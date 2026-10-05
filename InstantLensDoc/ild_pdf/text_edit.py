@@ -258,13 +258,14 @@ def _page_chars_styled(
     password: str | None = None,
 ) -> tuple[list[tuple[float, float, float, float, str, TextStyle, int]], float, float]:
     """Zeichen mit Box + Style (Y oben) + Seitengröße."""
-    import pypdfium2 as pdfium
 
     pdf_path = Path(pdf_path)
     kwargs = {}
     if password:
         kwargs["password"] = password
-    doc = pdfium.PdfDocument(str(pdf_path), **kwargs)
+    from .pdfium_open import open_pdfium
+
+    doc = open_pdfium(pdf_path, **kwargs)
     try:
         if page_index < 0 or page_index >= len(doc):
             raise IndexError(f"Seite {page_index} existiert nicht")

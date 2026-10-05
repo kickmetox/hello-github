@@ -25,11 +25,18 @@ class PdfDocument:
             raise FileNotFoundError(f"PDF nicht gefunden: {self.path}")
         if password is not None:
             self.password = password
+        # Fallback-Kette Bytes → Pfad → pikepdf-Reparatur statt nacktem
+        # ``PdfDocument(str_path)`` (Windows: „Data format error“) — 2.6.53
+        from .pdfium_open import PdfiumOpenError, open_pdfium
+
         try:
-            self._doc = pdfium.PdfDocument(str(self.path), password=self.password)
+            self._doc = open_pdfium(self.path, password=self.password)
         except MemoryError:
             self._doc = None
             raise
+        except PdfiumOpenError as e:
+            self._doc = None
+            raise RuntimeError(str(e)) from e
         except Exception as e:
             self._doc = None
             raise RuntimeError(f"PDF-Öffnung fehlgeschlagen: {e}") from e

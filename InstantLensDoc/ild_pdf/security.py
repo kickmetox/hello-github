@@ -129,6 +129,10 @@ def needs_password(
 
     Timeout (Default aus limits.PASSWORD_PROBE_TIMEOUT_SEC): bei Hang → False
     (Open versucht Seite 1; Passwort-Dialog bei Render-Fehler) — 2.6.45.
+
+    Der Worker-Thread nutzt **nur pikepdf** — PDFium ist nicht threadsicher und
+    lief hier bis 2.6.52 parallel zum Render im GUI-Thread (→ „Data format
+    error“/weiße Seite). Ohne pikepdf: Trailer-Heuristik ``/Encrypt`` — 2.6.53.
     """
     import threading
 
@@ -147,34 +151,22 @@ def needs_password(
         try:
             import pikepdf
             from pikepdf import PasswordError
-
-            try:
-                with pikepdf.open(str(path)):
-                    box["v"] = False
-                    return
-            except PasswordError:
-                box["v"] = True
-                return
-            except Exception as e:
-                msg = str(e).lower()
-                box["v"] = (
-                    "password" in msg or "passwd" in msg or "passwort" in msg
-                )
-                return
         except Exception:
-            pass
+            box["v"] = _encrypt_marker_heuristic(path)
+            return
         try:
-            import pypdfium2 as pdfium
-
-            doc = pdfium.PdfDocument(str(path))
-            try:
-                _ = len(doc)
-            finally:
-                doc.close()
-            box["v"] = False
+            with pikepdf.open(str(path)):
+                box["v"] = False
+                return
+        except PasswordError:
+            box["v"] = True
+            return
         except Exception as e:
             msg = str(e).lower()
-            box["v"] = "password" in msg or "passwd" in msg
+            box["v"] = (
+                "password" in msg or "passwd" in msg or "passwort" in msg
+            ) or _encrypt_marker_heuristic(path)
+            return
 
     t = threading.Thread(target=_probe, daemon=True, name="ild-pw-probe")
     t.start()
@@ -183,6 +175,23 @@ def needs_password(
         # Hang → nicht blockieren; Open zeigt Passwort bei Bedarf
         return False
     return bool(box.get("v", False))
+
+
+def _encrypt_marker_heuristic(path: Path, tail_bytes: int = 256 * 1024) -> bool:
+    """Billige Probe ohne Parser: ``/Encrypt`` im Trailer-Bereich (letzte 256 KB).
+
+    False-Positives sind unkritisch (Render-Pfad fragt Passwort nur bei echtem
+    PDFium-Passwortfehler nach); False-Negatives ebenso (Dialog bei Render).
+    """
+    try:
+        size = path.stat().st_size
+        with path.open("rb") as fh:
+            if size > tail_bytes:
+                fh.seek(size - tail_bytes)
+            data = fh.read(tail_bytes)
+        return b"/Encrypt" in data
+    except OSError:
+        return False
 
 
 WRONG_PASSWORD_MSG_DE = "Falsches Passwort. Bitte erneut eingeben."
@@ -209,9 +218,9 @@ def try_open_password(path: str | Path, password: str | None) -> Tuple[bool, str
     """Prüft, ob path mit password geöffnet werden kann."""
     path = Path(path)
     try:
-        import pypdfium2 as pdfium
+        from .pdfium_open import open_pdfium
 
-        doc = pdfium.PdfDocument(str(path), password=password or None)
+        doc = open_pdfium(path, password=password or None)
         try:
             n = len(doc)
         finally:

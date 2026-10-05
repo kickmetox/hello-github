@@ -163,12 +163,13 @@ def collect_document_stats(
     size = int(pdf_path.stat().st_size) if pdf_path.is_file() else 0
     pages = 0
     try:
-        import pypdfium2 as pdfium
 
         kwargs = {}
         if password:
             kwargs["password"] = password
-        doc = pdfium.PdfDocument(str(pdf_path), **kwargs)
+        from .pdfium_open import open_pdfium
+
+        doc = open_pdfium(pdf_path, **kwargs)
         try:
             pages = len(doc)
         finally:

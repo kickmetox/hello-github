@@ -74,12 +74,13 @@ class ObjectEditResult:
 
 
 def _page_height_pt(pdf_path: Path, page_index: int, password: str | None) -> float:
-    import pypdfium2 as pdfium
 
     kwargs = {}
     if password:
         kwargs["password"] = password
-    doc = pdfium.PdfDocument(str(pdf_path), **kwargs)
+    from .pdfium_open import open_pdfium
+
+    doc = open_pdfium(pdf_path, **kwargs)
     try:
         page = doc[page_index]
         return float(page.get_height())
@@ -88,12 +89,13 @@ def _page_height_pt(pdf_path: Path, page_index: int, password: str | None) -> fl
 
 
 def _open_doc(pdf_path: Path, password: str | None = None):
-    import pypdfium2 as pdfium
 
     kwargs = {}
     if password:
         kwargs["password"] = password
-    return pdfium.PdfDocument(str(pdf_path), **kwargs)
+    from .pdfium_open import open_pdfium
+
+    return open_pdfium(pdf_path, **kwargs)
 
 
 def _classify_form(page, form_obj) -> ObjectKind:

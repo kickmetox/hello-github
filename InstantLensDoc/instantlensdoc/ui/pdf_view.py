@@ -1299,6 +1299,25 @@ class PdfCanvas(QLabel):
             if shown is None or shown.isNull() or not qpixmap_has_ink(shown):
                 raise RuntimeError("Canvas Overlay/setPixmap ohne sichtbare Tinte")
 
+    def reset_page_image(self) -> None:
+        """Seitenbild + Overlays verwerfen (vor dem Öffnen einer neuen Datei) — 2.6.53.
+
+        Sonst zählt die Seite des **vorherigen** Dokuments beim fehlgeschlagenen
+        Open der nächsten Datei als „Canvas hat Bild“ — kein Banner, falsche Seite.
+        """
+        self._pixmap = None
+        self._annotations = []
+        self._uri_links = []
+        self._search_rects = []
+        self._search_active = -1
+        self._drag_start = None
+        self._drag_current = None
+        try:
+            self.clear()
+        except Exception:
+            pass
+        self.update()
+
     def show_render_fallback(self, message: str = "") -> None:
         """Sichtbarer Platzhalter statt stiller weißer Fläche — 2.6.47.
 
@@ -5645,6 +5664,13 @@ class PdfViewer(QWidget):
             clear_render_cache(path)
             self.pdf_path = path
             self.password = pw
+            # Altes Seitenbild verwerfen: darf nicht als Erfolg der neuen Datei zählen — 2.6.53
+            try:
+                self.canvas.reset_page_image()
+            except Exception:
+                pass
+            self._blank_view_fallback_active = False
+            self._last_render_blank_ok = False
             self.store = AnnotationStore(self.pdf_path)
             self.store.clear_history()
             self.clear_page_ops_undo()
@@ -5737,6 +5763,15 @@ class PdfViewer(QWidget):
             # Seitenanzahl + Soft-Warn im Hintergrund — nie vor Seite 1 warten — 2.6.45
             self._schedule_page_count_refresh(open_gen)
             prog.setValue(4)
+            # Hinweis wenn die Datei nur über Fallback (Pfad/pikepdf) ladbar war — 2.6.53
+            try:
+                from ild_pdf.pdfium_open import open_pdfium_steps_summary
+
+                fb_hint = open_pdfium_steps_summary(path)
+                if fb_hint:
+                    QTimer.singleShot(350, lambda: self.status.emit(fb_hint))
+            except Exception:
+                pass
             # Nach Progress-Close erneut malen (Viewport erst dann gültig) — 2.6.45
             def _paint_after_open() -> None:
                 if int(getattr(self, "_open_generation", 0) or 0) != open_gen:
@@ -5803,17 +5838,20 @@ class PdfViewer(QWidget):
         path_str = str(path)
 
         def _work() -> None:
+            # Nur pikepdf im Worker — PDFium ist nicht threadsicher; parallel zum
+            # Render im GUI-Thread korrumpierte es den Parser („Data format
+            # error“, weiße Seite). PDFium-Fallback läuft im Slot — 2.6.53
             n = 0
             err = ""
             try:
                 from ild_pdf.limits import catalog_page_count
 
-                n, _err = catalog_page_count(path, password=pw)
-                if n is None or int(n) <= 0:
-                    from ild_pdf import PdfDocument
-
-                    with PdfDocument(path, password=pw) as doc:
-                        n = int(len(doc))
+                cnt, cnt_err = catalog_page_count(path, password=pw)
+                if cnt is None or int(cnt) <= 0:
+                    n = 0
+                    err = str(cnt_err or "pikepdf: keine Seitenanzahl")
+                else:
+                    n = int(cnt)
             except Exception as e:  # pragma: no cover - defensive
                 err = str(e)
                 n = 0
@@ -5835,6 +5873,19 @@ class PdfViewer(QWidget):
             return
         if self.pdf_path is None or str(self.pdf_path) != str(path_str):
             return
+        n = int(n or 0)
+        if n <= 0:
+            # pikepdf konnte nicht zählen → PDFium im GUI-Thread (serialisiert,
+            # Bytes-Cache warm nach Seite 1) statt im Worker — 2.6.53
+            try:
+                from ild_pdf import PdfDocument
+
+                with PdfDocument(self.pdf_path, password=self.password) as doc:
+                    n = int(len(doc))
+                err = ""
+            except Exception as e:
+                err = f"{err} | PDFium: {e}" if err else str(e)
+                n = 0
         if err:
             try:
                 import logging
@@ -5844,7 +5895,6 @@ class PdfViewer(QWidget):
                 )
             except Exception:
                 pass
-        n = int(n or 0)
         if n <= 0 or n == int(self.page_count or 0):
             return
         self.page_count = n
@@ -5936,6 +5986,19 @@ class PdfViewer(QWidget):
         msg = (message or getattr(self, "_last_refresh_error", None) or "").strip()
         if not msg:
             msg = "Seite konnte nicht gerendert werden."
+        # Diagnose im Banner: pypdfium2/PDFium/pikepdf-Version + Datei — 2.6.53
+        if "pypdfium2" not in msg:
+            try:
+                from ild_pdf.pdfium_open import pdfium_version_info
+
+                msg = f"{msg}\n[{pdfium_version_info()}]"
+            except Exception:
+                pass
+        try:
+            if self.pdf_path and str(self.pdf_path) not in msg and self.pdf_path.name not in msg:
+                msg = f"{msg}\nDatei: {self.pdf_path}"
+        except Exception:
+            pass
         # Einzeiler für Statusleiste
         one = " ".join(msg.replace("\n", " ").split())
         if len(one) > 160:
@@ -5974,7 +6037,9 @@ class PdfViewer(QWidget):
             self.show()
         except Exception:
             pass
-        self._blank_view_fallback_active = False
+        # Banner-Flag NICHT vorab löschen: sonst zählt das gelbe Banner-Pixmap beim
+        # Retry als „Seitenbild“ (hat Tinte) und der Fehlerzustand geht verloren.
+        # ``refresh()`` setzt das Flag selbst zurück, sobald wirklich gerendert wurde — 2.6.53
         if self.refresh(quiet=True) and self._canvas_has_page_image():
             return True
         saved = float(self.scale or 1.0)

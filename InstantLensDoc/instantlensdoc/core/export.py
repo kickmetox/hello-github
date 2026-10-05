@@ -1164,9 +1164,10 @@ def import_document_text(path: str | Path) -> dict[str, Any]:
         return {"text": table_to_markdown(table), "meta": {**meta, "table": table.to_dict()}}
     if ext == "pdf":
         try:
-            import pypdfium2 as pdfium
 
-            doc = pdfium.PdfDocument(str(path))
+            from ild_pdf.pdfium_open import open_pdfium
+
+            doc = open_pdfium(path)
             try:
                 chunks: list[str] = []
                 for i in range(len(doc)):

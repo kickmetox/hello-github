@@ -138,9 +138,9 @@ def catalog_page_count(
 def _pdfium_page_count(
     path: Path, *, password: Optional[str] = None
 ) -> tuple[int, Optional[str]]:
-    import pypdfium2 as pdfium
+    from .pdfium_open import open_pdfium
 
-    doc = pdfium.PdfDocument(str(path), password=password)
+    doc = open_pdfium(path, password=password)
     try:
         return int(len(doc)), None
     finally:

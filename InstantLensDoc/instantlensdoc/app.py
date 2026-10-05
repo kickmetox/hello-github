@@ -399,6 +399,17 @@ def main(argv: list[str] | None = None) -> int:
     from instantlensdoc.ui.theme import apply_theme, install_system_theme_watch
 
     log_path = setup_logging()
+    # PDF-Engine-Versionen ins Log (Feld-Diagnose „Data format error“) — 2.6.53
+    try:
+        import logging
+
+        from ild_pdf.pdfium_open import pdfium_version_info
+
+        logging.getLogger("instantlensdoc.app").info(
+            "Start %s %s · %s", DISPLAY_NAME, __version__, pdfium_version_info()
+        )
+    except Exception:
+        pass
 
     app = QApplication(qt_argv)
     apply_theme(app)

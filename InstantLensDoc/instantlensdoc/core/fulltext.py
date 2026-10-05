@@ -223,9 +223,10 @@ def format_hit_line(
 
 def _pdf_pages_text(pdf_path: Path) -> List[tuple[int, str]]:
     """Alle PDF-Seiten in einem Document-Open extrahieren (Performance)."""
-    import pypdfium2 as pdfium
 
-    doc = pdfium.PdfDocument(str(pdf_path))
+    from ild_pdf.pdfium_open import open_pdfium
+
+    doc = open_pdfium(pdf_path)
     try:
         parts: List[tuple[int, str]] = []
         for i in range(len(doc)):

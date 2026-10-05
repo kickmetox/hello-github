@@ -169,12 +169,13 @@ def _convert_pdf_to_images(
 ) -> Path:
     """Jede Seite als Bild; Rückgabe = Ordner mit Seitenbildern."""
     from ild_pdf.render import render_page
-    import pypdfium2 as pdfium
 
     dest_dir = out_dir / f"{pdf.stem}_pages"
     dest_dir.mkdir(parents=True, exist_ok=True)
     scale = max(72, int(dpi or 150)) / 72.0
-    doc = pdfium.PdfDocument(str(pdf))
+    from ild_pdf.pdfium_open import open_pdfium
+
+    doc = open_pdfium(pdf)
     try:
         n = len(doc)
     finally:
@@ -467,9 +468,10 @@ def run_batch(
         for i, pdf_path in enumerate(pdfs, start=1):
             try:
                 log(f"PDF OCR {pdf_path.name}…", i - 1, total)
-                import pypdfium2 as pdfium
 
-                doc = pdfium.PdfDocument(str(pdf_path))
+                from ild_pdf.pdfium_open import open_pdfium
+
+                doc = open_pdfium(pdf_path)
                 n = len(doc)
                 doc.close()
                 combined: List[str] = []

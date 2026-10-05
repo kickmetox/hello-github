@@ -1288,9 +1288,10 @@ def ocr_pdf_document(
         raise OcrUnavailable(msg)
 
     pdf_path = Path(pdf_path)
-    import pypdfium2 as pdfium
 
-    doc = pdfium.PdfDocument(str(pdf_path))
+    from ild_pdf.pdfium_open import open_pdfium
+
+    doc = open_pdfium(pdf_path)
     try:
         total = len(doc)
     finally:

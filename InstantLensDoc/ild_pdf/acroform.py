@@ -466,12 +466,13 @@ def _checkbox_appearance(pdf, width: float, height: float):
 
 
 def _page_height_pt(path: Path, page_index: int, password: str | None = None) -> float:
-    import pypdfium2 as pdfium
 
     kwargs = {}
     if password:
         kwargs["password"] = password
-    doc = pdfium.PdfDocument(str(path), **kwargs)
+    from .pdfium_open import open_pdfium
+
+    doc = open_pdfium(path, **kwargs)
     try:
         return float(doc[page_index].get_height())
     finally:
@@ -841,13 +842,14 @@ def detect_form_candidates(
     - „[ ]“ / „( )“ Muster → Checkbox
     Bestehende AcroForm-Rects werden ausgelassen (Overlap).
     """
-    import pypdfium2 as pdfium
 
     path = Path(path)
     kwargs: dict[str, Any] = {}
     if password:
         kwargs["password"] = password
-    doc = pdfium.PdfDocument(str(path), **kwargs)
+    from .pdfium_open import open_pdfium
+
+    doc = open_pdfium(path, **kwargs)
     try:
         if page_index < 0 or page_index >= len(doc):
             return []

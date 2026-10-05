@@ -11,6 +11,7 @@ import pypdfium2 as pdfium
 
 from .document import PdfDocument
 from .limits import clamp_render_scale
+from .pdfium_open import PDFIUM_LOCK, clear_pdfium_bytes_cache, open_pdfium
 
 # LRU: (path_str, mtime_ns, page, scale_key, grayscale, invert) → PIL Image
 _CACHE: "OrderedDict[Tuple[str, int, int, float, bool, bool], Image.Image]" = OrderedDict()
@@ -18,14 +19,16 @@ _CACHE_MAX = 24
 
 
 def clear_render_cache(path: str | Path | None = None) -> None:
-    """Gesamten Cache oder Einträge zu einem Pfad leeren."""
+    """Gesamten Cache oder Einträge zu einem Pfad leeren (inkl. PDF-Bytes-Cache)."""
     if path is None:
         _CACHE.clear()
+        clear_pdfium_bytes_cache()
         return
     key_prefix = str(Path(path).resolve()) if Path(path).exists() else str(path)
     dead = [k for k in _CACHE if k[0] == key_prefix or k[0] == str(path)]
     for k in dead:
         _CACHE.pop(k, None)
+    clear_pdfium_bytes_cache(path)
 
 
 def _mtime_ns(path: Path) -> int:
@@ -120,12 +123,36 @@ def render_page(
     ``invert`` ist für die Nachtmodus-Ansicht gedacht und sollte bei
     Speichern/Export nicht gesetzt werden.
     """
+    # PDFium ist nicht threadsicher: Open+Render+Close als Einheit sperren — 2.6.53
+    with PDFIUM_LOCK:
+        return _render_page_locked(
+            source,
+            page_index,
+            scale,
+            use_cache=use_cache,
+            password=password,
+            grayscale=grayscale,
+            invert=invert,
+        )
+
+
+def _render_page_locked(
+    source: Union[str, Path, PdfDocument, pdfium.PdfDocument],
+    page_index: int,
+    scale: float,
+    *,
+    use_cache: bool,
+    password: Optional[str],
+    grayscale: bool,
+    invert: bool,
+) -> Image.Image:
     own = False
     path_for_cache: Optional[Path] = None
     if isinstance(source, (str, Path)):
         path_for_cache = Path(source)
         pw = password
-        doc = pdfium.PdfDocument(str(source), password=pw)
+        # Fallback-Kette (Bytes → Pfad → pikepdf) statt str-Pfad — 2.6.53
+        doc = open_pdfium(path_for_cache, password=pw)
         own = True
     elif isinstance(source, PdfDocument):
         doc = source.raw

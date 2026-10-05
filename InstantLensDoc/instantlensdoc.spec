@@ -10,6 +10,16 @@ root = Path(SPECPATH)
 
 # PDFium-Binary + Datenpakete mitpacken (sonst EXE öffnet PDF, Canvas bleibt weiß) — 2.6.49
 _pdfium_datas, _pdfium_binaries, _pdfium_hidden = collect_all("pypdfium2")
+# pypdfium2 ≥ 4: pdfium.dll + version.json liegen im separaten Top-Level-Paket
+# ``pypdfium2_raw`` — collect_all("pypdfium2") allein greift dort nicht — 2.6.53
+for _extra_pkg in ("pypdfium2_raw", "pikepdf"):
+    try:
+        _d, _b, _h = collect_all(_extra_pkg)
+    except Exception:
+        continue
+    _pdfium_datas = list(_pdfium_datas) + list(_d)
+    _pdfium_binaries = list(_pdfium_binaries) + list(_b)
+    _pdfium_hidden = list(_pdfium_hidden) + list(_h)
 
 a = Analysis(
     # Thin absolute-import entry (not instantlensdoc/__main__.py) — frozen scripts
@@ -29,6 +39,8 @@ a = Analysis(
         "pypdfium2",
         "pypdfium2.raw",
         "pypdfium2._helpers",
+        "pypdfium2_raw",
+        "pypdfium2_raw.bindings",
         "pikepdf",
         "PIL",
         "pytesseract",

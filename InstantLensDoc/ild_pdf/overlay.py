@@ -55,10 +55,11 @@ def extract_text_blocks(
     Liest sichtbaren Text einer Seite via pypdfium2 (PDF-Punkte, Y von oben).
     Liefert grobe Zeilen-/Blöcke — keine 1:1-Layout-Rekonstruktion.
     """
-    import pypdfium2 as pdfium
 
     pdf_path = Path(pdf_path)
-    doc = pdfium.PdfDocument(str(pdf_path))
+    from .pdfium_open import open_pdfium
+
+    doc = open_pdfium(pdf_path)
     try:
         if page_index < 0 or page_index >= len(doc):
             raise IndexError(f"Seite {page_index} existiert nicht")
@@ -156,13 +157,14 @@ def extract_page_plain_text(
     password: str | None = None,
 ) -> str:
     """Sichtbaren Text einer Seite als Plaintext (pypdfium2 get_text_bounded)."""
-    import pypdfium2 as pdfium
 
     pdf_path = Path(pdf_path)
     kwargs = {}
     if password:
         kwargs["password"] = password
-    doc = pdfium.PdfDocument(str(pdf_path), **kwargs)
+    from .pdfium_open import open_pdfium
+
+    doc = open_pdfium(pdf_path, **kwargs)
     try:
         if page_index < 0 or page_index >= len(doc):
             raise IndexError(f"Seite {page_index} existiert nicht")
@@ -191,13 +193,14 @@ def extract_plain_text_pages(
     Text ausgewählter Seiten als Plaintext (page-scoped).
     page_indices=None → alle Seiten. cancel_check(): bool → Abbruch.
     """
-    import pypdfium2 as pdfium
 
     pdf_path = Path(pdf_path)
     kwargs = {}
     if password:
         kwargs["password"] = password
-    doc = pdfium.PdfDocument(str(pdf_path), **kwargs)
+    from .pdfium_open import open_pdfium
+
+    doc = open_pdfium(pdf_path, **kwargs)
     try:
         n = len(doc)
         if page_indices is None:
@@ -288,13 +291,14 @@ def _page_chars(
     password: str | None = None,
 ) -> tuple[list[tuple[float, float, float, float, str]], float, float]:
     """Zeichen mit Boxen (Y oben) + Seitengröße."""
-    import pypdfium2 as pdfium
 
     pdf_path = Path(pdf_path)
     kwargs = {}
     if password:
         kwargs["password"] = password
-    doc = pdfium.PdfDocument(str(pdf_path), **kwargs)
+    from .pdfium_open import open_pdfium
+
+    doc = open_pdfium(pdf_path, **kwargs)
     try:
         if page_index < 0 or page_index >= len(doc):
             raise IndexError(f"Seite {page_index} existiert nicht")
