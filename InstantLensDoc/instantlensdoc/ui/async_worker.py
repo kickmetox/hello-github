@@ -57,6 +57,12 @@ def watch_worker(
             state["finished"] = True
             timer.stop()
             try:
+                from instantlensdoc.core.scan_procs import kill_tracked_scan_children
+
+                kill_tracked_scan_children(wia_orphans=True)
+            except Exception:
+                pass
+            try:
                 on_timeout()
             except Exception:
                 pass

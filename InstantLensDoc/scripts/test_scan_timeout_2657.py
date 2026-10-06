@@ -246,5 +246,87 @@ class TestScanDialogTimeoutUi(unittest.TestCase):
         self.assertTrue(any("Kyocera" in n for n in names))
 
 
+class TestScanProcTree(unittest.TestCase):
+    def test_kill_process_tree_reaps_child(self) -> None:
+        import subprocess
+
+        from instantlensdoc.core.scan_procs import kill_process_tree, register_pid, unregister_pid
+
+        proc = subprocess.Popen(
+            [sys.executable, "-c", "import time; time.sleep(30)"],
+            start_new_session=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        register_pid(proc.pid)
+        try:
+            killed = kill_process_tree(proc.pid)
+            t0 = time.monotonic()
+            while proc.poll() is None and time.monotonic() - t0 < 2.0:
+                time.sleep(0.05)
+            self.assertIsNotNone(proc.poll(), "child still running after kill_process_tree")
+            self.assertTrue(killed)
+        finally:
+            unregister_pid(proc.pid)
+            try:
+                proc.kill()
+            except Exception:
+                pass
+
+    def test_run_process_timeout_does_not_leave_child(self) -> None:
+        from instantlensdoc.core.scan_transfer import run_process
+
+        t0 = time.monotonic()
+        rc, _out, _err, timed_out = run_process(
+            [sys.executable, "-c", "import time; time.sleep(30)"],
+            timeout=0.35,
+            hide_window=False,
+        )
+        elapsed = time.monotonic() - t0
+        self.assertTrue(timed_out)
+        self.assertLess(elapsed, 2.0, f"run_process hang {elapsed:.2f}s")
+        self.assertEqual(len(__import__("instantlensdoc.core.scan_procs", fromlist=["tracked_pids"]).tracked_pids()), 0)
+
+    def test_kill_new_since_only_new_pids(self) -> None:
+        from instantlensdoc.core.scan_procs import kill_new_since
+
+        calls = []
+
+        def fake_list(names=None):
+            return [111, 222]
+
+        def fake_tree(pid):
+            calls.append(pid)
+            return [pid]
+
+        with patch("instantlensdoc.core.scan_procs.list_named_pids", side_effect=fake_list), patch(
+            "instantlensdoc.core.scan_procs.kill_process_tree", side_effect=fake_tree
+        ):
+            killed = kill_new_since({111})
+        self.assertEqual(killed, [222])
+        self.assertEqual(calls, [222])
+
+    def test_ecosys_name_is_network_mfp(self) -> None:
+        from instantlensdoc.core.devices import device_is_network
+        from instantlensdoc.core.scan_procs import name_looks_network_mfp
+
+        self.assertTrue(name_looks_network_mfp("ECOSYS M5521cdn"))
+        d = DeviceInfo(
+            kind=DeviceKind.SCANNER,
+            name="ECOSYS M5521cdn",
+            device_id="{6BDD}\\eco",
+            scope=DeviceScope.LOCAL,
+            backend="WIA",
+        )
+        self.assertTrue(device_is_network(d))
+
+    def test_wia_script_dialog_only_with_flag(self) -> None:
+        from instantlensdoc.core.scan_transfer import WIA_SCRIPT
+
+        self.assertIn("if ($UseDialog)", WIA_SCRIPT)
+        self.assertGreater(WIA_SCRIPT.find("ShowAcquireImage"), WIA_SCRIPT.find("if ($UseDialog)"))
+        self.assertIn("kein CommonDialog-Fallback", WIA_SCRIPT)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

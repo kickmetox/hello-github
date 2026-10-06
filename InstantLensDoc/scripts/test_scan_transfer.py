@@ -272,6 +272,22 @@ class TestPlanAndRun(unittest.TestCase):
         self.assertNotIn("wia", kinds)
         self.assertNotIn("wia-dialog", kinds)
 
+    def test_plan_auto_ecosys_skips_wia_dialog(self) -> None:
+        job = ScanJob(
+            device_id="{6BDD1FC6-810F-11D0-BEC7-08002BE2092F}\\0002",
+            device_name="ECOSYS M5521cdn",
+            device_backend="WIA",
+            backend=BACKEND_AUTO,
+        )
+        with patch("instantlensdoc.core.scan_transfer.is_windows", return_value=True), patch(
+            "instantlensdoc.core.scan_transfer.naps2_console_path",
+            return_value=r"C:\Program Files\NAPS2\NAPS2.Console.exe",
+        ):
+            steps = plan_steps(job)
+        kinds = [s.kind for s in steps]
+        self.assertNotIn("wia", kinds)
+        self.assertNotIn("wia-dialog", kinds)
+
     def test_run_scan_naps2_writes_file(self) -> None:
         with tempfile.TemporaryDirectory(prefix="ild-scan-test-") as raw:
             d = Path(raw)
@@ -417,6 +433,10 @@ class TestPlanAndRun(unittest.TestCase):
             self.assertNotIn("$dev.Items(1)", text)
             self.assertIn("ShowAcquireImage", text)
             self.assertIn("SaveFile", text)
+            self.assertIn("if ($UseDialog)", text)
+            self.assertIn("kein CommonDialog-Fallback", text)
+            self.assertNotIn("Windows-Scannerdialog wird verwendet", text)
+            self.assertGreater(text.find("ShowAcquireImage"), text.find("if ($UseDialog)"))
 
 
 class TestScannerChoices(unittest.TestCase):

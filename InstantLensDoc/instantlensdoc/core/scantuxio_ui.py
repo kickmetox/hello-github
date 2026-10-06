@@ -432,7 +432,7 @@ def popen_kwargs_show_window() -> dict:
 
 
 def launch_scantuxio_process(launch: ScanTuxioLaunch) -> subprocess.Popen:
-    return subprocess.Popen(
+    proc = subprocess.Popen(
         launch.argv,
         cwd=launch.cwd or None,
         env=launch.env,
@@ -440,6 +440,13 @@ def launch_scantuxio_process(launch: ScanTuxioLaunch) -> subprocess.Popen:
         stderr=subprocess.DEVNULL,
         **popen_kwargs_show_window(),
     )
+    try:
+        from instantlensdoc.core.scan_procs import register_pid
+
+        register_pid(proc.pid)
+    except Exception:
+        pass
+    return proc
 
 
 def is_wia_busy_message(text: str) -> bool:
