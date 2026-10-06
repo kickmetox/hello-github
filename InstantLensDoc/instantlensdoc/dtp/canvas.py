@@ -1173,10 +1173,13 @@ class DtpPane(QWidget):
             texts = [f for f in frames if f.kind == "text"]
             if texts:
                 family = texts[0].font_family or ""
+        glyph = self.probe_glyph_color()
         if hasattr(self, "_fill_chip"):
             self._fill_chip.setStyleSheet(f"background:{fill}; border:1px solid #333;")
         if hasattr(self, "_stroke_chip"):
             self._stroke_chip.setStyleSheet(f"background:{stroke}; border:1px solid #333;")
+        if hasattr(self, "_glyph_chip"):
+            self._glyph_chip.setStyleSheet(f"background:{glyph}; border:1px solid #333;")
         if family and hasattr(self, "font_combo"):
             self._block_font = True
             self.font_combo.setCurrentFont(QFont(family))
@@ -1315,6 +1318,7 @@ class DtpPane(QWidget):
                 color=color,
                 toggle=toggle,
             ) or hit.scope
+            self.mark_dirty()
             self.statusMessage.emit(f"Schrift {hit.scope}")
             return hit
         weight = None
@@ -1339,6 +1343,78 @@ class DtpPane(QWidget):
         self._refresh_after_tool(hit, rebuild=False)
         self._on_selection_chrome()
         self.statusMessage.emit(f"Schrift {hit.scope} ({len(hit.frames)})")
+        return hit
+
+    def probe_glyph_color(self) -> str:
+        """Aktuelle Glyphenfarbe: Caret, sonst gewählter Textrahmen."""
+        editing = self.editing_item()
+        if editing is not None and editing.text_item is not None:
+            c = editing.text_item.textCursor().charFormat().foreground().color()
+            if c.isValid() and c.alpha() > 0:
+                return c.name()
+            dc = editing.text_item.defaultTextColor()
+            if dc.isValid() and dc.alpha() > 0:
+                return dc.name()
+        for fr in self.scene.selected_frames():
+            if fr.kind != "text":
+                continue
+            it = self.scene._items.get(fr.id)
+            if it is None or it.text_item is None:
+                continue
+            dc = it.text_item.defaultTextColor()
+            if dc.isValid() and dc.alpha() > 0:
+                return dc.name()
+            cur = QTextCursor(it.text_item.document())
+            cur.select(QTextCursor.Document)
+            c = cur.charFormat().foreground().color()
+            if c.isValid() and c.alpha() > 0:
+                return c.name()
+            st = self.doc.styles.get(fr.style_id) if getattr(self.doc, "styles", None) else None
+            if st is not None and getattr(st, "color", ""):
+                return str(st.color)
+        return "#111111"
+
+    def apply_font_color(
+        self,
+        color: str | None = None,
+        *,
+        dialog: bool = False,
+    ) -> ToolHit:
+        """Glyphenfarbe (QColorDialog) auf Textauswahl oder Textrahmen, nicht Füllung."""
+        import os
+
+        initial = self.probe_glyph_color()
+        if dialog or not color:
+            c = QColorDialog.getColor(QColor(initial or "#111111"), self, "Schriftfarbe")
+            if os.environ.get("ILD_SMOKE_QT") == "1" and (c is None or not c.isValid()):
+                c = QColor("#cc0000")
+            if c is None or not c.isValid():
+                return ToolHit(scope="cancelled", frames=[], role="font_color")
+            color = c.name()
+        q = QColor(str(color or ""))
+        if not q.isValid():
+            return ToolHit(scope="cancelled", frames=[], role="font_color")
+        color = q.name()
+        hit = self.resolve_targets("font_color")
+        if hit.is_caret and hit.item is not None:
+            hit.scope = hit.item.apply_char_format(color=color) or hit.scope
+            self.mark_dirty()
+            if hasattr(self, "_glyph_chip"):
+                self._glyph_chip.setStyleSheet(f"background:{color}; border:1px solid #333;")
+            self.statusMessage.emit(f"Schriftfarbe {color} ({hit.scope})")
+            return hit
+        texts = [fr for fr in hit.frames if fr.kind == "text"]
+        if not texts:
+            self.statusMessage.emit("Schriftfarbe: kein Textrahmen")
+            return ToolHit(scope="none", frames=[], role="font_color")
+        fills = {fr.id: fr.fill for fr in texts}
+        for fr in texts:
+            self._apply_frame_glyph_color(fr.id, color)
+            fr.fill = fills[fr.id]
+        hit.frames = texts
+        self._refresh_after_tool(hit, rebuild=False)
+        self._on_selection_chrome()
+        self.statusMessage.emit(f"Schriftfarbe {color} ({hit.scope})")
         return hit
 
     def _apply_frame_glyph_color(self, frame_id: str, color: str) -> None:

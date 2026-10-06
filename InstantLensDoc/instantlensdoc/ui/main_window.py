@@ -4402,6 +4402,15 @@ class MainWindow(QMainWindow):
                 shared = None
             if shared is not None:
                 m_dtp.addAction(shared)
+        shared_fc = None
+        try:
+            from PySide6.QtGui import QAction as _QA
+
+            shared_fc = self.findChild(_QA, "actEditFontColor")
+        except Exception:
+            shared_fc = None
+        if shared_fc is not None:
+            m_dtp.addAction(shared_fc)
         act_dtp_help = QAction("Hilfe…", self)
         act_dtp_help.setObjectName("actDtpHelp")
         act_dtp_help.setToolTip("DTP-Hilfe: Werkzeuge, Rahmen, Speichern, Tastatur (F1)")
@@ -9230,6 +9239,7 @@ class MainWindow(QMainWindow):
             "dtp_fill": self._dtp_apply_fill,
             "dtp_stroke": self._dtp_apply_stroke,
             "dtp_font": self._dtp_apply_font,
+            "dtp_font_color": self._dtp_apply_font_color,
             "dtp_wrap": self._dtp_apply_wrap,
             "dtp_weld": self._dtp_weld,
             "dtp_symbol": self._dtp_symbol,
@@ -11941,9 +11951,8 @@ class MainWindow(QMainWindow):
         if self._layout_mode_active():
             try:
                 pane = self.dtp_pane
-                editing = pane.editing_item() if pane is not None else None
-                if editing is not None and editing.text_item is not None:
-                    c = editing.text_item.textCursor().charFormat().foreground().color()
+                if pane is not None and hasattr(pane, "probe_glyph_color"):
+                    c = QColor(pane.probe_glyph_color())
                     if c.isValid():
                         return c
             except Exception:
@@ -11995,7 +12004,10 @@ class MainWindow(QMainWindow):
         if self._layout_mode_active():
             pane = getattr(self, "dtp_pane", None)
             if pane is not None:
-                pane.apply_font(color=hexc, dialog=False)
+                if hasattr(pane, "apply_font_color"):
+                    pane.apply_font_color(hexc, dialog=False)
+                else:
+                    pane.apply_font(color=hexc, dialog=False)
                 self._set_status(f"Schriftfarbe: {hexc} (DTP)")
                 return
         if self._pdf_tab_active():
@@ -14465,6 +14477,11 @@ class MainWindow(QMainWindow):
         if not self._enter_layout_mode():
             return
         self.dtp_pane.apply_font(dialog=True)
+
+    def _dtp_apply_font_color(self) -> None:
+        if not self._enter_layout_mode():
+            return
+        self.dtp_pane.apply_font_color(dialog=True)
 
     def _dtp_apply_wrap(self) -> None:
         if not self._enter_layout_mode():

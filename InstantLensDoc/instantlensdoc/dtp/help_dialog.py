@@ -34,6 +34,8 @@ ohne Auswahl entsteht ein neuer Rahmen.</li>
 <li><b>Füllung / Kontur</b>: Farbwähler auf den gewählten Rahmen.</li>
 <li><b>Schrift</b>: Systemschriften (<code>QFontDialog</code> /
 <code>QFontDatabase</code>) auf Textrahmen oder Caret.</li>
+<li><b>Schriftfarbe</b>: <code>QColorDialog</code> auf Textauswahl oder
+gewählten Textrahmen (Glyphen, nicht Rahmen-Füllung).</li>
 <li><b>Verketten</b>: Overflow von Textrahmen in den nächsten Rahmen.</li>
 <li>Icon-Leiste und DTP-Menü führen dieselben Aktionen aus.</li>
 </ul>

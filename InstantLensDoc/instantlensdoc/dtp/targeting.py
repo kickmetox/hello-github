@@ -19,6 +19,7 @@ TEXT_TOOLS = frozenset(
         "dropcap",
         "hyphenate",
         "leading",
+        "font_color",
     }
 )
 OBJECT_TOOLS = frozenset({"fill", "stroke", "wrap", "object", "envelope", "extrude", "clip"})

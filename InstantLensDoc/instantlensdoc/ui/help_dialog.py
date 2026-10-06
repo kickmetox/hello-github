@@ -152,7 +152,8 @@ HELP_HTML = f"""
     Grafikimport AI/IDML/EPS/SVG/PSD/TIFF/Krita; natives XML <code>.sla</code> (Scribus-Teilmenge).
     Chrome analog Scribus: Menü Datei/Bearbeiten/Objekt/Einfügen/Seite/Tabelle/Ansicht/Extras/Fenster/Script/Hilfe,
     kompakte Icon-Leiste (Auswählen/Text/Bild/Form gelten auf der Auswahl; Füllung/Kontur-Farbwähler;
-    Schrift <code>QFontDialog</code>/<code>QFontDatabase</code>), Lineale mm/pt/in (ziehen setzt Hilfslinien),
+    Schrift <code>QFontDialog</code>/<code>QFontDatabase</code>; Schriftfarbe
+    <code>QColorDialog</code> auf Textauswahl oder Textrahmen), Lineale mm/pt/in (ziehen setzt Hilfslinien),
     grauer Pasteboard, Anschnitt rot, Satzspiegel blau (Seitengeometrie),
     Druckermarken (Crop/Registration) über dieselbe Einstellung wie PDF
     (<code>show_printer_marks</code>) — keine Word-Breiten- oder Kopf-/Fuß-Marken.

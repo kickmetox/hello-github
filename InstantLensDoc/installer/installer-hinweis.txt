@@ -3,7 +3,7 @@ InstantLens Doc 2.6.59 - Installation
 Neu in 2.6.59:
 - Word-Suite: Absatz/Seitenlayout/Kopf/Fuss/Ersatzzeichen, Formatvorlagen, Tabellen, Serienbrief
 - PDF-Menue live (Klick, Geschwister-PDF, Dialog oder Dateiaenderung)
-- OCR-Layout/Felder ohne Steuerzeichen; DTP-Lineale; DTP-Druckermarken geteilt mit PDF
+- OCR-Layout/Felder ohne Steuerzeichen; DTP-Lineale; DTP-Schriftfarbe; DTP-Druckermarken geteilt mit PDF
 - Word-Chrome Klassisch / Ribbon / Kombiniert
 - Pack InstantLensDoc-2.6.59-pack.zip
 - Windows-Rebuild: nach D:\AI_Temp\InstantLensDoc-2659 entpacken, wie 2.6.58

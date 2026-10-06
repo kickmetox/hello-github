@@ -132,6 +132,12 @@ def scribus_icon(kind: str, size: int = 18) -> QIcon:
     elif k == "font":
         p.setFont(QFont("Serif", 11, QFont.Bold))
         p.drawText(pm.rect(), Qt.AlignCenter, "A")
+    elif k == "font-color":
+        p.setFont(QFont("Serif", 10, QFont.Bold))
+        p.drawText(QPointF(4, 13), "A")
+        p.setBrush(QColor("#C0392B"))
+        p.setPen(Qt.NoPen)
+        p.drawRect(3, 14, 12, 3)
     else:
         p.setBrush(QColor("#bbb"))
         p.drawRect(3, 3, 12, 12)
@@ -333,6 +339,11 @@ def build_menu_bar(pane: QWidget) -> QMenuBar:
     m_bearb.addAction("Füllen…", lambda: pane.apply_fill(dialog=True))
     m_bearb.addAction("Kontur…", lambda: pane.apply_stroke(dialog=True))
     m_bearb.addAction("Schrift…", lambda: pane.apply_font(dialog=True))
+    act_fc = QAction("Schriftfarbe…", pane)
+    act_fc.setObjectName("dtpFontColorAction")
+    act_fc.setToolTip("Glyphenfarbe (QColorDialog) auf Textauswahl oder Textrahmen")
+    act_fc.triggered.connect(lambda: pane.apply_font_color(dialog=True))
+    m_bearb.addAction(act_fc)
     m_obj = bar.addMenu("&Objekt")
     m_obj.addAction("Schweißen", pane.weld_selected)
     m_obj.addAction("Symbol aus Auswahl", pane.symbol_from_selection)
@@ -473,6 +484,19 @@ def build_icon_bar(pane: QWidget) -> QWidget:
     pane._stroke_chip.mousePressEvent = lambda e: pane.apply_stroke(dialog=True)  # type: ignore[method-assign]
     lay.addWidget(pane._stroke_chip)
     add_btn("font", lambda: pane.apply_font(dialog=True), "Schrift (QFontDialog) auf Auswahl/Caret")
+    fc_btn = add_btn(
+        "font-color",
+        lambda: pane.apply_font_color(dialog=True),
+        "Schriftfarbe (QColorDialog) auf Auswahl/Caret",
+    )
+    fc_btn.setObjectName("dtpFontColorBtn")
+    pane._glyph_chip = QLabel()
+    pane._glyph_chip.setObjectName("dtpGlyphChip")
+    pane._glyph_chip.setFixedSize(14, 12)
+    pane._glyph_chip.setToolTip("Aktuelle Schriftfarbe")
+    pane._glyph_chip.setStyleSheet("background:#111111; border:1px solid #333;")
+    pane._glyph_chip.mousePressEvent = lambda e: pane.apply_font_color(dialog=True)  # type: ignore[method-assign]
+    lay.addWidget(pane._glyph_chip)
     pane.font_combo.setMaximumHeight(22)
     pane.font_combo.setMaximumWidth(140)
     pane.font_combo.setObjectName("dtpFontCombo")

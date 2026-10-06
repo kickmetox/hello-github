@@ -580,6 +580,7 @@ class RibbonBar(QWidget):
                     ("dtp_fill", "Füllen"),
                     ("dtp_stroke", "Kontur"),
                     ("dtp_font", "Schrift"),
+                    ("dtp_font_color", "Schriftfarbe"),
                     ("dtp_wrap", "Umfluss"),
                     ("dtp_weld", "Schweißen"),
                     ("dtp_symbol", "Symbol"),
