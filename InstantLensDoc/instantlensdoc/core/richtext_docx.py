@@ -507,6 +507,11 @@ class _HtmlToDocxParser(HTMLParser):
         self._span_stack: list[tuple[bool, bool, bool]] = []
         # Farbe / Größe / Textmarker aus Qt-Spans (innerster Wert gewinnt) — 2.6.52
         self._style_stack: list[dict[str, Any]] = []
+        self._cur_table: list[list[str]] | None = None
+        self._cur_row: list[str] | None = None
+        self._cell_buf: list[str] | None = None
+        self._in_cell = False
+        self._th_bold = False
 
     def _ensure_para(self) -> Any:
         if self._para is None:
@@ -539,8 +544,43 @@ class _HtmlToDocxParser(HTMLParser):
                     merged[k] = v
         return merged
 
+    def _flush_docx_table(self, rows: list[list[str]]) -> None:
+        if not rows:
+            return
+        cols = max((len(r) for r in rows), default=0)
+        if cols < 1:
+            return
+        try:
+            table = self.doc.add_table(rows=len(rows), cols=cols)
+            try:
+                table.style = "Table Grid"
+            except Exception:
+                pass
+            for ri, row in enumerate(rows):
+                for ci in range(cols):
+                    val = row[ci] if ci < len(row) else ""
+                    table.cell(ri, ci).text = val
+        except Exception:
+            for row in rows:
+                self._para = None
+                para = self._ensure_para()
+                para.add_run(" | ".join(row))
+                self._para = None
+        self._para = None
+
     def _add_text(self, text: str) -> None:
         if not text:
+            return
+        if self._in_cell and self._cell_buf is not None:
+            cleaned = (
+                str(text)
+                .replace("\x0c", " ")
+                .replace("\u00b6", " ")
+                .replace("\ufffd", " ")
+            )
+            self._cell_buf.append(cleaned)
+            return
+        if self._cur_table is not None:
             return
         para = self._ensure_para()
         run = para.add_run(text)
@@ -646,6 +686,8 @@ class _HtmlToDocxParser(HTMLParser):
                 extra["color"] = _expand_hex(ad.get("color", ""))
             self._style_stack.append(extra)
         elif t in {"p", "div", "h1", "h2", "h3", "h4", "h5", "h6"}:
+            if self._cur_table is not None:
+                return
             self._para = None
             self._pending_align = None
             style = ad.get("style", "")
@@ -660,11 +702,34 @@ class _HtmlToDocxParser(HTMLParser):
             else:
                 self._heading_level = None
         elif t == "br":
-            self._add_text("\n")
+            if self._in_cell:
+                self._add_text("\n")
+            else:
+                self._add_text("\n")
         elif t == "li":
+            if self._cur_table is not None:
+                return
             self._para = None
             self._heading_level = None
             self._pending_align = None
+        elif t == "table":
+            self._para = None
+            self._cur_table = []
+            self._cur_row = None
+            self._cell_buf = None
+            self._in_cell = False
+        elif t == "tr":
+            if self._cur_table is not None:
+                self._cur_row = []
+        elif t in {"td", "th"}:
+            if self._cur_row is not None:
+                self._cell_buf = []
+                self._in_cell = True
+                if t == "th":
+                    self._bold += 1
+                    self._th_bold = True
+        elif t in {"thead", "tbody", "tfoot", "colgroup", "col"}:
+            return
 
     def handle_endtag(self, tag: str) -> None:
         t = tag.lower()
@@ -693,12 +758,39 @@ class _HtmlToDocxParser(HTMLParser):
             if self._style_stack:
                 self._style_stack.pop()
         elif t in {"p", "div", "h1", "h2", "h3", "h4", "h5", "h6", "li"}:
+            if self._cur_table is not None:
+                return
             if self._para is None:
                 # leerer Absatz
                 self._ensure_para()
             self._para = None
             self._heading_level = None
             self._pending_align = None
+        elif t in {"td", "th"}:
+            if self._cur_row is not None:
+                text = "".join(self._cell_buf or []).strip()
+                self._cur_row.append(text)
+                self._cell_buf = None
+                self._in_cell = False
+            if self._th_bold:
+                self._bold = max(0, self._bold - 1)
+                self._th_bold = False
+            self._para = None
+        elif t == "tr":
+            if self._cur_table is not None and self._cur_row is not None:
+                self._cur_table.append(self._cur_row)
+            self._cur_row = None
+            self._para = None
+        elif t == "table":
+            rows = self._cur_table or []
+            self._cur_table = None
+            self._cur_row = None
+            self._cell_buf = None
+            self._in_cell = False
+            self._flush_docx_table(rows)
+            self._para = None
+        elif t in {"thead", "tbody", "tfoot", "colgroup", "col"}:
+            return
 
     def handle_data(self, data: str) -> None:
         if self._skip:

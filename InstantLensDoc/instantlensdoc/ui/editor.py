@@ -2752,6 +2752,90 @@ class TextEditor(QPlainTextEdit):
             self._replace_selection_or_document_text(new_text)
         return int(result.get("count") or 0) or (1 if new_text != text else 0)
 
+    def _table_html_fragment(self, table) -> str:
+        from ild_pdf.tables import table_to_html
+
+        html = table_to_html(table)
+        try:
+            from instantlensdoc.core.ocr_word_suite import sanitize_ocr_html
+
+            html = sanitize_ocr_html(html)
+        except Exception:
+            html = (
+                str(html or "")
+                .replace("\x0c", "")
+                .replace("\u00b6", "")
+                .replace("\ufffd", "")
+            )
+        return html
+
+    def _insert_table_html(self, table) -> bool:
+        """HTML-Tabelle an Cursor — Rich-OCR nicht als Markdown-Dump überschreiben."""
+        self._ensure_rich_mode()
+        html = self._table_html_fragment(table)
+        if not html.strip():
+            return False
+        cur = self.textCursor()
+        cur.beginEditBlock()
+        try:
+            cur.insertHtml(html)
+        finally:
+            cur.endEditBlock()
+        if cur.currentTable() is None:
+            cur.movePosition(QTextCursor.PreviousCharacter)
+        self.setTextCursor(cur)
+        return True
+
+    def _qtext_table_at_cursor(self):
+        tbl = self.textCursor().currentTable()
+        if tbl is not None:
+            return tbl
+        try:
+            cur = QTextCursor(self.textCursor())
+            cur.select(QTextCursor.TableUnderCursor)
+            if cur.hasSelection():
+                return cur.currentTable()
+        except Exception:
+            pass
+        return None
+
+    def _qtext_table_cells(self, tbl) -> list[list[str]]:
+        rows: list[list[str]] = []
+        try:
+            from instantlensdoc.core.ocr_word_suite import sanitize_ocr_visible_text
+        except Exception:
+            sanitize_ocr_visible_text = lambda s: str(s or "").replace("\x0c", " ").replace("\u00b6", " ")
+        for r in range(int(tbl.rows())):
+            row: list[str] = []
+            for c in range(int(tbl.columns())):
+                cell = tbl.cellAt(r, c)
+                cur = cell.firstCursorPosition()
+                cur.setPosition(cell.lastCursorPosition().position(), QTextCursor.KeepAnchor)
+                raw = cur.selectedText().replace("\u2029", " ").replace("\u2028", " ")
+                row.append(sanitize_ocr_visible_text(raw).strip())
+            rows.append(row)
+        return rows
+
+    def _replace_qtext_table(self, tbl, table) -> bool:
+        html = self._table_html_fragment(table)
+        if not html.strip():
+            return False
+        cur = QTextCursor(tbl.firstCursorPosition())
+        try:
+            cur.select(QTextCursor.TableUnderCursor)
+        except Exception:
+            last = tbl.cellAt(tbl.rows() - 1, tbl.columns() - 1).lastCursorPosition()
+            cur.setPosition(last.position(), QTextCursor.KeepAnchor)
+        cur.beginEditBlock()
+        try:
+            if cur.hasSelection():
+                cur.removeSelectedText()
+            cur.insertHtml(html)
+        finally:
+            cur.endEditBlock()
+        self.setTextCursor(cur)
+        return True
+
     def insert_table(
         self,
         rows: int = 3,
@@ -2761,12 +2845,14 @@ class TextEditor(QPlainTextEdit):
         align: str = "",
         style: str = "default",
     ) -> bool:
-        """Markdown-Tabelle an Cursor einfügen — 2.6.14."""
+        """Tabelle an Cursor: Rich-OCR als HTML, sonst Markdown — 2.6.14."""
         from ild_pdf.tables import create_table, insert_table_into_text
 
+        table = create_table(rows, cols, header=header, align=align, style=style)
+        if self.rich_mode():
+            return self._insert_table_html(table)
         cur = self.textCursor()
         at = cur.position()
-        table = create_table(rows, cols, header=header, align=align, style=style)
         new_text = insert_table_into_text(self.toPlainText(), table, at=at)
         self._replace_all_text_undoable(new_text)
         return True
@@ -2785,8 +2871,18 @@ class TextEditor(QPlainTextEdit):
 
     def sort_current_table(self, column: int = 0, *, reverse: bool = False) -> bool:
         """Ausgewählte/aktuelle Tabelle sortieren — ohne Tabellen-Treffer no-op."""
-        from ild_pdf.tables import find_tables_in_text, insert_table_into_text, sort_table
+        from ild_pdf.tables import (
+            DocumentTable,
+            find_tables_in_text,
+            insert_table_into_text,
+            sort_table,
+        )
 
+        qt = self._qtext_table_at_cursor() if self.rich_mode() else None
+        if qt is not None:
+            cells = self._qtext_table_cells(qt)
+            sorted_t = sort_table(DocumentTable(cells=cells), column=int(column), reverse=reverse)
+            return self._replace_qtext_table(qt, sorted_t)
         text = self.toPlainText()
         found = find_tables_in_text(text)
         idx = self._table_index_at_cursor(found)
@@ -2804,8 +2900,20 @@ class TextEditor(QPlainTextEdit):
         border: bool | None = None,
     ) -> bool:
         """Ausgewählte/aktuelle Tabelle formatieren — ohne Tabellen-Treffer no-op."""
-        from ild_pdf.tables import find_tables_in_text, format_table, insert_table_into_text
+        from ild_pdf.tables import (
+            DocumentTable,
+            find_tables_in_text,
+            format_table,
+            insert_table_into_text,
+        )
 
+        qt = self._qtext_table_at_cursor() if self.rich_mode() else None
+        if qt is not None:
+            cells = self._qtext_table_cells(qt)
+            formatted = format_table(
+                DocumentTable(cells=cells), align=align, style=style, border=border
+            )
+            return self._replace_qtext_table(qt, formatted)
         text = self.toPlainText()
         found = find_tables_in_text(text)
         idx = self._table_index_at_cursor(found)
@@ -2829,6 +2937,8 @@ class TextEditor(QPlainTextEdit):
             table = import_xlsx(p)
         else:
             raise ValueError(f"Kein Tabellenformat: {ext}")
+        if self.rich_mode():
+            return self._insert_table_html(table)
         at = self.textCursor().position()
         self._replace_all_text_undoable(insert_table_into_text(self.toPlainText(), table, at=at))
         return True

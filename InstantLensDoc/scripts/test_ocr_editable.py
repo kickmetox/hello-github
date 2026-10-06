@@ -208,6 +208,8 @@ def test_editor_ocr_bold_find_save() -> None:
 
     test_editor_ocr_field_tokens(win)
 
+    test_editor_ocr_styles_and_tables(win)
+
     assert app is not None
 
 
@@ -395,11 +397,13 @@ def test_core_sanitize_and_hocr_layout() -> None:
     from instantlensdoc.core.ocr_word_suite import (
         blocks_to_word_suite_html,
         classify_ocr_list_line,
+        expand_blocks_with_tables,
         normalize_field_tokens,
         open_ocr_result,
         parse_hocr_to_blocks,
         safe_field_display,
         sanitize_ocr_visible_text,
+        split_ocr_table_row,
     )
 
     dirty = "Hallo\x0cWelt\u2028Zeile\ufffd\u200e\u00b6"
@@ -528,6 +532,37 @@ def test_core_sanitize_and_hocr_layout() -> None:
     ft = (tok_doc.meta or {}).get("field_tokens") or {}
     if "date" not in ft or "page" not in ft:
         _fail(f"field_tokens unvollständig: {ft!r}")
+
+    pipe = (
+        "EINLEITUNG\n\n"
+        "| Name | Betrag |\n"
+        "| --- | --- |\n"
+        "| Alpha | 10 |\n"
+        "| Beta\x0c | 20\u00b6 |\n\n"
+        "Fliesstext"
+    )
+    tab_doc = open_ocr_result(text=pipe, auto_format=False, title="Word-Suite — Tabelle")
+    th = str((tab_doc.meta or {}).get("html") or "")
+    tt = tab_doc.text or ""
+    for g in ("\x0c", "\u00b6", "\ufffd"):
+        if g in th or g in tt:
+            _fail(f"Tabellen-OCR enthält Steuerzeichen {g!r}")
+    if "<table" not in th.lower():
+        _fail(f"Pipe-OCR ohne HTML-Tabelle: {th[:500]}")
+    if "Alpha" not in th or "Betrag" not in th:
+        _fail(f"Tabellenzellen fehlen: {th[:400]}")
+    if "<!-- ild-table" in th or "| --- |" in th:
+        _fail("OCR-Tabelle als Markdown-Dump statt HTML")
+    if "EINLEITUNG" not in tt or "Fliesstext" not in tt:
+        _fail("Fließtext neben Tabelle verloren")
+    if not any(getattr(b, "table_cells", None) for b in tab_doc.blocks):
+        _fail("table_cells fehlen nach Pipe-OCR")
+    cells = split_ocr_table_row("| A | B |")
+    if cells != ["A", "B"]:
+        _fail(f"split_ocr_table_row: {cells!r}")
+    expanded = expand_blocks_with_tables(tab_doc.blocks)
+    if not any(getattr(b, "table_cells", None) for b in expanded):
+        _fail("expand_blocks_with_tables verlor Tabelle")
     _ok("core: Steuerzeichen weg, hOCR Font/Fett/Kursiv/Align")
 
 
@@ -795,6 +830,111 @@ def test_editor_ocr_field_tokens(win) -> None:
         if "\x0c" in body or "\u00b6" in body or "\ufffd" in body:
             _fail("DOCX-Body mit Steuerzeichen statt Tokens")
     _ok("qt: OCR Feld-Tokens date/time/page/custom ohne Steuerzeichen")
+
+
+def test_editor_ocr_styles_and_tables(win) -> None:
+    """Formatvorlagen und Tabellen auf OCR-Richtext, ohne Markdown-Dump/Steuerzeichen."""
+    from PySide6.QtGui import QTextCursor
+
+    from instantlensdoc.core.documents import save_document
+
+    ok = win.open_ocr_result(
+        text=(
+            "EINLEITUNG\n\n"
+            "Fliesstext zum Formatvorlagen-Test.\n\n"
+            "| Name | Betrag |\n"
+            "| --- | --- |\n"
+            "| Alpha | 10 |\n"
+            "| Beta | 20 |\n"
+        ),
+        title="Word-Suite — Format/Tabelle",
+        auto_format=False,
+    )
+    if not ok:
+        _fail("open_ocr_result für Formatvorlagen/Tabellen fehlgeschlagen")
+    ed = win.editor
+    if not ed.rich_mode():
+        _fail("OCR nicht im Rich-Modus (Formatvorlagen/Tabellen brauchen QTextDocument)")
+    plain = ed.toPlainText()
+    html = ed.to_rich_html()
+    for g in ("\x0c", "\u00b6", "\ufffd"):
+        if g in plain or g in html:
+            _fail(f"OCR Format/Tabelle enthält Steuerzeichen {g!r}")
+    if "EINLEITUNG" not in plain:
+        _fail("EINLEITUNG fehlt vor Formatvorlage")
+    if "<table" not in html.lower():
+        _fail(f"OCR-HTML ohne Tabelle: {html[:400]}")
+
+    idx = plain.index("EINLEITUNG")
+    cur = ed.textCursor()
+    cur.setPosition(idx)
+    cur.setPosition(idx + len("EINLEITUNG"), QTextCursor.KeepAnchor)
+    ed.setTextCursor(cur)
+    if not ed.apply_style_paragraph("h1"):
+        _fail("apply_style_paragraph h1 auf OCR fehlgeschlagen")
+    fmt = ed.textCursor().charFormat()
+    size = float(fmt.fontPointSize() or 0.0)
+    if size < 16.0:
+        _fail(f"Formatvorlage h1 ohne Schriftgröße: {size}")
+    if not fmt.fontWeight() or int(fmt.fontWeight()) < 60:
+        _fail("Formatvorlage h1 ohne Fett")
+    after_style = ed.toPlainText()
+    if "EINLEITUNG" not in after_style or "Fliesstext" not in after_style:
+        _fail("Formatvorlage hat OCR-Text zerstört")
+    if "<!-- ild-table" in after_style:
+        _fail("Formatvorlage dumpte Markdown-Tabelle")
+
+    cur = ed.textCursor()
+    cur.movePosition(QTextCursor.End)
+    ed.setTextCursor(cur)
+    if not ed.insert_table(2, 2, header=True):
+        _fail("insert_table auf OCR-Richtext fehlgeschlagen")
+    plain2 = ed.toPlainText()
+    html2 = ed.to_rich_html()
+    for g in ("\x0c", "\u00b6", "\ufffd"):
+        if g in plain2 or g in html2:
+            _fail(f"insert_table schrieb Steuerzeichen {g!r}")
+    if "EINLEITUNG" not in plain2 or "Fliesstext" not in plain2:
+        _fail("insert_table hat OCR-Dokument als Markdown ersetzt")
+    if "<!-- ild-table" in plain2:
+        _fail("insert_table dumpte ild-table-Markdown in OCR-Richtext")
+    if "<table" not in html2.lower():
+        _fail(f"insert_table ohne HTML-Tabelle: {html2[:400]}")
+    if "Spalte 1" not in plain2 and "Spalte 1" not in html2:
+        _fail("eingefügte Tabellenköpfe fehlen")
+    tbl = ed.textCursor().currentTable()
+    if tbl is None:
+        cur = ed.textCursor()
+        cur.movePosition(QTextCursor.End)
+        ed.setTextCursor(cur)
+        tbl = ed._qtext_table_at_cursor()
+    if tbl is None:
+        _fail("QTextTable nach insert_table auf OCR fehlt")
+    if not ed.format_current_table(style="striped"):
+        _fail("format_current_table auf OCR-QTextTable fehlgeschlagen")
+    if "EINLEITUNG" not in ed.toPlainText():
+        _fail("format_current_table hat OCR-Body zerstört")
+
+    win._sync_editor_rich_meta()
+    with tempfile.TemporaryDirectory() as td:
+        out = Path(td) / "ocr-styles-tables.docx"
+        save_document(win.doc, out)
+        from docx import Document as DocxDocument
+
+        d = DocxDocument(str(out))
+        body = "\n".join(p.text for p in d.paragraphs)
+        if "EINLEITUNG" not in body.upper() and "EINLEITUNG" not in body:
+            _fail(f"DOCX ohne Überschrift nach Format/Tabelle: {body[:300]!r}")
+        if "\x0c" in body or "\u00b6" in body:
+            _fail("DOCX-Body mit Steuerzeichen nach Tabelle")
+        if not d.tables:
+            _fail("DOCX ohne python-docx-Tabelle nach OCR-insert_table")
+        joined_cells = " ".join(
+            cell.text for table in d.tables for row in table.rows for cell in row.cells
+        )
+        if "Alpha" not in joined_cells and "Spalte" not in joined_cells:
+            _fail(f"DOCX-Tabellenzellen leer: {joined_cells[:240]!r}")
+    _ok("qt: OCR Formatvorlagen + Tabellen ohne Steuerzeichen/Markdown-Dump")
 
 
 def main() -> int:

@@ -617,6 +617,10 @@ def check_version() -> None:
         _fail("ocr_word_suite fehlt Kopf-/Fußzeile (nicht als Body-Steuerzeichen)")
     if "normalize_field_tokens" not in ocr_ws or "safe_field_display" not in ocr_ws:
         _fail("ocr_word_suite fehlt Feld-Tokens (date/time/page, kein Steuerzeichen)")
+    if "expand_blocks_with_tables" not in ocr_ws or "ocr_table_html" not in ocr_ws:
+        _fail("ocr_word_suite fehlt Tabellen-HTML (kein Markdown-Dump/Steuerzeichen)")
+    if "split_ocr_table_row" not in ocr_ws:
+        _fail("ocr_word_suite fehlt split_ocr_table_row")
     if 'align="' not in ocr_ws or "margin-bottom" not in ocr_ws:
         _fail("ocr_word_suite HTML ohne align/margin (Absatz/Ausrichtung)")
     if "source_comment" not in ocr_ws:
@@ -632,6 +636,9 @@ def check_version() -> None:
         encoding="utf-8"
     ):
         _fail("editor.py fehlt selection_or_document_cursor (Auswahl vs. gesamter OCR-Text)")
+    ed_src = (ROOT / "instantlensdoc" / "ui" / "editor.py").read_text(encoding="utf-8")
+    if "_insert_table_html" not in ed_src or "apply_style_paragraph" not in ed_src:
+        _fail("editor.py fehlt OCR-Rich-Tabellen/Formatvorlagen (_insert_table_html)")
     scan_src = (ROOT / "instantlensdoc" / "core" / "scan.py").read_text(encoding="utf-8")
     if "to_word_suite_document" not in scan_src:
         _fail("scan.py fehlt to_word_suite_document (Scan-OCR→Editor)")

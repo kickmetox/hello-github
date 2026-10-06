@@ -115,6 +115,7 @@ class WordSuiteBlock:
     is_heading: bool = False
     align: str = ""
     list_kind: str = ""  # "" | "ul" | "ol"
+    table_cells: List[List[str]] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -228,9 +229,13 @@ def blocks_to_word_suite_text(
         if isinstance(b, dict):
             order = int(b.get("reading_order", i))
             text = str(b.get("text") or "").strip()
+            cells = b.get("table_cells") or []
         else:
             order = int(getattr(b, "reading_order", i))
             text = str(getattr(b, "text", "") or "").strip()
+            cells = getattr(b, "table_cells", None) or []
+        if not text and cells:
+            text = _table_plain(cells)
         if text:
             ordered.append((order, text))
     ordered.sort(key=lambda t: t[0])
@@ -263,6 +268,10 @@ def _ws_blocks_from_ocr(
                 is_heading=bool(getattr(b, "is_heading", False)),
                 align=str(getattr(b, "align", "") or ""),
                 list_kind=str(getattr(b, "list_kind", "") or ""),
+                table_cells=[
+                    [str(c) for c in row]
+                    for row in (getattr(b, "table_cells", None) or [])
+                ],
             )
         )
     out.sort(key=lambda x: (x.reading_order, x.top, x.left))
@@ -521,6 +530,8 @@ def lift_running_header_footer(
     from collections import Counter
 
     def _lines_of(b: WordSuiteBlock) -> List[str]:
+        if getattr(b, "table_cells", None):
+            return []
         raw = list(b.lines or []) or (b.text or "").splitlines() or [b.text or ""]
         return [_norm_hf_line(x) for x in raw if _norm_hf_line(x)]
 
@@ -554,6 +565,11 @@ def lift_running_header_footer(
     out: List[WordSuiteBlock] = []
     order = 0
     for b in items:
+        if getattr(b, "table_cells", None):
+            b.reading_order = order
+            out.append(b)
+            order += 1
+            continue
         lines = _lines_of(b)
         if not lines:
             continue
@@ -599,26 +615,201 @@ def classify_ocr_list_line(line: str) -> tuple[str, str]:
     return "", s
 
 
-def _clone_ws_block(src: WordSuiteBlock, text: str, list_kind: str, order: int) -> WordSuiteBlock:
+def _table_plain(cells: Sequence[Sequence[str]]) -> str:
+    """Tabellen-Fließtext ohne Markdown-Separator / Steuerzeichen."""
+    rows: List[str] = []
+    for row in cells or []:
+        parts = [sanitize_ocr_visible_text(str(c or "")).strip() for c in row]
+        if any(parts):
+            rows.append(" | ".join(parts))
+    return "\n".join(rows)
+
+
+def _sanitize_table_cells(cells: Sequence[Sequence[Any]] | None) -> List[List[str]]:
+    out: List[List[str]] = []
+    for row in cells or []:
+        cleaned = [sanitize_ocr_visible_text(str(c or "")).strip() for c in row]
+        if any(cleaned):
+            out.append(cleaned)
+    if not out:
+        return []
+    ncols = max(len(r) for r in out)
+    if ncols < 2:
+        return []
+    return [r + [""] * (ncols - len(r)) for r in out]
+
+
+def _is_ocr_table_sep(line: str) -> bool:
+    s = (line or "").strip().strip("|").strip()
+    if not s:
+        return False
+    parts = [p.strip() for p in s.split("|")]
+    return bool(parts) and all(
+        re.fullmatch(r":?-+:?", (p or "").replace(" ", "") or "-") for p in parts
+    )
+
+
+def _plausible_table_cells(cells: Sequence[str]) -> bool:
+    nonempty = [c for c in cells if str(c or "").strip()]
+    if len(nonempty) < 2:
+        return False
+    if len(cells) >= 3:
+        return True
+    return not any(len(str(c or "")) > 48 for c in cells)
+
+
+def split_ocr_table_row(line: str) -> List[str] | None:
+    """Pipe-/TSV-/Spalten-Zeile → Zellen; Separatorzeilen und Steuerzeichen raus."""
+    s = (line or "").strip(" \t\r\n")
+    if not s or _is_ocr_table_sep(s):
+        return None
+    if s.startswith("|") or s.count("|") >= 2:
+        inner = s.strip("|")
+        cells = [
+            sanitize_ocr_visible_text(c.replace("\\|", "|")).strip()
+            for c in re.split(r"(?<!\\)\|", inner)
+        ]
+        if len(cells) >= 2 and any(cells):
+            return cells
+    if "\t" in s:
+        cells = [sanitize_ocr_visible_text(c).strip() for c in s.split("\t")]
+        if _plausible_table_cells(cells):
+            return cells
+    if re.search(r"\S\s{2,}\S", s):
+        cells = [
+            sanitize_ocr_visible_text(c).strip()
+            for c in re.split(r"\s{2,}", s)
+            if sanitize_ocr_visible_text(c).strip()
+        ]
+        if _plausible_table_cells(cells):
+            return cells
+    return None
+
+
+def ocr_table_html(cells: Sequence[Sequence[str]], *, table_id: str = "ocr1") -> str:
+    """OCR-Tabelle als HTML für QTextDocument — keine ¶/Form-Feed/Pipe-Dump."""
+    cleaned = _sanitize_table_cells(cells)
+    if not cleaned:
+        return ""
+    try:
+        from ild_pdf.tables import DocumentTable, TableFormat, table_to_html
+
+        table = DocumentTable(
+            cells=cleaned,
+            format=TableFormat(header=True, border=True, style="default"),
+            table_id=table_id or "ocr1",
+        )
+        return sanitize_ocr_html(table_to_html(table))
+    except Exception:
+        bits = ['<table border="1" cellpadding="4" cellspacing="0">']
+        for i, row in enumerate(cleaned):
+            bits.append("<tr>")
+            tag = "th" if i == 0 else "td"
+            for c in row:
+                bits.append(f"<{tag}>{_html_escape(c)}</{tag}>")
+            bits.append("</tr>")
+        bits.append("</table>")
+        return sanitize_ocr_html("".join(bits))
+
+
+def _clone_ws_block(
+    src: WordSuiteBlock,
+    text: str,
+    list_kind: str,
+    order: int,
+    *,
+    table_cells: Sequence[Sequence[str]] | None = None,
+) -> WordSuiteBlock:
+    cells = _sanitize_table_cells(table_cells)
+    body = text if not cells else _table_plain(cells)
     return WordSuiteBlock(
         reading_order=order,
-        text=text,
+        text=body,
         block_num=int(src.block_num or 0),
         left=int(src.left or 0),
         top=int(src.top or 0),
         width=int(src.width or 0),
         height=int(src.height or 0),
         conf=float(src.conf if src.conf is not None else -1.0),
-        lines=text.splitlines() or [text],
+        lines=body.splitlines() or ([body] if body else []),
         font_name=src.font_name,
         font_size_pt=float(src.font_size_pt or 0.0),
-        bold=bool(src.bold),
-        italic=bool(src.italic),
+        bold=bool(src.bold) and not cells,
+        italic=bool(src.italic) and not cells,
         page=int(src.page or 0),
-        is_heading=bool(src.is_heading) and not list_kind,
+        is_heading=bool(src.is_heading) and not list_kind and not cells,
         align=src.align or "",
-        list_kind=list_kind,
+        list_kind="" if cells else list_kind,
+        table_cells=cells,
     )
+
+
+def expand_blocks_with_tables(blocks: Sequence[WordSuiteBlock] | None) -> List[WordSuiteBlock]:
+    """Pipe-/TSV-/Spaltenzeilen → Tabellenblöcke (HTML), nicht als ¶/Form-Feed-Liste."""
+    out: List[WordSuiteBlock] = []
+    order = 0
+    pending: List[tuple[WordSuiteBlock, List[str]]] = []
+
+    def _flush_pending() -> None:
+        nonlocal order
+        if not pending:
+            return
+        if len(pending) < 2:
+            src, cells = pending[0]
+            text = " | ".join(cells) if cells else (src.text or "")
+            kind, rest = classify_ocr_list_line(text)
+            out.append(_clone_ws_block(src, rest or text, kind, order))
+            order += 1
+            pending.clear()
+            return
+        src0 = pending[0][0]
+        cells = _sanitize_table_cells([row for _s, row in pending])
+        if cells:
+            out.append(_clone_ws_block(src0, _table_plain(cells), "", order, table_cells=cells))
+            order += 1
+        else:
+            for src, row in pending:
+                out.append(_clone_ws_block(src, " | ".join(row), "", order))
+                order += 1
+        pending.clear()
+
+    for src in blocks or []:
+        existing = _sanitize_table_cells(getattr(src, "table_cells", None))
+        if existing:
+            _flush_pending()
+            out.append(_clone_ws_block(src, _table_plain(existing), "", order, table_cells=existing))
+            order += 1
+            continue
+        raw_lines = list(src.lines or [])
+        blob = src.text or ""
+        if not raw_lines:
+            raw_lines = blob.splitlines() or ([blob] if blob.strip() else [])
+        emitted_line = False
+        for ln in raw_lines:
+            if _is_ocr_table_sep(ln):
+                continue
+            cells = split_ocr_table_row(ln)
+            kind, rest = classify_ocr_list_line(ln)
+            if kind and (not cells or len(cells) < 3):
+                cells = None
+            if cells:
+                pending.append((src, cells))
+                emitted_line = True
+                continue
+            _flush_pending()
+            body = rest if kind else sanitize_ocr_visible_text(ln or "").strip()
+            if not body:
+                continue
+            out.append(_clone_ws_block(src, body, kind, order))
+            order += 1
+            emitted_line = True
+        if not emitted_line and blob.strip() and not pending:
+            kind, rest = classify_ocr_list_line(blob)
+            if rest:
+                out.append(_clone_ws_block(src, rest, kind, order))
+                order += 1
+    _flush_pending()
+    return out
 
 
 def expand_blocks_with_lists(blocks: Sequence[WordSuiteBlock] | None) -> List[WordSuiteBlock]:
@@ -626,6 +817,13 @@ def expand_blocks_with_lists(blocks: Sequence[WordSuiteBlock] | None) -> List[Wo
     out: List[WordSuiteBlock] = []
     order = 0
     for src in blocks or []:
+        if getattr(src, "table_cells", None):
+            cells = _sanitize_table_cells(src.table_cells)
+            out.append(
+                _clone_ws_block(src, src.text or _table_plain(cells), "", order, table_cells=cells)
+            )
+            order += 1
+            continue
         raw_lines = list(src.lines or [])
         blob = src.text or ""
         if not raw_lines:
@@ -879,6 +1077,19 @@ def infer_block_styles(blocks: Sequence[WordSuiteBlock]) -> None:
                 sizes.append(b.font_size_pt)
     median = _median_positive(sizes) or DEFAULT_BODY_PT
     for b in blocks:
+        if getattr(b, "table_cells", None):
+            b.table_cells = _sanitize_table_cells(b.table_cells)
+            b.text = _table_plain(b.table_cells)
+            b.lines = b.text.splitlines() or [b.text]
+            b.is_heading = False
+            b.list_kind = ""
+            if not (b.align or "").strip():
+                b.align = "left"
+            if not b.font_name:
+                b.font_name = DEFAULT_BODY_FONT
+            if not b.font_size_pt:
+                b.font_size_pt = DEFAULT_BODY_PT
+            continue
         b.text = sanitize_ocr_visible_text(b.text)
         if not b.font_name:
             b.font_name = DEFAULT_BODY_FONT
@@ -970,8 +1181,9 @@ def blocks_to_word_suite_html(
     wrote = False
     ol_index = 0
     for b in items:
+        cells = _sanitize_table_cells(getattr(b, "table_cells", None))
         body = (b.text or "").strip()
-        if not body:
+        if not body and not cells:
             continue
         if _PAGE_MARK_RE.match(body):
             continue
@@ -981,6 +1193,11 @@ def blocks_to_word_suite_html(
             ol_index = 0
         if page:
             last_page = page
+        if cells:
+            parts.append(ocr_table_html(cells, table_id=f"ocr{int(b.reading_order)}"))
+            wrote = True
+            ol_index = 0
+            continue
         fam = html_lib.escape(b.font_name or font_family)
         size = float(b.font_size_pt or font_size_pt or DEFAULT_BODY_PT)
         inner = wrap_field_tokens_in_html(_html_escape(body))
@@ -1034,6 +1251,20 @@ def _int_meta(meta: dict[str, Any], key: str) -> int | None:
 
 def _finalize_word_suite_document(doc: WordSuiteDocument) -> WordSuiteDocument:
     """HTML, Überschriften und Quell-Link an ein Word-Suite-Dokument anhängen."""
+    doc.blocks = expand_blocks_with_tables(doc.blocks)
+    if not any(getattr(b, "table_cells", None) for b in doc.blocks):
+        extra = _sanitize_table_cells(doc.meta.get("table_rows"))
+        if extra:
+            src = doc.blocks[-1] if doc.blocks else WordSuiteBlock(reading_order=0, text="")
+            doc.blocks.append(
+                _clone_ws_block(
+                    src,
+                    _table_plain(extra),
+                    "",
+                    len(doc.blocks),
+                    table_cells=extra,
+                )
+            )
     doc.blocks = expand_blocks_with_lists(doc.blocks)
     infer_block_styles(doc.blocks)
     lifted_h, lifted_f = "", ""
@@ -1150,6 +1381,7 @@ def build_word_suite_document(
                         is_heading=bool(b.get("is_heading")),
                         align=str(b.get("align") or ""),
                         list_kind=str(b.get("list_kind") or ""),
+                        table_cells=_sanitize_table_cells(b.get("table_cells")),
                     )
                 )
     body = ""
@@ -1225,8 +1457,40 @@ def import_ildocr_sidecar(
             meta={"format": "hocr"},
         )
 
-    # TSV: Wörter zu Zeilen zusammenfassen
+    # TSV: Tesseract-Wortzeilen oder Dokumenttabelle
     if suffix.endswith(".ildocr.tsv") or suffix.endswith(".tsv"):
+        lines = raw.splitlines()
+        first = (lines[0] if lines else "").lower()
+        looks_tess = first.startswith("level") or (
+            len(lines) > 1 and len(lines[1].split("\t")) >= 12
+        )
+        if not looks_tess:
+            cells: List[List[str]] = []
+            for row in lines:
+                if not row.strip():
+                    continue
+                cells.append(
+                    [sanitize_ocr_visible_text(c).strip() for c in row.split("\t")]
+                )
+            cleaned = _sanitize_table_cells(cells)
+            if cleaned:
+                return build_word_suite_document(
+                    text=_table_plain(cleaned),
+                    blocks=[
+                        WordSuiteBlock(
+                            reading_order=0,
+                            text=_table_plain(cleaned),
+                            lines=_table_plain(cleaned).splitlines(),
+                            table_cells=cleaned,
+                        )
+                    ],
+                    title=title or f"Word-Suite — {p.stem}",
+                    source=str(p),
+                    mode="tsv",
+                    sidecar=str(p),
+                    auto_format=False,
+                    meta={"format": "tsv", "table_rows": cleaned},
+                )
         lines_out: List[str] = []
         cur_key: tuple[int, int, int] | None = None
         words: List[str] = []
@@ -1318,6 +1582,7 @@ def ocr_result_to_word_suite(
                 "format": "hocr",
                 "searchable_pdf": str(result.searchable_pdf) if result.searchable_pdf else "",
                 "hocr": str(result.hocr_path) if result.hocr_path else "",
+                "table_rows": list(result.table_rows or []),
             },
         )
     blocks = list(result.blocks or [])
@@ -1331,6 +1596,9 @@ def ocr_result_to_word_suite(
         _meta, body, hdr_blocks = strip_ildocr_header(text)
         text = body
         if not blocks and hdr_blocks:
+            _meta = dict(_meta)
+            if result.table_rows:
+                _meta.setdefault("table_rows", list(result.table_rows))
             return build_word_suite_document(
                 text=text,
                 blocks=hdr_blocks,
@@ -1355,6 +1623,7 @@ def ocr_result_to_word_suite(
             "searchable_pdf": str(result.searchable_pdf) if result.searchable_pdf else "",
             "hocr": str(result.hocr_path) if result.hocr_path else "",
             "tsv": str(result.tsv_path) if result.tsv_path else "",
+            "table_rows": list(result.table_rows or []),
         },
     )
 
