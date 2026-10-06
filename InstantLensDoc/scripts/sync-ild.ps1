@@ -67,6 +67,20 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+$ildVersionCandidates = @(
+    (Join-Path (Split-Path -Parent $scriptRoot) "VERSION.txt"),
+    (Join-Path $scriptRoot "VERSION.txt"),
+    "D:\AI_Temp\InstantLensDoc\VERSION.txt"
+)
+$IldVersion = $null
+foreach ($vf in $ildVersionCandidates) {
+    if ($vf -and (Test-Path -LiteralPath $vf -PathType Leaf)) {
+        $cand = ((Get-Content -LiteralPath $vf -Raw).Trim().Split()[0])
+        if ($cand -match '^\d+\.\d+\.\d+') { $IldVersion = $cand; break }
+    }
+}
+if (-not $IldVersion) { $IldVersion = "aktuell" }
 # -SkipStart ist Alias fuer -NoStart (beide unterdruecken den App-Start)
 if ($SkipStart) { $NoStart = $true }
 # Clean Sync ist Default (alte Layouts/Reste weg); -NoForceClean deaktiviert
@@ -162,7 +176,7 @@ function Write-DestinationLockedHint {
     Write-Host "  # optional Sysinternals Handle:"
     Write-Host "  # handle.exe `"$Dest`""
     Write-Host ""
-    Write-Host "3) Sync erneut (Pack 2.6.38), oder frischer Ordner + Swap:"
+    Write-Host "3) Sync erneut (Pack $IldVersion), oder frischer Ordner + Swap:"
     Write-Host "  cd $safe"
     Write-Host '  powershell -ExecutionPolicy Bypass -File .\sync-ild.ps1 -LocalPack D:\AI_Temp\InstantLensDoc-2.6.60-pack.zip -SkipStart'
     Write-Host "  # wenn InstantLensDoc weiter gesperrt:"
@@ -421,7 +435,7 @@ function Write-LocalPackHint {
 }
 
 try {
-    Write-Host "=== InstantLens Doc Sync ==="
+    Write-Host "=== InstantLens Doc Sync $IldVersion ==="
     Write-Host "Ziel: $Destination"
     if ($Swap) { Write-Host "Swap: nach Sync -> InstantLensDoc (altes Ziel wird .bak)" }
     if ($NoStart) { Write-Host "Start: uebersprungen (-NoStart/-SkipStart)" }

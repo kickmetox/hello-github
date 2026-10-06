@@ -828,6 +828,12 @@ def check_version() -> None:
     if "def group_selected_annotations(" not in pv:
         _fail("pdf_view.py fehlt group_selected_annotations (2.6.60 Overlay-Gruppe)")
     _ok("2.6.60 unified-view/ribbon-scroll/protect/formats/layout-marks: OK")
+    inst_ps1 = (ROOT / "scripts" / "install-ild.ps1").read_text(encoding="utf-8-sig")
+    if "VERSION.txt" not in inst_ps1:
+        _fail("install-ild.ps1 liest VERSION.txt nicht (Banner)")
+    if '$Version = "2.6.38"' in inst_ps1:
+        _fail("install-ild.ps1 Banner noch hart 2.6.38")
+    _ok("install-ild.ps1 banner from VERSION.txt: OK")
 
 
 def check_imports(*, with_qt: bool) -> None:

@@ -1,6 +1,6 @@
 @echo off
 setlocal EnableExtensions EnableDelayedExpansion
-REM InstantLens Doc 2.6.38 - ASCII-safe launcher (cmd.exe / CP1252-safe)
+REM InstantLens Doc - ASCII-safe launcher (cmd.exe / CP1252-safe); version from VERSION.txt
 REM No fancy Unicode (em-dash/ellipsis/arrows/smart-quotes) - those break cmd as mojibake quotes.
 REM No markdown/help prose executed as commands; paren-safe echo inside IF blocks.
 chcp 65001 >nul

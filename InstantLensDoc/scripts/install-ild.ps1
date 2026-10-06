@@ -1,4 +1,5 @@
-﻿# InstantLens Doc 2.6.38 - Benutzer-Installer (ohne Admin wenn möglich)
+﻿# InstantLens Doc - Benutzer-Installer (ohne Admin wenn möglich)
+# Banner [ILD x.y.z] aus VERSION.txt (nicht hart 2.6.38).
 # Startmenü-Shortcut + optional Desktop-Link (User-Profil).
 # Keygen-Shortcut im Startmenü, wenn run-keygen.bat oder InstantLensKeygen.exe vorhanden.
 # Idempotent: vorhandene Verknüpfungen werden aktualisiert.
@@ -41,7 +42,18 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$Version = "2.6.38"
+# Gleiche Quelle wie scripts\build-windows-installer.ps1: VERSION.txt neben der App.
+$Root = Split-Path -Parent $PSScriptRoot
+if (-not $Root) { $Root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path) }
+$VersionFile = Join-Path $Root "VERSION.txt"
+$Version = "0.0.0"
+if (Test-Path -LiteralPath $VersionFile) {
+    $Version = ((Get-Content -LiteralPath $VersionFile -Raw).Trim().Split()[0])
+}
+if ($Version -notmatch '^\d+\.\d+\.\d+') {
+    Write-Warning "VERSION.txt fehlt oder ungueltig: $VersionFile"
+    $Version = "0.0.0"
+}
 $AppName = "InstantLens Doc"
 
 function Write-IldInfo([string]$msg) { Write-Host "[ILD $Version] $msg" }
@@ -185,6 +197,11 @@ if (-not $AppDir -or -not (Test-Path (Join-Path $AppDir "run.bat"))) {
     Write-IldInfo "Tipp: -AppDir `"D:\AI_Temp\InstantLensDoc`" setzen oder zuerst sync-ild.ps1 ausführen."
     Write-IldInfo "Exit-Code 1 = Fehler; 0 = OK. -Uninstall braucht keinen App-Ordner."
     exit 1
+}
+$appVerFile = Join-Path $AppDir "VERSION.txt"
+if (Test-Path -LiteralPath $appVerFile) {
+    $appVer = ((Get-Content -LiteralPath $appVerFile -Raw).Trim().Split()[0])
+    if ($appVer -match '^\d+\.\d+\.\d+') { $Version = $appVer }
 }
 
 $runBat = Join-Path $AppDir "run.bat"
