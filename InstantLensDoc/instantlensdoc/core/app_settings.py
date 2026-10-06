@@ -1910,13 +1910,83 @@ def set_doc_tabs_visible(enabled: bool) -> None:
     save_settings({"doc_tabs_visible": bool(enabled)})
 
 
+CHROME_CLASSIC = "classic"
+CHROME_RIBBON = "ribbon"
+CHROME_COMBINED = "combined"
+CHROME_MODES = (CHROME_CLASSIC, CHROME_RIBBON, CHROME_COMBINED)
+CHROME_QSETTINGS_KEY = "ui/chromeMode"
+
+
+def _qsettings_chrome():
+    from PySide6.QtCore import QSettings
+
+    from instantlensdoc.config import APP_NAME, VENDOR
+
+    return QSettings(VENDOR, APP_NAME)
+
+
+def normalize_chrome_mode(mode: str | None) -> str:
+    raw = (mode or "").strip().lower()
+    aliases = {
+        "classic": CHROME_CLASSIC,
+        "klassisch": CHROME_CLASSIC,
+        "pulldown": CHROME_CLASSIC,
+        "menu": CHROME_CLASSIC,
+        "ribbon": CHROME_RIBBON,
+        "office": CHROME_RIBBON,
+        "combined": CHROME_COMBINED,
+        "kombiniert": CHROME_COMBINED,
+        "both": CHROME_COMBINED,
+    }
+    return aliases.get(raw, CHROME_COMBINED if raw not in CHROME_MODES else raw)
+
+
+def get_chrome_mode() -> str:
+    """Oberfläche: classic | ribbon | combined (Default kombiniert). Persistenz QSettings."""
+    qval = ""
+    try:
+        qval = str(_qsettings_chrome().value(CHROME_QSETTINGS_KEY, "") or "")
+    except Exception:
+        qval = ""
+    if qval:
+        return normalize_chrome_mode(qval)
+    data = load_settings()
+    if data.get("chrome_mode"):
+        return normalize_chrome_mode(str(data.get("chrome_mode")))
+    if "ribbon_visible" in data and not bool(data.get("ribbon_visible")):
+        return CHROME_CLASSIC
+    return CHROME_COMBINED
+
+
+def set_chrome_mode(mode: str) -> str:
+    """Chrome-Modus in QSettings + JSON speichern. Rückgabe: normalisierter Modus."""
+    m = normalize_chrome_mode(mode)
+    try:
+        qs = _qsettings_chrome()
+        qs.setValue(CHROME_QSETTINGS_KEY, m)
+        qs.sync()
+    except Exception:
+        pass
+    save_settings(
+        {
+            "chrome_mode": m,
+            "ribbon_visible": m != CHROME_CLASSIC,
+        }
+    )
+    return m
+
+
 def get_ribbon_visible() -> bool:
-    """Ribbon-Chrome sichtbar (partiell) — 2.6.19."""
-    return bool(load_settings().get("ribbon_visible", True))
+    """Ribbon-Chrome sichtbar — 2.6.19 / Chrome-Modus."""
+    return get_chrome_mode() != CHROME_CLASSIC
 
 
 def set_ribbon_visible(enabled: bool) -> None:
-    save_settings({"ribbon_visible": bool(enabled)})
+    if enabled:
+        current = get_chrome_mode()
+        set_chrome_mode(current if current != CHROME_CLASSIC else CHROME_COMBINED)
+    else:
+        set_chrome_mode(CHROME_CLASSIC)
 
 
 def get_pdf_continuous_scroll() -> bool:

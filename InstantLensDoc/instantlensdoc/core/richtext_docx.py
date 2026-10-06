@@ -405,7 +405,18 @@ def _para_to_html(para: Any) -> str:
     inner = _para_inner_html(para)
     if not inner:
         inner = "<br/>"
-    return f"<{tag}{_para_align_style(para)}>{inner}</{tag}>"
+    cls = ""
+    try:
+        from instantlensdoc.core.doc_styles import style_id_from_word_name
+
+        sid = style_id_from_word_name(style_name)
+        if sid and sid != "normal":
+            cls = f' class="ild-{sid}"'
+        elif tag == "p" and style_name:
+            cls = f' class="ild-{style_name.lower().replace(" ", "-")}"'
+    except Exception:
+        cls = ""
+    return f"<{tag}{cls}{_para_align_style(para)}>{inner}</{tag}>"
 
 
 def docx_to_html(path: str | Path) -> str:
@@ -512,13 +523,32 @@ class _HtmlToDocxParser(HTMLParser):
         self._cell_buf: list[str] | None = None
         self._in_cell = False
         self._th_bold = False
+        self._table: Any | None = None
+        self._table_row: Any | None = None
+        self._table_cell: Any | None = None
+        self._para_style: str | None = None
+        self._in_table = 0
+        self._table_col = 0
+        self._table_row_idx = -1
 
     def _ensure_para(self) -> Any:
+        if self._table_cell is not None:
+            if self._para is None:
+                paras = list(getattr(self._table_cell, "paragraphs", []) or [])
+                if paras:
+                    self._para = paras[0]
+                    if getattr(self._para, "text", ""):
+                        self._para = self._table_cell.add_paragraph("")
+                else:
+                    self._para = self._table_cell.add_paragraph("")
+                self._apply_para_style(self._para)
+            return self._para
         if self._para is None:
             if self._heading_level:
                 self._para = self.doc.add_heading("", level=self._heading_level)
             else:
                 self._para = self.doc.add_paragraph("")
+            self._apply_para_style(self._para)
             if self._pending_align:
                 try:
                     from docx.enum.text import WD_ALIGN_PARAGRAPH
@@ -535,6 +565,20 @@ class _HtmlToDocxParser(HTMLParser):
                 except Exception:
                     pass
         return self._para
+
+    def _apply_para_style(self, para: Any) -> None:
+        name = self._para_style
+        if not name:
+            return
+        try:
+            para.style = name
+        except Exception:
+            try:
+                from instantlensdoc.core.doc_styles import get_style
+
+                para.style = get_style(name).word_name
+            except Exception:
+                pass
 
     def _current_extra(self) -> dict[str, Any]:
         merged: dict[str, Any] = {}
@@ -658,6 +702,14 @@ class _HtmlToDocxParser(HTMLParser):
                 out["size"] = val
         return out
 
+    @staticmethod
+    def _ild_style_from_class(cls: str) -> str | None:
+        for part in (cls or "").split():
+            p = part.strip()
+            if p.startswith("ild-"):
+                return p[4:]
+        return None
+
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         t = tag.lower()
         ad = {k.lower(): (v or "") for k, v in attrs}
@@ -665,6 +717,45 @@ class _HtmlToDocxParser(HTMLParser):
             self._skip += 1
             return
         if self._skip:
+            return
+        if t == "table":
+            self._in_table += 1
+            try:
+                self._table = self.doc.add_table(rows=1, cols=1)
+                try:
+                    self._table.style = "Table Grid"
+                except Exception:
+                    pass
+            except Exception:
+                self._table = None
+            self._table_row = None
+            self._table_cell = None
+            self._table_col = 0
+            self._table_row_idx = -1
+            self._para = None
+            return
+        if t == "tr" and self._table is not None:
+            self._table_row_idx = getattr(self, "_table_row_idx", -1) + 1
+            self._table_col = 0
+            try:
+                while len(self._table.rows) <= self._table_row_idx:
+                    self._table.add_row()
+                self._table_row = self._table.rows[self._table_row_idx]
+            except Exception:
+                self._table_row = None
+            return
+        if t in {"td", "th"} and self._table is not None:
+            col = int(getattr(self, "_table_col", 0) or 0)
+            try:
+                while len(self._table.columns) <= col:
+                    self._table.add_column()
+                if self._table_row is None:
+                    self._table_row = self._table.rows[-1]
+                self._table_cell = self._table_row.cells[col]
+            except Exception:
+                self._table_cell = None
+            self._table_col = col + 1
+            self._para = None
             return
         if t in {"b", "strong"}:
             self._bold += 1
@@ -697,7 +788,23 @@ class _HtmlToDocxParser(HTMLParser):
                 self._pending_align = "right"
             elif "text-align:justify" in style.replace(" ", "").lower():
                 self._pending_align = "justify"
-            if t.startswith("h") and t[1:].isdigit():
+            ild = self._ild_style_from_class(ad.get("class", ""))
+            self._para_style = None
+            if ild:
+                try:
+                    from instantlensdoc.core.doc_styles import get_style
+
+                    spec = get_style(ild)
+                    self._para_style = spec.word_name
+                    if spec.heading:
+                        self._heading_level = int(spec.heading)
+                    elif t.startswith("h") and t[1:].isdigit():
+                        self._heading_level = int(t[1])
+                    else:
+                        self._heading_level = None
+                except Exception:
+                    self._para_style = ild
+            elif t.startswith("h") and t[1:].isdigit():
                 self._heading_level = int(t[1])
             else:
                 self._heading_level = None
@@ -766,6 +873,7 @@ class _HtmlToDocxParser(HTMLParser):
             self._para = None
             self._heading_level = None
             self._pending_align = None
+            self._para_style = None
         elif t in {"td", "th"}:
             if self._cur_row is not None:
                 text = "".join(self._cell_buf or []).strip()
@@ -776,10 +884,13 @@ class _HtmlToDocxParser(HTMLParser):
                 self._bold = max(0, self._bold - 1)
                 self._th_bold = False
             self._para = None
+            self._table_cell = None
         elif t == "tr":
             if self._cur_table is not None and self._cur_row is not None:
                 self._cur_table.append(self._cur_row)
             self._cur_row = None
+            self._table_row = None
+            self._table_cell = None
             self._para = None
         elif t == "table":
             rows = self._cur_table or []
@@ -787,7 +898,12 @@ class _HtmlToDocxParser(HTMLParser):
             self._cur_row = None
             self._cell_buf = None
             self._in_cell = False
-            self._flush_docx_table(rows)
+            if rows and self._table is None:
+                self._flush_docx_table(rows)
+            self._in_table = max(0, int(getattr(self, "_in_table", 0)) - 1)
+            self._table = None
+            self._table_row = None
+            self._table_cell = None
             self._para = None
         elif t in {"thead", "tbody", "tfoot", "colgroup", "col"}:
             return
@@ -829,6 +945,12 @@ def html_to_docx(
         style = d.styles["Normal"]
         style.font.name = "Calibri"
         style.font.size = Pt(11)
+    except Exception:
+        pass
+    try:
+        from instantlensdoc.core.doc_styles import ensure_docx_styles
+
+        ensure_docx_styles(d)
     except Exception:
         pass
 

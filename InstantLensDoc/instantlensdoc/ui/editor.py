@@ -5,7 +5,7 @@ from __future__ import annotations
 import tempfile
 from pathlib import Path
 
-from PySide6.QtCore import QRect, QSize, Qt, Signal
+from PySide6.QtCore import QPoint, QPointF, QRect, QSize, Qt, Signal
 from PySide6.QtGui import (
     QBrush,
     QColor,
@@ -17,7 +17,10 @@ from PySide6.QtGui import (
     QTextCursor,
     QTextDocument,
     QTextFormat,
+    QTextLength,
     QTextOption,
+    QTextTable,
+    QTextTableFormat,
 )
 from PySide6.QtWidgets import QAbstractScrollArea, QApplication, QPlainTextEdit, QTextEdit, QWidget
 
@@ -179,11 +182,17 @@ class _MinimapArea(QWidget):
         super().wheelEvent(event)
 
 
-class TextEditor(QPlainTextEdit):
+class TextEditor(QTextEdit):
+    """Rich-Text-Editor (QTextTable/Formatvorlagen). QPlainTextEdit-API bleibt als Shim."""
+
     line_bookmarks_changed = Signal()  # Zeilenfavoriten geändert → Sidebar-Liste
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        try:
+            self.setAcceptRichText(True)
+        except Exception:
+            pass
         font = QFont("Consolas", 11)
         font.setStyleHint(QFont.Monospace)
         self.setFont(font)
@@ -232,9 +241,21 @@ class TextEditor(QPlainTextEdit):
             self._page_layout = None
         self._line_number_area = _LineNumberArea(self)
         self._minimap_area = _MinimapArea(self)
-        self.blockCountChanged.connect(self._update_side_areas)
-        self.updateRequest.connect(self._update_line_number_area)
-        self.updateRequest.connect(self._update_minimap_area)
+        try:
+            self.blockCountChanged.connect(self._update_side_areas)
+        except Exception:
+            self.document().blockCountChanged.connect(self._update_side_areas)
+        if hasattr(self, "updateRequest"):
+            self.updateRequest.connect(self._update_line_number_area)
+            self.updateRequest.connect(self._update_minimap_area)
+        else:
+            self.verticalScrollBar().valueChanged.connect(
+                lambda *_: self._update_line_number_area(self.viewport().rect(), 0)
+            )
+            self.verticalScrollBar().valueChanged.connect(
+                lambda *_: self._update_minimap_area(self.viewport().rect(), 0)
+            )
+            self.textChanged.connect(lambda: self._line_number_area.update())
         self.cursorPositionChanged.connect(self._update_bracket_match)
         self.cursorPositionChanged.connect(self._update_current_line_highlight)
         self.verticalScrollBar().valueChanged.connect(lambda _v: self._minimap_area.update())
@@ -689,10 +710,33 @@ class TextEditor(QPlainTextEdit):
         """
         self._soft_wrap = bool(enabled)
         if self._soft_wrap or bool(getattr(self, "_rich_mode", False)):
-            self.setLineWrapMode(QPlainTextEdit.WidgetWidth)
+            self.setLineWrapMode(QTextEdit.WidgetWidth)
             self.setWordWrapMode(QTextOption.WrapAtWordBoundaryOrAnywhere)
         else:
-            self.setLineWrapMode(QPlainTextEdit.NoWrap)
+            self.setLineWrapMode(QTextEdit.NoWrap)
+
+    def firstVisibleBlock(self):  # noqa: N802
+        """QPlainTextEdit-Kompatibilität (Zeilennummern/Minimap)."""
+        return self.cursorForPosition(QPoint(0, 0)).block()
+
+    def blockCount(self) -> int:  # noqa: N802
+        try:
+            return int(self.document().blockCount())
+        except Exception:
+            return 1
+
+    def contentOffset(self):  # noqa: N802
+        return QPointF(0, 0)
+
+    def blockBoundingGeometry(self, block):  # noqa: N802
+        layout = self.document().documentLayout()
+        rect = layout.blockBoundingRect(block)
+        dx = -int(self.horizontalScrollBar().value())
+        dy = -int(self.verticalScrollBar().value())
+        return rect.translated(dx, dy)
+
+    def blockBoundingRect(self, block):  # noqa: N802
+        return self.document().documentLayout().blockBoundingRect(block)
 
     # ---- Rich-Modus / Seitenlayout — 2.6.53 --------------------------------
     def rich_mode(self) -> bool:
@@ -2021,8 +2065,17 @@ class TextEditor(QPlainTextEdit):
         self._sync_char_background_extras()
 
     def to_rich_html(self) -> str:
-        """Aktuelles Dokument als HTML (Bold/Italic/Underline erhalten)."""
+        """Aktuelles Dokument als HTML (Bold/Italic/Underline + Formatvorlagen)."""
         html = self.document().toHtml()
+        try:
+            from instantlensdoc.core.doc_styles import (
+                collect_block_style_ids,
+                inject_style_classes,
+            )
+
+            html = inject_style_classes(html, collect_block_style_ids(self.document()))
+        except Exception:
+            pass
         try:
             from instantlensdoc.core.ocr_word_suite import header_footer_html_comments
 
@@ -2531,30 +2584,20 @@ class TextEditor(QPlainTextEdit):
         return self._apply_to_selected_blocks(_mut, all_blocks=bool(all_paragraphs)) > 0
 
     def apply_style_paragraph(self, style_id: str = "body") -> bool:
-        """Absatzstil (Normal/Überschrift/Zitat) als QText-Formate — 2.6.55."""
-        sid = (style_id or "body").strip().lower()
-        presets = {
-            "body": {"size": 11.0, "bold": False, "italic": False, "align": "left", "indent": 0.0},
-            "normal": {"size": 11.0, "bold": False, "italic": False, "align": "left", "indent": 0.0},
-            "h1": {"size": 18.0, "bold": True, "italic": False, "align": "left", "indent": 0.0},
-            "heading1": {"size": 18.0, "bold": True, "italic": False, "align": "left", "indent": 0.0},
-            "h2": {"size": 14.0, "bold": True, "italic": False, "align": "left", "indent": 0.0},
-            "heading2": {"size": 14.0, "bold": True, "italic": False, "align": "left", "indent": 0.0},
-            "h3": {"size": 12.0, "bold": True, "italic": True, "align": "left", "indent": 0.0},
-            "heading3": {"size": 12.0, "bold": True, "italic": True, "align": "left", "indent": 0.0},
-            "quote": {"size": 11.0, "bold": False, "italic": True, "align": "left", "indent": 36.0},
-            "zitat": {"size": 11.0, "bold": False, "italic": True, "align": "left", "indent": 36.0},
-        }
-        spec = presets.get(sid, presets["body"])
+        """Absatzstil (Normal/Titel/Überschrift/Zitat/Beschriftung) — Auswahl sonst ganzes Doc."""
+        from instantlensdoc.core.doc_styles import ILD_STYLE_PROP, get_style, normalize_style_id
+
+        spec = get_style(style_id)
+        sid = normalize_style_id(spec.id)
         self._ensure_rich_mode()
         char = QTextCharFormat()
-        char.setFontPointSize(float(spec["size"]))
-        char.setFontWeight(QFont.Bold if spec["bold"] else QFont.Normal)
-        char.setFontItalic(bool(spec["italic"]))
-        if sid in ("quote", "zitat"):
-            char.setForeground(QBrush(QColor("#4B5563")))
-        align_name = str(spec["align"])
-        indent = float(spec["indent"])
+        char.setFontPointSize(float(spec.size))
+        char.setFontWeight(QFont.Bold if spec.bold else QFont.Normal)
+        char.setFontItalic(bool(spec.italic))
+        if spec.color:
+            char.setForeground(QBrush(QColor(spec.color)))
+        align_name = str(spec.align)
+        indent = float(spec.indent)
         work, restore, expanded = self._global_format_cursor()
         work.beginEditBlock()
         try:
@@ -2571,6 +2614,13 @@ class TextEditor(QPlainTextEdit):
                 }
                 fmt.setAlignment(mapping.get(align_name, Qt.AlignLeft))
                 fmt.setLeftMargin(indent)
+                fmt.setTopMargin(float(spec.space_before))
+                fmt.setBottomMargin(float(spec.space_after))
+                try:
+                    fmt.setHeadingLevel(int(spec.heading))
+                except Exception:
+                    pass
+                fmt.setProperty(ILD_STYLE_PROP, sid)
 
             self._apply_to_selected_blocks(_mut)
         finally:
@@ -2739,6 +2789,16 @@ class TextEditor(QPlainTextEdit):
         self.setTextCursor(cur)
         return True
 
+    def insert_merge_field(self, name: str) -> bool:
+        """Serienbrief-Feld `{{Name}}` an der Cursorposition."""
+        field = "".join(ch for ch in (name or "") if ch.isalnum() or ch == "_")
+        if not field:
+            return False
+        cur = self.textCursor()
+        cur.insertText("{{" + field + "}}")
+        self.setTextCursor(cur)
+        return True
+
     def hyphenate_document(self, *, lang: str = "de") -> int:
         """Silbentrennung auf Auswahl, sonst gesamtes Dokument — 2.6.13."""
         from ild_pdf.typography import hyphenate_text
@@ -2787,7 +2847,7 @@ class TextEditor(QPlainTextEdit):
         return True
 
     def _qtext_table_at_cursor(self):
-        tbl = self.textCursor().currentTable()
+        tbl = self.current_qtext_table()
         if tbl is not None:
             return tbl
         try:
@@ -2844,8 +2904,14 @@ class TextEditor(QPlainTextEdit):
         header: bool = True,
         align: str = "",
         style: str = "default",
+        rich: bool | None = None,
     ) -> bool:
-        """Tabelle an Cursor: Rich-OCR als HTML, sonst Markdown — 2.6.14."""
+        """Tabelle an Cursor: QTextTable im Rich-Modus, sonst Markdown — 2.6.14/Word-Chrome."""
+        use_rich = bool(self.rich_mode()) if rich is None else bool(rich)
+        if use_rich:
+            return self._insert_qtext_table(
+                rows, cols, header=header, align=align, style=style
+            )
         from ild_pdf.tables import create_table, insert_table_into_text
 
         table = create_table(rows, cols, header=header, align=align, style=style)
@@ -2855,6 +2921,204 @@ class TextEditor(QPlainTextEdit):
         at = cur.position()
         new_text = insert_table_into_text(self.toPlainText(), table, at=at)
         self._replace_all_text_undoable(new_text)
+        return True
+
+    def _insert_qtext_table(
+        self,
+        rows: int,
+        cols: int,
+        *,
+        header: bool = True,
+        align: str = "",
+        style: str = "default",
+    ) -> bool:
+        self._ensure_rich_mode()
+        r = max(1, int(rows))
+        c = max(1, int(cols))
+        fmt = QTextTableFormat()
+        fmt.setCellPadding(4)
+        fmt.setCellSpacing(0)
+        fmt.setBorder(1.0)
+        fmt.setBorderBrush(QBrush(QColor("#4B5563")))
+        try:
+            fmt.setBorderStyle(QTextTableFormat.BorderStyle_Solid)
+        except Exception:
+            pass
+        if header:
+            fmt.setHeaderRowCount(1)
+        al = (align or "").lower()
+        if al in ("center", "c"):
+            fmt.setAlignment(Qt.AlignHCenter)
+        elif al in ("right", "r"):
+            fmt.setAlignment(Qt.AlignRight | Qt.AlignAbsolute)
+        widths = [QTextLength(QTextLength.PercentageLength, 100.0 / c) for _ in range(c)]
+        try:
+            fmt.setColumnWidthConstraints(widths)
+        except Exception:
+            pass
+        cur = self.textCursor()
+        cur.beginEditBlock()
+        try:
+            table = cur.insertTable(r, c, fmt)
+            if table is None:
+                return False
+            if header:
+                for col in range(c):
+                    cell = table.cellAt(0, col)
+                    ccur = cell.firstCursorPosition()
+                    hf = QTextCharFormat()
+                    hf.setFontWeight(QFont.Bold)
+                    ccur.insertText(f"Spalte {col + 1}", hf)
+            if (style or "").lower() == "striped":
+                self._stripe_qtext_table(table)
+            self.setTextCursor(table.cellAt(min(1, r - 1), 0).firstCursorPosition())
+        finally:
+            cur.endEditBlock()
+        return True
+
+    def current_qtext_table(self) -> QTextTable | None:
+        cur = self.textCursor()
+        try:
+            table = cur.currentTable()
+        except Exception:
+            table = None
+        return table
+
+    def _stripe_qtext_table(self, table: QTextTable) -> None:
+        brush = QBrush(QColor("#EEF3FA"))
+        for row in range(table.rows()):
+            if row % 2 == 0:
+                continue
+            for col in range(table.columns()):
+                cell = table.cellAt(row, col)
+                cf = cell.format()
+                cf.setBackground(brush)
+                cell.setFormat(cf)
+
+    def _table_cell_range(self, table: QTextTable) -> tuple[int, int, int, int]:
+        cur = self.textCursor()
+        a = table.cellAt(cur.selectionStart() if cur.hasSelection() else cur.position())
+        b = table.cellAt(cur.selectionEnd() if cur.hasSelection() else cur.position())
+        r1, r2 = a.row(), b.row()
+        c1, c2 = a.column(), b.column()
+        return min(r1, r2), min(c1, c2), abs(r2 - r1) + 1, abs(c2 - c1) + 1
+
+    def add_table_row(self, *, after: bool = True) -> bool:
+        table = self.current_qtext_table()
+        if table is None:
+            return False
+        cell = table.cellAt(self.textCursor())
+        idx = cell.row() + (1 if after else 0)
+        table.insertRows(idx, 1)
+        return True
+
+    def delete_table_row(self) -> bool:
+        table = self.current_qtext_table()
+        if table is None or table.rows() <= 1:
+            return False
+        cell = table.cellAt(self.textCursor())
+        table.removeRows(cell.row(), 1)
+        return True
+
+    def add_table_column(self, *, after: bool = True) -> bool:
+        table = self.current_qtext_table()
+        if table is None:
+            return False
+        cell = table.cellAt(self.textCursor())
+        idx = cell.column() + (1 if after else 0)
+        table.insertColumns(idx, 1)
+        return True
+
+    def delete_table_column(self) -> bool:
+        table = self.current_qtext_table()
+        if table is None or table.columns() <= 1:
+            return False
+        cell = table.cellAt(self.textCursor())
+        table.removeColumns(cell.column(), 1)
+        return True
+
+    def merge_table_cells(self) -> bool:
+        table = self.current_qtext_table()
+        if table is None:
+            return False
+        r, c, nr, nc = self._table_cell_range(table)
+        if nr < 2 and nc < 2:
+            return False
+        table.mergeCells(r, c, nr, nc)
+        return True
+
+    def split_table_cells(self) -> bool:
+        table = self.current_qtext_table()
+        if table is None:
+            return False
+        cell = table.cellAt(self.textCursor())
+        table.splitCell(cell.row(), cell.column(), 1, 1)
+        return True
+
+    def set_table_header_row(self, enabled: bool = True) -> bool:
+        table = self.current_qtext_table()
+        if table is None:
+            return False
+        fmt = table.format()
+        fmt.setHeaderRowCount(1 if enabled else 0)
+        table.setFormat(fmt)
+        if enabled and table.rows() > 0:
+            for col in range(table.columns()):
+                cell = table.cellAt(0, col)
+                ccur = cell.firstCursorPosition()
+                ccur.movePosition(QTextCursor.EndOfBlock, QTextCursor.KeepAnchor)
+                cf = QTextCharFormat()
+                cf.setFontWeight(QFont.Bold)
+                ccur.mergeCharFormat(cf)
+        return True
+
+    def set_table_borders(self, *, width: float = 1.0, color: str = "#4B5563") -> bool:
+        table = self.current_qtext_table()
+        if table is None:
+            return False
+        fmt = table.format()
+        fmt.setBorder(float(width))
+        fmt.setBorderBrush(QBrush(QColor(color)))
+        try:
+            fmt.setBorderStyle(QTextTableFormat.BorderStyle_Solid)
+        except Exception:
+            pass
+        table.setFormat(fmt)
+        return True
+
+    def set_table_cell_align(self, align: str = "left") -> bool:
+        table = self.current_qtext_table()
+        if table is None:
+            return False
+        mapping = {
+            "left": Qt.AlignLeft | Qt.AlignAbsolute,
+            "center": Qt.AlignHCenter,
+            "right": Qt.AlignRight | Qt.AlignAbsolute,
+            "justify": Qt.AlignJustify,
+        }
+        flag = mapping.get((align or "left").lower(), Qt.AlignLeft)
+        r, c, nr, nc = self._table_cell_range(table)
+        for rr in range(r, r + nr):
+            for cc in range(c, c + nc):
+                cell = table.cellAt(rr, cc)
+                cur = cell.firstCursorPosition()
+                cur.movePosition(QTextCursor.EndOfBlock, QTextCursor.KeepAnchor)
+                bf = QTextBlockFormat()
+                bf.setAlignment(flag)
+                cur.mergeBlockFormat(bf)
+        return True
+
+    def _table_tab_add_row(self) -> bool:
+        """Tab in letzter Zelle hängt eine Zeile an (Word-Verhalten)."""
+        table = self.current_qtext_table()
+        if table is None:
+            return False
+        cell = table.cellAt(self.textCursor())
+        if cell.row() != table.rows() - 1 or cell.column() != table.columns() - 1:
+            return False
+        table.appendRows(1)
+        nxt = table.cellAt(table.rows() - 1, 0)
+        self.setTextCursor(nxt.firstCursorPosition())
         return True
 
     def _table_index_at_cursor(self, found: list) -> int | None:
@@ -2899,7 +3163,31 @@ class TextEditor(QPlainTextEdit):
         style: str | None = None,
         border: bool | None = None,
     ) -> bool:
-        """Ausgewählte/aktuelle Tabelle formatieren — ohne Tabellen-Treffer no-op."""
+        """Ausgewählte/aktuelle Tabelle formatieren — QTextTable oder Markdown."""
+        table = self.current_qtext_table()
+        if table is not None:
+            changed = False
+            if align:
+                fmt = table.format()
+                al = align.lower()
+                if al in ("center", "c"):
+                    fmt.setAlignment(Qt.AlignHCenter)
+                elif al in ("right", "r"):
+                    fmt.setAlignment(Qt.AlignRight | Qt.AlignAbsolute)
+                else:
+                    fmt.setAlignment(Qt.AlignLeft | Qt.AlignAbsolute)
+                table.setFormat(fmt)
+                changed = True
+            if border is True:
+                changed = self.set_table_borders(width=1.0) or changed
+            elif border is False:
+                changed = self.set_table_borders(width=0.0) or changed
+            if (style or "").lower() == "striped":
+                self._stripe_qtext_table(table)
+                changed = True
+            elif (style or "").lower() in ("default", "compact"):
+                changed = True
+            return changed
         from ild_pdf.tables import (
             DocumentTable,
             find_tables_in_text,
@@ -3194,6 +3482,15 @@ class TextEditor(QPlainTextEdit):
     def keyPressEvent(self, event):  # noqa: N802
         # Auswahl (ein-/mehrzeilig): Tab/Shift+Tab ein-/ausrücken; ohne Auswahl Tab einfügen
         if event.key() == Qt.Key_Tab and not (event.modifiers() & Qt.ControlModifier):
+            table = self.current_qtext_table()
+            if table is not None:
+                if event.modifiers() & Qt.ShiftModifier:
+                    super().keyPressEvent(event)
+                    return
+                if not self.textCursor().hasSelection() and self._table_tab_add_row():
+                    return
+                super().keyPressEvent(event)
+                return
             if event.modifiers() & Qt.ShiftModifier:
                 self.outdent_selection()
             elif self.textCursor().hasSelection():

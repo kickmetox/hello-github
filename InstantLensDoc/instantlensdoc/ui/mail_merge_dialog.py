@@ -24,9 +24,9 @@ from PySide6.QtWidgets import (
 class MailMergeDialog(QDialog):
     def __init__(self, parent=None, *, template_text: str | None = None):
         super().__init__(parent)
-        self.setWindowTitle("Seriendruck")
+        self.setWindowTitle("Serienbrief-Assistent")
         self.setObjectName("mailMergeDialog")
-        self.resize(560, 520)
+        self.resize(620, 560)
         self._result: dict | None = None
         layout = QVBoxLayout(self)
 
@@ -64,6 +64,7 @@ class MailMergeDialog(QDialog):
         self.fmt.addItem("Text (.txt)", "txt")
         self.fmt.addItem("HTML (.html)", "html")
         self.fmt.addItem("Word (.docx)", "docx")
+        self.fmt.addItem("PDF (.pdf)", "pdf")
         form.addRow("Format", self.fmt)
         self.delim = QComboBox()
         self.delim.addItem("Auto", "")
@@ -83,6 +84,28 @@ class MailMergeDialog(QDialog):
         else:
             self._inline_template = None
 
+        field_row = QHBoxLayout()
+        self.field_combo = QComboBox()
+        self.field_combo.setObjectName("mailMergeFieldCombo")
+        field_row.addWidget(QLabel("Feld"))
+        field_row.addWidget(self.field_combo, 1)
+        ins_btn = QPushButton("Feld einfügen")
+        ins_btn.setObjectName("mailMergeInsertField")
+        ins_btn.clicked.connect(self._insert_field)
+        field_row.addWidget(ins_btn)
+        prev_rec = QPushButton("◀ Datensatz")
+        prev_rec.setObjectName("mailMergePrevRecord")
+        prev_rec.clicked.connect(lambda: self._step_record(-1))
+        next_rec = QPushButton("Datensatz ▶")
+        next_rec.setObjectName("mailMergeNextRecord")
+        next_rec.clicked.connect(lambda: self._step_record(1))
+        field_row.addWidget(prev_rec)
+        field_row.addWidget(next_rec)
+        layout.addLayout(field_row)
+        self._record_index = 0
+        self._recipients: list = []
+        self.insert_field_callback = None
+
         self.preview = QPlainTextEdit()
         self.preview.setReadOnly(True)
         self.preview.setObjectName("mailMergePreview")
@@ -94,7 +117,7 @@ class MailMergeDialog(QDialog):
         prev_btn = buttons.addButton("Vorschau", QDialogButtonBox.ActionRole)
         prev_btn.setObjectName("mailMergePreviewBtn")
         prev_btn.clicked.connect(self._preview)
-        run_btn = buttons.addButton("Seriendruck starten", QDialogButtonBox.ActionRole)
+        run_btn = buttons.addButton("Zusammenführen", QDialogButtonBox.ActionRole)
         run_btn.setObjectName("mailMergeRunBtn")
         run_btn.clicked.connect(self._run)
         buttons.rejected.connect(self.reject)
@@ -141,6 +164,14 @@ class MailMergeDialog(QDialog):
                 raise ValueError("Empfängerdatei angeben")
             delim = self.delim.currentData() or None
             rows = load_recipients(rec, delimiter=delim or None)
+            self._recipients = list(rows)
+            self._record_index = 0
+            self.field_combo.clear()
+            cols = []
+            if rows:
+                cols = list(rows[0].keys())
+            for c in cols:
+                self.field_combo.addItem(c, c)
             data = preview_merge(tpl, rows, limit=3)
             lines = [
                 f"Empfänger: {data['total_recipients']}",
@@ -229,6 +260,40 @@ class MailMergeDialog(QDialog):
             QMessageBox.information(self, "Seriendruck", msg)
         except Exception as e:
             QMessageBox.warning(self, "Seriendruck", str(e))
+
+    def _insert_field(self) -> None:
+        name = str(self.field_combo.currentData() or self.field_combo.currentText() or "").strip()
+        if not name:
+            return
+        cb = getattr(self, "insert_field_callback", None)
+        if callable(cb):
+            cb(name)
+
+    def _step_record(self, delta: int) -> None:
+        from instantlensdoc.core.mail_merge import merge_one
+
+        rows = list(getattr(self, "_recipients", []) or [])
+        if not rows:
+            try:
+                self._preview()
+                rows = list(getattr(self, "_recipients", []) or [])
+            except Exception:
+                return
+        if not rows:
+            return
+        self._record_index = (int(getattr(self, "_record_index", 0)) + int(delta)) % len(rows)
+        try:
+            tpl = self._load_template()
+        except Exception as e:
+            self.preview.setPlainText(str(e))
+            return
+        letter = merge_one(tpl, rows[self._record_index])
+        self.preview.setPlainText(
+            f"Datensatz {self._record_index + 1} / {len(rows)}\n---\n{letter}"
+        )
+
+    def set_recipients_path(self, path: str) -> None:
+        self.rec_edit.setText(path)
 
     def result_data(self) -> dict | None:
         return self._result

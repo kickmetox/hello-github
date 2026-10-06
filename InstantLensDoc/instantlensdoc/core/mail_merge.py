@@ -193,6 +193,16 @@ def _write_letter(path: Path, text: str, fmt: str) -> Path:
             path = path.with_suffix(".txt")
             path.write_text(text, encoding="utf-8")
         return path
+    if fmt_l == "pdf":
+        path = path.with_suffix(".pdf")
+        try:
+            from instantlensdoc.core.export import export_pdf
+
+            export_pdf(text, path, title=path.stem)
+        except Exception:
+            path = path.with_suffix(".txt")
+            path.write_text(text, encoding="utf-8")
+        return path
     path = path.with_suffix(".txt")
     path.write_text(text, encoding="utf-8")
     return path
