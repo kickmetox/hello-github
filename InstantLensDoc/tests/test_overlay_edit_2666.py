@@ -238,6 +238,90 @@ def test_dtp_stamp_shape_move_resize_undo_lock(qapp):
     pane.close()
 
 
+def test_dtp_group_ctrl_click_and_ungroup(qapp):
+    from instantlensdoc.dtp.canvas import DtpPane
+    from instantlensdoc.dtp.model import DtpDocument
+    from PySide6.QtCore import Qt
+    from PySide6.QtTest import QTest
+    from PySide6.QtWidgets import QGraphicsView
+
+    doc = DtpDocument()
+    doc.grid_snap = False
+    a = doc.add_shape("rectangle", x=40, y=40, width=70, height=40, fill="#AABBCC")
+    b = doc.add_shape("ellipse", x=180, y=90, width=60, height=45, fill="#88AACC")
+    c = doc.add_text_frame("C", x=40, y=160, width=90, height=36)
+    pane = DtpPane(doc=doc)
+    pane.resize(900, 700)
+    pane.show()
+    qapp.processEvents()
+    pane.set_tool("select", apply=False)
+    assert pane.view.dragMode() == QGraphicsView.RubberBandDrag
+
+    msgs: list[str] = []
+    pane.statusMessage.connect(msgs.append)
+    assert pane.group_selected() == 0
+    assert any("Mindestens zwei Objekte markieren (Strg+Klick)" in m for m in msgs)
+
+    def _click(item, mods=Qt.KeyboardModifier.NoModifier):
+        center = item.sceneBoundingRect().center()
+        vp = pane.view.mapFromScene(center)
+        QTest.mouseClick(pane.view.viewport(), Qt.MouseButton.LeftButton, mods, vp)
+        qapp.processEvents()
+
+    _click(pane.scene._items[a.id])
+    sel = {f.id for f in pane.scene.selected_frames()}
+    assert a.id in sel
+    _click(pane.scene._items[b.id], Qt.KeyboardModifier.ControlModifier)
+    sel = {f.id for f in pane.scene.selected_frames()}
+    assert a.id in sel and b.id in sel, sel
+    n = pane.group_selected()
+    assert n >= 2
+    ga = doc.frame_by_id(a.id).group_id
+    gb = doc.frame_by_id(b.id).group_id
+    assert ga and ga == gb
+    assert DtpDocument.from_dict(doc.to_dict()).frame_by_id(a.id).group_id == ga
+
+    pane.scene.clearSelection()
+    qapp.processEvents()
+    pane.scene._items[a.id].setSelected(True)
+    pane.scene.apply_group_selection(a, additive=False)
+    sel = {f.id for f in pane.scene.selected_frames()}
+    assert a.id in sel and b.id in sel
+    assert c.id not in sel
+
+    n_ug = pane.ungroup_selected()
+    assert n_ug >= 2
+    assert doc.frame_by_id(a.id).group_id == ""
+    assert doc.frame_by_id(b.id).group_id == ""
+    pane.close()
+
+
+def test_dtp_group_model_and_main_window_routing():
+    from instantlensdoc.dtp.model import DtpDocument
+
+    doc = DtpDocument()
+    a = doc.add_shape("rectangle", x=10, y=10, width=20, height=10)
+    b = doc.add_shape("ellipse", x=40, y=10, width=20, height=10)
+    n, gid = doc.group_frames([a.id])
+    assert n == 0 and gid == ""
+    n, gid = doc.group_frames([a.id, b.id])
+    assert n == 2 and gid
+    assert a.group_id == b.group_id == gid
+    assert doc.expand_group_ids([a.id]) == [a.id, b.id] or set(doc.expand_group_ids([a.id])) == {a.id, b.id}
+    assert doc.ungroup_frames([a.id]) == 2
+    assert a.group_id == "" and b.group_id == ""
+
+    mw = (ROOT / "instantlensdoc" / "ui" / "main_window.py").read_text(encoding="utf-8")
+    cv = (ROOT / "instantlensdoc" / "dtp" / "canvas.py").read_text(encoding="utf-8")
+    pv = (ROOT / "instantlensdoc" / "ui" / "pdf_view.py").read_text(encoding="utf-8")
+    tip = "Mindestens zwei Objekte markieren (Strg+Klick)"
+    assert tip in mw and tip in cv and tip in pv
+    fn = mw.split("def _group_selected_annotations", 1)[1][:1800]
+    assert "_ensure_pdf_target" not in fn
+    assert "group_selected()" in fn
+    assert "_layout_mode_active" in fn
+
+
 def test_dtp_stamp_paint_frameless(qapp):
     from instantlensdoc.dtp.export import paint_frame_local
     from instantlensdoc.dtp.model import DtpDocument

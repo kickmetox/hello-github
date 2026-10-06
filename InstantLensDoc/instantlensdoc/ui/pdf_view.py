@@ -3244,14 +3244,16 @@ class PdfViewer(QWidget):
         btn_group.setFixedWidth(28)
         btn_group.setObjectName("btnAnnGroup")
         btn_group.setToolTip(
-            "Auswahl gruppieren (≥2). Klick, Gummiband oder Ctrl+Klick für Mehrfachauswahl — wie DTP."
+            "Mindestens zwei Objekte markieren (Strg+Klick); dann Gruppieren"
         )
         btn_group.clicked.connect(self.group_selected_annotations)
+        self.btn_ann_group = btn_group
         btn_ungroup = QPushButton("Aufh.")
         btn_ungroup.setFixedWidth(36)
         btn_ungroup.setObjectName("btnAnnUngroup")
-        btn_ungroup.setToolTip("Gruppierung aufheben (group_id leeren)")
+        btn_ungroup.setToolTip("Zuerst eine Gruppe auswählen")
         btn_ungroup.clicked.connect(self.ungroup_selected_annotations)
+        self.btn_ann_ungroup = btn_ungroup
         btn_group_lock = QPushButton("🔒")
         btn_group_lock.setFixedWidth(28)
         btn_group_lock.setToolTip(
@@ -6666,6 +6668,15 @@ class PdfViewer(QWidget):
         except Exception:
             pass
 
+    def _notify_group_actions(self) -> None:
+        win = self.window() if hasattr(self, "window") else None
+        fn = getattr(win, "_sync_group_actions", None) if win is not None else None
+        if callable(fn):
+            try:
+                fn()
+            except Exception:
+                pass
+
     def _on_annotation_selected(self, ann_id: str):
         """Auswahl setzen; Gruppe → alle Mitglieder; Ctrl/Shift+Klick Mehrfachauswahl."""
         mods = QApplication.keyboardModifiers()
@@ -6716,6 +6727,7 @@ class PdfViewer(QWidget):
                     self.status.emit("1 Annotation ausgewählt")
             else:
                 self.status.emit(f"{n} Annotationen ausgewählt (Ctrl/Shift)")
+            self._notify_group_actions()
             return
         if aid and self.store:
             expanded = self.store.expand_group_ids([aid])
@@ -6754,11 +6766,13 @@ class PdfViewer(QWidget):
                     self.status.emit(f"Auswahl: {ann.type.value} (S. {ann.page + 1})")
             else:
                 self.status.emit("Auswahl aufgehoben")
+            self._notify_group_actions()
             return
         self._selected_ann_id = aid
         self._selected_ann_ids = {self._selected_ann_id} if self._selected_ann_id else set()
         self.canvas.set_selected_id(self._selected_ann_id)
         self.status.emit("Auswahl aufgehoben")
+        self._notify_group_actions()
 
     def select_all_annotations_on_page(self) -> int:
         """Alle Annotationen der aktuellen Seite auswählen. Rückgabe: Anzahl."""
@@ -9056,8 +9070,7 @@ class PdfViewer(QWidget):
             QMessageBox.information(
                 self,
                 "Gruppieren",
-                "Mindestens zwei Overlays/Formen markieren "
-                "(Klick, Gummiband oder Ctrl+Klick), dann Grp.",
+                "Mindestens zwei Objekte markieren (Strg+Klick)",
             )
             return 0
         n, gid = self.store.group(ids)

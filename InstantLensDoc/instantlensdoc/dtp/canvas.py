@@ -132,6 +132,13 @@ class ResizeHandle(QGraphicsRectItem):
 class FrameTextItem(QGraphicsTextItem):
     """Caret im Textrahmen; Doppelklick startet die Bearbeitung."""
 
+    def mousePressEvent(self, event) -> None:  # type: ignore[override]
+        parent = self.parentItem()
+        if isinstance(parent, FrameItem) and not parent._editing:
+            event.ignore()
+            return
+        super().mousePressEvent(event)
+
     def mouseDoubleClickEvent(self, event) -> None:  # type: ignore[override]
         parent = self.parentItem()
         if isinstance(parent, FrameItem) and not parent._editing:
@@ -427,6 +434,29 @@ class FrameItem(QGraphicsRectItem):
         self._place_handles()
         if pane is not None:
             pane.mark_dirty()
+            gid = str(getattr(self.frame, "group_id", "") or "").strip()
+            if gid and orig[2] > 0.1 and orig[3] > 0.1:
+                sx = w / orig[2]
+                sy = h / orig[3]
+                for other in self.doc.frames:
+                    if other.id == self.frame.id or str(other.group_id or "") != gid:
+                        continue
+                    relx = other.x - orig[0]
+                    rely = other.y - orig[1]
+                    other.x = x + relx * sx
+                    other.y = y + rely * sy
+                    other.resize(other.width * sx, other.height * sy)
+                    oit = None
+                    sc = self.scene()
+                    if isinstance(sc, DtpScene):
+                        oit = sc._items.get(other.id)
+                    if oit is not None:
+                        oit.prepareGeometryChange()
+                        oit.setRect(0, 0, other.width, other.height)
+                        oit.setPos(other.x + PAGE_OFFSET, other.y + PAGE_OFFSET)
+                        if oit.text_item is not None:
+                            oit.text_item.setTextWidth(max(12.0, other.width - 6))
+                        oit._place_handles()
 
     def mouseDoubleClickEvent(self, event) -> None:  # type: ignore[override]
         if self.frame.kind in ("text", "stamp"):
@@ -463,15 +493,37 @@ class FrameItem(QGraphicsRectItem):
         if change == QGraphicsItem.ItemPositionHasChanged and not self._editing:
             nx = self.pos().x() - PAGE_OFFSET
             ny = self.pos().y() - PAGE_OFFSET
+            dx = nx - self.frame.x
+            dy = ny - self.frame.y
             pane = self._pane()
-            if pane is not None and (
-                abs(nx - self.frame.x) > 0.05 or abs(ny - self.frame.y) > 0.05
-            ):
+            if pane is not None and (abs(dx) > 0.05 or abs(dy) > 0.05):
                 pane.begin_gesture("Verschieben")
             self.frame.x = nx
             self.frame.y = ny
             if pane is not None:
                 pane.mark_dirty()
+            gid = str(getattr(self.frame, "group_id", "") or "").strip()
+            sc = self.scene()
+            if (
+                gid
+                and isinstance(sc, DtpScene)
+                and not getattr(sc, "_moving_group", False)
+                and (abs(dx) > 0.05 or abs(dy) > 0.05)
+            ):
+                sc._moving_group = True
+                try:
+                    for other in self.doc.frames:
+                        if other.id == self.frame.id or str(other.group_id or "") != gid:
+                            continue
+                        oit = sc._items.get(other.id)
+                        if oit is not None and oit.isSelected():
+                            continue
+                        other.x += dx
+                        other.y += dy
+                        if oit is not None:
+                            oit.setPos(other.x + PAGE_OFFSET, other.y + PAGE_OFFSET)
+                finally:
+                    sc._moving_group = False
         return super().itemChange(change, value)
 
     def mousePressEvent(self, event) -> None:  # type: ignore[override]
@@ -479,7 +531,16 @@ class FrameItem(QGraphicsRectItem):
             super().mousePressEvent(event)
             self.setFlag(QGraphicsItem.ItemIsMovable, False)
             return
+        additive = bool(
+            event.modifiers() & (Qt.ControlModifier | Qt.ShiftModifier | Qt.MetaModifier)
+        )
+        sc = self.scene()
+        if isinstance(sc, DtpScene) and not additive:
+            self.setSelected(True)
+            sc.apply_group_selection(self.frame, additive=False)
         super().mousePressEvent(event)
+        if isinstance(sc, DtpScene):
+            sc.apply_group_selection(self.frame, additive=additive)
 
     def mouseReleaseEvent(self, event) -> None:  # type: ignore[override]
         pane = self._pane()
@@ -545,6 +606,8 @@ class DtpScene(QGraphicsScene):
         super().__init__(parent)
         self.doc = doc
         self._items: dict[str, FrameItem] = {}
+        self._expanding_group = False
+        self._moving_group = False
         self.selectionChanged.connect(self._remember_story)
         self.rebuild()
 
@@ -701,12 +764,38 @@ class DtpScene(QGraphicsScene):
 
     def selected_frames(self) -> list[DtpFrame]:
         out = []
+        seen: set[str] = set()
         for it in self.selectedItems():
+            fr = None
             if isinstance(it, FrameItem):
-                out.append(it.frame)
+                fr = it.frame
             elif isinstance(it, (QGraphicsTextItem, FrameTextItem)) and isinstance(it.parentItem(), FrameItem):
-                out.append(it.parentItem().frame)
+                fr = it.parentItem().frame
+            if fr is not None and fr.id not in seen:
+                seen.add(fr.id)
+                out.append(fr)
         return out
+
+    def apply_group_selection(self, frame: DtpFrame, *, additive: bool) -> None:
+        """Gruppe als Einheit wählen; Ctrl/Strg schaltet alle Mitglieder."""
+        gid = str(getattr(frame, "group_id", "") or "").strip()
+        if not gid or self._expanding_group:
+            return
+        members = self.doc.ids_in_group(gid)
+        if len(members) < 2:
+            return
+        self._expanding_group = True
+        try:
+            want_on = True
+            if additive:
+                item = self._items.get(frame.id)
+                want_on = bool(item is not None and item.isSelected())
+            for mid in members:
+                it = self._items.get(mid)
+                if it is not None:
+                    it.setSelected(want_on)
+        finally:
+            self._expanding_group = False
 
 
 class DtpView(QGraphicsView):
@@ -717,6 +806,10 @@ class DtpView(QGraphicsView):
         super().__init__(scene, parent)
         self.setRenderHint(QPainter.Antialiasing, True)
         self.setDragMode(QGraphicsView.RubberBandDrag)
+        try:
+            self.setRubberBandSelectionMode(Qt.IntersectsItemShape)
+        except Exception:
+            pass
         self.setBackgroundBrush(QBrush(QColor(PASTEBOARD)))
         self.setFrameShape(QFrame.NoFrame)
         self.ink_mode = False
@@ -1413,6 +1506,13 @@ class DtpPane(QWidget):
             self._block_font = True
             self.font_combo.setCurrentFont(QFont(family))
             self._block_font = False
+        win = self.window()
+        sync = getattr(win, "_sync_group_actions", None)
+        if callable(sync) and win is not self:
+            try:
+                sync()
+            except Exception:
+                pass
         for it in self.scene._items.values():
             if it._editing:
                 return it
@@ -1955,6 +2055,48 @@ class DtpPane(QWidget):
                 return True
         self.statusMessage.emit("Kein Stempel ausgewählt")
         return False
+
+    def group_selected(self) -> int:
+        if getattr(self, "_schreibschutz", False):
+            self.statusMessage.emit("Schreibschutz: Gruppieren gesperrt")
+            return 0
+        frames = list(self.scene.selected_frames())
+        ids = self.doc.expand_group_ids([f.id for f in frames])
+        if len(ids) < 2:
+            self.statusMessage.emit("Mindestens zwei Objekte markieren (Strg+Klick)")
+            return 0
+        self.push_undo("Gruppieren")
+        n, gid = self.doc.group_frames(ids)
+        if n < 2 or not gid:
+            self.statusMessage.emit("Mindestens zwei Objekte markieren (Strg+Klick)")
+            return 0
+        self.mark_dirty()
+        first = self.doc.frame_by_id(ids[0])
+        if first is not None:
+            self.scene.apply_group_selection(first, additive=False)
+        self.statusMessage.emit(f"{n} Objekte gruppiert")
+        return n
+
+    def ungroup_selected(self) -> int:
+        if getattr(self, "_schreibschutz", False):
+            self.statusMessage.emit("Schreibschutz: Gruppierung gesperrt")
+            return 0
+        frames = list(self.scene.selected_frames())
+        ids = [f.id for f in frames]
+        if not ids:
+            self.statusMessage.emit("Zuerst eine Gruppe auswählen")
+            return 0
+        if not any(str(getattr(f, "group_id", "") or "").strip() for f in frames):
+            self.statusMessage.emit("Keine Gruppe in der Auswahl")
+            return 0
+        self.push_undo("Gruppierung aufheben")
+        n = self.doc.ungroup_frames(ids)
+        if n <= 0:
+            self.statusMessage.emit("Keine Gruppe in der Auswahl")
+            return 0
+        self.mark_dirty()
+        self.statusMessage.emit(f"Gruppierung aufgehoben ({n})")
+        return n
 
     def prev_page(self) -> None:
         self.doc.current_page = max(0, self.doc.current_page - 1)

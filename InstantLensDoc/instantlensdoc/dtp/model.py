@@ -165,6 +165,7 @@ class DtpFrame:
     layer_id: str = ""
     z: int = 0
     locked: bool = False
+    group_id: str = ""
     next_id: Optional[str] = None
     text: str = ""
     rich_html: str = ""
@@ -569,6 +570,70 @@ class DtpDocument:
         )
         self.frames.append(fr)
         return fr
+
+    def group_frames(self, frame_ids: list[str], group_id: str | None = None) -> tuple[int, str]:
+        """Auswahl gruppieren (≥2). Gemeinsame group_id; Rückgabe (Anzahl, id)."""
+        ids = self.expand_group_ids([str(i) for i in frame_ids if i])
+        seen: set[str] = set()
+        targets: list[DtpFrame] = []
+        for fid in ids:
+            if fid in seen:
+                continue
+            fr = self.frame_by_id(fid)
+            if fr is None:
+                continue
+            seen.add(fid)
+            targets.append(fr)
+        if len(targets) < 2:
+            return 0, ""
+        gid = str(group_id or "").strip() or _nid()
+        for fr in targets:
+            fr.group_id = gid
+        return len(targets), gid
+
+    def ungroup_frames(self, frame_ids: list[str] | None = None) -> int:
+        """Gruppierung aufheben. Ohne IDs: alle Rahmen mit group_id."""
+        if frame_ids:
+            wanted = {str(i) for i in frame_ids if i}
+            gids = {
+                str(fr.group_id or "").strip()
+                for fr in self.frames
+                if fr.id in wanted and str(fr.group_id or "").strip()
+            }
+            targets = [fr for fr in self.frames if str(fr.group_id or "").strip() in gids]
+        else:
+            targets = [fr for fr in self.frames if str(fr.group_id or "").strip()]
+        n = 0
+        for fr in targets:
+            if fr.group_id:
+                fr.group_id = ""
+                n += 1
+        return n
+
+    def ids_in_group(self, group_id: str) -> list[str]:
+        gid = str(group_id or "").strip()
+        if not gid:
+            return []
+        return [fr.id for fr in self.frames if str(fr.group_id or "").strip() == gid]
+
+    def expand_group_ids(self, frame_ids: list[str]) -> list[str]:
+        out: list[str] = []
+        seen: set[str] = set()
+        for raw in frame_ids or []:
+            fid = str(raw or "").strip()
+            if not fid or fid in seen:
+                continue
+            fr = self.frame_by_id(fid)
+            gid = str(getattr(fr, "group_id", "") or "").strip() if fr is not None else ""
+            if gid:
+                for mid in self.ids_in_group(gid):
+                    if mid not in seen:
+                        seen.add(mid)
+                        out.append(mid)
+            else:
+                seen.add(fid)
+                out.append(fid)
+        return out
 
     def link_frames(self, from_id: str, to_id: str) -> None:
         src, dst = self.frame_by_id(from_id), self.frame_by_id(to_id)
