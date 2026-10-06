@@ -206,6 +206,8 @@ def mouse_click_menu_action(app, menu: QMenu, action: QAction) -> bool:
             app.processEvents()
         geo = menu.actionGeometry(action)
         center = geo.center()
+    # Overflow-Spalte: local pos darf außerhalb von menu.rect() liegen —
+    # QTest liefert an dieses QMenu; MenuClickFilter nimmt actionAt/activeAction.
     QTest.mouseClick(
         menu,
         Qt.MouseButton.LeftButton,

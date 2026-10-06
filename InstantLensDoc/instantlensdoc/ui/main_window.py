@@ -3130,6 +3130,7 @@ class MainWindow(QMainWindow):
         self._ensure_devices_menu(mb)
 
         m_pdf = mb.addMenu("&PDF")
+        m_pdf.setObjectName("menuPdf")
         m_pdf.setToolTipsVisible(True)
         self._pdf_menu = m_pdf
         act_merge = QAction("PDFs zusammenführen / teilen…", self)
@@ -3593,6 +3594,17 @@ class MainWindow(QMainWindow):
                 )
             self._bind_pdf_action(a, slot)
             m_pdf.addAction(a)
+
+        try:
+            from instantlensdoc.ui.menu_click import prepare_menu_for_clicks
+
+            prepare_menu_for_clicks(m_pdf)
+        except Exception:
+            pass
+        try:
+            m_pdf.aboutToShow.connect(self._on_pdf_menu_about_to_show)
+        except Exception:
+            pass
 
         # Geräte-Menü idempotent nachziehen — 2.6.51
         self._ensure_devices_menu(mb)
@@ -4078,6 +4090,21 @@ class MainWindow(QMainWindow):
             if v:
                 ids.add(v)
         return {x for x in ids if x}
+
+    def _on_pdf_menu_about_to_show(self) -> None:
+        """Eine Spalte + Enablement, bevor das lange PDF-Menü layoutet."""
+        try:
+            from instantlensdoc.ui.menu_click import prepare_menu_for_clicks
+
+            menu = getattr(self, "_pdf_menu", None)
+            if menu is not None:
+                prepare_menu_for_clicks(menu)
+        except Exception:
+            pass
+        try:
+            self._sync_menu_enablement()
+        except Exception:
+            pass
 
     def _bind_pdf_action(self, act, slot):
         """PDF-Menü: jeder Klick geht durch _pdf_menu_call (Dialog oder Dateiänderung)."""
@@ -4634,17 +4661,13 @@ class MainWindow(QMainWindow):
                         continue
                     if is_pdf:
                         self._set_action_available(a, True, "")
-                    elif has_open:
-                        self._set_action_available(
-                            a, True, "Fragt nach dem geöffneten PDF-Tab"
-                        )
                     else:
                         self._set_action_available(
                             a,
                             False,
                             pdf_menu_disable_reason(
                                 label,
-                                has_open_pdf=False,
+                                has_open_pdf=has_open,
                                 is_pdf_tab=False,
                             ),
                         )

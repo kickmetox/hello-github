@@ -1,7 +1,7 @@
 """PDF-Menü: Enablement-Klassen — kein No-Op, Dialog oder Dateiänderung.
 
 always  — Dateidialoge, unabhängig vom aktuellen Tab (Merge, Vergleich, Scan, …)
-pdf     — braucht mindestens ein geöffnetes PDF (sonst disabled; sonst Zielwahl)
+pdf     — braucht aktuellen PDF-Tab (sonst disabled, auch bei offenem Geschwister-PDF)
 selection — braucht aktiven PDF-Tab plus Auswahl (Stempel, Bookmark, Textauswahl, …)
 """
 
