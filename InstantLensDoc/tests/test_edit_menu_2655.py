@@ -27,8 +27,19 @@ from menu_smoke_lib import (  # noqa: E402
     load_state,
     pump,
 )
+from menu_effect_lib import (  # noqa: E402
+    DialogRecorder,
+    classify_events,
+    snapshot_state,
+    state_changed,
+)
 
 from PySide6.QtGui import QColor, QFont, QTextCursor  # noqa: E402
+from instantlensdoc.ui.menu_click import (  # noqa: E402
+    find_menubar_menu,
+    iter_leaf_actions,
+    mouse_click_menu_action,
+)
 
 
 _APP = None
@@ -332,3 +343,134 @@ def test_drop_cap_and_table_require_object_selection(qapp) -> None:
     # Cursor liegt in der eingefügten Tabelle
     assert ed.format_current_table(style="striped") is True
     ed.deleteLater()
+
+
+def _reseed_for_click(win, text: str = "Hallo Formatierung Absatz fuer Mausklick.") -> None:
+    win.editor.setPlainText(text)
+    cur = win.editor.textCursor()
+    cur.setPosition(0)
+    win.editor.setTextCursor(cur)
+    try:
+        win._sync_menu_enablement()
+        win._sync_editor_only_actions()
+    except Exception:
+        pass
+
+
+def _menu_or_fail(title: str):
+    menu = find_menubar_menu(_WIN, title)
+    assert menu is not None, f"Menü {title} fehlt"
+    return menu
+
+
+def _leaf(menu, title: str, label: str):
+    for path, host, act in iter_leaf_actions(menu, title):
+        text = (act.text() or "").replace("&", "").strip()
+        if text == label:
+            return path, host, act
+    raise AssertionError(f"{title}: {label} nicht gefunden")
+
+
+def test_qtest_mouseclick_fett_bearbeiten_changes_document() -> None:
+    load_state(_WIN, _APP, "empty", _FIXTURES)
+    pump(_APP, 0.15)
+    _reseed_for_click(_WIN)
+    before = _WIN.editor.document().toHtml()
+    menu = _menu_or_fail("Bearbeiten")
+    _path, host, act = _leaf(menu, "Bearbeiten", "Fett")
+    assert act.isEnabled()
+    assert mouse_click_menu_action(_APP, host, act)
+    pump(_APP, 0.1)
+    after = _WIN.editor.document().toHtml()
+    assert after != before, "QTest.mouseClick Fett (Bearbeiten) ohne Dokumentänderung"
+
+
+def test_qtest_mouseclick_fett_format_changes_document() -> None:
+    load_state(_WIN, _APP, "empty", _FIXTURES)
+    pump(_APP, 0.15)
+    _reseed_for_click(_WIN)
+    before = _WIN.editor.document().toHtml()
+    menu = _menu_or_fail("Format")
+    _path, host, act = _leaf(menu, "Format", "Fett")
+    assert act.isEnabled()
+    assert mouse_click_menu_action(_APP, host, act)
+    pump(_APP, 0.1)
+    after = _WIN.editor.document().toHtml()
+    assert after != before, "QTest.mouseClick Fett (Format) ohne Dokumentänderung"
+
+
+def test_qtest_mouseclick_column2_case_and_indent() -> None:
+    load_state(_WIN, _APP, "empty", _FIXTURES)
+    pump(_APP, 0.15)
+    menu = _menu_or_fail("Bearbeiten")
+    _reseed_for_click(_WIN, "Alpha Beta")
+    before_plain = _WIN.editor.toPlainText()
+    _path, host, act = _leaf(menu, "Bearbeiten", "Groß-/Kleinschreibung umschalten")
+    assert act.isEnabled()
+    assert mouse_click_menu_action(_APP, host, act)
+    pump(_APP, 0.1)
+    after_plain = _WIN.editor.toPlainText()
+    assert after_plain != before_plain, "Mausklick Groß-/Kleinschreibung ohne Effekt"
+    _reseed_for_click(_WIN, "Einrueckung Satz.")
+    before_html = _WIN.editor.document().toHtml()
+    _path, host, act = _leaf(menu, "Bearbeiten", "Einrückung erhöhen")
+    assert act.isEnabled()
+    assert mouse_click_menu_action(_APP, host, act)
+    pump(_APP, 0.1)
+    after_html = _WIN.editor.document().toHtml()
+    assert after_html != before_html, "Mausklick Einrückung erhöhen ohne Effekt"
+
+
+def test_qtest_mouseclick_suchen_opens_dialog() -> None:
+    load_state(_WIN, _APP, "empty", _FIXTURES)
+    pump(_APP, 0.15)
+    rec = DialogRecorder(shot_dir=None)
+    rec.install()
+    try:
+        menu = _menu_or_fail("Bearbeiten")
+        _reseed_for_click(_WIN)
+        _path, host, act = _leaf(menu, "Bearbeiten", "Suchen…")
+        assert act.isEnabled()
+        rec.reset()
+        assert mouse_click_menu_action(_APP, host, act)
+        pump(_APP, 0.15)
+        verdict, detail = classify_events(rec.events, [])
+        assert verdict == "open", f"Suchen… Mausklick: {verdict}/{detail} events={rec.events}"
+    finally:
+        rec.restore()
+
+
+def test_qtest_mouseclick_all_enabled_bearbeiten_format_leaves() -> None:
+    load_state(_WIN, _APP, "empty", _FIXTURES)
+    pump(_APP, 0.2)
+    rec = DialogRecorder(shot_dir=None)
+    rec.install()
+    fails: list[str] = []
+    clicked = 0
+    try:
+        for title in ("Bearbeiten", "Format"):
+            menu = _menu_or_fail(title)
+            for path, host, act in iter_leaf_actions(menu, title):
+                text = (act.text() or "").replace("&", "").strip()
+                if text in ("(leer)",) or text.lower() in ("beenden", "quit", "exit"):
+                    continue
+                _reseed_for_click(_WIN)
+                try:
+                    if not act.isEnabled():
+                        continue
+                except Exception:
+                    continue
+                rec.reset()
+                before = snapshot_state(_WIN)
+                ok = mouse_click_menu_action(_APP, host, act)
+                pump(_APP, 0.05)
+                after = snapshot_state(_WIN)
+                changes = state_changed(before, after)
+                verdict, detail = classify_events(rec.events, changes)
+                clicked += 1
+                if not ok or verdict not in ("open", "effect"):
+                    fails.append(f"{path}: click={ok} {verdict}/{detail}")
+        assert clicked > 0, "keine enabled Leaves geklickt"
+        assert fails == [], "Mausklick ohne Dialog/Effekt:\n" + "\n".join(fails[:24])
+    finally:
+        rec.restore()

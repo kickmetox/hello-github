@@ -1600,6 +1600,12 @@ class MainWindow(QMainWindow):
             self._set_status(SCAN_START_HINT_DE)
         except Exception:
             pass
+        try:
+            from instantlensdoc.ui.menu_click import prepare_menu_for_clicks
+
+            prepare_menu_for_clicks(m_devices)
+        except Exception:
+            pass
         return m_devices
 
     def _build_menus(self):
@@ -1815,6 +1821,7 @@ class MainWindow(QMainWindow):
         m_file.addAction(act_quit)
 
         m_edit = mb.addMenu("&Bearbeiten")
+        m_edit.setObjectName("menuBearbeiten")
         # Sichtbares Vor/Zurück: Pfeil-Icons, Ctrl+Z / Ctrl+Y / Ctrl+Shift+Z, Enabled-
         # Zustand folgt dem Undo-Stack des aktiven Editors (undoAvailable/redoAvailable);
         # dieselben Aktionen bedienen die Ribbon-Pfeile (Start + Bearbeiten) — 2.6.54
@@ -3739,6 +3746,9 @@ class MainWindow(QMainWindow):
         self._install_editor_context_menu()
         self._sync_editor_only_actions()
         self._sync_menu_enablement()
+        from instantlensdoc.ui.menu_click import apply_clickable_popup_menus
+
+        apply_clickable_popup_menus(self)
 
     _FORMAT_MENU_TEXTS = frozenset(
         {
