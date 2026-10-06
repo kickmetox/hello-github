@@ -67,8 +67,9 @@ class ScanBackendSettingsWidget(QWidget):
         self.backend_combo = QComboBox()
         self.backend_combo.setObjectName("scanBackendCombo")
         self.backend_combo.setToolTip(
-            "Welches Scanprogramm „Scannen“ verwendet. Automatik = lokal WIA/NAPS2, "
-            "Netzwerk eSCL/AirScan (kein WIA-Connect im Energiesparmodus) — 2.6.57"
+            "Welches Scanprogramm „Scannen“ verwendet. Automatik = lokal WIA-Transfer "
+            "(keine CommonDialog-Vorschau), Netzwerk eSCL/AirScan/ScanTuxio "
+            "(kein WIA-Vorschau-Dialog im Energiesparmodus)."
         )
         for key in BACKEND_ORDER:
             self.backend_combo.addItem(BACKEND_LABELS_DE[key], key)

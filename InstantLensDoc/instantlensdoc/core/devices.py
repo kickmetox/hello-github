@@ -708,22 +708,24 @@ def scanner_choices(
             "wia",
         )
     if include_wia_dialog:
-        try:
-            from instantlensdoc.core.scan_transfer import WIA_DIALOG_DEVICE_ID, WIA_DIALOG_LABEL_DE
-        except Exception:  # pragma: no cover
-            WIA_DIALOG_DEVICE_ID, WIA_DIALOG_LABEL_DE = "wia:dialog", "Windows-Scannerauswahl (WIA-Dialog)"
-        out.append(
-            ScannerChoice(
-                label=WIA_DIALOG_LABEL_DE,
-                primary=DeviceInfo(
-                    kind=DeviceKind.SCANNER,
-                    name=WIA_DIALOG_LABEL_DE,
-                    device_id=WIA_DIALOG_DEVICE_ID,
-                    scope=DeviceScope.LOCAL,
-                    backend="WIA",
-                ),
+        only_network = bool(out) and all(device_is_network(ch.primary) for ch in out)
+        if not only_network:
+            try:
+                from instantlensdoc.core.scan_transfer import WIA_DIALOG_DEVICE_ID, WIA_DIALOG_LABEL_DE
+            except Exception:  # pragma: no cover
+                WIA_DIALOG_DEVICE_ID, WIA_DIALOG_LABEL_DE = "wia:dialog", "Windows-Scannerauswahl (WIA-Dialog)"
+            out.append(
+                ScannerChoice(
+                    label=WIA_DIALOG_LABEL_DE,
+                    primary=DeviceInfo(
+                        kind=DeviceKind.SCANNER,
+                        name=WIA_DIALOG_LABEL_DE,
+                        device_id=WIA_DIALOG_DEVICE_ID,
+                        scope=DeviceScope.LOCAL,
+                        backend="WIA",
+                    ),
+                )
             )
-        )
     return out
 
 

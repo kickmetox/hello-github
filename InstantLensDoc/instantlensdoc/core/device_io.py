@@ -24,9 +24,10 @@ DISCOVERY_STEP_TIMEOUT_S = 8.0
 MENU_REFRESH_TIMEOUT_S = 45.0
 
 DEVICE_TIMEOUT_DE = (
-    "Gerät antwortet nicht (Zeitüberschreitung {seconds} s). "
-    "Es ist möglicherweise im Energiesparmodus oder nicht erreichbar. "
-    "Bitte ein anderes Gerät wählen oder später erneut versuchen."
+    "Gerät hat nicht geantwortet (Zeitüberschreitung {seconds} s). "
+    "Netzwerk-Scanner im Energiesparmodus reagieren oft nicht "
+    "(WIA-Vorschau / Netzwerk). "
+    "Bitte eSCL/ScanTuxio oder ein anderes Gerät bzw. Backend wählen."
 )
 
 _POOL = ThreadPoolExecutor(max_workers=2, thread_name_prefix="ild-devio")

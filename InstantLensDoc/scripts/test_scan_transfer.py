@@ -31,6 +31,8 @@ from instantlensdoc.core.scan_transfer import (
     BACKEND_WIA,
     ScanAttempt,
     ScanJob,
+    WIA_DIALOG_DEVICE_ID,
+    WIA_NETWORK_NO_PREVIEW_DE,
     build_external_command,
     build_naps2_command,
     build_wia_command,
@@ -223,7 +225,7 @@ class TestPlanAndRun(unittest.TestCase):
         kinds = [s.kind for s in steps]
         self.assertEqual(kinds[0], "wia")
         self.assertIn("naps2", kinds)
-        self.assertEqual(kinds[-1], "wia-dialog")
+        self.assertNotIn("wia-dialog", kinds)
 
     def test_plan_forced_naps2(self) -> None:
         job = ScanJob(
@@ -287,6 +289,34 @@ class TestPlanAndRun(unittest.TestCase):
         kinds = [s.kind for s in steps]
         self.assertNotIn("wia", kinds)
         self.assertNotIn("wia-dialog", kinds)
+
+    def test_plan_wia_backend_ecosys_prefers_escl_no_preview(self) -> None:
+        job = ScanJob(
+            device_id="{6BDD1FC6-810F-11D0-BEC7-08002BE2092F}\\0002",
+            device_name="ECOSYS M5521cdn",
+            device_backend="WIA",
+            backend=BACKEND_WIA,
+            fallback_devices=[
+                ("native-escl:http://192.168.1.50:80", "ECOSYS M5521cdn", "ScanTuxio/eSCL"),
+            ],
+        )
+        with patch("instantlensdoc.core.scan_transfer.is_windows", return_value=True):
+            steps = plan_steps(job)
+        kinds = [s.kind for s in steps]
+        self.assertEqual(kinds[0], "escl")
+        self.assertNotIn("wia-dialog", kinds)
+        self.assertNotIn("ShowAcquireImage", "".join(s.kind for s in steps))
+
+    def test_plan_wia_backend_local_skips_auto_preview(self) -> None:
+        job = ScanJob(
+            device_id="{6BDD}\\0000",
+            device_name="Canon CanoScan",
+            device_backend="WIA",
+            backend=BACKEND_WIA,
+        )
+        with patch("instantlensdoc.core.scan_transfer.is_windows", return_value=True):
+            steps = plan_steps(job)
+        self.assertEqual([s.kind for s in steps], ["wia"])
 
     def test_run_scan_naps2_writes_file(self) -> None:
         with tempfile.TemporaryDirectory(prefix="ild-scan-test-") as raw:
@@ -422,6 +452,62 @@ class TestPlanAndRun(unittest.TestCase):
             self.assertTrue(result.cancelled)
             self.assertFalse(result.ok)
 
+    def test_run_scan_wia_timeout_mentions_network_backend(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="ild-scan-test-") as raw:
+            d = Path(raw)
+            cmds: list = []
+
+            def fake_run(cmd, *, timeout, cwd=None, env=None, hide_window=True):
+                cmds.append(list(cmd))
+                return 1, "", "", True
+
+            job = ScanJob(
+                device_id="{6BDD1FC6-810F-11D0-BEC7-08002BE2092F}\\0002",
+                device_name="ECOSYS M5521cdn",
+                device_backend="WIA",
+                backend=BACKEND_WIA,
+                out_dir=d,
+            )
+            with patch("instantlensdoc.core.scan_transfer.is_windows", return_value=True), patch(
+                "instantlensdoc.core.scan_transfer.powershell_exe", return_value="powershell"
+            ), patch(
+                "instantlensdoc.core.scan_transfer._escl_step_from_cache", return_value=None
+            ), patch("instantlensdoc.core.scan_transfer.run_process", side_effect=fake_run):
+                result = run_scan(job)
+            self.assertFalse(result.ok)
+            self.assertTrue(cmds)
+            self.assertTrue(all("-UseDialog" not in c for c in cmds))
+            self.assertIn("Energiesparmodus", result.error)
+            self.assertIn("Backend", result.error)
+
+    def test_run_scan_wia_dialog_refused_for_ecosys(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="ild-scan-test-") as raw:
+            d = Path(raw)
+            called = []
+
+            def fake_run(cmd, *, timeout, cwd=None, env=None, hide_window=True):
+                called.append(list(cmd))
+                return 0, "", "", False
+
+            job = ScanJob(
+                device_id=WIA_DIALOG_DEVICE_ID,
+                device_name="ECOSYS M5521cdn",
+                device_backend="WIA",
+                backend=BACKEND_WIA,
+                out_dir=d,
+            )
+            with patch("instantlensdoc.core.scan_transfer.is_windows", return_value=True), patch(
+                "instantlensdoc.core.scan_transfer.powershell_exe", return_value="powershell"
+            ), patch(
+                "instantlensdoc.core.scan_transfer._escl_step_from_cache", return_value=None
+            ), patch("instantlensdoc.core.scan_transfer.run_process", side_effect=fake_run):
+                result = run_scan(job)
+            self.assertFalse(result.ok)
+            self.assertFalse(called)
+            self.assertIn("Vorschau", result.error)
+            self.assertIn("Energiesparmodus", result.error)
+            self.assertIn("eSCL", WIA_NETWORK_NO_PREVIEW_DE)
+
     def test_wia_script_written_utf8_bom_and_items_item(self) -> None:
         with tempfile.TemporaryDirectory(prefix="ild-scan-test-") as raw:
             d = Path(raw)
@@ -437,6 +523,8 @@ class TestPlanAndRun(unittest.TestCase):
             self.assertIn("kein CommonDialog-Fallback", text)
             self.assertNotIn("Windows-Scannerdialog wird verwendet", text)
             self.assertGreater(text.find("ShowAcquireImage"), text.find("if ($UseDialog)"))
+            self.assertIn("kein CommonDialog/Vorschau für Netzwerk-MFP", text)
+            self.assertIn("ecosys", text.lower())
 
 
 class TestScannerChoices(unittest.TestCase):
@@ -491,6 +579,19 @@ class TestScannerChoices(unittest.TestCase):
         choices = scanner_choices([wia, escl], backend="auto", include_wia_dialog=False)
         self.assertEqual(len(choices), 1)
         self.assertTrue(choices[0].primary.device_id.startswith("native-escl:"))
+
+    def test_network_only_dropdown_omits_wia_dialog(self) -> None:
+        escl = DeviceInfo(
+            kind=DeviceKind.SCANNER,
+            name="ECOSYS M5521cdn",
+            device_id="native-escl:http://192.168.1.50:80",
+            scope=DeviceScope.NETWORK,
+            backend="ScanTuxio/eSCL",
+        )
+        choices = scanner_choices([escl], backend="auto", include_wia_dialog=True)
+        ids = [ch.primary.device_id for ch in choices]
+        self.assertTrue(any(i.startswith("native-escl:") for i in ids))
+        self.assertFalse(any(i == "wia:dialog" for i in ids))
 
 
 class TestAcquireBridge(unittest.TestCase):

@@ -96,6 +96,17 @@ EXTERNAL_PLACEHOLDERS: Tuple[str, ...] = (
 WIA_DIALOG_DEVICE_ID = "wia:dialog"
 WIA_DIALOG_LABEL_DE = "Windows-Scannerauswahl (WIA-Dialog)"
 
+# WIA-Vorschau (CommonDialog/ShowAcquireImage) an schlafenden Netzwerk-MFPs.
+WIA_NETWORK_NO_PREVIEW_DE = (
+    "WIA-Vorschau/CommonDialog wird für Netzwerk-Scanner nicht verwendet "
+    "(Energiesparmodus). Bitte eSCL/ScanTuxio oder ein anderes Gerät bzw. Backend wählen."
+)
+WIA_NETWORK_TIMEOUT_DE = (
+    "Gerät hat nicht geantwortet (WIA, {seconds} s). "
+    "Netzwerk-Scanner im Energiesparmodus reagieren oft nicht auf die WIA-Vorschau. "
+    "Bitte eSCL/ScanTuxio oder ein anderes Gerät bzw. Backend wählen."
+)
+
 DEFAULT_TIMEOUT_S = 240.0
 FILE_WAIT_S = 6.0
 EXTERNAL_FILE_WAIT_S = 12.0
@@ -655,7 +666,8 @@ def backend_availability(settings: Optional[dict] = None) -> List[BackendStatus]
             BACKEND_AUTO,
             BACKEND_LABELS_DE[BACKEND_AUTO],
             True,
-            "Lokal: WIA → NAPS2 → Dialog. Netzwerk: eSCL/AirScan zuerst (kein WIA-Connect im Sleep).",
+            "Lokal: WIA-Transfer (keine Auto-Vorschau). Netzwerk: eSCL/AirScan/ScanTuxio "
+            "(kein WIA-CommonDialog).",
         )
     )
     st_path = ""
@@ -684,7 +696,12 @@ def backend_availability(settings: Optional[dict] = None) -> List[BackendStatus]
                 BACKEND_WIA,
                 BACKEND_LABELS_DE[BACKEND_WIA],
                 bool(ps),
-                f"gefunden: {ps} (WIA-COM)" if ps else "PowerShell nicht gefunden",
+                (
+                    f"gefunden: {ps} (WIA-COM, Transfer ohne Vorschau-Dialog; "
+                    "Netzwerk-MFP → eSCL)"
+                    if ps
+                    else "PowerShell nicht gefunden"
+                ),
                 ps or "",
             )
         )
@@ -966,6 +983,12 @@ try {
   $item = $null
   if ($UseDialog) {
     # Nur mit Watchdog (ILD killt wiaacmgr-Baum bei Timeout). Nie stiller Fallback.
+    # Kein CommonDialog/Vorschau für Netzwerk-MFP (ECOSYS/Kyocera im Sleep → „Es ist ein Fehler aufgetreten“).
+    $blob = (($DeviceId + ' ' + $DeviceName)).ToLowerInvariant()
+    if ($blob -match 'ecosys|kyocera|taskalfa|m5521|m5526|m2040|m2135|e-studio|workcentre|airprint|airscan|netzwerk|network') {
+      Write-Err 'WIA: kein CommonDialog/Vorschau für Netzwerk-MFP (Energiesparmodus). Bitte eSCL oder ScanTuxio wählen.'
+      exit 1
+    }
     $cd = New-Object -ComObject WIA.CommonDialog
     $img = $cd.ShowAcquireImage()
     if ($null -eq $img) { Write-Output 'CANCELLED'; exit 3 }
@@ -1127,6 +1150,10 @@ def _run_wia(
     use_dialog: bool,
 ) -> ScanAttempt:
     attempt = ScanAttempt(backend=BACKEND_WIA)
+    if use_dialog and _job_looks_network(job):
+        attempt.error = WIA_NETWORK_NO_PREVIEW_DE
+        scan_log(f"WIA: {attempt.error}")
+        return attempt
     ps = powershell_exe()
     if not ps:
         attempt.error = "PowerShell nicht gefunden — WIA-Scan nur unter Windows möglich."
@@ -1144,8 +1171,8 @@ def _run_wia(
         script,
         out_dir=out_dir,
         result_file=result_file,
-        device_id=device_id if not use_dialog else "",
-        device_name=device_name if not use_dialog else "",
+        device_id=device_id or "",
+        device_name=device_name or "",
         dpi=job.dpi,
         color_mode=job.color_mode,
         source=job.source,
@@ -1181,10 +1208,7 @@ def _run_wia(
             attempt.cancelled = True
             attempt.error = "Scan abgebrochen (Windows-Scannerdialog)."
         elif to:
-            attempt.error = (
-                f"Zeitüberschreitung ({int(wia_timeout)} s) beim WIA-Scan. "
-                "Gerät im Energiesparmodus oder nicht erreichbar — anderes Gerät wählen."
-            )
+            attempt.error = WIA_NETWORK_TIMEOUT_DE.format(seconds=int(wia_timeout))
         else:
             msg = _tail(err, 400) or f"Exit-Code {rc}"
             if is_busy_text(err):
@@ -1446,7 +1470,7 @@ def _steps_for_device(device_id: str, device_name: str, device_backend: str, *, 
     win = is_windows()
     steps: List[_Step] = []
     if cls == "dialog":
-        return [_Step("wia-dialog")]
+        return [] if skip_wia else [_Step("wia-dialog")]
     if cls == "naps2":
         drv, nm = parse_naps2_id(device_id)
         steps.append(_Step("naps2", device_id, nm or name, drv))
@@ -1476,7 +1500,10 @@ def _steps_for_device(device_id: str, device_name: str, device_backend: str, *, 
     if cls == "sane" or (cls == "unknown" and not win):
         return [_Step("sane", device_id, name)]
     if cls == "none":
-        return [_Step("wia-dialog")] if win and not skip_wia else ([_Step("sane", "", "")] if not win else [])
+        if not win:
+            return [_Step("sane", "", "")]
+        # Windows: kein Auto-CommonDialog — Vorschau nur bei explizitem wia:dialog.
+        return []
     # unknown unter Windows: Name probieren
     if win and not core_only and name and not skip_wia:
         steps.append(_Step("wia", "", name))
@@ -1512,7 +1539,6 @@ def plan_steps(job: ScanJob) -> List[_Step]:
     """Versuchsreihenfolge gemäß Backend-Einstellung (dedupliziert)."""
     backend = (job.backend or BACKEND_AUTO).lower()
     naps2_ok = bool(naps2_console_path(job.naps2_path))
-    win = is_windows()
     devices = [(job.device_id, job.device_name, job.device_backend)] + list(job.fallback_devices or [])
     name = clean_device_name(job.device_name)
     steps: List[_Step] = []
@@ -1520,13 +1546,31 @@ def plan_steps(job: ScanJob) -> List[_Step]:
     if backend == BACKEND_EXTERNAL:
         steps = [_Step("external", job.device_id, name)]
     elif backend == BACKEND_WIA:
-        cls = classify_device_id(job.device_id, job.device_backend)
-        if cls == "dialog" or (not job.device_id and not name):
-            steps = [_Step("wia-dialog")]
-        elif cls == "wia":
-            steps = [_Step("wia", job.device_id, name), _Step("wia-dialog")]
+        if _job_looks_network(job):
+            # Kein CommonDialog/Vorschau für Netzwerk-MFP — eSCL/ScanTuxio zuerst.
+            for did, dn, dbe in devices:
+                if classify_device_id(did, dbe) == "escl":
+                    steps.append(_Step("escl", did, clean_device_name(dn)))
+            if not any(s.kind == "escl" for s in steps):
+                extra = _escl_step_from_cache(name)
+                if extra is not None:
+                    steps.append(extra)
+            cls = classify_device_id(job.device_id, job.device_backend)
+            if cls != "dialog":
+                wid = job.device_id if cls == "wia" else ""
+                if wid or name:
+                    steps.append(_Step("wia", wid, name))
+            elif not steps:
+                # Expliziter CommonDialog an Netzwerk-MFP: nicht starten (DE-Hinweis).
+                steps.append(_Step("wia-dialog", job.device_id, name))
         else:
-            steps = [_Step("wia", "", name), _Step("wia-dialog")]
+            cls = classify_device_id(job.device_id, job.device_backend)
+            if cls == "dialog" or (not job.device_id and not name):
+                steps = [_Step("wia-dialog")]
+            else:
+                # WIA gewählt: Transfer ohne Auto-Vorschau (kein ShowAcquireImage).
+                wid = job.device_id if cls == "wia" else ""
+                steps = [_Step("wia", wid, name)]
     elif backend == BACKEND_NAPS2:
         cls = classify_device_id(job.device_id, job.device_backend)
         if cls == "naps2":
@@ -1555,8 +1599,6 @@ def plan_steps(job: ScanJob) -> List[_Step]:
                     did, dn, dbe, naps2_ok=naps2_ok, core_only=core_only, skip_wia=skip_wia
                 )
             )
-        if win and not core_only and not skip_wia:
-            steps.append(_Step("wia-dialog"))
         if skip_wia:
             escl_steps = [s for s in steps if s.kind == "escl"]
             if not escl_steps:
@@ -1587,7 +1629,17 @@ def _run_step(job: ScanJob, out_dir: Path, step: _Step) -> ScanAttempt:
     if step.kind == "wia":
         return _run_wia(job, out_dir, device_id=step.device_id, device_name=step.device_name, use_dialog=False)
     if step.kind == "wia-dialog":
-        return _run_wia(job, out_dir, device_id="", device_name="", use_dialog=True)
+        if _job_looks_network(job):
+            a = ScanAttempt(backend=BACKEND_WIA, error=WIA_NETWORK_NO_PREVIEW_DE)
+            scan_log(f"WIA: {a.error}")
+            return a
+        return _run_wia(
+            job,
+            out_dir,
+            device_id=step.device_id,
+            device_name=step.device_name,
+            use_dialog=True,
+        )
     if step.kind == "escl":
         return _run_escl(job, out_dir, device_id=step.device_id)
     if step.kind == "sane":
@@ -1681,6 +1733,8 @@ __all__ = [
     "SOURCE_LABELS_DE",
     "WIA_DIALOG_DEVICE_ID",
     "WIA_DIALOG_LABEL_DE",
+    "WIA_NETWORK_NO_PREVIEW_DE",
+    "WIA_NETWORK_TIMEOUT_DE",
     "backend_availability",
     "build_external_command",
     "build_naps2_command",
