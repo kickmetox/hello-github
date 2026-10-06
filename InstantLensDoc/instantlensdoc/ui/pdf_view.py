@@ -3247,9 +3247,10 @@ class PdfViewer(QWidget):
             "Auswahl gruppieren (≥2). Klick, Gummiband oder Ctrl+Klick für Mehrfachauswahl — wie DTP."
         )
         btn_group.clicked.connect(self.group_selected_annotations)
-        btn_ungroup = QPushButton("⧉")
-        btn_ungroup.setFixedWidth(28)
-        btn_ungroup.setToolTip("Auswahl entgruppieren (group_id leeren)")
+        btn_ungroup = QPushButton("Aufh.")
+        btn_ungroup.setFixedWidth(36)
+        btn_ungroup.setObjectName("btnAnnUngroup")
+        btn_ungroup.setToolTip("Gruppierung aufheben (group_id leeren)")
         btn_ungroup.clicked.connect(self.ungroup_selected_annotations)
         btn_group_lock = QPushButton("🔒")
         btn_group_lock.setFixedWidth(28)
@@ -5900,7 +5901,7 @@ class PdfViewer(QWidget):
         act_paste = menu.addAction("Einfügen\tCtrl+V")
         menu.addSeparator()
         act_group = menu.addAction("Gruppieren")
-        act_ungroup = menu.addAction("Entgruppieren")
+        act_ungroup = menu.addAction("Gruppierung aufheben")
         menu.addSeparator()
         act_front = menu.addAction("Nach vorn")
         act_back = menu.addAction("Nach hinten")
@@ -9078,38 +9079,38 @@ class PdfViewer(QWidget):
         return n
 
     def ungroup_selected_annotations(self) -> int:
-        """Auswahl entgruppieren (group_id leeren)."""
+        """Gruppierung aufheben (group_id leeren)."""
         if not self.store:
             self.status.emit("Kein PDF geladen")
-            QMessageBox.information(self, "Entgruppieren", "Kein PDF geladen.")
+            QMessageBox.information(self, "Gruppierung aufheben", "Kein PDF geladen.")
             return 0
         ids = self._selected_annotation_ids()
         if not ids:
-            self.status.emit("Entgruppieren: keine Auswahl")
+            self.status.emit("Gruppierung aufheben: keine Auswahl")
             QMessageBox.information(
                 self,
-                "Entgruppieren",
+                "Gruppierung aufheben",
                 "Zuerst eine Gruppe auswählen (Klick auf ein Mitglied).",
             )
             return 0
         n = self.store.ungroup(ids)
         if n <= 0:
-            self.status.emit("Entgruppieren: keine Gruppe in der Auswahl")
+            self.status.emit("Gruppierung aufheben: keine Gruppe in der Auswahl")
             QMessageBox.information(
-                self, "Entgruppieren", "Die Auswahl ist nicht gruppiert."
+                self, "Gruppierung aufheben", "Die Auswahl ist nicht gruppiert."
             )
             return 0
         try:
             self.schedule_sidecar_save(force=True)
         except Exception as e:
-            QMessageBox.warning(self, "Entgruppieren", str(e))
+            QMessageBox.warning(self, "Gruppierung aufheben", str(e))
             return 0
         self.refresh()
         self._selected_ann_ids = set(ids)
         self._selected_ann_id = ids[0] if ids else None
         self.canvas.set_selected_ids(ids)
         self.annotations_changed.emit()
-        self.status.emit(f"{n} Annotation(en) entgruppiert")
+        self.status.emit(f"{n} Annotation(en): Gruppierung aufgehoben")
         return n
 
     def toggle_selected_group_lock(self) -> int:

@@ -451,6 +451,17 @@ def test_ctrl_click_multi_select_then_group_ungroup(qapp, viewer):
     assert viewer.store.get(b.id).group_id == ""
 
 
+def test_group_ungroup_labels():
+    mw = (ROOT / "instantlensdoc" / "ui" / "main_window.py").read_text(encoding="utf-8")
+    pv = (ROOT / "instantlensdoc" / "ui" / "pdf_view.py").read_text(encoding="utf-8")
+    assert 'QAction("Gruppieren"' in mw
+    assert 'QAction("Gruppierung aufheben"' in mw
+    assert "actAnnGroup" in mw and "actAnnUngroup" in mw
+    assert 'menu.addAction("Gruppieren")' in pv
+    assert 'menu.addAction("Gruppierung aufheben")' in pv
+    assert "btnAnnUngroup" in pv
+
+
 def test_rubber_band_then_grp(qapp, viewer):
     from ild_pdf import AnnotationType
     from PySide6.QtWidgets import QApplication

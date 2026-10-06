@@ -2660,17 +2660,19 @@ class MainWindow(QMainWindow):
         m_align.addAction(act_dist_v)
         m_align.addSeparator()
         act_group = QAction("Gruppieren", self)
+        act_group.setObjectName("actAnnGroup")
         act_group.setShortcut(QKeySequence("Ctrl+Alt+Shift+G"))
         act_group.setToolTip(
-            "Ausgewählte Annotationen gruppieren (≥2) — temporäre Gruppen-ID im Sidecar "
-            "(Ctrl+Alt+Shift+G)"
+            "Ausgewählte PDF-Overlays gruppieren (≥2): Klick, Gummiband oder Strg+Klick "
+            "wie DTP — temporäre Gruppen-ID (Ctrl+Alt+Shift+G)"
         )
         act_group.triggered.connect(self._group_selected_annotations)
         m_align.addAction(act_group)
-        act_ungroup = QAction("Entgruppieren", self)
+        act_ungroup = QAction("Gruppierung aufheben", self)
+        act_ungroup.setObjectName("actAnnUngroup")
         act_ungroup.setShortcut(QKeySequence("Ctrl+Alt+Shift+Y"))
         act_ungroup.setToolTip(
-            "Auswahl entgruppieren (group_id leeren) — Ctrl+Alt+Shift+Y"
+            "Gruppierung der Overlay-Auswahl aufheben (group_id leeren) — Ctrl+Alt+Shift+Y"
         )
         act_ungroup.triggered.connect(self._ungroup_selected_annotations)
         m_align.addAction(act_ungroup)
@@ -7299,7 +7301,7 @@ class MainWindow(QMainWindow):
             self._refresh_pdf_marks()
 
     def _ungroup_selected_annotations(self):
-        if not self._ensure_pdf_target("Entgruppieren"):
+        if not self._ensure_pdf_target("Gruppierung aufheben"):
             return
         n = self.pdf_view.ungroup_selected_annotations()
         if n:
