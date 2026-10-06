@@ -25,6 +25,7 @@ from PySide6.QtWidgets import (
     QListWidgetItem,
     QMessageBox,
     QPushButton,
+    QScrollArea,
     QSpinBox,
     QTabWidget,
     QTableWidget,
@@ -396,6 +397,7 @@ class SettingsDialog(QDialog):
         outer = QVBoxLayout(self)
         self.tabs = QTabWidget()
         general = QWidget()
+        general.setObjectName("settingsGeneralPage")
         layout = QVBoxLayout(general)
         layout.addWidget(QLabel(tr("settings_title")))
 
@@ -1961,15 +1963,55 @@ class SettingsDialog(QDialog):
 
         stubs_page = self._build_stubs_page()
         scan_page = self._build_scan_page()
-        self.tabs.addTab(general, "Allgemein")
+        general_scroll = QScrollArea()
+        general_scroll.setObjectName("settingsGeneralScroll")
+        general_scroll.setWidgetResizable(True)
+        general_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        general_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        general_scroll.setFrameShape(QFrame.NoFrame)
+        general_scroll.setWidget(general)
+        self._general_scroll = general_scroll
+        self.tabs.addTab(general_scroll, "Allgemein")
         self.tabs.addTab(scan_page, "Scannen")
         self.tabs.addTab(stubs_page, "Stubs")
-        outer.addWidget(self.tabs)
+        outer.addWidget(self.tabs, 1)
 
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons.setObjectName("settingsDialogButtons")
         buttons.accepted.connect(self._save)
         buttons.rejected.connect(self.reject)
         outer.addWidget(buttons)
+        self._cap_dialog_to_screen()
+
+    def showEvent(self, event):  # noqa: N802
+        super().showEvent(event)
+        self._cap_dialog_to_screen()
+
+    def _cap_dialog_to_screen(self) -> None:
+        """OK/Abbrechen bleiben sichtbar — Allgemein scrollt auf Laptop-Höhe."""
+        from PySide6.QtWidgets import QApplication
+
+        screen = None
+        try:
+            wh = self.windowHandle()
+            if wh is not None:
+                screen = wh.screen()
+        except Exception:
+            screen = None
+        if screen is None:
+            app = QApplication.instance()
+            if app is not None:
+                screen = app.primaryScreen()
+        if screen is None:
+            return
+        ag = screen.availableGeometry()
+        cap_h = max(420, int(ag.height() * 0.82))
+        cap_w = max(520, int(ag.width() * 0.92))
+        self.setMaximumHeight(cap_h)
+        self.setMaximumWidth(cap_w)
+        w = min(max(self.width() or 620, 520), cap_w)
+        h = min(max(self.height() or 560, 420), cap_h)
+        self.resize(w, h)
 
     def _build_scan_page(self) -> QWidget:
         """Einstellungen → Scannen: Backend, Pfade, DPI/Farbe/Quelle — 2.6.54."""

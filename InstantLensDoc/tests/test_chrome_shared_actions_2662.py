@@ -464,23 +464,39 @@ def test_ribbon_overflow_one_column_triggers_bound_qaction() -> None:
     assert hits["n"] >= 1, f"Overflow-Klick ohne QAction.triggered ({hits['n']})"
 
 
+def _same_action(menu_act, ribbon_act) -> bool:
+    if menu_act is ribbon_act:
+        return True
+    try:
+        return menu_act.property("ildMirrorOf") is ribbon_act
+    except Exception:
+        return False
+
+
 def test_absatz_seitenlayout_einfuegen_share_ribbon_qactions() -> None:
     _seed()
     _p, _h, para = _menu_action("Absatz", "Absatz…")
-    assert _WIN.ribbon_bar.qaction("paragraph") is para
-    assert _WIN.chrome_tab_qactions("Start")["paragraph"] is para
+    rib_para = _WIN.ribbon_bar.qaction("paragraph")
+    assert _same_action(para, rib_para)
+    assert _same_action(_WIN.chrome_tab_qactions("Start")["paragraph"], rib_para) or (
+        _WIN.chrome_tab_qactions("Start")["paragraph"] is rib_para
+    )
     _p, _h, hf = _menu_action("Seitenlayout", "Kopf-/Fußzeile…")
-    assert _WIN.ribbon_bar.qaction("header_footer") is hf
-    assert _WIN.chrome_tab_qactions("Seitenlayout")["header_footer"] is hf
+    rib_hf = _WIN.ribbon_bar.qaction("header_footer")
+    assert _same_action(hf, rib_hf)
+    assert _WIN.chrome_tab_qactions("Seitenlayout")["header_footer"] is rib_hf or _same_action(
+        _WIN.chrome_tab_qactions("Seitenlayout")["header_footer"], rib_hf
+    )
     _p, _h, ft = _menu_action("Absatz", "Ersatzzeichen…")
-    assert _WIN.ribbon_bar.qaction("field_token") is ft
+    rib_ft = _WIN.ribbon_bar.qaction("field_token")
+    assert _same_action(ft, rib_ft)
     _p, _h, ft_ins = _menu_action("Einfügen", "Ersatzzeichen…")
-    assert ft_ins is ft
-    assert _WIN.chrome_tab_qactions("Einfügen")["field_token"] is ft
+    assert ft_ins is rib_ft or _same_action(ft_ins, rib_ft)
+    assert _WIN.chrome_tab_qactions("Einfügen")["field_token"] is rib_ft
     _p, _h, a4 = _menu_action("Seitenlayout", "A4")
-    assert _WIN.ribbon_bar.qaction("page_size_a4") is a4
+    assert _same_action(a4, _WIN.ribbon_bar.qaction("page_size_a4"))
     _p, _h, cols = _menu_action("Seitenlayout", "2 Spalten")
-    assert _WIN.chrome_qactions()["page_columns_2"] is cols
+    assert _same_action(cols, _WIN.chrome_qactions()["page_columns_2"])
     assert _WIN.chrome_feature_qactions("Ausrichtung")["align_left"] is _WIN.chrome_qactions()[
         "align_left"
     ]

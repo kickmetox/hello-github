@@ -1,5 +1,19 @@
 # InstantLens Doc — Kurzinfo
 
+### 2.6.61 — UI: ein Menü pro Klick, Einstellungen scrollbar, Tab zeigt Dokument
+
+Ein Pulldown zur Zeit (Enablement öffnet keine Stapel-Popups); Allgemein-Tab scrollbar; Tab-X/Öffnen ohne Extra-Popups; geöffnete Datei in der zentralen Ansicht. Pack `InstantLensDoc-2.6.61-pack.zip`. VERSION **2.6.61**.
+
+**Windows-Rebuild (Andreas Meyer)** — Ziel `D:\AI_Temp\InstantLensDoc-2661`:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File "D:\AI_Temp\sync-ild.ps1" -LocalPack D:\AI_Temp\InstantLensDoc-2.6.61-pack.zip -Dest D:\AI_Temp\InstantLensDoc-2661 -Swap -SkipStart
+cd D:\AI_Temp\InstantLensDoc
+python -m pip install -r requirements.txt
+powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
+powershell -ExecutionPolicy Bypass -File .\scripts\install-ild.ps1
+```
+
 ### 2.6.60 — Release
 
 PDF-Menü live, OCR-Layout/Felder/Handschrift, DTP-Gruppieren/Overlays/Stempel, Word-Ribbon Start–Ansicht, vereinigte Ansicht (Text/PDF/DTP), Ribbon-Scrollbar, Schriftwerkzeuge grau ohne OCR, Schreibschutz und Textersteller, Tinte/Maus/rechte Werkzeugspalte, Markdown/CSV/Excel (md/csv/xls/xlsx), Layout-Marken, DTP-Hilfe und Speichern-Abfrage. Pack `InstantLensDoc-2.6.60-pack.zip`. VERSION **2.6.60**. HEAD `f51542a`. Nach 2.6.59-Pack (`659cf45`).
@@ -57,7 +71,7 @@ Menü **Geräte** (Scanner / Scannen…, Drucker, Erkennen), PDF → Scannen, To
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **2.6.60** |
+| Version | **2.6.61** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |

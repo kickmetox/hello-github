@@ -1788,6 +1788,12 @@ class MainWindow(QMainWindow):
             menu = None
         if menu is None:
             return
+        try:
+            from instantlensdoc.ui.menu_click import close_other_menus
+
+            close_other_menus(menu, menubar=self.menuBar())
+        except Exception:
+            pass
         self._fill_devices_menu_from_cache(menu)
         self._schedule_device_cache_refresh()
 
@@ -4402,9 +4408,11 @@ class MainWindow(QMainWindow):
             elif title == "Hilfe":
                 help_act = act
 
-        m_format = QMenu("&Format", self)
+        m_format = QMenu("&Format", mb)
         m_format.setObjectName("menuFormat")
         m_format.setToolTip("Zeichen- und Absatzformat — Auswahl oder ganzes Dokument")
+        from instantlensdoc.ui.menu_click import mirror_menu_action
+
         for act in edit_acts:
             if act.isSeparator():
                 continue
@@ -4417,13 +4425,13 @@ class MainWindow(QMainWindow):
                         if sa.isSeparator():
                             nm.addSeparator()
                         else:
-                            nm.addAction(sa)
+                            nm.addAction(mirror_menu_action(sa, nm))
                 continue
             text = (act.text() or "").replace("&", "").strip()
             if text in self._FORMAT_MENU_TEXTS:
-                m_format.addAction(act)
+                m_format.addAction(mirror_menu_action(act, m_format))
 
-        m_absatz = QMenu("&Absatz", self)
+        m_absatz = QMenu("&Absatz", mb)
         m_absatz.setObjectName("menuAbsatz")
         m_absatz.setToolTip(
             "Absatzdialog, Ausrichtung, Aufzählung/Nummerierung — Word-Suite/DOCX"
@@ -4446,14 +4454,14 @@ class MainWindow(QMainWindow):
                 continue
             shared = by_edit.get(text)
             if shared is not None:
-                m_absatz.addAction(shared)
+                m_absatz.addAction(mirror_menu_action(shared, m_absatz))
         if styles_acts:
             nm = m_absatz.addMenu("Formatvorlagen")
             for sa in styles_acts:
                 if sa.isSeparator():
                     nm.addSeparator()
                 else:
-                    nm.addAction(sa)
+                    nm.addAction(mirror_menu_action(sa, nm))
         m_absatz.addSeparator()
         act_ls10 = QAction("Zeilenabstand 1,0", self)
         act_ls10.setObjectName("actLineSpacing10")
@@ -4506,17 +4514,21 @@ class MainWindow(QMainWindow):
         act_vbottom.triggered.connect(lambda: self._set_cell_vertical_align("bottom"))
         m_absatz.addAction(self._track_editor_action(act_vbottom))
         m_absatz.addSeparator()
-        m_absatz.addAction(self._track_editor_action(self._field_token_action))
+        m_absatz.addAction(
+            self._track_editor_action(
+                mirror_menu_action(self._field_token_action, m_absatz)
+            )
+        )
         self._absatz_menu = m_absatz
         self._editor_only_menus.append(m_absatz)
 
-        m_seiten = QMenu("Seiten&layout", self)
+        m_seiten = QMenu("Seiten&layout", mb)
         m_seiten.setObjectName("menuSeitenlayout")
         m_seiten.setToolTip(
             "Seitenformat-Picker und Ausrichtung für den Word-Suite-/DOCX-Editor"
         )
         if getattr(self, "_page_layout_action", None) is not None:
-            m_seiten.addAction(self._page_layout_action)
+            m_seiten.addAction(mirror_menu_action(self._page_layout_action, m_seiten))
         m_seiten.addSeparator()
         act_port = QAction("Hochformat", self)
         act_port.setObjectName("actPageLayoutPortrait")
@@ -4602,7 +4614,7 @@ class MainWindow(QMainWindow):
         self._seitenlayout_menu = m_seiten
         self._editor_only_menus.append(m_seiten)
 
-        m_fenster = QMenu("&Fenster", self)
+        m_fenster = QMenu("&Fenster", mb)
         m_fenster.setObjectName("menuFenster")
         m_fenster.setToolTip("Teilung, Sync-Scroll, separates Dokumentfenster")
         if view_acts:
@@ -4613,7 +4625,7 @@ class MainWindow(QMainWindow):
                     continue
                 text = (act.text() or "").replace("&", "").strip()
                 if text in self._FENSTER_MENU_TEXTS:
-                    m_fenster.addAction(act)
+                    m_fenster.addAction(mirror_menu_action(act, m_fenster))
         act_detach = QAction("Dokument in eigenem Fenster", self)
         act_detach.setObjectName("actDetachDocumentWindow")
         act_detach.setToolTip("Aktuelles Dokument in einem schließbaren Viewer-Fenster")
@@ -4639,9 +4651,9 @@ class MainWindow(QMainWindow):
                     if sa.isSeparator():
                         nm.addSeparator()
                     else:
-                        nm.addAction(sa)
+                        nm.addAction(mirror_menu_action(sa, nm))
 
-        m_dtp = QMenu("&DTP", self)
+        m_dtp = QMenu("&DTP", mb)
         m_dtp.setObjectName("menuDtp")
         m_dtp.setToolTip(
             "DTP-Werkzeuge in derselben Ansicht wie Text und PDF"
@@ -4655,7 +4667,7 @@ class MainWindow(QMainWindow):
         self._dtp_view_action.triggered.connect(self._on_layout_mode_triggered)
         m_dtp.addAction(self._dtp_view_action)
         if getattr(self, "_layout_mode_action", None) is not None:
-            m_dtp.addAction(self._layout_mode_action)
+            m_dtp.addAction(mirror_menu_action(self._layout_mode_action, m_dtp))
         for objn in (
             "actTextOnPath",
             "actTextToOutlines",
@@ -4674,7 +4686,7 @@ class MainWindow(QMainWindow):
             except Exception:
                 shared = None
             if shared is not None:
-                m_dtp.addAction(shared)
+                m_dtp.addAction(mirror_menu_action(shared, m_dtp))
         shared_fc = None
         try:
             from PySide6.QtGui import QAction as _QA
@@ -4683,7 +4695,7 @@ class MainWindow(QMainWindow):
         except Exception:
             shared_fc = None
         if shared_fc is not None:
-            m_dtp.addAction(shared_fc)
+            m_dtp.addAction(mirror_menu_action(shared_fc, m_dtp))
         act_dtp_help = QAction("Hilfe…", self)
         act_dtp_help.setObjectName("actDtpHelp")
         act_dtp_help.setToolTip("DTP-Hilfe: Werkzeuge, Rahmen, Speichern, Tastatur (F1)")
@@ -4721,13 +4733,29 @@ class MainWindow(QMainWindow):
         """Menütitel DTP (11f8876): aboutToShow → _enter_layout_mode, eine Spalte."""
         if getattr(self, "_dtp_switching", False):
             return
+        menu = self.sender()
+        try:
+            mb = self.menuBar()
+            active = mb.activeAction() if mb is not None else None
+            if (
+                active is not None
+                and active.menu() is not None
+                and menu is not None
+                and active.menu() is not menu
+            ):
+                return
+        except Exception:
+            pass
         self._dtp_menu_showing = True
         try:
             try:
-                from instantlensdoc.ui.menu_click import prepare_menu_for_clicks
+                from instantlensdoc.ui.menu_click import (
+                    close_other_menus,
+                    prepare_menu_for_clicks,
+                )
 
-                menu = self.sender()
                 if menu is not None:
+                    close_other_menus(menu, menubar=self.menuBar())
                     prepare_menu_for_clicks(menu)
             except Exception:
                 pass
@@ -4738,11 +4766,15 @@ class MainWindow(QMainWindow):
     def _on_word_suite_menu_about_to_show(self) -> None:
         """Eine Spalte + Enablement bevor Absatz/Seitenlayout/Format layoutet."""
         try:
-            from instantlensdoc.ui.menu_click import prepare_menu_for_clicks
+            from instantlensdoc.ui.menu_click import (
+                close_other_menus,
+                prepare_menu_for_clicks,
+            )
             from PySide6.QtWidgets import QMenu
 
             menu = self.sender()
             if isinstance(menu, QMenu):
+                close_other_menus(menu, menubar=self.menuBar())
                 prepare_menu_for_clicks(menu)
         except Exception:
             pass
@@ -4830,10 +4862,14 @@ class MainWindow(QMainWindow):
     def _on_pdf_menu_about_to_show(self) -> None:
         """Eine Spalte + Enablement, bevor das lange PDF-Menü layoutet."""
         try:
-            from instantlensdoc.ui.menu_click import prepare_menu_for_clicks
+            from instantlensdoc.ui.menu_click import (
+                close_other_menus,
+                prepare_menu_for_clicks,
+            )
 
             menu = getattr(self, "_pdf_menu", None)
             if menu is not None:
+                close_other_menus(menu, menubar=self.menuBar())
                 prepare_menu_for_clicks(menu)
         except Exception:
             pass
@@ -5175,6 +5211,12 @@ class MainWindow(QMainWindow):
         """Enable/Disable mit Tooltip-Grund, ohne Tooltip zu stapeln — 2.6.54."""
         if act is None:
             return
+        try:
+            src = act.property("ildMirrorOf")
+            if src is not None:
+                act = src
+        except Exception:
+            pass
         try:
             src = act.property("ildAvailTip")
             if not src:
@@ -5769,6 +5811,7 @@ class MainWindow(QMainWindow):
 
         for top in mb.actions():
             try:
+                # Nur der Menütitel (QAction). QMenu.setVisible(True) öffnet das Popup.
                 top.setVisible(True)
                 top.setEnabled(True)
             except Exception:
@@ -5776,7 +5819,6 @@ class MainWindow(QMainWindow):
             menu = top.menu() if hasattr(top, "menu") else None
             if menu is not None:
                 try:
-                    menu.setVisible(True)
                     menu.setEnabled(True)
                 except Exception:
                     pass
@@ -10682,8 +10724,23 @@ class MainWindow(QMainWindow):
         self._set_status(f"Separates Fenster: {p.name}")
 
     def _on_doc_tab_activated(self, path: str) -> None:
-        if path:
-            self.open_path(path)
+        if not path:
+            return
+        self._dismiss_chrome_menus()
+        cur = ""
+        try:
+            if self.doc and self.doc.path:
+                cur = str(Path(self.doc.path))
+        except Exception:
+            cur = ""
+        try:
+            same = bool(cur) and str(Path(path)) == str(Path(cur))
+        except Exception:
+            same = bool(cur) and cur == str(path)
+        if same:
+            self._reveal_document_host()
+            return
+        self.open_path(path)
 
     def _schedule_doc_tab_bar_sync(self, *_args) -> None:
         """Tab-Leiste nach Modelländerung der Dokumentliste nachziehen (gebündelt) — 2.6.54."""
@@ -11183,6 +11240,59 @@ class MainWindow(QMainWindow):
             self._set_status("Keine wiederherstellbaren Session-Tabs")
         else:
             self._set_status("Weitergearbeitet — letzte Session-Tabs geöffnet")
+
+    def _dismiss_chrome_menus(self) -> None:
+        """Offene Menüleisten-Popups zu — Klick auf Tab-X / Öffnen trifft kein Blatt."""
+        try:
+            from instantlensdoc.ui.menu_click import close_other_menus
+
+            close_other_menus(None, menubar=self.menuBar())
+        except Exception:
+            pass
+
+    def _reveal_document_host(self) -> None:
+        """Geöffnetes Dokument in der zentralen Ansicht zeigen, nicht nur als Tab.
+
+        DTP bleibt Overlay in derselben Ansicht, wenn der Layout-Modus aktiv ist;
+        sonst darf die DTP-Fläche den Stack nicht verdecken.
+        """
+        self._dismiss_chrome_menus()
+        stack = getattr(self, "stack", None)
+        if stack is None:
+            return
+        doc = getattr(self, "doc", None)
+        kind = getattr(doc, "kind", None) if doc is not None else None
+        want = None
+        if kind == DocKind.PDF:
+            want = getattr(self, "pdf_view", None)
+        elif kind == DocKind.IMAGE:
+            want = getattr(self, "image_label", None)
+        elif doc is not None:
+            want = getattr(self, "editor_pane", None)
+        if want is None:
+            return
+        try:
+            want.show()
+            stack.setCurrentWidget(want)
+            stack.show()
+        except Exception:
+            pass
+        pane = getattr(self, "dtp_pane", None)
+        if pane is not None:
+            try:
+                if self._layout_mode_active():
+                    pane.show()
+                    pane.raise_()
+                else:
+                    pane.hide()
+            except Exception:
+                pass
+        host = getattr(self, "_doc_host", None)
+        if host is not None:
+            try:
+                host.show()
+            except Exception:
+                pass
 
     def _show_welcome_if_empty(self) -> bool:
         """Willkommensseite anzeigen wenn keine Tabs / kein Dokument — 1.0.0."""
@@ -12642,7 +12752,7 @@ class MainWindow(QMainWindow):
         return False
 
     def _sync_editor_only_actions(self, *_args) -> None:
-        """Aktionen grauen (Tooltip), Menüs bleiben sichtbar — nie setVisible(False)."""
+        """Aktionen grauen (Tooltip); Menütitel bleiben (QAction), Popup nicht aufklappen."""
         caps = self._view_capability_state()
         for act in getattr(self, "_editor_only_actions", None) or []:
             try:
@@ -12675,7 +12785,7 @@ class MainWindow(QMainWindow):
                 pass
         for menu in getattr(self, "_editor_only_menus", None) or []:
             try:
-                menu.setVisible(True)
+                # Titel bleibt über die QAction der Menüleiste; Popup nicht aufklappen.
                 menu.setEnabled(True)
             except Exception:
                 pass
@@ -18857,6 +18967,7 @@ class MainWindow(QMainWindow):
 
     def close_current_tab(self):
         """Aktuelles Dokument schließen; Speichern-Dialog bei dirty."""
+        self._dismiss_chrome_menus()
         if not self.doc:
             self._set_status("Kein Dokument geöffnet")
             return
@@ -18994,6 +19105,7 @@ class MainWindow(QMainWindow):
                 return
             try:
                 self.open_path(target)
+                self._reveal_document_host()
             except Exception as e:
                 _log.warning("Tab nach Close aktivieren: %s", e)
                 return
@@ -19021,6 +19133,7 @@ class MainWindow(QMainWindow):
 
     def close_tab_path(self, path: str) -> None:
         """Sidebar-Tab schließen (Mittelklick / Kontextmenü) — dirty → Speichern-Dialog."""
+        self._dismiss_chrome_menus()
         target = str(Path(path)) if path else ""
         if not target:
             self._set_status("Kein Tab zum Schließen")
@@ -21252,6 +21365,7 @@ class MainWindow(QMainWindow):
     def open_dialog(self):
         from instantlensdoc.ui.file_dialogs import document_open_name_filters, get_open_file_name
 
+        self._dismiss_chrome_menus()
         start = dialog_start_dir(get_default_open_dir())
         path, _ = get_open_file_name(
             self,
@@ -21302,6 +21416,7 @@ class MainWindow(QMainWindow):
         self, path: str, *, encoding: str | None = None, readonly: bool = False
     ):
         path = native_fs_path(path) or str(path or "")
+        self._dismiss_chrome_menus()
         # Vor Tab-Wechsel Last-Page/Scroll des aktuellen Docs merken (0.9.1)
         try:
             self._capture_current_tab_view_state()
@@ -21528,6 +21643,7 @@ class MainWindow(QMainWindow):
                     self._refresh_document_outline(pdf_path=None)
             except Exception:
                 pass
+            self._reveal_document_host()
         except Exception as e:
             _log.exception("Anzeige fehlgeschlagen: %s", path)
             QMessageBox.critical(self, "Öffnen", f"Anzeige fehlgeschlagen:\n{e}")

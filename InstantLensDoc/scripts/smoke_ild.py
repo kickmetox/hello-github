@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.6.60.
+"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.6.61.
 
 Leichtgewichtig. Exit-Codes:
   0  OK  (ok=true)
@@ -14,12 +14,12 @@ Aufruf:
   python scripts/smoke_ild.py -h
 
 JSON-Schema (--json), Erfolg:
-  {"ok": true, "version": "2.6.60", "duration_ms": 1234,
+  {"ok": true, "version": "2.6.61", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 
 JSON bei Fail: checks[] enthält Objekt mit error-Text (max 200 Zeichen, Truncate …);
 Exitcode spiegelt ok (0↔true, 1↔false) — 2.2.0:
-  {"ok": false, "version": "2.6.60", "duration_ms": 12,
+  {"ok": false, "version": "2.6.61", "duration_ms": 12,
    "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 """
 
@@ -41,7 +41,7 @@ if str(ROOT) not in sys.path:
 # Headless/CI: Qt ohne Display
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-EXPECTED_VERSION = "2.6.60"
+EXPECTED_VERSION = "2.6.61"
 FAIL_ERROR_MAX_LEN = 200
 
 EXIT_OK = 0
@@ -827,6 +827,24 @@ def check_version() -> None:
         _fail("dtp/model.py fehlt group_frames (2.6.60 DTP-Gruppe)")
     if "def group_selected_annotations(" not in pv:
         _fail("pdf_view.py fehlt group_selected_annotations (2.6.60 Overlay-Gruppe)")
+    mc = (ROOT / "instantlensdoc" / "ui" / "menu_click.py").read_text(encoding="utf-8")
+    if "close_other_menus" not in mc or "mirror_menu_action" not in mc:
+        _fail("ui/menu_click.py fehlt exclusive menus (2.6.61)")
+    sd = (ROOT / "instantlensdoc" / "ui" / "settings_dialog.py").read_text(encoding="utf-8")
+    if "settingsGeneralScroll" not in sd:
+        _fail("settings_dialog.py fehlt Allgemein-Scroll (2.6.61)")
+    mw = (ROOT / "instantlensdoc" / "ui" / "main_window.py").read_text(encoding="utf-8")
+    if "_reveal_document_host" not in mw or "_dismiss_chrome_menus" not in mw:
+        _fail("main_window.py fehlt Tab/Host-Aktivierung (2.6.61)")
+    if "menu.setVisible(True)" in mw:
+        _fail("main_window.py QMenu.setVisible(True) klappt alle Pulldowns auf (2.6.61)")
+    if not (ROOT / "tests" / "test_menu_exclusive_2667.py").is_file():
+        _fail("tests/test_menu_exclusive_2667.py fehlt (2.6.61)")
+    if not (ROOT / "tests" / "test_settings_general_scroll_2667.py").is_file():
+        _fail("tests/test_settings_general_scroll_2667.py fehlt (2.6.61)")
+    if not (ROOT / "tests" / "test_tab_open_host_2667.py").is_file():
+        _fail("tests/test_tab_open_host_2667.py fehlt (2.6.61)")
+    _ok("2.6.61 exclusive-menus/settings-scroll/tab-host: OK")
     _ok("2.6.60 unified-view/ribbon-scroll/protect/formats/layout-marks: OK")
     inst_ps1 = (ROOT / "scripts" / "install-ild.ps1").read_text(encoding="utf-8-sig")
     if "VERSION.txt" not in inst_ps1:
@@ -1733,6 +1751,8 @@ def check_changelog() -> None:
         _fail("CHANGELOG fehlt ## 2.6.49")
     if "## 2.6.51" not in cl:
         _fail("CHANGELOG fehlt ## 2.6.51")
+    if "## 2.6.61" not in cl:
+        _fail("CHANGELOG fehlt ## 2.6.61")
     if "## 2.6.60" not in cl:
         _fail("CHANGELOG fehlt ## 2.6.60")
     if "## 2.6.59" not in cl:
@@ -3214,11 +3234,11 @@ Exit-Codes:
 Laufzeit: am Ende als „Laufzeit: N ms“ (oder duration_ms im JSON).
 
 Beispiel --json (Erfolg):
-  {"ok": true, "version": "2.6.60", "duration_ms": 1234,
+  {"ok": true, "version": "2.6.61", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 
 Beispiel --json (Fail):
-  {"ok": false, "version": "2.6.60", "duration_ms": 12,
+  {"ok": false, "version": "2.6.61", "duration_ms": 12,
    "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 """.rstrip()
     )

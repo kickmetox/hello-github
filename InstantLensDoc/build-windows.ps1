@@ -1,4 +1,4 @@
-﻿# InstantLens Doc - Windows-Build (PyInstaller App + Keygen) 2.6.60
+﻿# InstantLens Doc - Windows-Build (PyInstaller App + Keygen) 2.6.61
 # Eine Zeile:
 #   powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 #
@@ -33,7 +33,7 @@ $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $Root
 
-Write-Host "=== InstantLens Doc Build 2.6.60 (Windows x64) ==="
+Write-Host "=== InstantLens Doc Build 2.6.61 (Windows x64) ==="
 Write-Host "Root: $Root"
 
 # Mindestgroesse: leere/stub EXE und fehlgeschlagenes onedir entlarven (~49 MB Setup)
@@ -340,7 +340,7 @@ if (-not $SkipKeygen) {
     Write-Host "Keygen uebersprungen (-SkipKeygen)"
 }
 
-Write-Host "Fertig (2.6.60). Optional:"
+Write-Host "Fertig (2.6.61). Optional:"
 Write-Host '  powershell -ExecutionPolicy Bypass -File .\installer\build-installer.ps1'
 Write-Host "  (ohne Keygen: -SkipKeygen bzw. ISCC /DIncludeKeygen=0)"
 Write-Host '  python scripts\pack-windows-runnable.py   # Python-Layout-Zip ohne EXE'

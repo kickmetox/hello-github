@@ -15,6 +15,7 @@ from typing import Literal
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QFrame,
+    QMenuBar,
     QScrollArea,
     QSizePolicy,
     QWidget,
@@ -39,6 +40,33 @@ CHROME_LABELS: dict[str, str] = {
 }
 
 DEFAULT_CHROME_MODE: ChromeMode = CHROME_KOMBINIERT
+
+
+def menubar_unwrapped_size(mb: QMenuBar) -> tuple[int, int]:
+    """Einzeilige Breite/Höhe — Wrap würde Titel-Geometrien überlappen."""
+    total_w = 8
+    row_h = 24
+    try:
+        fm = mb.fontMetrics()
+        row_h = max(row_h, int(fm.height() + 10))
+        for act in mb.actions():
+            text = (act.text() or "").replace("&", "")
+            g = mb.actionGeometry(act)
+            w_geo = int(g.width()) if g.isValid() and g.width() > 0 else 0
+            w_txt = max(36, int(fm.horizontalAdvance(text) + 20))
+            total_w += max(w_geo, w_txt)
+            if g.isValid() and g.height() > 0:
+                row_h = max(row_h, int(g.height()))
+    except Exception:
+        try:
+            total_w = max(total_w, int(mb.sizeHint().width() or 1))
+        except Exception:
+            total_w = max(total_w, 1)
+    try:
+        hint_w = int(mb.sizeHint().width() or 1)
+    except Exception:
+        hint_w = 1
+    return max(total_w, hint_w, 1), max(row_h, 24)
 
 
 def normalize_chrome_mode(value: object) -> ChromeMode:
@@ -122,6 +150,12 @@ class HScrollHost(QScrollArea):
             int(inner.minimumWidth() or 0),
             1,
         )
+        if isinstance(inner, QMenuBar):
+            mb_w, mb_h = menubar_unwrapped_size(inner)
+            hint_w = max(hint_w, mb_w)
+            min_h = max(min_h, mb_h)
+            inner.setMinimumWidth(hint_w)
+            inner.setMaximumHeight(mb_h + 4)
         need = hint_w > int(vw)
         inner.setMinimumWidth(hint_w)
         if not self.widgetResizable():
@@ -157,6 +191,8 @@ def install_chrome_shrink_layout(window) -> None:
     mb = QMenuBar()
     mb.setObjectName("ildScrollMenuBar")
     mb.setNativeMenuBar(False)
+    mb.setMouseTracking(True)
+    mb.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)
     host = wrap_hscroll(mb, object_name="ildMenuBarScroll")
     window._ild_chrome_menubar = mb
     window._ild_menubar_host = host

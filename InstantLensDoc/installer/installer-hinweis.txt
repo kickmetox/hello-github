@@ -1,4 +1,17 @@
-InstantLens Doc 2.6.60 - Installation
+InstantLens Doc 2.6.61 - Installation
+
+Neu in 2.6.61:
+- Ein Menue pro Klick (keine gestapelten Pulldowns)
+- Einstellungen -> Allgemein scrollbar; OK/Abbrechen sichtbar
+- Tab-X / Datei -> Oeffnen ohne Extra-Popups
+- Geoeffnete Datei in der zentralen Ansicht, nicht nur als Tab
+- Pack InstantLensDoc-2.6.61-pack.zip
+- Windows-Rebuild: nach D:\AI_Temp\InstantLensDoc-2661 entpacken
+  powershell -ExecutionPolicy Bypass -File "D:\AI_Temp\sync-ild.ps1" -LocalPack D:\AI_Temp\InstantLensDoc-2.6.61-pack.zip -Dest D:\AI_Temp\InstantLensDoc-2661 -Swap -SkipStart
+  cd D:\AI_Temp\InstantLensDoc
+  python -m pip install -r requirements.txt
+  powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
+  powershell -ExecutionPolicy Bypass -File .\scripts\install-ild.ps1
 
 Neu in 2.6.60:
 - PDF-Menue live, OCR-Layout/Felder/Handschrift

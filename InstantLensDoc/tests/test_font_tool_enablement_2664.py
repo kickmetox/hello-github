@@ -97,9 +97,9 @@ def _assert_menus_visible() -> None:
         assert top.isVisible(), f"Menü unsichtbar: {top.text()}"
         assert top.isEnabled(), f"Menü-Titel disabled: {top.text()}"
         if menu is not None:
-            assert menu.isVisible()
+            # Titel = QAction; QMenu.isVisible() wäre das Popup.
             assert menu.isEnabled()
-            titles.append((menu.title() or "").replace("&", ""))
+            titles.append((menu.title() or top.text() or "").replace("&", ""))
     for need in ("Bearbeiten", "Absatz", "Seitenlayout", "PDF", "DTP"):
         assert need in titles, f"Top-Level fehlt/versteckt: {need} in {titles}"
 

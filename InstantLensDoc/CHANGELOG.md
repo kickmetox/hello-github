@@ -1,3 +1,22 @@
+## 2.6.61 - UI: ein Menü pro Klick, Einstellungen scrollbar, Tab zeigt Dokument
+
+Pack `InstantLensDoc-2.6.61-pack.zip`; VERSION **2.6.61**. Nach 2.6.60-Pack (`667f9d4`).
+
+- **Ein Menü pro Klick:** Enablement darf `QMenu.setVisible(True)` nicht mehr setzen (das klappte Datei…Hilfe gleichzeitig auf). Menüleiste in der Chrome-Scrollbar öffnet nur das angeklickte Pulldown; alle anderen Popups gehen zu (`close_other_menus`, exklusiver Titel-Klick). Geteilte Einträge in Format/Absatz/Seitenlayout/Fenster/DTP sind Spiegel-QActions (`mirror_menu_action`), nicht dieselbe QAction in zwei Menüs.
+- **Einstellungen → Allgemein:** Inhalt in `QScrollArea`; Dialog auf Laptop-Höhe begrenzt; OK/Abbrechen bleiben sichtbar.
+- **Tab-X / Datei → Öffnen:** offene Menü-Popups werden geschlossen, bevor der Klick Dialoge auslöst.
+- **Dokumenthost:** nach Öffnen und nach Tab-Wechsel erscheint PDF/DOCX in der zentralen Ansicht (`_reveal_document_host`), nicht nur als Tab. DTP bleibt Overlay in derselben Ansicht, wenn der Layout-Modus aktiv ist.
+
+Windows-Rebuild (Andreas Meyer):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File "D:\AI_Temp\sync-ild.ps1" -LocalPack D:\AI_Temp\InstantLensDoc-2.6.61-pack.zip -Dest D:\AI_Temp\InstantLensDoc-2661 -Swap -SkipStart
+cd D:\AI_Temp\InstantLensDoc
+python -m pip install -r requirements.txt
+powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
+powershell -ExecutionPolicy Bypass -File .\scripts\install-ild.ps1
+```
+
 ## 2.6.60 - Release: PDF-Menü, OCR, DTP, Word-Ribbon, vereinigte Ansicht
 
 Pack `InstantLensDoc-2.6.60-pack.zip`; VERSION **2.6.60**. HEAD `f51542a` (Shrink-Tests sichtbare Tab-Instanz). Nach 2.6.59-Pack (`659cf45`).
