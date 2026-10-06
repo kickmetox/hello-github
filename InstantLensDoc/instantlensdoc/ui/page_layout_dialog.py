@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QPushButton,
     QRadioButton,
+    QSpinBox,
     QVBoxLayout,
 )
 
@@ -42,7 +43,7 @@ class PageLayoutDialog(QDialog):
         self.setObjectName("pageLayoutDialog")
         self.setWindowTitle("Seitenlayout")
         self.setModal(True)
-        self.resize(460, 520)
+        self.resize(480, 640)
         self._layout = EditorPageLayout.from_dict((layout or EditorPageLayout()).to_dict())
         self._unit = get_page_size_unit()
         self._rich_document = bool(rich_document)
@@ -63,7 +64,7 @@ class PageLayoutDialog(QDialog):
         root.addLayout(unit_row)
 
         # --- Seitenformat ----------------------------------------------------
-        size_box = QGroupBox("Seitenformat (DTP-Presets)")
+        size_box = QGroupBox("Seitenformat")
         size_form = QFormLayout(size_box)
         self.preset = QComboBox()
         self.preset.setObjectName("pageLayoutPreset")
@@ -129,6 +130,29 @@ class PageLayoutDialog(QDialog):
         margin_form.addRow(btn_sp)
         root.addWidget(margin_box)
 
+        # --- Spalten / Kopf-Fuß ---------------------------------------------
+        col_box = QGroupBox("Spalten und Kopf-/Fußzeile")
+        col_form = QFormLayout(col_box)
+        self.columns_spin = QSpinBox()
+        self.columns_spin.setObjectName("pageLayoutColumns")
+        self.columns_spin.setRange(1, 3)
+        self.columns_spin.setValue(1)
+        self.columns_spin.valueChanged.connect(self._refresh_info)
+        col_form.addRow("Spalten", self.columns_spin)
+        self.header_spin = QDoubleSpinBox()
+        self.header_spin.setObjectName("pageLayoutHeaderDistance")
+        self.footer_spin = QDoubleSpinBox()
+        self.footer_spin.setObjectName("pageLayoutFooterDistance")
+        for spin in (self.header_spin, self.footer_spin):
+            spin.setRange(0.0, 80.0)
+            spin.setDecimals(1)
+            spin.valueChanged.connect(self._refresh_info)
+        self._hf_header_label = QLabel("Kopfzeilenabstand")
+        self._hf_footer_label = QLabel("Fußzeilenabstand")
+        col_form.addRow(self._hf_header_label, self.header_spin)
+        col_form.addRow(self._hf_footer_label, self.footer_spin)
+        root.addWidget(col_box)
+
         # --- Geltung ---------------------------------------------------------
         scope_box = QGroupBox("Anwenden auf")
         scope_form = QFormLayout(scope_box)
@@ -188,6 +212,13 @@ class PageLayoutDialog(QDialog):
                 (self.m_right, lay.margin_right_mm),
             ):
                 spin.setValue(convert_pt(to_pt(mm, "mm"), self._unit))
+            self.columns_spin.setValue(max(1, min(3, int(getattr(lay, "columns", 1) or 1))))
+            self.header_spin.setValue(
+                convert_pt(to_pt(getattr(lay, "header_distance_mm", 12.5), "mm"), self._unit)
+            )
+            self.footer_spin.setValue(
+                convert_pt(to_pt(getattr(lay, "footer_distance_mm", 12.5), "mm"), self._unit)
+            )
             sidx = self.scope.findData(lay.scope if lay.enabled else "off")
             self.scope.setCurrentIndex(max(0, sidx))
             u = self._unit_suffix()
@@ -196,6 +227,8 @@ class PageLayoutDialog(QDialog):
             for key, lab in self._margin_labels.items():
                 base = {"top": "Oben", "bottom": "Unten", "left": "Links / innen", "right": "Rechts / außen"}[key]
                 lab.setText(f"{base} ({u})")
+            self._hf_header_label.setText(f"Kopfzeilenabstand ({u})")
+            self._hf_footer_label.setText(f"Fußzeilenabstand ({u})")
         finally:
             self._updating = False
         self._refresh_info()
@@ -214,6 +247,9 @@ class PageLayoutDialog(QDialog):
         lay.margin_bottom_mm = pt_to_mm(to_pt(self.m_bottom.value(), self._unit))
         lay.margin_left_mm = pt_to_mm(to_pt(self.m_left.value(), self._unit))
         lay.margin_right_mm = pt_to_mm(to_pt(self.m_right.value(), self._unit))
+        lay.columns = int(self.columns_spin.value())
+        lay.header_distance_mm = pt_to_mm(to_pt(self.header_spin.value(), self._unit))
+        lay.footer_distance_mm = pt_to_mm(to_pt(self.footer_spin.value(), self._unit))
         scope = str(self.scope.currentData() or "rich")
         lay.enabled = scope != "off"
         lay.scope = scope

@@ -405,7 +405,35 @@ def _para_to_html(para: Any) -> str:
     inner = _para_inner_html(para)
     if not inner:
         inner = "<br/>"
+    prefix = _list_prefix_html(para, style_name)
+    if prefix and not inner.startswith(prefix):
+        inner = prefix + inner
     return f"<{tag}{_para_align_style(para)}>{inner}</{tag}>"
+
+
+def _list_prefix_html(para: Any, style_name: str) -> str:
+    """Word-Listen → sichtbares • / 1. (kein Steuerzeichen)."""
+    name = (style_name or "").lower()
+    num_pr = None
+    try:
+        ppr = para._p.pPr
+        num_pr = ppr.numPr if ppr is not None else None
+    except Exception:
+        num_pr = None
+    ilvl = 0
+    try:
+        if num_pr is not None and num_pr.ilvl is not None:
+            ilvl = int(num_pr.ilvl.val)
+    except Exception:
+        ilvl = 0
+    is_num = "list number" in name or "nummer" in name
+    is_bullet = "list bullet" in name or "aufzähl" in name or "bullet" in name
+    if not is_num and not is_bullet and num_pr is None:
+        return ""
+    if is_num:
+        return "1. "
+    glyphs = ("• ", "◦ ", "▪ ")
+    return glyphs[min(max(0, ilvl), 2)]
 
 
 def docx_to_html(path: str | Path) -> str:

@@ -295,7 +295,9 @@ def _maybe_auto_format(text: str, *, enabled: bool) -> tuple[str, bool]:
 
 
 def _html_escape(text: str) -> str:
-    return html_lib.escape(text or "", quote=False).replace("\n", "<br/>")
+    from instantlensdoc.ui.rich_lists import html_escape_ocr_text
+
+    return html_escape_ocr_text(text)
 
 
 def looks_like_heading(
@@ -448,7 +450,13 @@ def blocks_to_word_suite_html(
         for para in _paragraphs_as_blocks(text):
             parts.append(f"<p>{_html_escape(para.text)}</p>")
     parts.append("</body></html>")
-    return "".join(parts)
+    html = "".join(parts)
+    try:
+        from instantlensdoc.ui.rich_lists import sanitize_rich_html
+
+        return sanitize_rich_html(html)
+    except Exception:
+        return html
 
 
 def _int_meta(meta: dict[str, Any], key: str) -> int | None:

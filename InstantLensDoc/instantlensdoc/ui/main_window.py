@@ -1980,16 +1980,19 @@ class MainWindow(QMainWindow):
         act_bullet.setToolTip("Aufzählung ein/aus (• )")
         act_bullet.triggered.connect(lambda: self._toggle_list(ordered=False))
         m_edit.addAction(self._track_editor_action(act_bullet))
+        self._act_bullet_list = act_bullet
         act_number = QAction("Nummerierung", self)
         act_number.setObjectName("actEditNumberedList")
         act_number.setToolTip("Nummerierte Liste ein/aus (1. )")
         act_number.triggered.connect(lambda: self._toggle_list(ordered=True))
         m_edit.addAction(self._track_editor_action(act_number))
+        self._act_numbered_list = act_number
         act_para_dlg = QAction("Absatz…", self)
         act_para_dlg.setObjectName("actEditParagraph")
-        act_para_dlg.setToolTip("Zeilenabstand und Abstand davor/danach")
+        act_para_dlg.setToolTip("Zeilenabstand, Einzug, Abstand davor/danach, Absatzkontrolle")
         act_para_dlg.triggered.connect(self._paragraph_format_dialog)
         m_edit.addAction(self._track_editor_action(act_para_dlg))
+        self._act_paragraph_dialog = act_para_dlg
         act_break_line = QAction("Zeilenumbruch einfügen", self)
         act_break_line.setObjectName("actEditInsertLineBreak")
         act_break_line.setToolTip("Harter Zeilenumbruch an der Cursorposition")
@@ -2045,11 +2048,13 @@ class MainWindow(QMainWindow):
         act_align_l.setToolTip("Absatzausrichtung links — 2.6.11")
         act_align_l.triggered.connect(lambda: self._set_paragraph_alignment("left"))
         m_edit.addAction(self._track_editor_action(act_align_l))
+        self._act_align_left = act_align_l
         act_align_c = QAction("Absatz zentriert", self)
         act_align_c.setShortcut(QKeySequence("Ctrl+E"))
         act_align_c.setToolTip("Absatzausrichtung zentriert — 2.6.11")
         act_align_c.triggered.connect(lambda: self._set_paragraph_alignment("center"))
         m_edit.addAction(self._track_editor_action(act_align_c))
+        self._act_align_center = act_align_c
         act_align_r = QAction("Absatz rechts", self)
         act_align_r.setShortcut(QKeySequence("Ctrl+R"))
         act_align_r.setToolTip(
@@ -2057,20 +2062,24 @@ class MainWindow(QMainWindow):
         )
         act_align_r.triggered.connect(lambda: self._set_paragraph_alignment("right"))
         m_edit.addAction(self._track_editor_action(act_align_r))
+        self._act_align_right = act_align_r
         act_align_j = QAction("Absatz Blocksatz", self)
         act_align_j.setShortcut(QKeySequence("Ctrl+J"))
         act_align_j.setToolTip("Absatzausrichtung Blocksatz — 2.6.11")
         act_align_j.triggered.connect(lambda: self._set_paragraph_alignment("justify"))
         m_edit.addAction(self._track_editor_action(act_align_j))
+        self._act_align_justify = act_align_j
         act_spacing = QAction("Zeilenabstand 1,5", self)
         act_spacing.setObjectName("actLineSpacing15")
         act_spacing.setToolTip("Zeilenabstand 1,5 für aktuellen Absatz — 2.6.11")
         act_spacing.triggered.connect(lambda: self._set_paragraph_line_spacing(1.5))
         m_edit.addAction(self._track_editor_action(act_spacing))
+        self._act_spacing_15 = act_spacing
         act_spacing15 = QAction("Zeilenabstand 1,15 (Standard)", self)
         act_spacing15.setObjectName("actLineSpacing115")
         act_spacing15.triggered.connect(lambda: self._set_paragraph_line_spacing(1.15))
         m_edit.addAction(self._track_editor_action(act_spacing15))
+        self._act_spacing_115 = act_spacing15
         act_tracking = QAction("Laufweite +50 (Tracking)", self)
         act_tracking.setToolTip("Tracking +50/1000 em für aktuellen Absatz — 2.6.13")
         act_tracking.triggered.connect(lambda: self._set_typography(tracking=50.0))
@@ -2276,11 +2285,13 @@ class MainWindow(QMainWindow):
         act_indent.setToolTip("Zeilen/Block einrücken (auch Tab)")
         act_indent.triggered.connect(self._indent_selection)
         m_edit.addAction(self._track_editor_action(act_indent))
+        self._act_indent = act_indent
         act_outdent = QAction("Einrückung verringern", self)
         act_outdent.setShortcut(QKeySequence("Ctrl+["))
         act_outdent.setToolTip("Zeilen/Block ausrücken (auch Shift+Tab)")
         act_outdent.triggered.connect(self._outdent_selection)
         m_edit.addAction(self._track_editor_action(act_outdent))
+        self._act_outdent = act_outdent
         act_clear_marks = QAction("Markierungen löschen", self)
         act_clear_marks.triggered.connect(self._clear_editor_marks)
         m_edit.addAction(act_clear_marks)
@@ -3736,6 +3747,7 @@ class MainWindow(QMainWindow):
         a.triggered.connect(lambda: AboutDialog(self).exec())
         m_help.addAction(a)
         self._install_format_and_window_menus(mb)
+        self._install_word_suite_layout_menus(mb)
         self._install_editor_context_menu()
         self._sync_editor_only_actions()
         self._sync_menu_enablement()
@@ -3866,6 +3878,154 @@ class MainWindow(QMainWindow):
         else:
             mb.addMenu(m_fenster)
 
+    def _install_word_suite_layout_menus(self, mb) -> None:
+        """Eigene Word-Suite-Menüs: Absatz, Seitenlayout, Ausrichtung, Aufzählungszeichen."""
+        help_act = extra_act = None
+        for act in mb.actions():
+            menu = act.menu() if hasattr(act, "menu") else None
+            title = ""
+            try:
+                title = (menu.title() if menu is not None else act.text() or "")
+            except Exception:
+                title = act.text() or ""
+            title = title.replace("&", "")
+            if title == "Hilfe":
+                help_act = act
+            elif title in ("Extras", "Extra"):
+                extra_act = act
+
+        def _add(menu, act):
+            if act is not None:
+                menu.addAction(act)
+
+        m_para = QMenu("&Absatz", self)
+        m_para.setObjectName("menuAbsatz")
+        m_para.setToolTip("Absatzabstand, Einzug, Zeilenabstand, Textfluss")
+        _add(m_para, getattr(self, "_act_paragraph_dialog", None))
+        m_para.addSeparator()
+        act_ls10 = QAction("Zeilenabstand 1,0", self)
+        act_ls10.setObjectName("actLineSpacing10")
+        act_ls10.triggered.connect(lambda: self._set_paragraph_line_spacing(1.0))
+        m_para.addAction(self._track_editor_action(act_ls10))
+        _add(m_para, getattr(self, "_act_spacing_115", None))
+        _add(m_para, getattr(self, "_act_spacing_15", None))
+        act_ls20 = QAction("Zeilenabstand 2,0", self)
+        act_ls20.setObjectName("actLineSpacing20")
+        act_ls20.triggered.connect(lambda: self._set_paragraph_line_spacing(2.0))
+        m_para.addAction(self._track_editor_action(act_ls20))
+        act_ls_ex = QAction("Zeilenabstand genau…", self)
+        act_ls_ex.setObjectName("actLineSpacingExact")
+        act_ls_ex.triggered.connect(self._paragraph_format_dialog)
+        m_para.addAction(self._track_editor_action(act_ls_ex))
+        m_para.addSeparator()
+        _add(m_para, getattr(self, "_act_indent", None))
+        _add(m_para, getattr(self, "_act_outdent", None))
+        act_keep = QAction("Mit nächstem Absatz zusammenhalten", self)
+        act_keep.setObjectName("actKeepWithNext")
+        act_keep.triggered.connect(lambda: self._set_keep_with_next(True))
+        m_para.addAction(self._track_editor_action(act_keep))
+        act_widow = QAction("Absatzkontrolle (Witwen/Waisen)", self)
+        act_widow.setObjectName("actWidowOrphan")
+        act_widow.triggered.connect(lambda: self._set_widow_orphan(True))
+        m_para.addAction(self._track_editor_action(act_widow))
+        self._editor_only_menus.append(m_para)
+
+        m_align = QMenu("A&usrichtung", self)
+        m_align.setObjectName("menuAusrichtung")
+        m_align.setToolTip("Horizontale Absatzausrichtung und vertikale Zellenausrichtung")
+        _add(m_align, getattr(self, "_act_align_left", None))
+        _add(m_align, getattr(self, "_act_align_center", None))
+        _add(m_align, getattr(self, "_act_align_right", None))
+        _add(m_align, getattr(self, "_act_align_justify", None))
+        m_align.addSeparator()
+        act_vtop = QAction("Zelle oben", self)
+        act_vtop.setObjectName("actCellAlignTop")
+        act_vtop.triggered.connect(lambda: self._set_cell_vertical_align("top"))
+        m_align.addAction(self._track_editor_action(act_vtop))
+        act_vmiddle = QAction("Zelle mittig", self)
+        act_vmiddle.setObjectName("actCellAlignMiddle")
+        act_vmiddle.triggered.connect(lambda: self._set_cell_vertical_align("middle"))
+        m_align.addAction(self._track_editor_action(act_vmiddle))
+        act_vbottom = QAction("Zelle unten", self)
+        act_vbottom.setObjectName("actCellAlignBottom")
+        act_vbottom.triggered.connect(lambda: self._set_cell_vertical_align("bottom"))
+        m_align.addAction(self._track_editor_action(act_vbottom))
+        self._editor_only_menus.append(m_align)
+
+        m_list = QMenu("Aufzählungs&zeichen", self)
+        m_list.setObjectName("menuAufzaehlungszeichen")
+        m_list.setToolTip("Aufzählung, Nummerierung, Einzug, Zeichen wechseln")
+        _add(m_list, getattr(self, "_act_bullet_list", None))
+        _add(m_list, getattr(self, "_act_numbered_list", None))
+        act_nested = QAction("Liste verschachteln", self)
+        act_nested.setObjectName("actListNest")
+        act_nested.triggered.connect(lambda: self._adjust_list_indent(+1))
+        m_list.addAction(self._track_editor_action(act_nested))
+        act_glyph = QAction("Aufzählungszeichen ändern…", self)
+        act_glyph.setObjectName("actListGlyph")
+        act_glyph.triggered.connect(self._change_list_glyph_dialog)
+        m_list.addAction(self._track_editor_action(act_glyph))
+        act_restart = QAction("Nummerierung neu beginnen", self)
+        act_restart.setObjectName("actListRestart")
+        act_restart.triggered.connect(self._restart_list_numbering)
+        m_list.addAction(self._track_editor_action(act_restart))
+        m_list.addSeparator()
+        _add(m_list, getattr(self, "_act_indent", None))
+        _add(m_list, getattr(self, "_act_outdent", None))
+        act_list_in = QAction("Listenebene erhöhen", self)
+        act_list_in.setObjectName("actListIndent")
+        act_list_in.triggered.connect(lambda: self._adjust_list_indent(+1))
+        m_list.addAction(self._track_editor_action(act_list_in))
+        act_list_out = QAction("Listenebene verringern", self)
+        act_list_out.setObjectName("actListOutdent")
+        act_list_out.triggered.connect(lambda: self._adjust_list_indent(-1))
+        m_list.addAction(self._track_editor_action(act_list_out))
+        self._editor_only_menus.append(m_list)
+
+        m_layout = QMenu("&Seitenlayout", self)
+        m_layout.setObjectName("menuSeitenlayout")
+        m_layout.setToolTip("Seitenformat, Ausrichtung, Ränder, Spalten — Word-Suite")
+        _add(m_layout, getattr(self, "_page_layout_action", None))
+        m_pick = m_layout.addMenu("Seitenformat")
+        m_pick.setObjectName("menuSeitenformatPicker")
+        for preset, label in (("A4", "A4"), ("Letter", "Letter"), ("Legal", "Legal")):
+            act_p = QAction(label, self)
+            act_p.setObjectName(f"actPageSize_{preset}")
+            act_p.triggered.connect(lambda _c=False, p=preset: self._apply_page_size_preset(p))
+            m_pick.addAction(self._track_editor_action(act_p))
+        act_custom = QAction("Benutzerdefiniert (mm)…", self)
+        act_custom.setObjectName("actPageSizeCustom")
+        act_custom.triggered.connect(self._show_page_layout_dialog)
+        m_pick.addAction(self._track_editor_action(act_custom))
+        m_layout.addSeparator()
+        act_por = QAction("Hochformat", self)
+        act_por.setObjectName("actPagePortrait")
+        act_por.triggered.connect(lambda: self._apply_page_orientation("portrait"))
+        m_layout.addAction(self._track_editor_action(act_por))
+        act_land = QAction("Querformat", self)
+        act_land.setObjectName("actPageLandscape")
+        act_land.triggered.connect(lambda: self._apply_page_orientation("landscape"))
+        m_layout.addAction(self._track_editor_action(act_land))
+        m_layout.addSeparator()
+        for n, lab in ((1, "1 Spalte"), (2, "2 Spalten"), (3, "3 Spalten")):
+            act_c = QAction(lab, self)
+            act_c.setObjectName(f"actPageColumns_{n}")
+            act_c.triggered.connect(lambda _c=False, c=n: self._apply_page_columns(c))
+            m_layout.addAction(self._track_editor_action(act_c))
+        m_layout.addSeparator()
+        act_sec = QAction("Abschnittsumbruch einfügen", self)
+        act_sec.setObjectName("actSectionBreak")
+        act_sec.triggered.connect(self._insert_section_break)
+        m_layout.addAction(self._track_editor_action(act_sec))
+        self._editor_only_menus.append(m_layout)
+
+        anchor = extra_act or help_act
+        for menu in (m_layout, m_list, m_align, m_para):
+            if anchor is not None:
+                mb.insertMenu(anchor, menu)
+            else:
+                mb.addMenu(menu)
+
     def _install_editor_context_menu(self) -> None:
         ed = getattr(self, "editor", None)
         if ed is None:
@@ -3889,6 +4049,9 @@ class MainWindow(QMainWindow):
             ("Unterstrichen", self._toggle_underline),
             ("Durchgestrichen", self._toggle_strike),
             ("Formatierungen löschen", self._clear_formatting),
+            ("Absatz links", lambda: self._set_paragraph_alignment("left")),
+            ("Aufzählungszeichen", lambda: self._toggle_list(ordered=False)),
+            ("Absatz…", self._paragraph_format_dialog),
             ("Suchen und Ersetzen…", self._find_replace),
         ):
             act = menu.addAction(label)
@@ -4098,6 +4261,12 @@ class MainWindow(QMainWindow):
             "aufzählungszeichen",
             "nummerierung",
             "absatz…",
+            "zeilenabstand 1,0",
+            "listenebene",
+            "zelle oben",
+            "abschnittsumbruch",
+            "hochformat",
+            "querformat",
             "zeilenumbruch einfügen",
             "seitenumbruch einfügen",
             "tabelle einfügen",
@@ -4133,6 +4302,12 @@ class MainWindow(QMainWindow):
         t = (label or "").strip().lower()
         needles = (
             "seitenlayout",
+            "hochformat",
+            "querformat",
+            "abschnittsumbruch",
+            "1 spalte",
+            "2 spalten",
+            "3 spalten",
             "zeilennummern",
             "editor-minimap",
             "minimap",
@@ -4316,9 +4491,9 @@ class MainWindow(QMainWindow):
                 _walk(menu, "pdf")
             elif title == "Einfügen":
                 _walk(menu, "insert")
-            elif title in ("Bearbeiten", "Edit", "Format"):
+            elif title in ("Bearbeiten", "Edit", "Format", "Absatz", "Ausrichtung", "Aufzählungszeichen"):
                 _walk(menu, "edit")
-            elif title in ("Ansicht", "View", "Fenster"):
+            elif title in ("Ansicht", "View", "Fenster", "Seitenlayout"):
                 _walk(menu, "view-editor")
             elif title in ("Extras", "Extra"):
                 _walk(menu, "extra")
@@ -4476,6 +4651,11 @@ class MainWindow(QMainWindow):
                 "align_justify",
                 "bullet_list",
                 "numbered_list",
+                "paragraph",
+                "page_size_a4",
+                "page_size_letter",
+                "page_portrait",
+                "page_landscape",
                 "indent",
                 "outdent",
                 "clear_formatting",
@@ -4503,6 +4683,7 @@ class MainWindow(QMainWindow):
                     tb.setEnabled(bool(is_editor))
                 except Exception:
                     pass
+        self._sync_editor_only_actions()
 
     def _refresh_recent(self):
         # Fehlende Dateien aus der persistierten Liste streichen — 2.6.54
@@ -8059,6 +8240,24 @@ class MainWindow(QMainWindow):
             "ki_assistant": self._show_ki_assistant,
             "varfonts": self._show_variable_fonts,
             "pades_sign": self._show_pades_dialog,
+            "paragraph": self._paragraph_format_dialog,
+            "list_glyph": self._change_list_glyph_dialog,
+            "list_restart": self._restart_list_numbering,
+            "list_indent": lambda: self._adjust_list_indent(+1),
+            "list_outdent": lambda: self._adjust_list_indent(-1),
+            "section_break": self._insert_section_break,
+            "page_size_a4": lambda: self._apply_page_size_preset("A4"),
+            "page_size_letter": lambda: self._apply_page_size_preset("Letter"),
+            "page_size_legal": lambda: self._apply_page_size_preset("Legal"),
+            "page_size_custom": self._show_page_layout_dialog,
+            "page_portrait": lambda: self._apply_page_orientation("portrait"),
+            "page_landscape": lambda: self._apply_page_orientation("landscape"),
+            "page_columns_1": lambda: self._apply_page_columns(1),
+            "page_columns_2": lambda: self._apply_page_columns(2),
+            "page_columns_3": lambda: self._apply_page_columns(3),
+            "cell_align_top": lambda: self._set_cell_vertical_align("top"),
+            "cell_align_middle": lambda: self._set_cell_vertical_align("middle"),
+            "cell_align_bottom": lambda: self._set_cell_vertical_align("bottom"),
         }
         fn = handlers.get(action_id)
         if callable(fn):
@@ -10133,24 +10332,127 @@ class MainWindow(QMainWindow):
     def _paragraph_format_dialog(self) -> None:
         if not self._guard_editor_action("Absatz"):
             return
-        from PySide6.QtWidgets import QInputDialog
+        from instantlensdoc.ui.paragraph_dialog import ParagraphDialog
 
-        ls, ok = QInputDialog.getDouble(self, "Absatz", "Zeilenabstand:", 1.15, 0.5, 4.0, 2)
-        if not ok:
+        dlg = ParagraphDialog(self.editor.current_paragraph_spec(), self)
+        if dlg.exec() != QDialog.Accepted:
             return
-        sb, ok = QInputDialog.getDouble(self, "Absatz", "Abstand davor (pt):", 0.0, 0.0, 72.0, 1)
-        if not ok:
-            return
-        sa, ok = QInputDialog.getDouble(self, "Absatz", "Abstand danach (pt):", 8.0, 0.0, 72.0, 1)
-        if not ok:
-            return
-        self.editor.set_paragraph_spacing(
-            line_spacing=float(ls),
-            space_before_pt=float(sb),
-            space_after_pt=float(sa),
-        )
+        spec = dlg.result_spec()
+        self.editor.apply_paragraph_spec(spec)
         self._sync_editor_rich_meta()
-        self._set_status(f"Absatz: Abstand {ls:g} / {sb:g} / {sa:g} pt")
+        self._set_status(
+            f"Absatz: {spec.line_spacing:g} / davor {spec.space_before_pt:g} pt"
+        )
+
+    def _set_keep_with_next(self, enabled: bool = True) -> None:
+        if not self._guard_editor_action("Absatz"):
+            return
+        self.editor.set_paragraph_spacing(keep_with_next=bool(enabled))
+        self._sync_editor_rich_meta()
+        self._set_status("Mit nächstem Absatz zusammenhalten")
+
+    def _set_widow_orphan(self, enabled: bool = True) -> None:
+        if not self._guard_editor_action("Absatz"):
+            return
+        self.editor.set_paragraph_spacing(widow_orphan=bool(enabled))
+        self._sync_editor_rich_meta()
+        self._set_status("Absatzkontrolle (Witwen/Waisen)")
+
+    def _change_list_glyph_dialog(self) -> None:
+        if not self._guard_editor_action("Aufzählungszeichen"):
+            return
+        from instantlensdoc.ui.list_glyph_dialog import ListGlyphDialog
+        from instantlensdoc.ui.rich_lists import DEFAULT_BULLET, parse_list_prefix
+
+        cur = parse_list_prefix(self.editor.textCursor().block().text() or "")
+        glyph = cur.glyph if cur and not cur.ordered else DEFAULT_BULLET
+        dlg = ListGlyphDialog(glyph, self)
+        if dlg.exec() != QDialog.Accepted:
+            return
+        self.editor.set_list_glyph(dlg.result_glyph())
+        self._sync_editor_rich_meta()
+        self._set_status(f"Aufzählungszeichen: {dlg.result_glyph()}")
+
+    def _restart_list_numbering(self) -> None:
+        if not self._guard_editor_action("Nummerierung"):
+            return
+        if self.editor.restart_list_numbering():
+            self._sync_editor_rich_meta()
+            self._set_status("Nummerierung neu begonnen")
+        else:
+            self._set_status("Keine nummerierte Liste an der Auswahl")
+
+    def _adjust_list_indent(self, delta: int) -> None:
+        if not self._guard_editor_action("Listenebene"):
+            return
+        self.editor.adjust_list_indent(int(delta))
+        self._sync_editor_rich_meta()
+        self._set_status("Listenebene erhöht" if delta > 0 else "Listenebene verringert")
+
+    def _set_cell_vertical_align(self, alignment: str) -> None:
+        if not self._guard_editor_action("Zellenausrichtung"):
+            return
+        if self.editor.set_table_cell_vertical_alignment(alignment):
+            self._sync_editor_rich_meta()
+            self._set_status(f"Zelle: {alignment}")
+        else:
+            self._set_status("Keine Tabelle an der Auswahl — zuerst Tabelle markieren")
+
+    def _insert_section_break(self) -> None:
+        if not self._guard_editor_action("Abschnittsumbruch"):
+            return
+        self.editor.insert_section_break()
+        self._sync_editor_rich_meta()
+        self._set_status("Abschnittsumbruch eingefügt")
+
+    def _apply_page_size_preset(self, name: str) -> None:
+        if not self._guard_editor_action("Seitenlayout"):
+            return
+        if (name or "").lower() in ("custom", "benutzerdefiniert"):
+            self._show_page_layout_dialog()
+            return
+        from instantlensdoc.core.editor_page_layout import EditorPageLayout
+
+        lay = self.editor.page_layout() or EditorPageLayout.from_settings()
+        lay.with_preset(str(name))
+        lay.enabled = True
+        if lay.scope == "off":
+            lay.scope = "rich"
+        self._commit_page_layout(lay)
+
+    def _apply_page_orientation(self, orientation: str) -> None:
+        if not self._guard_editor_action("Seitenlayout"):
+            return
+        from instantlensdoc.core.editor_page_layout import EditorPageLayout
+
+        lay = self.editor.page_layout() or EditorPageLayout.from_settings()
+        lay.orientation = "landscape" if orientation == "landscape" else "portrait"
+        lay.enabled = True
+        self._commit_page_layout(lay)
+
+    def _apply_page_columns(self, columns: int) -> None:
+        if not self._guard_editor_action("Seitenlayout"):
+            return
+        from instantlensdoc.core.editor_page_layout import EditorPageLayout
+
+        lay = self.editor.page_layout() or EditorPageLayout.from_settings()
+        lay.columns = columns if columns in (1, 2, 3) else 1
+        lay.enabled = True
+        self._commit_page_layout(lay)
+
+    def _commit_page_layout(self, layout) -> None:
+        try:
+            layout.save()
+        except Exception as e:
+            _log.warning("Seitenlayout konnte nicht gespeichert werden: %s", e)
+        self.editor.set_page_layout(layout)
+        try:
+            sec = getattr(self, "secondary_editor", None)
+            if sec is not None and hasattr(sec, "set_page_layout"):
+                sec.set_page_layout(layout)
+        except Exception:
+            pass
+        self._set_status(f"Seitenlayout: {layout.describe()}")
 
     def _sync_editor_rich_meta(self) -> None:
         """Plaintext + HTML-Meta aus dem Editor für DOCX/HTML/RTF-Speichern — 2.6.49."""
@@ -11546,6 +11848,23 @@ class MainWindow(QMainWindow):
         if aid == "find":
             self._find_replace()
             return
+        extra = {
+            "align_left": lambda: self._set_paragraph_alignment("left"),
+            "align_center": lambda: self._set_paragraph_alignment("center"),
+            "align_right": lambda: self._set_paragraph_alignment("right"),
+            "align_justify": lambda: self._set_paragraph_alignment("justify"),
+            "bullet_list": lambda: self._toggle_list(ordered=False),
+            "numbered_list": lambda: self._toggle_list(ordered=True),
+            "paragraph": self._paragraph_format_dialog,
+            "page_layout": self._show_page_layout_dialog,
+            "page_size_a4": lambda: self._apply_page_size_preset("A4"),
+            "page_size_letter": lambda: self._apply_page_size_preset("Letter"),
+            "page_size_legal": lambda: self._apply_page_size_preset("Legal"),
+            "page_size_custom": self._show_page_layout_dialog,
+        }
+        fn = extra.get(aid)
+        if callable(fn):
+            fn()
 
     def _mark_selection(self):
         """Textmarker im Editor (Text/DOCX/HTML) — PDF nutzt das Highlight-Werkzeug — 2.6.52."""
@@ -14141,6 +14460,12 @@ class MainWindow(QMainWindow):
             "para_align_center": lambda: self._set_paragraph_alignment("center"),
             "para_align_right": lambda: self._set_paragraph_alignment("right"),
             "para_align_justify": lambda: self._set_paragraph_alignment("justify"),
+            "paragraph": self._paragraph_format_dialog,
+            "list_glyph": self._change_list_glyph_dialog,
+            "list_restart": self._restart_list_numbering,
+            "page_layout": self._show_page_layout_dialog,
+            "page_size_a4": lambda: self._apply_page_size_preset("A4"),
+            "section_break": self._insert_section_break,
             "toggle_rulers": lambda: self._toggle_rulers(
                 not getattr(self.pdf_view, "_show_rulers", False)
             ),

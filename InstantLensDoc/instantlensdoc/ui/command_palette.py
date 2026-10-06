@@ -185,9 +185,27 @@ def default_palette_commands() -> list[PaletteCommand]:
         PaletteCommand(
             "para_align_justify",
             "Absatz Blocksatz",
-            "absatz align justify blocksatz",
-            "Bearbeiten",
+            "absatz align justify blocksatz ausrichtung",
+            "Ausrichtung",
             "Ctrl+J",
+        ),
+        PaletteCommand(
+            "paragraph",
+            "Absatz…",
+            "absatz paragraph einzug zeilenabstand",
+            "Absatz",
+        ),
+        PaletteCommand(
+            "page_layout",
+            "Seitenlayout…",
+            "seitenlayout page size a4 letter ränder spalten",
+            "Seitenlayout",
+        ),
+        PaletteCommand(
+            "list_glyph",
+            "Aufzählungszeichen ändern…",
+            "bullet glyph aufzählung",
+            "Aufzählungszeichen",
         ),
         PaletteCommand(
             "toggle_rulers",
