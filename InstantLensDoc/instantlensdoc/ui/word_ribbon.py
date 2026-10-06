@@ -16,6 +16,13 @@ OFF_MACROS = "Makros (VBA) sind nicht lokal verfügbar."
 OFF_INK = "Stifteingabe/Ink ist in dieser Word-Leiste nicht verfügbar."
 OFF_COPILOT = "Copilot ist nicht lokal verfügbar."
 OFF_TTS = "Vorlesen ist in dieser Version nicht enthalten (kein TTS)."
+OFF_THESAURUS = "Thesaurus ist nicht lokal verfügbar."
+OFF_TRANSLATE = "Übersetzung braucht eine Cloud-Verbindung und ist hier nicht verfügbar."
+OFF_SCREENSHOT = "Bildschirmfoto ist in dieser Version nicht enthalten."
+OFF_ICONS = "Office-Icons sind nicht lokal verfügbar."
+OFF_CHART = "Excel-Diagramme sind nicht lokal verfügbar."
+OFF_ONLINE_PIC = "Onlinebilder brauchen eine Cloud-Verbindung und sind hier nicht verfügbar."
+OFF_RULES = "Seriendruck-Regeln (If/Then) sind in dieser Version nicht enthalten."
 
 DISABLED_REASONS: dict[str, str] = {
     "smartart": OFF_SMARTART,
@@ -32,6 +39,13 @@ DISABLED_REASONS: dict[str, str] = {
     "ink_tools": OFF_INK,
     "copilot": OFF_COPILOT,
     "read_aloud": OFF_TTS,
+    "thesaurus": OFF_THESAURUS,
+    "translate": OFF_TRANSLATE,
+    "screenshot": OFF_SCREENSHOT,
+    "icons": OFF_ICONS,
+    "insert_chart": OFF_CHART,
+    "online_pictures": OFF_ONLINE_PIC,
+    "mail_merge_rules": OFF_RULES,
 }
 
 WORD_TAB_GROUPS: dict[str, tuple[tuple[str, tuple], ...]] = {
@@ -53,6 +67,7 @@ WORD_TAB_GROUPS: dict[str, tuple[tuple[str, tuple], ...]] = {
                 ("highlight", "Texthervorhebung"),
                 ("highlight_color", "Hintergrundfarbe"),
                 ("clear_formatting", "Format löschen"),
+                ("toggle_case", "Groß-/Kleinschreibung"),
             ),
         ),
         (
@@ -89,6 +104,10 @@ WORD_TAB_GROUPS: dict[str, tuple[tuple[str, tuple], ...]] = {
             "Bearbeiten",
             (
                 ("find_replace", "Suchen"),
+                ("replace", "Ersetzen"),
+                ("goto", "Gehe zu"),
+                ("select_all", "Markieren"),
+                ("show_special_chars", "¶"),
                 ("spellcheck", "Rechtschreibung"),
             ),
         ),
@@ -97,6 +116,7 @@ WORD_TAB_GROUPS: dict[str, tuple[tuple[str, tuple], ...]] = {
         (
             "Seiten",
             (
+                ("insert_cover_page", "Deckblatt"),
                 ("insert_blank_page", "Leere Seite"),
                 ("insert_break", "Seitenumbruch"),
                 ("section_break", "Abschnittsumbruch"),
@@ -111,8 +131,12 @@ WORD_TAB_GROUPS: dict[str, tuple[tuple[str, tuple], ...]] = {
             (
                 ("insert_picture", "Bilder"),
                 ("insert_shape", "Formen"),
+                ("online_pictures", "Onlinebilder", "off", OFF_ONLINE_PIC),
                 ("models_3d", "3D-Modelle", "off", OFF_3D),
                 ("smartart", "SmartArt", "off", OFF_SMARTART),
+                ("insert_chart", "Diagramm", "off", OFF_CHART),
+                ("screenshot", "Bildschirmfoto", "off", OFF_SCREENSHOT),
+                ("icons", "Icons", "off", OFF_ICONS),
                 ("online_video", "Onlinevideo", "off", OFF_VIDEO),
             ),
         ),
@@ -121,6 +145,7 @@ WORD_TAB_GROUPS: dict[str, tuple[tuple[str, tuple], ...]] = {
             (
                 ("insert_hyperlink", "Link"),
                 ("insert_bookmark", "Textmarke"),
+                ("insert_cross_ref", "Querverweis"),
             ),
         ),
         (
@@ -130,6 +155,8 @@ WORD_TAB_GROUPS: dict[str, tuple[tuple[str, tuple], ...]] = {
         (
             "Kopf-/Fußzeile",
             (
+                ("insert_header", "Kopfzeile"),
+                ("insert_footer", "Fußzeile"),
                 ("header_footer", "Kopf-/Fußzeile"),
                 ("insert_page_number", "Seitenzahl"),
             ),
@@ -137,10 +164,15 @@ WORD_TAB_GROUPS: dict[str, tuple[tuple[str, tuple], ...]] = {
         (
             "Text",
             (
+                ("insert_cover_page", "Deckblatt"),
                 ("insert_text_box", "Textfeld"),
+                ("insert_snippet", "Schnellbausteine"),
                 ("insert_date", "Datum/Uhrzeit"),
+                ("insert_equation", "Gleichung"),
+                ("insert_signature", "Signaturzeile"),
                 ("insert_symbol", "Symbol"),
                 ("drop_cap", "Initial"),
+                ("field_token", "Ersatzzeichen"),
                 ("wordart", "WordArt", "off", OFF_WORDART),
                 ("addins", "Add-Ins", "off", OFF_ADDINS),
             ),
@@ -166,6 +198,7 @@ WORD_TAB_GROUPS: dict[str, tuple[tuple[str, tuple], ...]] = {
             (
                 ("insert_caption", "Beschriftung"),
                 ("auto_lof", "Abbildungsverzeichnis"),
+                ("insert_cross_ref", "Querverweis"),
             ),
         ),
         (
@@ -175,9 +208,14 @@ WORD_TAB_GROUPS: dict[str, tuple[tuple[str, tuple], ...]] = {
         (
             "Zitate",
             (
+                ("insert_citation", "Zitat"),
                 ("bibliography", "Literaturverzeichnis"),
                 ("researcher", "Researcher", "off", OFF_RESEARCHER),
             ),
+        ),
+        (
+            "Index markieren",
+            (("mark_index", "Eintrag markieren"),),
         ),
     ),
     "Sendungen": (
@@ -193,7 +231,12 @@ WORD_TAB_GROUPS: dict[str, tuple[tuple[str, tuple], ...]] = {
             "Felder schreiben und einfügen",
             (
                 ("mail_merge_data", "Datenquelle…"),
+                ("mail_merge_recipients", "Empfängerliste"),
                 ("mail_merge_field", "Feld einfügen"),
+                ("mail_merge_address", "Adressblock"),
+                ("mail_merge_greeting", "Grußzeile"),
+                ("mail_merge_highlight", "Felder hervorheben"),
+                ("mail_merge_rules", "Regeln", "off", OFF_RULES),
             ),
         ),
         (
@@ -214,7 +257,9 @@ WORD_TAB_GROUPS: dict[str, tuple[tuple[str, tuple], ...]] = {
             "Dokumentprüfung",
             (
                 ("spellcheck", "Rechtschreibung"),
+                ("thesaurus", "Thesaurus", "off", OFF_THESAURUS),
                 ("word_count", "Wörter zählen"),
+                ("translate", "Übersetzen", "off", OFF_TRANSLATE),
                 ("read_aloud", "Vorlesen", "off", OFF_TTS),
             ),
         ),
@@ -230,6 +275,8 @@ WORD_TAB_GROUPS: dict[str, tuple[tuple[str, tuple], ...]] = {
             "Nachverfolgung",
             (
                 ("review_mode", "Änderungen"),
+                ("review_accept", "Annehmen"),
+                ("review_reject", "Ablehnen"),
                 ("compare_pdfs", "Vergleichen"),
             ),
         ),
@@ -244,30 +291,34 @@ WORD_TAB_GROUPS: dict[str, tuple[tuple[str, tuple], ...]] = {
         ),
     ),
     "Ansicht": (
-        (
-            "Ansichten",
             (
-                ("view_print", "Seitenlayout"),
-                ("view_draft", "Entwurf"),
-                ("view_web", "Weblayout"),
-                ("chrome_klassisch", "Klassisch"),
-                ("chrome_ribbon", "Ribbon"),
-                ("chrome_kombiniert", "Kombiniert"),
-                ("focus_mode", "Fokus", "off", OFF_IMMERSIVE),
+                "Ansichten",
+                (
+                    ("chrome_klassisch", "Klassisch"),
+                    ("chrome_ribbon", "Ribbon"),
+                    ("chrome_kombiniert", "Kombiniert"),
+                    ("view_print", "Seitenlayout"),
+                    ("view_draft", "Entwurf"),
+                    ("view_web", "Weblayout"),
+                    ("view_outline", "Gliederung"),
+                    ("focus_mode", "Fokus", "off", OFF_IMMERSIVE),
+                ),
             ),
-        ),
         (
             "Anzeigen",
             (
                 ("toggle_rulers", "Lineal"),
                 ("toggle_grid", "Gitternetzlinien"),
                 ("toggle_navigation", "Navigation"),
+                ("toggle_minimap", "Minimap"),
+                ("show_special_chars", "¶"),
             ),
         ),
         (
             "Zoom",
             (
                 ("zoom_100", "100 %"),
+                ("zoom_one_page", "Eine Seite"),
                 ("zoom_page_width", "Seitenbreite"),
                 ("zoom_multi", "Mehrere Seiten"),
             ),

@@ -9281,6 +9281,33 @@ class MainWindow(QMainWindow):
             "zoom_multi": lambda: self._toggle_book_layout(
                 not self.pdf_view.book_layout_enabled()
             ),
+            "toggle_case": self._toggle_case_selection,
+            "replace": self._find_replace,
+            "goto": self._goto_line_or_page,
+            "select_all": self._select_all_document,
+            "show_special_chars": lambda: self._toggle_special_chars(
+                not bool(self.editor.special_chars_visible())
+            ),
+            "insert_cover_page": self._insert_cover_page,
+            "insert_cross_ref": self._insert_cross_ref_dialog,
+            "insert_header": self._header_footer_dialog,
+            "insert_footer": self._header_footer_dialog,
+            "insert_snippet": lambda: self._insert_snippet(0),
+            "insert_equation": self._insert_equation_dialog,
+            "insert_signature": self._insert_signature_line,
+            "insert_citation": self._insert_citation_dialog,
+            "mark_index": self._mark_index_dialog,
+            "mail_merge_recipients": lambda: self._run_mail_merge_dialog(focus="data"),
+            "mail_merge_address": self._insert_address_block,
+            "mail_merge_greeting": self._insert_greeting_line,
+            "mail_merge_highlight": self._highlight_merge_fields,
+            "review_accept": lambda: self._review_accept_reject(True),
+            "review_reject": lambda: self._review_accept_reject(False),
+            "view_outline": self._set_outline_view,
+            "toggle_minimap": lambda: self._toggle_minimap(
+                not bool(self.editor.minimap_visible())
+            ),
+            "zoom_one_page": self._fit_page,
         }
         fn = handlers.get(aid)
         if callable(fn):
@@ -9677,6 +9704,138 @@ class MainWindow(QMainWindow):
         on = not bar.isVisible()
         bar.setVisible(on)
         self._set_status("Navigation ein" if on else "Navigation aus")
+
+    def _select_all_document(self) -> None:
+        ed = getattr(self, "editor", None)
+        if ed is not None and self.stack.currentWidget() is self.editor_pane:
+            ed.selectAll()
+            self._set_status("Alles markiert")
+            return
+        self._select_all_annotations_on_page()
+
+    def _insert_cover_page(self) -> None:
+        if not self._guard_editor_action("Deckblatt"):
+            return
+        from PySide6.QtWidgets import QInputDialog
+
+        title, ok = QInputDialog.getText(self, "Deckblatt", "Titel:", text="Titel")
+        if not ok:
+            return
+        self.editor.insert_cover_page(title)
+        self._sync_editor_rich_meta()
+        self._set_status("Deckblatt eingefügt")
+
+    def _insert_cross_ref_dialog(self) -> None:
+        if not self._guard_editor_action("Querverweis"):
+            return
+        from PySide6.QtWidgets import QInputDialog
+
+        name, ok = QInputDialog.getText(self, "Querverweis", "Textmarke:", text="marke")
+        if not ok:
+            return
+        self.editor.insert_cross_ref(name)
+        self._sync_editor_rich_meta()
+        self._set_status(f"Querverweis: {name}")
+
+    def _insert_equation_dialog(self) -> None:
+        if not self._guard_editor_action("Gleichung"):
+            return
+        from PySide6.QtWidgets import QInputDialog
+
+        glyphs = ("∑", "∫", "√", "∞", "≈", "≠", "≤", "≥", "π", "α", "β")
+        glyph, ok = QInputDialog.getItem(self, "Gleichung", "Zeichen:", glyphs, 0, False)
+        if not ok:
+            return
+        self.editor.insert_equation(glyph)
+        self._sync_editor_rich_meta()
+        self._set_status(f"Gleichung: {glyph}")
+
+    def _insert_signature_line(self) -> None:
+        if not self._guard_editor_action("Signaturzeile"):
+            return
+        self.editor.insert_signature_line()
+        self._sync_editor_rich_meta()
+        self._set_status("Signaturzeile eingefügt")
+
+    def _insert_citation_dialog(self) -> None:
+        if not self._guard_editor_action("Zitat"):
+            return
+        from instantlensdoc.ui.bibliography_dialog import BibliographyDialog
+
+        dlg = BibliographyDialog(self)
+        dlg.setWindowTitle("Zitat")
+        if dlg.exec() != QDialog.Accepted:
+            return
+        author, title, year = dlg.result_entry()
+        self.editor.insert_citation(author, year, title)
+        self._sync_editor_rich_meta()
+        self._set_status("Zitat eingefügt")
+
+    def _mark_index_dialog(self) -> None:
+        if not self._guard_editor_action("Indexeintrag"):
+            return
+        from PySide6.QtWidgets import QInputDialog
+
+        cur = self.editor.textCursor()
+        seed = cur.selectedText().replace("\u2029", " ").strip() or "Eintrag"
+        term, ok = QInputDialog.getText(self, "Indexeintrag", "Begriff:", text=seed)
+        if not ok:
+            return
+        self.editor.mark_index_entry(term)
+        self._sync_editor_rich_meta()
+        self._set_status(f"Index: {term}")
+
+    def _insert_address_block(self) -> None:
+        if not self._guard_editor_action("Adressblock"):
+            return
+        self.editor.insert_address_block()
+        self._sync_editor_rich_meta()
+        self._set_status("Adressblock eingefügt")
+
+    def _insert_greeting_line(self) -> None:
+        if not self._guard_editor_action("Grußzeile"):
+            return
+        self.editor.insert_greeting_line()
+        self._sync_editor_rich_meta()
+        self._set_status("Grußzeile eingefügt")
+
+    def _highlight_merge_fields(self) -> None:
+        if not self._guard_editor_action("Felder hervorheben"):
+            return
+        n = self.editor.highlight_merge_fields()
+        self._sync_editor_rich_meta()
+        self._set_status(f"Seriendruckfelder: {n} markiert")
+
+    def _review_accept_reject(self, accept: bool) -> None:
+        from instantlensdoc.core.review import ReviewStore
+
+        path = self._collab_doc_path()
+        if not path:
+            self._set_status("Keine Änderungen zum Prüfen")
+            return
+        store = ReviewStore.for_doc(path, load=True)
+        pending = store.pending()
+        if not pending:
+            self._set_status("Keine ausstehenden Änderungen")
+            return
+        cid = pending[0].id
+        if accept:
+            store.accept(cid)
+            self._set_status("Änderung angenommen")
+        else:
+            store.reject(cid)
+            self._set_status("Änderung abgelehnt")
+
+    def _set_outline_view(self) -> None:
+        self._set_word_view_mode("draft")
+        bar = getattr(self, "sidebar", None)
+        if bar is not None:
+            bar.setVisible(True)
+        try:
+            self._refresh_document_outline()
+        except Exception:
+            pass
+        self._set_status("Gliederung")
 
     def _sync_spellcheck_ribbon(self) -> None:
         rb = getattr(self, "ribbon_bar", None)

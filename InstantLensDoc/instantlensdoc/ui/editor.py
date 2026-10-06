@@ -2749,6 +2749,85 @@ class TextEditor(QPlainTextEdit):
         self.setTextCursor(end)
         return True
 
+    def insert_cover_page(self, title: str = "Titel") -> bool:
+        heading = (title or "").strip() or "Titel"
+        self._ensure_rich_mode()
+        cur = QTextCursor(self.document())
+        cur.movePosition(QTextCursor.Start)
+        cur.insertText(heading)
+        cur.insertBlock()
+        self.setTextCursor(cur)
+        self.apply_style_paragraph("h1")
+        return self.insert_break("page")
+
+    def insert_cross_ref(self, name: str) -> bool:
+        ident = (name or "").strip() or "marke"
+        cur = self.textCursor()
+        cur.insertText(f"siehe [{ident}]")
+        self.setTextCursor(cur)
+        return True
+
+    def mark_index_entry(self, term: str) -> bool:
+        word = (term or "").strip()
+        if not word:
+            cur = self.textCursor()
+            word = cur.selectedText().replace("\u2029", " ").strip() or "Eintrag"
+        self.textCursor().insertText(f"{{XE:{word}}}")
+        return True
+
+    def insert_citation(self, author: str, year: str, title: str = "") -> bool:
+        a = (author or "").strip() or "o. A."
+        y = (year or "").strip() or "o. J."
+        extra = f", {(title or '').strip()}" if (title or "").strip() else ""
+        self.textCursor().insertText(f"({a} {y}{extra})")
+        return True
+
+    def insert_equation(self, glyph: str = "∑") -> bool:
+        ch = (glyph or "").strip() or "∑"
+        self._ensure_rich_mode()
+        fmt = QTextCharFormat()
+        fmt.setFontItalic(True)
+        cur = self.textCursor()
+        cur.insertText(ch, fmt)
+        self.setTextCursor(cur)
+        return True
+
+    def insert_signature_line(self) -> bool:
+        cur = self.textCursor()
+        cur.insertBlock()
+        cur.insertText("______________________________")
+        cur.insertBlock()
+        cur.insertText("Unterschrift")
+        cur.insertBlock()
+        self.setTextCursor(cur)
+        return True
+
+    def insert_address_block(self) -> bool:
+        cur = self.textCursor()
+        cur.insertText("{vorname} {nachname}\n{strasse}\n{plz} {ort}")
+        self.setTextCursor(cur)
+        return True
+
+    def insert_greeting_line(self) -> bool:
+        cur = self.textCursor()
+        cur.insertText("{anrede} {nachname},")
+        self.setTextCursor(cur)
+        return True
+
+    def highlight_merge_fields(self) -> int:
+        import re
+
+        text = self.toPlainText() or ""
+        n = 0
+        for m in re.finditer(r"\{[A-Za-z][A-Za-z0-9_]*\}", text):
+            cur = QTextCursor(self.document())
+            cur.setPosition(m.start())
+            cur.setPosition(m.end(), QTextCursor.KeepAnchor)
+            self.setTextCursor(cur)
+            self.highlight_selection("#C5E0B4")
+            n += 1
+        return n
+
     def word_count_stats(self) -> dict[str, int]:
         text = self.toPlainText() or ""
         words = [w for w in text.split() if w]

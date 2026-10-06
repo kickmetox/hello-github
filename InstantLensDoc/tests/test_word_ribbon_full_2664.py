@@ -124,6 +124,24 @@ def test_insert_mutations_and_references() -> None:
     assert ed.insert_bibliography_block("Literatur\n[1] Test (2024): Werk.")
     assert "Literatur" in ed.toPlainText()
     assert ed.insert_text_box("Kasten")
+    assert ed.insert_cover_page("DeckblattTest")
+    assert "DeckblattTest" in ed.toPlainText()
+    assert ed.insert_cross_ref("ziel")
+    assert "siehe [ziel]" in ed.toPlainText()
+    assert ed.mark_index_entry("Indexwort")
+    assert "{XE:Indexwort}" in ed.toPlainText()
+    assert ed.insert_citation("Meier", "2020", "Werk")
+    assert "Meier" in ed.toPlainText()
+    assert ed.insert_equation("∑")
+    assert "∑" in ed.toPlainText()
+    assert ed.insert_signature_line()
+    assert "Unterschrift" in ed.toPlainText()
+    assert ed.insert_address_block()
+    assert "{vorname}" in ed.toPlainText()
+    assert ed.insert_greeting_line()
+    assert "{anrede}" in ed.toPlainText()
+    n = ed.highlight_merge_fields()
+    assert n >= 1
     stats = ed.word_count_stats()
     assert stats["words"] > 0
     from instantlensdoc.ui.bibliography_dialog import BibliographyDialog
@@ -160,3 +178,31 @@ def test_disabled_ribbon_click_sets_status() -> None:
     except Exception:
         msg = ""
     assert "SmartArt" in msg or "nicht lokal" in msg
+    for aid in (
+        "thesaurus",
+        "translate",
+        "screenshot",
+        "icons",
+        "insert_chart",
+        "online_pictures",
+        "mail_merge_rules",
+    ):
+        assert aid in _WIN.ribbon_bar._actions
+        assert not _WIN.ribbon_bar._actions[aid].isEnabled()
+    for aid in (
+        "toggle_case",
+        "replace",
+        "goto",
+        "insert_cover_page",
+        "insert_cross_ref",
+        "insert_citation",
+        "mark_index",
+        "mail_merge_address",
+        "review_accept",
+        "view_outline",
+        "toggle_minimap",
+        "zoom_one_page",
+    ):
+        assert aid in _WIN.ribbon_bar._actions, aid
+        assert _WIN.ribbon_bar._actions[aid].isEnabled(), aid
+
