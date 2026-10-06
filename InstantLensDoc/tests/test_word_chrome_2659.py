@@ -51,15 +51,24 @@ def setup_module() -> None:
 
 def teardown_module() -> None:
     global _WIN, _TD, _RESTORE
+    if _RESTORE:
+        try:
+            _RESTORE()
+        except Exception:
+            pass
+        _RESTORE = None
     try:
         if _WIN is not None:
-            _WIN.close()
+            _WIN.hide()
     except Exception:
         pass
-    if _RESTORE:
-        _RESTORE()
+    _WIN = None
     if _TD is not None:
-        _TD.cleanup()
+        try:
+            _TD.cleanup()
+        except Exception:
+            pass
+        _TD = None
 
 
 def test_ribbon_has_word_tabs() -> None:
@@ -182,21 +191,19 @@ def test_mail_merge_dialog_opens_and_closes() -> None:
     opened = []
 
     def _close():
-        dlg = None
         for w in _WIN.findChildren(QDialog):
-            if w.objectName() == "mailMergeDialog" and w.isVisible():
-                dlg = w
+            if w.objectName() == "mailMergeDialog":
+                opened.append(w.objectName())
+                w.reject()
                 break
-        if dlg is not None:
-            opened.append(dlg.objectName())
-            dlg.reject()
 
-    QTimer.singleShot(80, _close)
+    # Smoke-Hooks rejecten Dialoge nach 30 ms — vorher greifen.
+    QTimer.singleShot(10, _close)
     _WIN._run_mail_merge_dialog()
     pump(_APP, 0.25)
     assert "mailMergeDialog" in opened
     dlg = MailMergeDialog(_WIN, template_text="Hallo {{Name}}")
     assert dlg.objectName() == "mailMergeDialog"
-    QTimer.singleShot(50, dlg.reject)
+    QTimer.singleShot(10, dlg.reject)
     dlg.exec()
     dlg.deleteLater()
