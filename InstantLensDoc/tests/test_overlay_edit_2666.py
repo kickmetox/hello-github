@@ -326,9 +326,17 @@ def test_dtp_group_model_and_main_window_routing():
     assert "_ensure_pdf_target" not in fn
     assert "group_selected()" in fn
     assert "_layout_mode_active" in fn
+    rb = (ROOT / "instantlensdoc" / "ui" / "ribbon_bar.py").read_text(encoding="utf-8")
+    assert '"group_frames", "Gruppieren"' in rb
+    assert '"ungroup_frames", "Aufheben"' in rb
+    ca = (ROOT / "instantlensdoc" / "ui" / "chrome_actions.py").read_text(encoding="utf-8")
+    assert '"group_frames": "actAnnGroup"' in ca
+    assert '"ungroup_frames": "actAnnUngroup"' in ca
     assert "_grp_button_clicked" in pv
     assert "actAnnGroup" in mw
     assert 'setEnabled(n >= 2)' in pv or "can_group" in mw
+    assert '"group_frames": self._group_selected_annotations' in mw
+    assert '"ungroup_frames": self._ungroup_selected_annotations' in mw
 
 
 def test_dtp_stamp_paint_frameless(qapp):

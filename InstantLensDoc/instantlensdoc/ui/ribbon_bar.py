@@ -464,6 +464,12 @@ class RibbonBar(QWidget):
             g_arr.panel.overflow_picked.connect(self.action_triggered.emit)
             _add_button(g_arr.panel, "bring_forward", "Vorwärts")
             _add_button(g_arr.panel, "send_backward", "Rückwärts")
+            grp = _add_button(g_arr.panel, "group_frames", "Gruppieren")
+            grp.setEnabled(False)
+            grp.setToolTip("Mindestens zwei Objekte markieren (Strg+Klick)")
+            ugrp = _add_button(g_arr.panel, "ungroup_frames", "Aufheben")
+            ugrp.setEnabled(False)
+            ugrp.setToolTip("Zuerst eine Gruppe auswählen")
             row.addWidget(g_arr)
             self._arrange_group = g_arr
 

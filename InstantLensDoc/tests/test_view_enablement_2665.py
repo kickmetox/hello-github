@@ -265,7 +265,7 @@ def test_never_hide_menus_or_ribbon_groups() -> None:
     assert not dtp.isHidden()
     if rb._table_tab_index >= 0:
         assert rb._cat_buttons[rb._table_tab_index].isVisible()
-    for aid in ("bold", "font", "font_color", "mail_merge", "page_layout", "scan_import"):
+    for aid in ("bold", "font", "font_color", "mail_merge", "page_layout", "scan_import", "group_frames", "ungroup_frames"):
         assert aid in rb._actions
         btn = rb._actions[aid]
         assert btn is not None
@@ -322,3 +322,68 @@ def test_font_enabled_on_md_csv_xlsx() -> None:
         assert _WIN.ribbon_bar.is_enabled("font_color"), path.name
         _p, _h, fett = _leaf("Bearbeiten", "Fett")
         assert fett.isEnabled(), path.name
+
+
+def test_layout_group_ribbon_needs_two_objects() -> None:
+    """Layout-Gruppieren ist an actAnnGroup gebunden; erst ab zwei Objekten aktiv."""
+    from instantlensdoc.dtp.model import DtpDocument
+
+    try:
+        if getattr(_WIN, "doc", None) is not None:
+            _WIN.doc.dirty = False
+        if hasattr(_WIN.dtp_pane, "clear_dirty"):
+            _WIN.dtp_pane.clear_dirty()
+    except Exception:
+        pass
+    doc = DtpDocument()
+    a = doc.add_shape("rectangle", x=10, y=10, width=40, height=20, fill="#AABBCC")
+    b = doc.add_shape("ellipse", x=70, y=10, width=40, height=20, fill="#88AACC")
+    _WIN.dtp_pane.set_document(doc)
+    try:
+        _WIN.dtp_pane.clear_dirty()
+    except Exception:
+        pass
+    _WIN._dtp_tools_on = True
+    _WIN.dtp_pane.show()
+    _WIN.dtp_pane.raise_()
+    pump(_APP, 0.1)
+    _WIN.ribbon_bar.select_tab("Layout")
+    pump(_APP, 0.05)
+    mapping = getattr(_WIN, "_ribbon_qactions", {}) or {}
+    assert mapping.get("group_frames") is _WIN._act_ann_group
+    assert mapping.get("ungroup_frames") is _WIN._act_ann_ungroup
+    scene = _WIN.dtp_pane.scene
+    scene.clearSelection()
+    _WIN._sync_group_actions()
+    assert not _WIN._act_ann_group.isEnabled()
+    assert not _WIN.ribbon_bar.is_enabled("group_frames")
+    tip = _WIN.ribbon_bar._actions["group_frames"].toolTip() or ""
+    assert "zwei" in tip.lower() or "markieren" in tip.lower()
+    scene._items[a.id].setSelected(True)
+    _WIN._sync_group_actions()
+    assert not _WIN._act_ann_group.isEnabled()
+    assert not _WIN.ribbon_bar.is_enabled("group_frames")
+    scene._items[b.id].setSelected(True)
+    _WIN._sync_group_actions()
+    assert len(scene.selected_frames()) >= 2
+    assert _WIN._act_ann_group.isEnabled()
+    assert _WIN.ribbon_bar.is_enabled("group_frames")
+    _WIN._act_ann_group.trigger()
+    pump(_APP, 0.05)
+    ga = doc.frame_by_id(a.id).group_id
+    gb = doc.frame_by_id(b.id).group_id
+    assert ga and ga == gb
+    _WIN._sync_group_actions()
+    assert _WIN._act_ann_ungroup.isEnabled()
+    assert _WIN.ribbon_bar.is_enabled("ungroup_frames")
+    _WIN._act_ann_ungroup.trigger()
+    pump(_APP, 0.05)
+    assert doc.frame_by_id(a.id).group_id == ""
+    assert doc.frame_by_id(b.id).group_id == ""
+    try:
+        _WIN.dtp_pane.clear_dirty()
+    except Exception:
+        pass
+    _WIN.dtp_pane.hide()
+    _WIN._dtp_tools_on = False
+    _WIN._sync_menu_enablement()

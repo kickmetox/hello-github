@@ -576,6 +576,9 @@ TABLE_ACTION_IDS = frozenset(
     }
 )
 ARRANGE_ACTION_IDS = frozenset({"bring_forward", "send_backward"})
+GROUP_ACTION_IDS = frozenset({"group_frames", "ungroup_frames"})
+REASON_GROUP = "Mindestens zwei Objekte markieren (Strg+Klick)"
+REASON_UNGROUP = "Zuerst eine Gruppe auswählen"
 RICH_TEXT_ACTION_IDS = frozenset(
     {
         "export_epub",

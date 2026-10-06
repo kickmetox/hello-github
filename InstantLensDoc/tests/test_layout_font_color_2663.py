@@ -102,6 +102,8 @@ def test_layout_ribbon_word_page_setup_groups() -> None:
         "outdent",
         "bring_forward",
         "send_backward",
+        "group_frames",
+        "ungroup_frames",
         "page_layout",
         "font_color",
     ):

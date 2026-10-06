@@ -5818,6 +5818,7 @@ class MainWindow(QMainWindow):
         from instantlensdoc.ui.word_ribbon import (
             ALWAYS_ACTION_IDS,
             ARRANGE_ACTION_IDS,
+            GROUP_ACTION_IDS,
             FONT_ACTION_IDS,
             MAIL_ACTION_IDS,
             PAGE_ACTION_IDS,
@@ -5850,6 +5851,8 @@ class MainWindow(QMainWindow):
             got = bool(caps.get("table")), str(caps.get("table_reason") or "")
         elif aid in ARRANGE_ACTION_IDS:
             got = bool(caps.get("dtp_frame")), str(caps.get("dtp_frame_reason") or "")
+        elif aid in GROUP_ACTION_IDS:
+            got = None
         elif aid in RICH_TEXT_ACTION_IDS:
             got = bool(caps.get("rich_text")), str(caps.get("rich_text_reason") or "")
         elif aid.startswith("dtp_"):
@@ -7813,6 +7816,17 @@ class MainWindow(QMainWindow):
                 btn.setToolTip(tip)
             except Exception:
                 pass
+        rb = getattr(self, "ribbon_bar", None)
+        if rb is not None:
+            try:
+                if hasattr(rb, "set_available"):
+                    rb.set_available("group_frames", can_group, "" if can_group else tip_g)
+                    rb.set_available("ungroup_frames", can_ungroup, "" if can_ungroup else tip_u)
+                else:
+                    rb.set_enabled("group_frames", can_group)
+                    rb.set_enabled("ungroup_frames", can_ungroup)
+            except Exception:
+                pass
 
     def _toggle_selected_group_lock(self):
         if self.stack.currentWidget() is not self.pdf_view or not self.pdf_view.pdf_path:
@@ -9623,6 +9637,8 @@ class MainWindow(QMainWindow):
         "detach_window": "actDetachDocumentWindow",
         "write_protect": "actWriteProtect",
         "doc_info": "actFileInfo",
+        "group_frames": "actAnnGroup",
+        "ungroup_frames": "actAnnUngroup",
     }
 
     def _bind_ribbon_qactions(self) -> None:
@@ -9698,6 +9714,10 @@ class MainWindow(QMainWindow):
         rb = getattr(self, "ribbon_bar", None)
         if rb is not None and hasattr(rb, "bind_qactions"):
             rb.bind_qactions(mapping)
+        try:
+            self._sync_group_actions()
+        except Exception:
+            pass
 
     def chrome_qactions(self) -> dict:
         """Alle gebundenen Ribbon/Pulldown-QActions (Chrome platziert, baut kein zweites Ribbon)."""
@@ -9906,6 +9926,8 @@ class MainWindow(QMainWindow):
             "hyphenate_it": lambda: self._hyphenate_document("it"),
             "bring_forward": self._arrange_bring_forward,
             "send_backward": self._arrange_send_backward,
+            "group_frames": self._group_selected_annotations,
+            "ungroup_frames": self._ungroup_selected_annotations,
             "cell_align_top": lambda: self._set_cell_vertical_align("top"),
             "cell_align_middle": lambda: self._set_cell_vertical_align("middle"),
             "cell_align_bottom": lambda: self._set_cell_vertical_align("bottom"),

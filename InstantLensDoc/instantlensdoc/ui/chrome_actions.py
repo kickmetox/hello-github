@@ -96,6 +96,8 @@ CHROME_FEATURE_ACTION_IDS: dict[str, tuple[str, ...]] = {
         "hyphenate",
         "bring_forward",
         "send_backward",
+        "group_frames",
+        "ungroup_frames",
     ),
     "Kopf/Fuß": ("header_footer",),
     "Ersatzzeichen": ("field_token",),
@@ -174,6 +176,8 @@ CHROME_ACTION_OBJECT_NAMES: dict[str, str] = {
     "outdent": "actEditOutdent",
     "bring_forward": "actArrangeBringForward",
     "send_backward": "actArrangeSendBackward",
+    "group_frames": "actAnnGroup",
+    "ungroup_frames": "actAnnUngroup",
 }
 
 CHROME_ACTION_ATTRS: tuple[tuple[str, str], ...] = (
@@ -196,6 +200,8 @@ CHROME_ACTION_ATTRS: tuple[tuple[str, str], ...] = (
     ("layout_marks", "_layout_marks_action"),
     ("indent", "_act_indent"),
     ("outdent", "_act_outdent"),
+    ("group_frames", "_act_ann_group"),
+    ("ungroup_frames", "_act_ann_ungroup"),
 )
 
 
