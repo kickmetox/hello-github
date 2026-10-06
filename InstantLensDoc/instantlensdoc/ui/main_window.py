@@ -3979,9 +3979,31 @@ class MainWindow(QMainWindow):
         }
     )
 
+    @staticmethod
+    def _qt_widget_alive(obj) -> bool:
+        if obj is None:
+            return False
+        try:
+            obj.objectName()
+            return True
+        except RuntimeError:
+            return False
+
+    @staticmethod
+    def _snapshot_menu_actions(menu) -> list:
+        """QAction-Liste sofort kopieren — PySide-Wrapper von QAction.menu() verfallen."""
+        if menu is None:
+            return []
+        try:
+            return list(menu.actions())
+        except RuntimeError:
+            return []
+
     def _install_format_and_window_menus(self, mb) -> None:
         """Klassische Menüs Format + Fenster (Aktionen geteilt, nicht verdoppelt)."""
-        m_edit = m_view = extra_act = help_act = None
+        extra_act = help_act = None
+        edit_acts: list = []
+        view_acts: list = []
         for act in mb.actions():
             menu = act.menu() if hasattr(act, "menu") else None
             title = ""
@@ -3991,9 +4013,9 @@ class MainWindow(QMainWindow):
                 title = act.text() or ""
             title = title.replace("&", "")
             if title in ("Bearbeiten", "Edit"):
-                m_edit = menu
+                edit_acts = self._snapshot_menu_actions(menu)
             elif title in ("Ansicht", "View"):
-                m_view = menu
+                view_acts = self._snapshot_menu_actions(menu)
             elif title in ("Extras", "Extra"):
                 extra_act = act
             elif title == "Hilfe":
@@ -4002,24 +4024,23 @@ class MainWindow(QMainWindow):
         m_format = QMenu("&Format", self)
         m_format.setObjectName("menuFormat")
         m_format.setToolTip("Zeichen- und Absatzformat — Auswahl oder ganzes Dokument")
-        if m_edit is not None:
-            for act in m_edit.actions():
-                if act.isSeparator():
-                    continue
-                sub = act.menu() if hasattr(act, "menu") else None
-                if sub is not None:
-                    st = (sub.title() or "").replace("&", "")
-                    if st in self._FORMAT_MENU_SUBS:
-                        nm = m_format.addMenu(st)
-                        for sa in sub.actions():
-                            if sa.isSeparator():
-                                nm.addSeparator()
-                            else:
-                                nm.addAction(sa)
-                    continue
-                text = (act.text() or "").replace("&", "").strip()
-                if text in self._FORMAT_MENU_TEXTS:
-                    m_format.addAction(act)
+        for act in edit_acts:
+            if act.isSeparator():
+                continue
+            sub = act.menu() if hasattr(act, "menu") else None
+            if sub is not None:
+                st = (sub.title() or "").replace("&", "")
+                if st in self._FORMAT_MENU_SUBS:
+                    nm = m_format.addMenu(st)
+                    for sa in self._snapshot_menu_actions(sub):
+                        if sa.isSeparator():
+                            nm.addSeparator()
+                        else:
+                            nm.addAction(sa)
+                continue
+            text = (act.text() or "").replace("&", "").strip()
+            if text in self._FORMAT_MENU_TEXTS:
+                m_format.addAction(act)
 
         m_absatz = QMenu("&Absatz", self)
         m_absatz.setObjectName("menuAbsatz")
@@ -4027,18 +4048,17 @@ class MainWindow(QMainWindow):
             "Absatzdialog, Ausrichtung, Aufzählung/Nummerierung — Word-Suite/DOCX"
         )
         by_edit = {}
-        styles_src = None
-        if m_edit is not None:
-            for act in m_edit.actions():
-                if act.isSeparator():
-                    continue
-                sub = act.menu() if hasattr(act, "menu") else None
-                if sub is not None:
-                    st = (sub.title() or "").replace("&", "").strip()
-                    if st == "Formatvorlagen":
-                        styles_src = sub
-                    continue
-                by_edit[(act.text() or "").replace("&", "").strip()] = act
+        styles_acts: list = []
+        for act in edit_acts:
+            if act.isSeparator():
+                continue
+            sub = act.menu() if hasattr(act, "menu") else None
+            if sub is not None:
+                st = (sub.title() or "").replace("&", "").strip()
+                if st == "Formatvorlagen":
+                    styles_acts = self._snapshot_menu_actions(sub)
+                continue
+            by_edit[(act.text() or "").replace("&", "").strip()] = act
         for text in self._ABSATZ_MENU_ORDER:
             if text is None:
                 m_absatz.addSeparator()
@@ -4046,9 +4066,9 @@ class MainWindow(QMainWindow):
             shared = by_edit.get(text)
             if shared is not None:
                 m_absatz.addAction(shared)
-        if styles_src is not None:
+        if styles_acts:
             nm = m_absatz.addMenu("Formatvorlagen")
-            for sa in styles_src.actions():
+            for sa in styles_acts:
                 if sa.isSeparator():
                     nm.addSeparator()
                 else:
@@ -4172,8 +4192,8 @@ class MainWindow(QMainWindow):
         m_fenster = QMenu("&Fenster", self)
         m_fenster.setObjectName("menuFenster")
         m_fenster.setToolTip("Teilung, Sync-Scroll, separates Dokumentfenster")
-        if m_view is not None:
-            for act in m_view.actions():
+        if view_acts:
+            for act in view_acts:
                 if act.isSeparator():
                     continue
                 if act.menu() is not None:
@@ -4187,20 +4207,26 @@ class MainWindow(QMainWindow):
         act_detach.triggered.connect(self._detach_current_document)
         m_fenster.addAction(act_detach)
         act_ws = None
-        if m_view is not None:
-            for act in m_view.actions():
-                sub = act.menu() if hasattr(act, "menu") else None
-                if sub is not None and "layout" in (sub.title() or "").lower():
+        for act in view_acts:
+            sub = act.menu() if hasattr(act, "menu") else None
+            if sub is not None:
+                try:
+                    st = (sub.title() or "").lower()
+                except RuntimeError:
+                    continue
+                if "layout" in st:
                     act_ws = act
                     break
-        if act_ws is not None and act_ws.menu() is not None:
-            src = act_ws.menu()
-            nm = m_fenster.addMenu(src.title() or "Arbeitsbereich-Layouts")
-            for sa in src.actions():
-                if sa.isSeparator():
-                    nm.addSeparator()
-                else:
-                    nm.addAction(sa)
+        if act_ws is not None:
+            src = act_ws.menu() if hasattr(act_ws, "menu") else None
+            src_acts = self._snapshot_menu_actions(src)
+            if src is not None and src_acts:
+                nm = m_fenster.addMenu((src.title() if src is not None else "") or "Arbeitsbereich-Layouts")
+                for sa in src_acts:
+                    if sa.isSeparator():
+                        nm.addSeparator()
+                    else:
+                        nm.addAction(sa)
 
         if extra_act is not None:
             mb.insertMenu(extra_act, m_format)
@@ -5194,7 +5220,8 @@ class MainWindow(QMainWindow):
                 self.welcome_page.refresh_recent()
             except Exception:
                 pass
-        if self._recent_menu is None:
+        if not self._qt_widget_alive(getattr(self, "_recent_menu", None)):
+            self._recent_menu = None
             return
         self._recent_menu.clear()
         if not entries:
@@ -5234,7 +5261,8 @@ class MainWindow(QMainWindow):
 
     def _refresh_workspaces(self):
         """Projekt-Ordner-Menü (letzte 5 Workspaces) neu aufbauen."""
-        if self._workspace_menu is None:
+        if not self._qt_widget_alive(getattr(self, "_workspace_menu", None)):
+            self._workspace_menu = None
             return
         self._workspace_menu.clear()
         act_choose = QAction("Projekt-Ordner wählen…", self)
