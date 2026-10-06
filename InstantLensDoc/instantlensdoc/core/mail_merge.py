@@ -19,6 +19,23 @@ _PLACEHOLDER_RE = re.compile(
 )
 
 
+def sniff_csv_delimiter(sample: str) -> str:
+    """CSV-Trennzeichen: Komma, Semikolon, Tab (Sniffer + Häufigkeit)."""
+    text = sample or ""
+    try:
+        dialect = csv.Sniffer().sniff(text[:4096], delimiters=",;\t|")
+        if dialect.delimiter in ",;\t|":
+            return dialect.delimiter
+    except csv.Error:
+        pass
+    counts = {",": text.count(","), ";": text.count(";"), "\t": text.count("\t")}
+    if counts["\t"] and counts["\t"] >= counts[","] and counts["\t"] >= counts[";"]:
+        return "\t"
+    if counts[";"] >= counts[","]:
+        return ";"
+    return ","
+
+
 def load_recipients_csv(
     path: str | Path,
     *,
@@ -26,15 +43,17 @@ def load_recipients_csv(
 ) -> list[dict[str, str]]:
     """CSV mit Kopfzeile laden → Liste von Empfänger-Dicts."""
     p = Path(path)
-    text = p.read_text(encoding="utf-8-sig")
+    enc = "utf-8-sig"
+    try:
+        from instantlensdoc.core.documents import detect_file_encoding
+
+        detected = detect_file_encoding(p)
+        enc = "utf-8-sig" if detected == "utf-8" else detected
+    except Exception:
+        enc = "utf-8-sig"
+    text = p.read_text(encoding=enc, errors="replace")
     sample = text[:4096]
-    delim = delimiter
-    if not delim:
-        try:
-            dialect = csv.Sniffer().sniff(sample, delimiters=",;\t|")
-            delim = dialect.delimiter
-        except csv.Error:
-            delim = "," if sample.count(",") >= sample.count(";") else ";"
+    delim = delimiter or sniff_csv_delimiter(sample)
     reader = csv.DictReader(io.StringIO(text), delimiter=delim)
     rows: list[dict[str, str]] = []
     for row in reader:

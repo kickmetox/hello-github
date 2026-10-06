@@ -631,7 +631,15 @@ class MainWindow(QMainWindow):
             QTimer.singleShot(0, _apply_ed_scroll)
 
     # ---- Tab-Dokument-Cache (geparste Nicht-PDF-Dokumente offener Tabs) — 2.6.54 ----
-    _DOC_CACHE_KINDS = (DocKind.DOCX, DocKind.RTF, DocKind.XLSX, DocKind.HTML, DocKind.TEXT, DocKind.MARKDOWN)
+    _DOC_CACHE_KINDS = (
+        DocKind.DOCX,
+        DocKind.RTF,
+        DocKind.XLSX,
+        DocKind.CSV,
+        DocKind.HTML,
+        DocKind.TEXT,
+        DocKind.MARKDOWN,
+    )
 
     @staticmethod
     def _doc_cache_sig(path: str | Path | None) -> tuple[int, int] | None:
@@ -1266,6 +1274,8 @@ class MainWindow(QMainWindow):
         # Word-Suite / Text-Toolbar (Auswahl…Markierungen) — 2.6.44
         if hasattr(self.editor_pane, "tool_action"):
             self.editor_pane.tool_action.connect(self._on_editor_toolbar_action)
+        if hasattr(self.editor_pane, "sheet_changed"):
+            self.editor_pane.sheet_changed.connect(self._on_spreadsheet_sheet_changed)
         self.pdf_view = PdfViewer()
         self.pdf_view.status.connect(self._on_pdf_view_status)
         self.pdf_view.ocr_region_finished.connect(self._on_ocr_region_finished)
@@ -5059,6 +5069,7 @@ class MainWindow(QMainWindow):
                 is_editor = self.stack.currentWidget() is self.editor_pane
             except Exception:
                 is_editor = False
+        writable = bool(is_editor) and not self._document_is_readonly()
         try:
             pdf_paths = self._open_pdf_paths()
         except Exception:
@@ -5155,14 +5166,18 @@ class MainWindow(QMainWindow):
                     elif "schriftfarbe" in label:
                         self._set_action_available(
                             a,
-                            bool(is_editor or is_pdf),
-                            "Schriftfarbe: Editor, OCR, PDF-Text oder DTP",
+                            bool(writable or is_pdf),
+                            "Schreibgeschützt"
+                            if self._document_is_readonly()
+                            else "Schriftfarbe: Editor, OCR, PDF-Text oder DTP",
                         )
                     elif self._label_is_editor_only(label) or parent.strip().lower() == "absatz":
                         self._set_action_available(
                             a,
-                            is_editor,
-                            "Nur im Text- oder DOCX-Editor verfügbar",
+                            writable,
+                            "Schreibgeschützt"
+                            if self._document_is_readonly()
+                            else "Nur im Text- oder DOCX-Editor verfügbar",
                         )
                 elif mode == "view-editor":
                     src = ""
@@ -8648,7 +8663,7 @@ class MainWindow(QMainWindow):
         paths = list(self.sidebar.document_paths()) if hasattr(self.sidebar, "document_paths") else []
         current = self._path_key(self.doc.path) if self.doc and self.doc.path else None
         pick = path
-        text_ext = {".txt", ".md", ".markdown", ".html", ".htm", ".csv", ".json", ".log", ".py"}
+        text_ext = {".txt", ".md", ".markdown", ".html", ".htm", ".csv", ".xls", ".xlsx", ".json", ".log", ".py"}
         remembered_kind = str(getattr(self, "_secondary_kind", "") or "").strip().lower()
         if not pick:
             # Session-gemerktes Zweit-Doc bevorzugen, sonst Typ-Mischung
@@ -11753,6 +11768,9 @@ class MainWindow(QMainWindow):
 
     def _guard_editor_action(self, what: str) -> bool:
         """Editor-only Aktion: bei PDF/anderem Tab no-op, kein Stack-Wechsel — 2.6.54."""
+        if self._document_is_readonly():
+            self._set_status(f"{what} — Schreibschutz")
+            return False
         if self._editor_document_active() or self._layout_mode_active():
             return True
         self._set_status(f"{what} nur im Editor")
@@ -11767,7 +11785,7 @@ class MainWindow(QMainWindow):
         return act
 
     def _sync_editor_only_actions(self, *_args) -> None:
-        on = self._editor_document_active() or self._layout_mode_active()
+        on = (self._editor_document_active() or self._layout_mode_active()) and not self._document_is_readonly()
         for act in getattr(self, "_editor_only_actions", None) or []:
             try:
                 act.setEnabled(on)
@@ -12243,13 +12261,15 @@ class MainWindow(QMainWindow):
             DocKind.HTML,
             DocKind.DOCX,
             DocKind.RTF,
+            DocKind.CSV,
+            DocKind.XLSX,
         ):
             return
         try:
             self.doc.text = self.editor.toPlainText()
         except Exception:
             return
-        if self.doc.kind in (DocKind.DOCX, DocKind.HTML, DocKind.RTF) or self.doc.meta.get(
+        if self.doc.kind in (DocKind.DOCX, DocKind.HTML, DocKind.RTF, DocKind.MARKDOWN, DocKind.CSV, DocKind.XLSX) or self.doc.meta.get(
             "rich_text"
         ) or bool(getattr(self.editor, "_rich_mode", False)):
             try:
@@ -12257,6 +12277,15 @@ class MainWindow(QMainWindow):
                 self.doc.meta["rich_text"] = True
             except Exception:
                 pass
+            if self.doc.kind == DocKind.MARKDOWN:
+                try:
+                    md = self.editor.to_markdown()
+                    if md.strip():
+                        self.doc.meta["markdown_source"] = md
+                        self.doc.text = md
+                except Exception:
+                    pass
+            self._capture_editor_table_meta()
             try:
                 hdr = self.editor.document_header()
                 ftr = self.editor.document_footer()
@@ -19513,13 +19542,14 @@ class MainWindow(QMainWindow):
         self._set_status(label)
 
     def open_dialog(self):
+        from instantlensdoc.ui.file_dialogs import document_open_name_filters, get_open_file_name
+
         start = dialog_start_dir(get_default_open_dir())
-        path, _ = QFileDialog.getOpenFileName(
+        path, _ = get_open_file_name(
             self,
             "Öffnen",
             start,
-            "Dokumente (*.ild *.txt *.md *.html *.htm *.docx *.rtf *.pdf *.png *.jpg *.jpeg);;"
-            "Alle (*.*)",
+            document_open_name_filters(),
         )
         path = native_fs_path(path)
         if path:
@@ -19551,7 +19581,7 @@ class MainWindow(QMainWindow):
             self,
             f"Öffnen ({enc})",
             start,
-            "Textdokumente (*.txt *.md *.html *.htm *.log *.csv);;Alle (*.*)",
+            "Textdokumente (*.txt *.md *.csv *.html *.htm *.log);;Alle (*.*)",
         )
         path = native_fs_path(path)
         if path:
@@ -19684,22 +19714,41 @@ class MainWindow(QMainWindow):
                 try:
                     self.editor.blockSignals(True)
                     html = (self.doc.meta or {}).get("html")
-                    if html and self.doc.kind in (DocKind.DOCX, DocKind.HTML):
+                    rich_kinds = (
+                        DocKind.DOCX,
+                        DocKind.HTML,
+                        DocKind.MARKDOWN,
+                        DocKind.CSV,
+                        DocKind.XLSX,
+                    )
+                    if html and self.doc.kind in rich_kinds:
                         try:
-                            self.editor.set_rich_html(
-                                str(html), base_font=self._rich_base_font_for_doc()
-                            )
+                            if self.doc.kind == DocKind.MARKDOWN:
+                                try:
+                                    self.editor.set_rich_markdown(
+                                        self.doc.text,
+                                        base_font=self._rich_base_font_for_doc(),
+                                    )
+                                except Exception:
+                                    self.editor.set_rich_html(
+                                        str(html), base_font=self._rich_base_font_for_doc()
+                                    )
+                            else:
+                                self.editor.set_rich_html(
+                                    str(html), base_font=self._rich_base_font_for_doc()
+                                )
                         except Exception:
                             self.editor.setPlainText(self.doc.text)
                     else:
                         self.editor.setPlainText(self.doc.text)
                     self.editor.blockSignals(False)
                     # Rich-Text: Plaintext des Docs an Qt-Normalisierung angleichen
-                    if html and self.doc.kind in (DocKind.DOCX, DocKind.HTML):
+                    if html and self.doc.kind in rich_kinds:
                         try:
                             self.doc.text = self.editor.toPlainText()
                         except Exception:
                             pass
+                    self._sync_sheet_bar()
                     self.doc.dirty = False
                     self.stack.setCurrentWidget(self.editor_pane)
                 finally:
@@ -19730,6 +19779,8 @@ class MainWindow(QMainWindow):
                 pass
             self._update_doc_status()
             self._sync_preview_readonly_banner()
+            self._apply_schreibschutz_ui()
+            self._sync_sheet_bar()
             enc = self.doc.meta.get("encoding")
             mismatch = self.doc.meta.get("kind_mismatch")
             if mismatch:
@@ -19766,6 +19817,138 @@ class MainWindow(QMainWindow):
         except Exception as e:
             _log.exception("Anzeige fehlgeschlagen: %s", path)
             QMessageBox.critical(self, "Öffnen", f"Anzeige fehlgeschlagen:\n{e}")
+
+    def _document_is_readonly(self) -> bool:
+        return bool(self.doc and (self.doc.meta or {}).get("readonly"))
+
+    def _apply_schreibschutz_ui(self) -> None:
+        """Editor ReadOnly + Schriftwerkzeuge ausgegraut bei Schreibschutz."""
+        ro = self._document_is_readonly()
+        try:
+            self.editor.setReadOnly(ro)
+        except Exception:
+            pass
+        try:
+            self._sync_editor_only_actions()
+            self._sync_menu_enablement()
+        except Exception:
+            pass
+        pane = getattr(self, "editor_pane", None)
+        if pane is not None and hasattr(pane, "set_edit_tools_enabled"):
+            try:
+                pane.set_edit_tools_enabled(not ro)
+            except Exception:
+                pass
+        # Nach Menu-Sync noch einmal die Leiste (QAction.setEnabled kann Widgets zurücksetzen)
+        if pane is not None:
+            for btn in (getattr(pane, "_tool_buttons", None) or {}).values():
+                aid = ""
+                try:
+                    name = str(btn.objectName() or "")
+                    aid = name.split("editorToolbar_", 1)[-1] if "editorToolbar_" in name else ""
+                except Exception:
+                    aid = ""
+                if aid in {"select", "find"}:
+                    continue
+                if aid:
+                    try:
+                        btn.setEnabled(not ro)
+                    except Exception:
+                        pass
+
+    def _sync_sheet_bar(self) -> None:
+        pane = getattr(self, "editor_pane", None)
+        if pane is None or not hasattr(pane, "set_sheet_names"):
+            return
+        sheets = []
+        active = None
+        if self.doc and self.doc.kind == DocKind.XLSX:
+            sheets = list((self.doc.meta or {}).get("sheets") or [])
+            active = (self.doc.meta or {}).get("active_sheet")
+        try:
+            pane.set_sheet_names(sheets, active=str(active) if active else None)
+        except Exception:
+            pass
+
+    def _on_spreadsheet_sheet_changed(self, name: str) -> None:
+        """Anderes Excel-Blatt in denselben Editor laden (keine Extra-App)."""
+        sheet = str(name or "").strip()
+        if not sheet or not self.doc or self.doc.kind != DocKind.XLSX:
+            return
+        if str((self.doc.meta or {}).get("active_sheet") or "") == sheet:
+            return
+        path = self.doc.path
+        if path is None:
+            return
+        if self._current_is_dirty():
+            self._sync_editor_rich_meta()
+        try:
+            from ild_pdf.tables import import_spreadsheet, table_to_html_document, table_to_markdown
+
+            table = import_spreadsheet(path, sheet=sheet)
+            html = table_to_html_document(table, title=sheet)
+            self.doc.meta["html"] = html
+            self.doc.meta["rich_text"] = True
+            self.doc.meta["table"] = table.to_dict()
+            self.doc.meta["active_sheet"] = sheet
+            self.doc.text = table_to_markdown(table, with_markers=False)
+            self._loading_document = True
+            try:
+                self.editor.blockSignals(True)
+                self.editor.set_rich_html(html, base_font=self._rich_base_font_for_doc())
+                self.doc.text = self.editor.toPlainText()
+                self.editor.blockSignals(False)
+            finally:
+                self._loading_document = False
+            self.doc.dirty = False
+            self._set_status(f"Blatt: {sheet}")
+        except Exception as e:
+            QMessageBox.warning(self, "Excel", f"Blatt konnte nicht geladen werden:\n{e}")
+
+    def _capture_editor_table_meta(self) -> None:
+        """QTextTable / HTML-Tabelle in doc.meta.table für CSV/Excel-Speichern."""
+        if not self.doc or self.doc.kind not in (DocKind.CSV, DocKind.XLSX, DocKind.MARKDOWN):
+            return
+        cells: list[list[str]] = []
+        try:
+            from instantlensdoc.ui.tables import current_table, first_qtext_table_cells, qtext_table_cells
+
+            cur_tbl = current_table(self.editor.textCursor())
+            if cur_tbl is not None:
+                cells = qtext_table_cells(cur_tbl)
+            if not cells:
+                cells = first_qtext_table_cells(self.editor.document())
+        except Exception:
+            cells = []
+        if not cells:
+            html = ""
+            try:
+                html = self.editor.to_rich_html()
+            except Exception:
+                html = str((self.doc.meta or {}).get("html") or "")
+            try:
+                from ild_pdf.tables import cells_from_html_tables
+
+                found = cells_from_html_tables(html)
+                if found:
+                    cells = found[0]
+            except Exception:
+                pass
+        if cells:
+            from ild_pdf.tables import create_table
+
+            table = create_table(data=cells, header=True)
+            self.doc.meta["table"] = table.to_dict()
+
+    def _warn_xls_write_if_needed(self) -> None:
+        msg = str((self.doc.meta or {}).get("xls_write_warning") or "") if self.doc else ""
+        if not msg:
+            return
+        QMessageBox.warning(self, "Excel .xls", msg)
+        try:
+            self.doc.meta.pop("xls_write_warning", None)
+        except Exception:
+            pass
 
     def _sync_preview_readonly_banner(self) -> None:
         """Banner „Vorschau“ + Bearbeiten-Button bei Readonly-Tab — 1.1.5."""
@@ -19813,6 +19996,7 @@ class MainWindow(QMainWindow):
                     pass
                 btn.clicked.connect(self._open_preview_for_edit)
         banner.setVisible(is_ro)
+        self._apply_schreibschutz_ui()
 
     def _save_mismatched_with_real_extension(self) -> None:
         """Falsch benannte .pdf (Inhalt DOCX/HTML/…) unter richtiger Endung kopieren — 2.6.54."""
@@ -19880,6 +20064,7 @@ class MainWindow(QMainWindow):
         title_name = self.doc.display_name
         self.setWindowTitle(self._app_title(title_name))
         self._sync_preview_readonly_banner()
+        self._apply_schreibschutz_ui()
         self._update_doc_status()
         self._set_status(f"Zum Bearbeiten geöffnet: {path}")
 
@@ -19935,7 +20120,7 @@ class MainWindow(QMainWindow):
         if not self.doc.path:
             self.save_as()
             return not self._current_is_dirty()
-        if self.doc.kind in (DocKind.TEXT, DocKind.MARKDOWN, DocKind.HTML, DocKind.DOCX, DocKind.RTF):
+        if self.doc.kind in (DocKind.TEXT, DocKind.MARKDOWN, DocKind.HTML, DocKind.DOCX, DocKind.RTF, DocKind.CSV, DocKind.XLSX):
             self._sync_editor_text_before_save()
         self._sync_editor_rich_meta()
         try:
@@ -19964,6 +20149,7 @@ class MainWindow(QMainWindow):
             enc = self.doc.meta.get("encoding")
             suffix = f" [{enc}]" if enc else ""
             self._set_status(f"Gespeichert: {self.doc.path}{suffix}")
+            self._warn_xls_write_if_needed()
             try:
                 from instantlensdoc.core.plugin_hooks import emit as emit_hook
 
@@ -20123,9 +20309,11 @@ class MainWindow(QMainWindow):
             DocKind.DOCX,
             DocKind.RTF,
             DocKind.XLSX,
+            DocKind.CSV,
         ):
             self._sync_editor_text_before_save()
             self.doc.text = self.editor.toPlainText()
+            self._sync_editor_rich_meta()
         try:
             dest = Path(native_fs_path(path) or path)
             # Text → PDF ausschließlich über den PDF-Exporter — nie über save_document
@@ -20164,6 +20352,7 @@ class MainWindow(QMainWindow):
             self.setWindowTitle(self._app_title(self.doc.display_name))
             filt_hint = f" [{selected}]" if selected else ""
             self._set_status(f"Gespeichert: {dest}{filt_hint}")
+            self._warn_xls_write_if_needed()
         except Exception as e:
             QMessageBox.critical(self, "Speichern", f"Speichern fehlgeschlagen:\n{e}")
 
@@ -20188,6 +20377,7 @@ class MainWindow(QMainWindow):
             DocKind.DOCX,
             DocKind.RTF,
             DocKind.XLSX,
+            DocKind.CSV,
         )
         if self.stack.currentWidget() is self.editor_pane:
             text = self.editor.toPlainText()

@@ -415,24 +415,49 @@ def insert_table_into_text(
     return before + pad_before + md + pad_after + after
 
 
+def sniff_csv_delimiter(sample: str) -> str:
+    """Trennzeichen erkennen: Komma, Semikolon, Tab (wie Seriendruck)."""
+    text = sample or ""
+    try:
+        from instantlensdoc.core.mail_merge import sniff_csv_delimiter as _mm_sniff
+
+        return _mm_sniff(text)
+    except Exception:
+        pass
+    try:
+        dialect = csv.Sniffer().sniff(text[:4096], delimiters=",;\t|")
+        if dialect.delimiter in ",;\t|":
+            return dialect.delimiter
+    except csv.Error:
+        pass
+    counts = {",": text.count(","), ";": text.count(";"), "\t": text.count("\t")}
+    return max(counts, key=counts.get) if any(counts.values()) else ","
+
+
 def import_csv(
     path: PathLike,
     *,
     delimiter: str | None = None,
-    encoding: str = "utf-8-sig",
+    encoding: str | None = "auto",
     header: bool = True,
     table_id: str = "csv1",
 ) -> DocumentTable:
-    """CSV in DocumentTable laden (Delimiter-Autodetect wenn None)."""
+    """CSV in DocumentTable laden (Delimiter- + Encoding-Autodetect)."""
     p = Path(path)
-    raw = p.read_text(encoding=encoding, errors="replace")
+    enc = encoding
+    if enc in (None, "", "auto", "detect"):
+        try:
+            from instantlensdoc.core.documents import detect_file_encoding
+
+            enc = detect_file_encoding(p)
+        except Exception:
+            enc = "utf-8"
+    if str(enc).lower() in ("utf-8", "utf8"):
+        enc = "utf-8-sig"
+    raw = p.read_text(encoding=enc, errors="replace")
     sample = raw[:4096]
     if delimiter is None:
-        try:
-            dialect = csv.Sniffer().sniff(sample, delimiters=";,\t|")
-            delimiter = dialect.delimiter
-        except csv.Error:
-            delimiter = ";" if sample.count(";") >= sample.count(",") else ","
+        delimiter = sniff_csv_delimiter(sample)
     reader = csv.reader(io.StringIO(raw), delimiter=delimiter)
     cells = [[str(c) for c in row] for row in reader if any(str(x).strip() for x in row) or row]
     if not cells:
@@ -463,6 +488,139 @@ def _col_row(cell_ref: str) -> tuple[int, int]:
     for ch in col_s:
         col = col * 26 + (ord(ch) - 64)
     return col - 1, int(row_s) - 1
+
+
+def list_spreadsheet_sheets(path: PathLike) -> list[str]:
+    """Blattnamen aus .xlsx/.xls (openpyxl / OOXML / xlrd)."""
+    p = Path(path)
+    suf = p.suffix.lower()
+    if suf == ".xls" and not zipfile.is_zipfile(p):
+        try:
+            import xlrd  # type: ignore
+
+            wb = xlrd.open_workbook(str(p), on_demand=True)
+            try:
+                return [str(n) for n in wb.sheet_names()]
+            finally:
+                wb.release_resources()
+        except ImportError:
+            return []
+        except Exception:
+            return []
+    try:
+        import openpyxl  # type: ignore
+
+        wb = openpyxl.load_workbook(str(p), read_only=True, data_only=True)
+        try:
+            return [str(n) for n in wb.sheetnames]
+        finally:
+            wb.close()
+    except ImportError:
+        pass
+    except Exception:
+        pass
+    try:
+        with zipfile.ZipFile(p, "r") as z:
+            wb_xml = ET.fromstring(z.read("xl/workbook.xml"))
+            ns = {"m": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
+            names = []
+            for s in wb_xml.findall("m:sheets/m:sheet", ns):
+                n = s.get("name")
+                if n:
+                    names.append(str(n))
+            return names
+    except Exception:
+        return []
+
+
+def import_xls(
+    path: PathLike,
+    *,
+    sheet: str | int | None = 0,
+    header: bool = True,
+    table_id: str = "xls1",
+) -> DocumentTable:
+    """Excel 97–2003 .xls (xlrd) oder .xls-mit-xlsx-Inhalt."""
+    p = Path(path)
+    if zipfile.is_zipfile(p):
+        return import_xlsx(p, sheet=sheet, header=header, table_id=table_id)
+    try:
+        import xlrd  # type: ignore
+    except ImportError as e:
+        raise RuntimeError(
+            "xlrd fehlt — .xls (Excel 97–2003) kann nicht gelesen werden. "
+            "Bitte als .xlsx speichern oder xlrd installieren."
+        ) from e
+    wb = xlrd.open_workbook(str(p))
+    if isinstance(sheet, str):
+        ws = wb.sheet_by_name(sheet)
+    else:
+        idx = int(sheet or 0)
+        ws = wb.sheet_by_index(idx)
+    cells: list[list[str]] = []
+    for r in range(ws.nrows):
+        cells.append(
+            ["" if ws.cell_value(r, c) is None else str(ws.cell_value(r, c)) for c in range(ws.ncols)]
+        )
+    while cells and all(not str(c).strip() for c in cells[-1]):
+        cells.pop()
+    if not cells:
+        cells = [[""]]
+    return create_table(data=cells, header=header, table_id=table_id)
+
+
+def import_spreadsheet(
+    path: PathLike,
+    *,
+    sheet: str | int | None = 0,
+    header: bool = True,
+    table_id: str = "sheet1",
+) -> DocumentTable:
+    """Erste/gewählte Tabelle aus .xlsx oder .xls."""
+    p = Path(path)
+    if p.suffix.lower() == ".xls" and not zipfile.is_zipfile(p):
+        return import_xls(p, sheet=sheet, header=header, table_id=table_id)
+    return import_xlsx(p, sheet=sheet, header=header, table_id=table_id)
+
+
+def table_to_html_document(table: DocumentTable, *, title: str = "") -> str:
+    """Vollständiges HTML mit einer QTextTable-tauglichen Tabelle."""
+    inner = table_to_html(table)
+    heading = f"<h1>{_escape_html(title)}</h1>" if title else ""
+    return (
+        "<!DOCTYPE html><html><head><meta charset='utf-8'/></head>"
+        f"<body>{heading}{inner}</body></html>"
+    )
+
+
+def cells_from_html_tables(html: str) -> list[list[list[str]]]:
+    """Alle HTML-Tabellen → Zellenlisten (für CSV/XLSX-Speichern)."""
+    src = html or ""
+    if "<table" not in src.lower():
+        return []
+    tables: list[list[list[str]]] = []
+    for m in re.finditer(r"<table\b[^>]*>(.*?)</table>", src, flags=re.I | re.S):
+        block = m.group(1)
+        rows: list[list[str]] = []
+        for rm in re.finditer(r"<tr\b[^>]*>(.*?)</tr>", block, flags=re.I | re.S):
+            cells = [
+                re.sub(r"<[^>]+>", "", c).replace("&nbsp;", " ").replace("&amp;", "&").strip()
+                for c in re.findall(r"<t[dh]\b[^>]*>(.*?)</t[dh]>", rm.group(1), flags=re.I | re.S)
+            ]
+            if cells:
+                rows.append(cells)
+        if rows:
+            tables.append(rows)
+    return tables
+
+
+def document_table_from_cells(
+    cells: Sequence[Sequence[Any]] | None,
+    *,
+    header: bool = True,
+    table_id: str = "t1",
+) -> DocumentTable:
+    return create_table(data=cells or [[""]], header=header, table_id=table_id)
 
 
 def import_xlsx(

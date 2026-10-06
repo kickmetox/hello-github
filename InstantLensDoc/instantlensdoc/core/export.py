@@ -1211,11 +1211,26 @@ def import_document_text(path: str | Path) -> dict[str, Any]:
         return {"text": import_pptx(path), "meta": meta}
     if ext in ("txt", "log", "md", "markdown", "html", "htm", "csv"):
         if ext == "csv":
-            from ild_pdf.tables import import_csv, table_to_markdown
+            from ild_pdf.tables import import_csv, table_to_html_document, table_to_markdown
 
             table = import_csv(path)
-            return {"text": table_to_markdown(table), "meta": {**meta, "table": table.to_dict()}}
+            return {
+                "text": table_to_markdown(table, with_markers=False),
+                "meta": {
+                    **meta,
+                    "table": table.to_dict(),
+                    "html": table_to_html_document(table),
+                    "rich_text": True,
+                },
+            }
         text = path.read_text(encoding="utf-8", errors="replace")
+        if ext in ("md", "markdown"):
+            from instantlensdoc.core.markdown_io import markdown_to_html
+
+            return {
+                "text": text,
+                "meta": {**meta, "html": markdown_to_html(text), "rich_text": True},
+            }
         return {"text": text, "meta": meta}
     if ext == "rtf":
         return {"text": import_rtf(path), "meta": meta}
@@ -1244,11 +1259,23 @@ def import_document_text(path: str | Path) -> dict[str, Any]:
                 return {"text": "\n".join(parts), "meta": meta}
             except ImportError as e:
                 raise RuntimeError("python-docx fehlt zum DOCX-Import") from e
-    if ext == "xlsx":
-        from ild_pdf.tables import import_xlsx, table_to_markdown
+    if ext in ("xlsx", "xls"):
+        from ild_pdf.tables import (
+            import_spreadsheet,
+            table_to_html_document,
+            table_to_markdown,
+        )
 
-        table = import_xlsx(path)
-        return {"text": table_to_markdown(table), "meta": {**meta, "table": table.to_dict()}}
+        table = import_spreadsheet(path)
+        return {
+            "text": table_to_markdown(table, with_markers=False),
+            "meta": {
+                **meta,
+                "table": table.to_dict(),
+                "html": table_to_html_document(table),
+                "rich_text": True,
+            },
+        }
     if ext == "pdf":
         try:
 

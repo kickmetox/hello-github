@@ -15,12 +15,13 @@ if TYPE_CHECKING:
 DOC_SAVE_FILTER_ENTRIES: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("ILD Dokument", (".ild",)),
     ("Text", (".txt",)),
-    ("Markdown", (".md",)),
+    ("Markdown", (".md", ".markdown")),
     ("HTML", (".html", ".htm")),
     ("DOCX", (".docx",)),
     ("RTF", (".rtf",)),
+    ("CSV", (".csv",)),
+    ("Excel", (".xlsx", ".xls")),
     ("PDF", (".pdf",)),
-    ("Excel", (".xlsx",)),
 )
 
 _DOC_SAVE_KNOWN_EXTS = frozenset(
@@ -98,6 +99,18 @@ def document_save_name_filters() -> str:
     return ";;".join(parts)
 
 
+def document_open_name_filters() -> str:
+    """Qt-Name-Filter für Datei ▸ Öffnen (MD/CSV/Excel inkl. .xls)."""
+    return (
+        "Dokumente (*.ild *.txt *.md *.markdown *.html *.htm *.docx *.rtf "
+        "*.csv *.xls *.xlsx *.pdf *.png *.jpg *.jpeg);;"
+        "Markdown (*.md *.markdown);;"
+        "Excel (*.xlsx *.xls);;"
+        "CSV (*.csv);;"
+        "Alle (*.*)"
+    )
+
+
 def document_save_default_suffix(kind: "DocKind | str | None" = None) -> str:
     """Standard-Endung für unbenannte Dokumente (nie .py)."""
     from instantlensdoc.core.documents import DocKind
@@ -111,6 +124,7 @@ def document_save_default_suffix(kind: "DocKind | str | None" = None) -> str:
         DocKind.HTML.value: ".html",
         DocKind.DOCX.value: ".docx",
         DocKind.RTF.value: ".rtf",
+        DocKind.CSV.value: ".csv",
         DocKind.XLSX.value: ".xlsx",
         DocKind.PDF.value: ".pdf",
     }.get(key, ".ild")

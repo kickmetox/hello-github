@@ -289,3 +289,61 @@ def show_table_picker(
     picker.show()
     picker.raise_()
     return picker
+
+
+def qtext_table_cells(table: QTextTable | None) -> list[list[str]]:
+    """Zelleninhalt einer QTextTable."""
+    if table is None:
+        return []
+    try:
+        rows, cols = int(table.rows()), int(table.columns())
+    except Exception:
+        return []
+    out: list[list[str]] = []
+    for r in range(rows):
+        row: list[str] = []
+        for c in range(cols):
+            try:
+                cell = table.cellAt(r, c)
+                cur = cell.firstCursorPosition()
+                cur.setPosition(cell.lastCursorPosition().position(), QTextCursor.KeepAnchor)
+                row.append((cur.selectedText() or "").replace("\u2029", " ").strip())
+            except Exception:
+                row.append("")
+        out.append(row)
+    return out
+
+
+def iter_qtext_tables(document: QTextDocument | None) -> list[QTextTable]:
+    """Alle QTextTable im Dokument (Word-Suite / CSV / Excel)."""
+    if document is None:
+        return []
+    found: list[QTextTable] = []
+
+    def _walk(frame) -> None:
+        try:
+            it = frame.begin()
+        except Exception:
+            return
+        while not it.atEnd():
+            child = it.currentFrame()
+            if child is not None and child is not frame:
+                if isinstance(child, QTextTable) or (
+                    hasattr(child, "rows") and hasattr(child, "columns")
+                ):
+                    found.append(child)
+                _walk(child)
+            it += 1
+
+    try:
+        _walk(document.rootFrame())
+    except Exception:
+        pass
+    return found
+
+
+def first_qtext_table_cells(document: QTextDocument | None) -> list[list[str]]:
+    tables = iter_qtext_tables(document)
+    if not tables:
+        return []
+    return qtext_table_cells(tables[0])

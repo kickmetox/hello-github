@@ -2050,6 +2050,44 @@ class TextEditor(QPlainTextEdit):
         self._apply_page_layout()
         self._sync_char_background_extras()
 
+    def set_rich_markdown(self, markdown: str, base_font: QFont | None = None) -> None:
+        """Markdown in den Rich-Editor laden (Überschriften/Listen/Tabellen) — ohne ¶."""
+        from instantlensdoc.core.markdown_io import markdown_to_html, strip_pilcrow
+
+        md = strip_pilcrow(markdown or "")
+        self._rich_mode = True
+        try:
+            self.set_special_chars_visible(False)
+        except Exception:
+            pass
+        font = QFont(base_font) if base_font is not None else self._default_rich_font()
+        doc = self.document()
+        doc.setDefaultFont(font)
+        loaded = False
+        try:
+            doc.setMarkdown(md)
+            loaded = True
+        except Exception:
+            loaded = False
+        if not loaded:
+            self.set_rich_html(markdown_to_html(md), base_font=font)
+            return
+        self._rich_base_font = QFont(font)
+        try:
+            self._scrub_control_list_prefixes()
+        except Exception:
+            pass
+        self._apply_page_layout()
+
+    def to_markdown(self) -> str:
+        """Aktuelles Rich-Dokument als Markdown ohne Absatzmarken."""
+        from instantlensdoc.core.markdown_io import qtextdocument_to_markdown, strip_pilcrow
+
+        try:
+            return strip_pilcrow(qtextdocument_to_markdown(self.document()))
+        except Exception:
+            return strip_pilcrow(self.toPlainText() or "")
+
     def to_rich_html(self) -> str:
         """Aktuelles Dokument als HTML (Bold/Italic/Underline erhalten)."""
         html = self.document().toHtml()
@@ -4121,6 +4159,7 @@ class EditorPane(QWidget):
 
     # action id: select|edit|mark|underline|bold|italic|clear_marks|find
     tool_action = Signal(str)
+    sheet_changed = Signal(str)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -4134,6 +4173,21 @@ class EditorPane(QWidget):
         self._tool_buttons: dict[str, "QToolButton"] = {}
         self._active_tool = "select"
         self._build_edit_toolbar(layout)
+        from PySide6.QtWidgets import QComboBox, QHBoxLayout, QLabel, QWidget
+
+        self.sheet_bar = QWidget()
+        self.sheet_bar.setObjectName("ildSheetBar")
+        self.sheet_bar.setVisible(False)
+        srow = QHBoxLayout(self.sheet_bar)
+        srow.setContentsMargins(8, 2, 8, 2)
+        srow.setSpacing(6)
+        srow.addWidget(QLabel("Blatt:"))
+        self.sheet_combo = QComboBox()
+        self.sheet_combo.setObjectName("ildSheetCombo")
+        self.sheet_combo.setToolTip("Weitere Tabellenblätter im Dokument")
+        self.sheet_combo.currentTextChanged.connect(self._on_sheet_combo)
+        srow.addWidget(self.sheet_combo, 1)
+        layout.addWidget(self.sheet_bar)
         self.splitter = QSplitter(Qt.Horizontal)
         self.editor = TextEditor()
         self.preview = QTextBrowser()
@@ -4154,6 +4208,7 @@ class EditorPane(QWidget):
         layout.addWidget(self.splitter, 1)
         self._preview_visible = bool(get_editor_markdown_preview())
         self.preview.setVisible(self._preview_visible)
+        self._schreibschutz = False
         self.editor.textChanged.connect(self._sync_preview)
         self._sync_preview()
         self.set_active_tool("select")
@@ -4277,7 +4332,8 @@ class EditorPane(QWidget):
                     pass
             elif aid == "edit":
                 try:
-                    self.editor.setReadOnly(False)
+                    if not bool(getattr(self, "_schreibschutz", False)):
+                        self.editor.setReadOnly(False)
                     self.editor.setFocus(Qt.OtherFocusReason)
                 except Exception:
                     pass
@@ -4310,6 +4366,67 @@ class EditorPane(QWidget):
         tb = getattr(self, "toolbar", None)
         if tb is not None:
             tb.setVisible(bool(visible))
+
+    def set_edit_tools_enabled(self, enabled: bool) -> None:
+        """Schrift-/Formatwerkzeuge; bei Schreibschutz ausgegraut (wie TXT/DOCX)."""
+        on = bool(enabled)
+        font_ids = {
+            "edit",
+            "mark",
+            "underline",
+            "bold",
+            "italic",
+            "strike",
+            "align_left",
+            "align_center",
+            "align_right",
+            "align_justify",
+            "bullet_list",
+            "numbered_list",
+            "paragraph",
+            "page_layout",
+            "clear_format",
+            "clear_marks",
+        }
+        for aid, btn in (getattr(self, "_tool_buttons", None) or {}).items():
+            try:
+                if aid in font_ids:
+                    btn.setEnabled(on)
+                    if not on:
+                        btn.setToolTip((btn.toolTip() or "").split(" — Schreibschutz")[0] + " — Schreibschutz")
+            except Exception:
+                pass
+        picker = getattr(self, "layout_picker", None)
+        if picker is not None:
+            try:
+                picker.setEnabled(on)
+            except Exception:
+                pass
+        self._schreibschutz = not on
+
+    def _on_sheet_combo(self, name: str) -> None:
+        text = str(name or "").strip()
+        if text:
+            self.sheet_changed.emit(text)
+
+    def set_sheet_names(self, names: list[str] | None, *, active: str | None = None) -> None:
+        """Blattwahl für Excel — einheitliche Dokumentansicht, keine Extra-App."""
+        bar = getattr(self, "sheet_bar", None)
+        combo = getattr(self, "sheet_combo", None)
+        if bar is None or combo is None:
+            return
+        names = [str(n) for n in (names or []) if str(n).strip()]
+        combo.blockSignals(True)
+        try:
+            combo.clear()
+            for n in names:
+                combo.addItem(n)
+            if active and names:
+                idx = names.index(active) if active in names else 0
+                combo.setCurrentIndex(max(0, idx))
+        finally:
+            combo.blockSignals(False)
+        bar.setVisible(len(names) > 1)
 
     def toolbar_visible(self) -> bool:
         tb = getattr(self, "toolbar", None)

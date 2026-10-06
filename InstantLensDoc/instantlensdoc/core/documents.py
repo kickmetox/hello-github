@@ -1,4 +1,4 @@
-"""Dokument-I/O: TXT, MD, HTML, DOCX, PDF, Bilder."""
+"""Dokument-I/O: TXT, MD, HTML, DOCX, CSV, Excel, PDF, Bilder."""
 
 from __future__ import annotations
 
@@ -158,10 +158,27 @@ class DocKind(str, Enum):
     HTML = "html"
     DOCX = "docx"
     RTF = "rtf"
+    CSV = "csv"
     XLSX = "xlsx"
     PDF = "pdf"
     IMAGE = "image"
     UNKNOWN = "unknown"
+
+
+# .xls ohne xlwt: Inhalt ist OOXML/.xlsx unter .xls-Endung
+XLS_WRITE_VIA_XLSX_DE = (
+    "xlwt fehlt — die Datei wurde im Excel-2007-Format (.xlsx) unter der "
+    "Endung .xls gespeichert. Excel öffnet sie meist trotzdem; für echtes "
+    "Excel-97-.xls bitte xlwt installieren."
+)
+
+RICH_EDITOR_KINDS = (
+    DocKind.DOCX,
+    DocKind.HTML,
+    DocKind.MARKDOWN,
+    DocKind.CSV,
+    DocKind.XLSX,
+)
 
 
 @dataclass
@@ -187,9 +204,11 @@ class Document:
 
 def detect_kind(path: Path) -> DocKind:
     ext = path.suffix.lower()
-    if ext in {".txt", ".log", ".csv", ".ild"}:
+    if ext in {".txt", ".log", ".ild"}:
         # .ild = natives InstantLens-Doc (UTF-8-Text) — 2.6.43
         return DocKind.TEXT
+    if ext == ".csv":
+        return DocKind.CSV
     if ext in {".md", ".markdown"}:
         return DocKind.MARKDOWN
     if ext in {".html", ".htm"}:
@@ -198,7 +217,7 @@ def detect_kind(path: Path) -> DocKind:
         return DocKind.DOCX
     if ext == ".rtf":
         return DocKind.RTF
-    if ext == ".xlsx":
+    if ext in {".xlsx", ".xlsm", ".xls"}:
         return DocKind.XLSX
     if ext == ".pdf":
         return DocKind.PDF
@@ -281,9 +300,38 @@ def open_document(path: str | Path, *, encoding: str | None = None) -> Document:
     if requested == "auto":
         doc.meta["encoding_detected"] = True
 
-    if kind in (DocKind.TEXT, DocKind.MARKDOWN):
+    if kind == DocKind.TEXT:
         doc.text = path.read_text(encoding=enc, errors="replace")
         doc.meta["encoding"] = enc
+    elif kind == DocKind.MARKDOWN:
+        from instantlensdoc.core.markdown_io import markdown_to_html
+
+        doc.text = path.read_text(encoding=enc, errors="replace")
+        doc.meta["encoding"] = enc
+        doc.meta["html"] = markdown_to_html(doc.text)
+        doc.meta["rich_text"] = True
+    elif kind == DocKind.CSV:
+        from ild_pdf.tables import (
+            import_csv,
+            sniff_csv_delimiter,
+            table_to_html_document,
+            table_to_markdown,
+        )
+
+        table = import_csv(path, encoding=enc)
+        raw = path.read_bytes()[:4096]
+        try:
+            sample = raw.decode(enc if enc != "utf-8" else "utf-8-sig", errors="replace")
+        except Exception:
+            sample = path.read_text(encoding=enc, errors="replace")[:4096]
+        delim = sniff_csv_delimiter(sample)
+        html = table_to_html_document(table, title=path.stem)
+        doc.text = table_to_markdown(table, with_markers=False)
+        doc.meta["encoding"] = enc
+        doc.meta["html"] = html
+        doc.meta["rich_text"] = True
+        doc.meta["table"] = table.to_dict()
+        doc.meta["csv_delimiter"] = delim
     elif kind == DocKind.HTML:
         doc.text = path.read_text(encoding=enc, errors="replace")
         doc.meta["encoding"] = enc
@@ -371,11 +419,25 @@ def open_document(path: str | Path, *, encoding: str | None = None) -> Document:
         doc.meta["encoding"] = "utf-8"
         # RTF-Import bleibt plaintext; Editor-Formate beim Speichern via meta.html
     elif kind == DocKind.XLSX:
-        from ild_pdf.tables import import_xlsx, table_to_markdown
+        from ild_pdf.tables import (
+            import_spreadsheet,
+            list_spreadsheet_sheets,
+            table_to_html_document,
+            table_to_markdown,
+        )
 
-        table = import_xlsx(path)
-        doc.text = table_to_markdown(table)
+        sheets = list_spreadsheet_sheets(path)
+        table = import_spreadsheet(path, sheet=0)
+        active = sheets[0] if sheets else "Tabelle1"
+        html = table_to_html_document(table, title=active)
+        doc.text = table_to_markdown(table, with_markers=False)
+        doc.meta["html"] = html
+        doc.meta["rich_text"] = True
         doc.meta["table"] = table.to_dict()
+        doc.meta["sheets"] = sheets
+        doc.meta["active_sheet"] = active
+        if path.suffix.lower() == ".xls":
+            doc.meta["xls_legacy"] = True
     elif kind == DocKind.PDF:
         doc.text = ""  # PDF wird über Viewer gerendert
         doc.meta["pdf"] = str(path)
@@ -534,10 +596,54 @@ def save_document(
             from instantlensdoc.core.export import export_rtf
 
             export_rtf(doc.text, target, title=doc.title)
-    elif kind == DocKind.XLSX:
-        from instantlensdoc.core.export import export_xlsx_from_text
+    elif kind == DocKind.MARKDOWN:
+        from instantlensdoc.core.markdown_io import html_to_markdown, strip_pilcrow
 
-        export_xlsx_from_text(doc.text, target)
+        html = (doc.meta or {}).get("html")
+        md_src = (doc.meta or {}).get("markdown_source")
+        if html:
+            text = html_to_markdown(str(html))
+        elif md_src:
+            text = str(md_src)
+        else:
+            text = doc.text or ""
+        text = strip_pilcrow(text)
+        if "¶" in text:
+            text = text.replace("¶", "")
+        target.write_text(text, encoding=enc, errors="replace")
+        doc.meta["encoding"] = enc
+        doc.meta["html"] = html or doc.meta.get("html")
+    elif kind == DocKind.CSV:
+        from ild_pdf.tables import (
+            create_table,
+            export_table_csv,
+        )
+
+        delim = str((doc.meta or {}).get("csv_delimiter") or ";")
+        if delim not in (",", ";", "\t", "|"):
+            delim = ";"
+        table = _table_from_doc(doc)
+        if table is None:
+            rows = [[line] for line in (doc.text or "").splitlines()] or [[""]]
+            table = create_table(data=rows, header=False)
+        csv_enc = enc if enc != "utf-8" else "utf-8-sig"
+        export_table_csv(table, target, delimiter=delim, encoding=csv_enc)
+        doc.meta["encoding"] = csv_enc
+        doc.meta["csv_delimiter"] = delim
+    elif kind == DocKind.XLSX:
+        from ild_pdf.tables import create_table, export_table_xlsx
+
+        table = _table_from_doc(doc)
+        if table is None:
+            from instantlensdoc.core.export import export_xlsx_from_text
+
+            export_xlsx_from_text(doc.text or "", target)
+        else:
+            sheet = str((doc.meta or {}).get("active_sheet") or "Tabelle1")
+            if target.suffix.lower() == ".xls":
+                _save_xls(table, target, sheet_name=sheet, doc=doc)
+            else:
+                export_table_xlsx(table, target, sheet_name=sheet)
     elif kind == DocKind.HTML:
         html = (doc.meta or {}).get("html") or doc.text or ""
         stripped = (html or "").lstrip().lower()
@@ -598,3 +704,49 @@ def save_document(
     except Exception:
         pass
     return target
+
+
+def _table_from_doc(doc: Document):
+    """Aktuelle Tabelle aus Meta oder HTML (CSV/Excel-Speichern)."""
+    from ild_pdf.tables import (
+        DocumentTable,
+        TableFormat,
+        cells_from_html_tables,
+        create_table,
+    )
+
+    raw = (doc.meta or {}).get("table")
+    if isinstance(raw, dict) and raw.get("cells"):
+        fmt_raw = raw.get("format") if isinstance(raw.get("format"), dict) else {}
+        allowed = {k: fmt_raw[k] for k in ("header", "border", "align", "header_bold", "style") if k in fmt_raw}
+        fmt = TableFormat(**allowed) if allowed else TableFormat()
+        return DocumentTable(
+            cells=list(raw.get("cells") or []),
+            format=fmt,
+            table_id=str(raw.get("id") or "t1"),
+        ).normalized()
+    html = str((doc.meta or {}).get("html") or "")
+    tables = cells_from_html_tables(html)
+    if tables:
+        return create_table(data=tables[0], header=True)
+    return None
+
+
+def _save_xls(table, target: Path, *, sheet_name: str, doc: Document) -> None:
+    """Echtes .xls via xlwt, sonst XLSX-Bytes unter .xls + deutsche Warnung."""
+    from ild_pdf.tables import export_table_xlsx
+
+    try:
+        import xlwt  # type: ignore
+    except ImportError:
+        export_table_xlsx(table, target, sheet_name=sheet_name)
+        doc.meta["xls_write_warning"] = XLS_WRITE_VIA_XLSX_DE
+        return
+    wb = xlwt.Workbook()
+    ws = wb.add_sheet((sheet_name or "Tabelle1")[:31] or "Tabelle1")
+    t = table.normalized()
+    for r_i, row in enumerate(t.cells):
+        for c_i, val in enumerate(row):
+            ws.write(r_i, c_i, val)
+    wb.save(str(target))
+    doc.meta.pop("xls_write_warning", None)
