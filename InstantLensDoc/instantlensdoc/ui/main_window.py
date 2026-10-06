@@ -4268,14 +4268,44 @@ class MainWindow(QMainWindow):
                     else:
                         nm.addAction(sa)
 
+        m_dtp = QMenu("&DTP", self)
+        m_dtp.setObjectName("menuDtp")
+        m_dtp.setToolTip(
+            "DTP-Layout: Menütitel öffnet den Canvas; Einträge teilen bestehende Slots"
+        )
+        if getattr(self, "_layout_mode_action", None) is not None:
+            m_dtp.addAction(self._layout_mode_action)
+        for objn in (
+            "actTextOnPath",
+            "actTextToOutlines",
+            "actClipMask",
+            "actLiveFill",
+            "actGlyphPalette",
+            "actExtrude3d",
+            "actShapeRecognize",
+            "actEnvelopeDistort",
+        ):
+            shared = None
+            try:
+                from PySide6.QtGui import QAction as _QA
+
+                shared = self.findChild(_QA, objn)
+            except Exception:
+                shared = None
+            if shared is not None:
+                m_dtp.addAction(shared)
+        self._dtp_menu = m_dtp
+
         if extra_act is not None:
             mb.insertMenu(extra_act, m_format)
             mb.insertMenu(extra_act, m_absatz)
             mb.insertMenu(extra_act, m_seiten)
+            mb.insertMenu(extra_act, m_dtp)
         else:
             mb.addMenu(m_format)
             mb.addMenu(m_absatz)
             mb.addMenu(m_seiten)
+            mb.addMenu(m_dtp)
         if help_act is not None:
             mb.insertMenu(help_act, m_fenster)
         else:
@@ -4286,6 +4316,24 @@ class MainWindow(QMainWindow):
             for menu in (m_format, m_absatz, m_seiten, m_fenster):
                 prepare_menu_for_clicks(menu)
                 menu.aboutToShow.connect(self._on_word_suite_menu_about_to_show)
+            prepare_menu_for_clicks(m_dtp)
+            m_dtp.aboutToShow.connect(self._on_dtp_menu_about_to_show)
+        except Exception:
+            pass
+
+    def _on_dtp_menu_about_to_show(self) -> None:
+        """Menütitel DTP: eine Spalte, Canvas öffnen. Slot bleibt sibling-owned."""
+        try:
+            from instantlensdoc.ui.menu_click import prepare_menu_for_clicks
+
+            menu = self.sender()
+            if menu is not None:
+                prepare_menu_for_clicks(menu)
+        except Exception:
+            pass
+        try:
+            if not self._layout_mode_active():
+                self._enter_layout_mode()
         except Exception:
             pass
 

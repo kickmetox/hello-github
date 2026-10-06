@@ -488,6 +488,10 @@ class RibbonBar(QWidget):
             btn.setToolTip(tip)
             btn.setProperty("altMnemonic", mnemonic)
             btn.clicked.connect(lambda _=False, idx=i: self._select_cat(idx))
+            if title == "DTP":
+                btn.clicked.connect(
+                    lambda _=False: self.action_triggered.emit("dtp_layout")
+                )
             cats.addWidget(btn)
             self._cat_buttons.append(btn)
             self._tab_index[title] = i
