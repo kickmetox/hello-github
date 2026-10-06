@@ -1,3 +1,24 @@
+## 2.6.59 - Release: Word-Suite, PDF-Menü, OCR, DTP, Ribbon
+
+Pack `InstantLensDoc-2.6.59-pack.zip`; VERSION **2.6.59**. HEAD `8f01af3` (Ersatzzeichen) auf Chrome/Klick `d1e74c6`. Nach 2.6.58-Pack (`db9ef25`).
+
+- **PDF-Menü live:** Klick eine Spalte; Einträge enabled bei offenem PDF-Tab oder Geschwister-PDF; jeder Slot Dialog oder Dateiänderung (`_bind_pdf_action` / `_pdf_menu_call`).
+- **OCR Word-Suite:** Absätze/Ausrichtung/Listen, Seitenlayout, Kopf/Fuß nicht im Body, Feld-Tokens, Formatvorlagen und Tabellen ohne Steuerzeichen.
+- **DTP:** Lineale mm/pt/in mit Hilfslinien; Werkzeuge/Füllung/Kontur/Systemschriften auf der Auswahl.
+- **Word-Chrome:** Klassisch (Pull-down) / Ribbon / Kombiniert ohne Dokumentverlust; Ribbon-Overflow und Chrome-Modi klicken dieselben Pulldown-QActions.
+- **Absatz / Seitenlayout / Kopf / Fuß / Ersatzzeichen:** echte Dialoge auf den bestehenden Menüs `menuAbsatz` / `menuSeitenlayout`; Builtin-Tokens plus frei definierbare Felder.
+- **Formatvorlagen, Tabellen, Serienbrief:** Ribbon und Pulldown teilen QActions; Tabellen-Dialog; Seriendruck-Dialog.
+
+Windows-Rebuild (Andreas Meyer), wie 2.6.58:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\sync-ild.ps1 -LocalPack D:\AI_Temp\InstantLensDoc-2.6.59-pack.zip -Dest D:\AI_Temp\InstantLensDoc-2659 -Swap -SkipStart
+cd D:\AI_Temp\InstantLensDoc
+python -m pip install -r requirements.txt
+powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
+powershell -ExecutionPolicy Bypass -File .\scripts\install-ild.ps1
+```
+
 ## 2.6.58 - Release: Auswahl-Gummiband per Mausziehen
 
 Pack `InstantLensDoc-2.6.58-pack.zip`; VERSION **2.6.58**. HEAD `56d90a4` (Auswahl-Gummiband per Mausziehen). Nach 2.6.57-Pack (`42eebb7`).

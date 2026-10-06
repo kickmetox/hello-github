@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.6.58.
+"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.6.59.
 
 Leichtgewichtig. Exit-Codes:
   0  OK  (ok=true)
@@ -14,12 +14,12 @@ Aufruf:
   python scripts/smoke_ild.py -h
 
 JSON-Schema (--json), Erfolg:
-  {"ok": true, "version": "2.6.58", "duration_ms": 1234,
+  {"ok": true, "version": "2.6.59", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 
 JSON bei Fail: checks[] enthält Objekt mit error-Text (max 200 Zeichen, Truncate …);
 Exitcode spiegelt ok (0↔true, 1↔false) — 2.2.0:
-  {"ok": false, "version": "2.6.58", "duration_ms": 12,
+  {"ok": false, "version": "2.6.59", "duration_ms": 12,
    "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 """
 
@@ -41,7 +41,7 @@ if str(ROOT) not in sys.path:
 # Headless/CI: Qt ohne Display
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-EXPECTED_VERSION = "2.6.58"
+EXPECTED_VERSION = "2.6.59"
 FAIL_ERROR_MAX_LEN = 200
 
 EXIT_OK = 0
@@ -718,6 +718,40 @@ def check_version() -> None:
     if "Gummiband-Drag:" not in audit_2654:
         _fail("test_ui_audit_2654.py fehlt Gummiband-Drag (2.6.58, 7c ohne Fallback)")
     _ok("2.6.58 rubber-band drag-select: OK")
+    # 2.6.59: Word-Suite, PDF-Menü live, OCR, DTP, Ribbon/Chrome
+    if "def _pdf_menu_call(" not in mw or "def _bind_pdf_action(" not in mw:
+        _fail("main_window.py fehlt _pdf_menu_call/_bind_pdf_action (2.6.59 PDF-Menü live)")
+    if "def _open_pdf_paths(" not in mw:
+        _fail("main_window.py fehlt _open_pdf_paths (2.6.59 Geschwister-PDF)")
+    if not (ROOT / "ild_pdf" / "menu_policy.py").is_file():
+        _fail("ild_pdf/menu_policy.py fehlt (2.6.59 PDF-Menü)")
+    chrome_ui = ROOT / "instantlensdoc" / "ui" / "chrome.py"
+    if not chrome_ui.is_file():
+        _fail("ui/chrome.py fehlt (2.6.59 Word-Chrome)")
+    chrome_ui_t = chrome_ui.read_text(encoding="utf-8")
+    if "CHROME_KLASSISCH" not in chrome_ui_t or "CHROME_KOMBINIERT" not in chrome_ui_t:
+        _fail("ui/chrome.py fehlt Klassisch/Kombiniert (2.6.59)")
+    if "def _set_chrome_mode(" not in mw:
+        _fail("main_window.py fehlt _set_chrome_mode (2.6.59)")
+    if "def _header_footer_dialog(" not in mw or "def _field_token_dialog(" not in mw:
+        _fail("main_window.py fehlt Kopf/Fuß/Ersatzzeichen (2.6.59)")
+    if 'objectName("menuAbsatz")' not in mw and 'setObjectName("menuAbsatz")' not in mw:
+        _fail("main_window.py fehlt menuAbsatz (2.6.59)")
+    if not (ROOT / "instantlensdoc" / "ui" / "field_token_dialog.py").is_file():
+        _fail("ui/field_token_dialog.py fehlt (2.6.59 Ersatzzeichen)")
+    if not (ROOT / "instantlensdoc" / "core" / "field_tokens.py").is_file():
+        _fail("core/field_tokens.py fehlt (2.6.59)")
+    if "insert_field_token" not in ed_src:
+        _fail("editor.py fehlt insert_field_token (2.6.59)")
+    if not (ROOT / "tests" / "test_word_chrome_2659.py").is_file():
+        _fail("tests/test_word_chrome_2659.py fehlt (2.6.59)")
+    if not (ROOT / "tests" / "test_paragraph_layout_2659.py").is_file():
+        _fail("tests/test_paragraph_layout_2659.py fehlt (2.6.59)")
+    if not (ROOT / "tests" / "test_chrome_shared_actions_2662.py").is_file():
+        _fail("tests/test_chrome_shared_actions_2662.py fehlt (2.6.59 Chrome-Klick)")
+    if not (ROOT / "tests" / "test_dtp_2660.py").is_file():
+        _fail("tests/test_dtp_2660.py fehlt (2.6.59 DTP-Lineale)")
+    _ok("2.6.59 word-suite/pdf-menu/ocr/dtp/chrome/ribbon: OK")
 
 
 def check_imports(*, with_qt: bool) -> None:
@@ -1617,6 +1651,8 @@ def check_changelog() -> None:
         _fail("CHANGELOG fehlt ## 2.6.49")
     if "## 2.6.51" not in cl:
         _fail("CHANGELOG fehlt ## 2.6.51")
+    if "## 2.6.59" not in cl:
+        _fail("CHANGELOG fehlt ## 2.6.59")
     if "## 2.6.58" not in cl:
         _fail("CHANGELOG fehlt ## 2.6.58")
     if "## 2.6.57" not in cl:
@@ -3094,11 +3130,11 @@ Exit-Codes:
 Laufzeit: am Ende als „Laufzeit: N ms“ (oder duration_ms im JSON).
 
 Beispiel --json (Erfolg):
-  {"ok": true, "version": "2.6.58", "duration_ms": 1234,
+  {"ok": true, "version": "2.6.59", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 
 Beispiel --json (Fail):
-  {"ok": false, "version": "2.6.58", "duration_ms": 12,
+  {"ok": false, "version": "2.6.59", "duration_ms": 12,
    "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 """.rstrip()
     )

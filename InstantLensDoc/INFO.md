@@ -1,5 +1,23 @@
 # InstantLens Doc — Kurzinfo
 
+### 2.6.59 — Release
+
+Word-Suite (Absatz/Seitenlayout/Kopf/Fuß/Ersatzzeichen, Formatvorlagen, Tabellen, Serienbrief), PDF-Menü live, OCR-Layout/Felder, DTP-Lineale, Word-Chrome Klassisch/Ribbon/Kombiniert. Pack `InstantLensDoc-2.6.59-pack.zip`. VERSION **2.6.59**. HEAD `8f01af3` (Ersatzzeichen) auf Chrome/Klick `d1e74c6`.
+
+**Windows-Rebuild (Andreas Meyer)** — gleicher Ablauf wie 2.6.58, Ziel `D:\AI_Temp\InstantLensDoc-2659`:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File "D:\AI_Temp\sync-ild.ps1" -LocalPack D:\AI_Temp\InstantLensDoc-2.6.59-pack.zip -Dest D:\AI_Temp\InstantLensDoc-2659 -Swap -SkipStart
+cd D:\AI_Temp\InstantLensDoc
+python -m pip install -r requirements.txt
+powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
+powershell -ExecutionPolicy Bypass -File .\scripts\install-ild.ps1
+# optional Inno:
+powershell -ExecutionPolicy Bypass -File .\scripts\build-windows-installer.ps1
+```
+
+Oder Pack direkt nach `D:\AI_Temp\InstantLensDoc-2659` entpacken (nested: innerer Ordner `InstantLensDoc\`), dann `build-windows.ps1` wie bei 2.6.58.
+
 ### 2.6.58 — Release
 
 Auswahl-Gummiband per Mausziehen: leere Fläche ziehen selektiert sich schneidende Annotationen; bereits ausgewähltes Objekt ziehen verschiebt; Klick bleibt Hit-Test. DTP-Layout: nutzbare Lineale (mm/pt/in, Hilfslinien ziehen), Werkzeuge/Füllung/Kontur/Schrift auf Auswahl (`QFontDatabase`). Pack `InstantLensDoc-2.6.58-pack.zip`. VERSION **2.6.58**. HEAD `56d90a4`.
@@ -35,7 +53,7 @@ Menü **Geräte** (Scanner / Scannen…, Drucker, Erkennen), PDF → Scannen, To
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **2.6.58** |
+| Version | **2.6.59** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |

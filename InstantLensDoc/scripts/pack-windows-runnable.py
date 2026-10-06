@@ -96,13 +96,23 @@ def write_start_hinweis(dest_dir: Path, version: str) -> None:
 ## Schnellstart (64-Bit empfohlen)
 
 1. Python **3.10+ 64-Bit** installieren (python.org oder Microsoft Store).
-2. Dieses Paket nach z. B. `D:\\AI_Temp\\InstantLensDoc` entpacken.
-3. Abhängigkeiten:
+2. Dieses Paket nach z. B. `D:\\AI_Temp\\InstantLensDoc-2659` entpacken
+   (nested: innerer Ordner `InstantLensDoc\\`).
+3. Abhängigkeiten (gleicher Rebuild wie 2.6.58):
 
 ```bat
-cd /d D:\\AI_Temp\\InstantLensDoc
+cd /d D:\\AI_Temp\\InstantLensDoc-2659
 python -m pip install -r requirements.txt
 run.bat
+```
+
+Oder Sync + Swap wie 2.6.58:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\\scripts\\sync-ild.ps1 -LocalPack D:\\AI_Temp\\InstantLensDoc-2.6.59-pack.zip -Dest D:\\AI_Temp\\InstantLensDoc-2659 -Swap -SkipStart
+cd /d D:\\AI_Temp\\InstantLensDoc
+python -m pip install -r requirements.txt
+powershell -ExecutionPolicy Bypass -File .\\build-windows.ps1
 ```
 
 Oder non-interactive: `run.bat --yes`

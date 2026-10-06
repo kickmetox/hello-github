@@ -1,4 +1,16 @@
-InstantLens Doc 2.6.58 - Installation
+InstantLens Doc 2.6.59 - Installation
+
+Neu in 2.6.59:
+- Word-Suite: Absatz/Seitenlayout/Kopf/Fuss/Ersatzzeichen, Formatvorlagen, Tabellen, Serienbrief
+- PDF-Menue live (Klick, Geschwister-PDF, Dialog oder Dateiaenderung)
+- OCR-Layout/Felder ohne Steuerzeichen; DTP-Lineale
+- Word-Chrome Klassisch / Ribbon / Kombiniert
+- Pack InstantLensDoc-2.6.59-pack.zip
+- Windows-Rebuild: nach D:\AI_Temp\InstantLensDoc-2659 entpacken, wie 2.6.58
+  powershell -ExecutionPolicy Bypass -File .\scripts\sync-ild.ps1 -LocalPack D:\AI_Temp\InstantLensDoc-2.6.59-pack.zip -Dest D:\AI_Temp\InstantLensDoc-2659 -Swap -SkipStart
+  cd D:\AI_Temp\InstantLensDoc
+  python -m pip install -r requirements.txt
+  powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 
 Neu in 2.6.58:
 - Auswahl-Gummiband: leere Flaeche ziehen selektiert sich schneidende Annotationen
