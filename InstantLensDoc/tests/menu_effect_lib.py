@@ -188,6 +188,12 @@ def snapshot_state(win) -> dict[str, Any]:
                     break
                 except Exception:
                     pass
+        try:
+            canvas = getattr(pv, "canvas", None)
+            if canvas is not None and getattr(canvas, "_scale", None) is not None:
+                zoom = canvas._scale
+        except Exception:
+            pass
         tool = getattr(pv, "tool", None) or getattr(pv, "_tool", None) or getattr(pv, "current_tool", None)
         if hasattr(tool, "value"):
             try:
@@ -710,7 +716,9 @@ def should_skip(row: dict, state: str) -> bool:
         return True
     if not row.get("enabled", True):
         return True
-    if row.get("kind") == "pdf-toolbar" and state != "pdf":
+    if row.get("kind") == "context" and state == "pdf" and "Kontext Editor" in (row.get("path") or ""):
+        return True
+    if (row.get("text") or "").startswith("● "):
         return True
     if row.get("kind") == "pdf-toolbar":
         w = row.get("widget")

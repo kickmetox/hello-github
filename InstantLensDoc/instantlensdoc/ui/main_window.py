@@ -3992,6 +3992,10 @@ class MainWindow(QMainWindow):
             "zeile nach unten",
             "zeilen sortieren",
             "zeile kommentieren",
+            "zeile favorisieren",
+            "zeilen-lesezeichen",
+            "nächstes zeilen-lesezeichen",
+            "vorheriges zeilen-lesezeichen",
             "weiches trennzeichen",
             "geschütztes leerzeichen",
             "deutsch (de)",
@@ -4125,9 +4129,35 @@ class MainWindow(QMainWindow):
                         src = ""
                     label = (src or t).replace("&", "").lower()
                     if self._label_is_pdf_annotation(label, parent) or "treffer als highlight" in label:
-                        self._set_action_available(
-                            a, is_pdf, "Nur bei geöffnetem PDF verfügbar"
-                        )
+                        has_sel = False
+                        try:
+                            canvas = getattr(self.pdf_view, "canvas", None)
+                            ids = set()
+                            if canvas is not None:
+                                ids = set(getattr(canvas, "_selected_ids", None) or [])
+                                if getattr(canvas, "_selected_id", None):
+                                    ids.add(canvas._selected_id)
+                            need_sel = (
+                                "auswahl ausrichten" in parent
+                                or "auswahl-deckkraft" in label
+                                or "auswahl-farbe" in label
+                                or label.startswith("annotationen kopieren")
+                            )
+                            ok = is_pdf and (has_sel or ids or not need_sel)
+                            if need_sel:
+                                self._set_action_available(
+                                    a,
+                                    is_pdf and bool(ids),
+                                    "Keine Annotation ausgewählt",
+                                )
+                            else:
+                                self._set_action_available(
+                                    a, is_pdf, "Nur bei geöffnetem PDF verfügbar"
+                                )
+                        except Exception:
+                            self._set_action_available(
+                                a, is_pdf, "Nur bei geöffnetem PDF verfügbar"
+                            )
                     elif self._label_is_editor_only(label):
                         self._set_action_available(
                             a,
@@ -6127,36 +6157,46 @@ class MainWindow(QMainWindow):
     def _goto_next_line_bookmark(self):
         if not self._guard_editor_action("Zeilen-Lesezeichen"):
             return
+        cur = self.editor.textCursor().blockNumber() + 1
         line = self.editor.goto_next_line_bookmark()
         if line:
+            if line == cur:
+                self._feature_dialog(
+                    "Nächstes Zeilen-Lesezeichen",
+                    "Bereits am einzigen bzw. letzten Lesezeichen.",
+                    object_name="ildLineBookmarkDialog",
+                )
+                return
             self._refresh_line_favorites()
             self._set_status(f"Lesezeichen → Zeile {line}")
         else:
-            from instantlensdoc.ui.feature_dialog import FeatureDialog
-
-            FeatureDialog(
-                self,
-                title="Nächstes Zeilen-Lesezeichen",
-                body="Keine Zeilen-Lesezeichen im Dokument.",
+            self._feature_dialog(
+                "Nächstes Zeilen-Lesezeichen",
+                "Keine Zeilen-Lesezeichen im Dokument.",
                 object_name="ildLineBookmarkDialog",
-            ).exec()
+            )
 
     def _goto_prev_line_bookmark(self):
         if not self._guard_editor_action("Zeilen-Lesezeichen"):
             return
+        cur = self.editor.textCursor().blockNumber() + 1
         line = self.editor.goto_prev_line_bookmark()
         if line:
+            if line == cur:
+                self._feature_dialog(
+                    "Vorheriges Zeilen-Lesezeichen",
+                    "Bereits am einzigen bzw. ersten Lesezeichen.",
+                    object_name="ildLineBookmarkDialog",
+                )
+                return
             self._refresh_line_favorites()
             self._set_status(f"Lesezeichen → Zeile {line}")
         else:
-            from instantlensdoc.ui.feature_dialog import FeatureDialog
-
-            FeatureDialog(
-                self,
-                title="Vorheriges Zeilen-Lesezeichen",
-                body="Keine Zeilen-Lesezeichen im Dokument.",
+            self._feature_dialog(
+                "Vorheriges Zeilen-Lesezeichen",
+                "Keine Zeilen-Lesezeichen im Dokument.",
                 object_name="ildLineBookmarkDialog",
-            ).exec()
+            )
 
     def _clear_line_bookmarks(self):
         if not self._guard_editor_action("Zeilen-Lesezeichen"):
@@ -9667,9 +9707,12 @@ class MainWindow(QMainWindow):
         self._set_status(f"Favorit → Seite {int(page_index) + 1}")
 
     def _focus_search(self):
-        """Ctrl+F: Editor → Suchen/Ersetzen; PDF → Sidebar-Suche."""
+        """Ctrl+F: Editor → Suchen/Ersetzen; PDF → Multi-Dokument-Suche."""
         if self._editor_document_active():
             self._find_replace()
+            return
+        if self._pdf_tab_active():
+            self._open_multi_doc_search()
             return
         self.sidebar.setVisible(True)
         le = self.sidebar.search.lineEdit()
@@ -10448,12 +10491,20 @@ class MainWindow(QMainWindow):
         if self.doc.path:
             self.reopen_current()
             return
-        self._set_status("Tab duplizieren: nur Editor-Inhalt oder gespeicherte Datei")
+        self._feature_dialog(
+            "Tab duplizieren",
+            "Tab duplizieren braucht Editor-Inhalt oder eine gespeicherte Datei.",
+            object_name="ildDuplicateTabDialog",
+        )
 
     def reopen_current(self):
         """Aktuelle Datei vom Datenträger neu laden."""
         if not self.doc or not self.doc.path:
-            self._set_status("Erneut öffnen: keine gespeicherte Datei")
+            self._feature_dialog(
+                "Erneut öffnen",
+                "Keine gespeicherte Datei zum erneuten Öffnen.",
+                object_name="ildReopenDialog",
+            )
             return
         path = str(self.doc.path)
         if self._current_is_dirty():
@@ -14562,7 +14613,11 @@ class MainWindow(QMainWindow):
         pivot = str(Path(pivot_path)) if pivot_path else ""
         paths = list(self.sidebar.document_paths()) if hasattr(self.sidebar, "document_paths") else []
         if not pivot or not paths:
-            self._set_status("Keine Tabs links zum Schließen")
+            self._feature_dialog(
+                "Tabs schließen",
+                "Keine Tabs links zum Schließen.",
+                object_name="ildCloseTabsDialog",
+            )
             return
         idx = -1
         for i, p in enumerate(paths):
@@ -14570,7 +14625,11 @@ class MainWindow(QMainWindow):
                 idx = i
                 break
         if idx <= 0:
-            self._set_status("Keine Tabs links zum Schließen")
+            self._feature_dialog(
+                "Tabs schließen",
+                "Keine Tabs links zum Schließen.",
+                object_name="ildCloseTabsDialog",
+            )
             return
         cur = str(Path(self.doc.path)) if self.doc and self.doc.path else None
         # Wenn aktuelles Doc unter den zu schließenden liegt → zuerst Pivot aktivieren
@@ -14582,14 +14641,22 @@ class MainWindow(QMainWindow):
             left, status_ok="{n} Tab(s) links geschlossen"
         )
         if n == 0:
-            self._set_status("Keine Tabs links zum Schließen")
+            self._feature_dialog(
+                "Tabs schließen",
+                "Keine Tabs links zum Schließen.",
+                object_name="ildCloseTabsDialog",
+            )
 
     def close_tabs_right_of(self, pivot_path: str) -> None:
         """Alle Tabs rechts vom angegebenen Pfad schließen (Kontextmenü)."""
         pivot = str(Path(pivot_path)) if pivot_path else ""
         paths = list(self.sidebar.document_paths()) if hasattr(self.sidebar, "document_paths") else []
         if not pivot or not paths:
-            self._set_status("Keine Tabs rechts zum Schließen")
+            self._feature_dialog(
+                "Tabs schließen",
+                "Keine Tabs rechts zum Schließen.",
+                object_name="ildCloseTabsDialog",
+            )
             return
         idx = -1
         for i, p in enumerate(paths):
@@ -14597,7 +14664,11 @@ class MainWindow(QMainWindow):
                 idx = i
                 break
         if idx < 0 or idx >= len(paths) - 1:
-            self._set_status("Keine Tabs rechts zum Schließen")
+            self._feature_dialog(
+                "Tabs schließen",
+                "Keine Tabs rechts zum Schließen.",
+                object_name="ildCloseTabsDialog",
+            )
             return
         cur = str(Path(self.doc.path)) if self.doc and self.doc.path else None
         right = [str(Path(str(p))) for p in paths[idx + 1 :]]
@@ -14608,7 +14679,11 @@ class MainWindow(QMainWindow):
             right, status_ok="{n} Tab(s) rechts geschlossen"
         )
         if n == 0:
-            self._set_status("Keine Tabs rechts zum Schließen")
+            self._feature_dialog(
+                "Tabs schließen",
+                "Keine Tabs rechts zum Schließen.",
+                object_name="ildCloseTabsDialog",
+            )
 
     def close_tabs_left_of_current(self) -> None:
         if not self.doc or not self.doc.path:
@@ -18154,7 +18229,11 @@ class MainWindow(QMainWindow):
                 )
             if len(frames) > 8:
                 lines.append(f"    … +{len(frames) - 8} weitere")
-        QMessageBox.information(self, "Dokument-Ebenen", "\n".join(lines))
+        self._feature_dialog(
+            "Dokument-Ebenen",
+            "\n".join(lines),
+            object_name="ildDocLayersDialog",
+        )
 
     def _export_pdfx(self) -> None:
         """PDF/X bzw. print-ready Export — 2.6.18."""
