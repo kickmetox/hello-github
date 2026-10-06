@@ -111,6 +111,43 @@ def test_layout_marks_dialog_opens_qtimer_close(main_win) -> None:
     win._show_editor_layout_marks_dialog()
     pump(app, 0.15)
     assert "editorLayoutMarksDialog" in opened, opened
+    assert "pageMarginsDialog" not in opened
+
+
+def test_marks_do_not_mutate_page_margins(main_win) -> None:
+    """Seitenränder gehören Layout → Seitenränder, nicht den Marken."""
+    _app, win = main_win
+    lay = win.editor.page_layout()
+    assert lay is not None
+    before = (
+        float(lay.margin_left_mm),
+        float(lay.margin_right_mm),
+        float(lay.margin_top_mm),
+        float(lay.margin_bottom_mm),
+        float(lay.header_distance_mm),
+        float(lay.footer_distance_mm),
+    )
+    m = win.editor.layout_marks()
+    m.header_height_mm = 20.0
+    m.footer_height_mm = 18.0
+    win.editor.set_layout_marks(m)
+    win._toggle_width_marks(not win.editor.show_width_marks())
+    lay2 = win.editor.page_layout()
+    after = (
+        float(lay2.margin_left_mm),
+        float(lay2.margin_right_mm),
+        float(lay2.margin_top_mm),
+        float(lay2.margin_bottom_mm),
+        float(lay2.header_distance_mm),
+        float(lay2.footer_distance_mm),
+    )
+    assert after == before
+    from instantlensdoc.ui.page_margins_dialog import PageMarginsDialog
+    from instantlensdoc.ui.editor_layout_marks_dialog import EditorLayoutMarksDialog
+
+    assert PageMarginsDialog is not EditorLayoutMarksDialog
+    assert PageMarginsDialog().objectName() == "pageMarginsDialog"
+    assert EditorLayoutMarksDialog().objectName() == "editorLayoutMarksDialog"
 
 
 def test_header_footer_dialog_opens_qtimer_close(main_win) -> None:

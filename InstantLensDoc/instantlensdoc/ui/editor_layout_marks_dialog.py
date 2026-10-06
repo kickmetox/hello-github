@@ -35,8 +35,9 @@ class EditorLayoutMarksDialog(QDialog):
         hint = QLabel(
             "Breitenmarken, Druckmarken und Kopf-/Fußzeilen-Marken lassen sich "
             "unabhängig über Ansicht und die Editor-Leiste ein- und ausschalten. "
-            "Hier Größen (mm), Farbe und ob Marken auf dem Bildschirm und/oder "
-            "beim Drucken/PDF erscheinen."
+            "Hier nur Marken: Größen (mm), Farbe, Crop/Bleed/Register, Bildschirm "
+            "vs. Druck/PDF. Satzspiegel und Seitenränder bleiben unter "
+            "Layout → Seitenränder — kein zweites Ränder-Dialog."
         )
         hint.setWordWrap(True)
         root.addWidget(hint)
@@ -106,14 +107,14 @@ class EditorLayoutMarksDialog(QDialog):
         pre_form.addRow("Arten", kinds)
         root.addWidget(pre)
 
-        hf = QGroupBox("Kopf- / Fußzeile")
+        hf = QGroupBox("Kopf- / Fußzeilen-Marken (Bänder)")
         hf_form = QFormLayout(hf)
         self.spin_header = self._mm_spin(self._marks.header_height_mm, 4.0, 40.0)
         self.spin_header.setObjectName("marksHeaderMm")
         self.spin_footer = self._mm_spin(self._marks.footer_height_mm, 4.0, 40.0)
         self.spin_footer.setObjectName("marksFooterMm")
-        hf_form.addRow("Kopfzeilen-Höhe (mm)", self.spin_header)
-        hf_form.addRow("Fußzeilen-Höhe (mm)", self.spin_footer)
+        hf_form.addRow("Bandhöhe Kopf (mm)", self.spin_header)
+        hf_form.addRow("Bandhöhe Fuß (mm)", self.spin_footer)
         root.addWidget(hf)
 
         col = QGroupBox("Farben")

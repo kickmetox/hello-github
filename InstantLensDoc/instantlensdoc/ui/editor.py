@@ -844,7 +844,11 @@ class TextEditor(QPlainTextEdit):
         self.set_layout_marks(m)
 
     def layout_marks_geometry(self) -> dict | None:
-        """Seite + Satzspiegel in Editor-Koordinaten für das Overlay."""
+        """Seite + Satzspiegel in Editor-Koordinaten für das Overlay.
+
+        Satzspiegel-Breite kommt aus ``EditorPageLayout`` (Layout → Seitenränder),
+        nicht aus diesem Marken-Dialog.
+        """
         from instantlensdoc.core.editor_layout_marks import mm_to_px
 
         cr = self.contentsRect()

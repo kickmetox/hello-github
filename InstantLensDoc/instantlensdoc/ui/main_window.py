@@ -12459,14 +12459,6 @@ class MainWindow(QMainWindow):
             return
         marks = dlg.result_marks()
         self.editor.set_layout_marks(marks)
-        lay = self.editor.page_layout()
-        if lay is not None:
-            try:
-                lay.header_distance_mm = float(marks.header_height_mm)
-                lay.footer_distance_mm = float(marks.footer_height_mm)
-                self.editor.set_page_layout(lay)
-            except Exception:
-                pass
         self._sync_editor_layout_mark_actions()
         self._set_status("Layout-Marken übernommen")
 
