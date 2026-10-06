@@ -39,7 +39,9 @@ ohne Auswahl entsteht ein neuer Rahmen.</li>
 gewählten Textrahmen (Glyphen, nicht Rahmen-Füllung).</li>
 <li><b>Verketten</b>: Overflow von Textrahmen in den nächsten Rahmen.</li>
 <li>Word-Menüs und DTP-Werkzeuge in derselben Ansicht; Lineale und Rahmen
-im Dokumentbereich.</li>
+im Dokumentbereich. Eigenschaften (Werkzeuge, Füllung, Kontur, Schrift,
+Ebenen) liegen in der <b>rechten Werkzeugspalte</b> zusammen mit Stiften
+und Pinsel — keine zweite rechte Leiste.</li>
 </ul>
 
 <h3>Rahmen</h3>

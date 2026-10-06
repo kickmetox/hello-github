@@ -202,7 +202,7 @@ class InkToolsPane(QWidget):
         host_lay.setContentsMargins(0, 0, 0, 0)
         host_lay.setSpacing(0)
         self.dtp_host.hide()
-        root.addWidget(self.dtp_host)
+        root.addWidget(self.dtp_host, 1)
 
     def _add_heading(self, text: str) -> None:
         lab = QLabel(text)

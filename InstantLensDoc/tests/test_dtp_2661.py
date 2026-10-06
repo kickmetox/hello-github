@@ -26,7 +26,7 @@ from menu_smoke_lib import (  # noqa: E402
     pump,
 )
 from instantlensdoc.ui.menu_click import find_menubar_menu  # noqa: E402
-from PySide6.QtWidgets import QDialog, QMessageBox  # noqa: E402
+from PySide6.QtWidgets import QDialog, QMessageBox, QWidget  # noqa: E402
 
 
 _APP = None
@@ -264,3 +264,34 @@ def test_dtp_embedded_keeps_word_menus_hides_own_chrome() -> None:
     ]
     assert "DTP" in titles
     assert "Datei" in titles
+
+
+def test_dtp_properties_merge_into_one_right_column() -> None:
+    _reload_pdf()
+    _WIN._toggle_right_toolbox(True)
+    pump(_APP, 0.05)
+    tools = _WIN.ink_tools_pane
+    assert tools is not None
+    assert tools.objectName() == "ildRightToolbox"
+    assert tools.isVisible()
+    assert _WIN._enter_layout_mode() is True
+    pump(_APP, 0.05)
+    host = tools.dtp_host
+    props = _WIN.dtp_pane.props_panel
+    layers = _WIN.dtp_pane.side_panel
+    assert host is not None
+    assert host.isVisible()
+    assert host.isAncestorOf(props)
+    assert host.isAncestorOf(layers)
+    assert props.isVisible()
+    assert layers.isVisible()
+    assert tools.isAncestorOf(props)
+    assert tools.findChild(QWidget, "inkTool_brush") is not None
+    assert props.findChild(QWidget, "dtpPropFill") is not None
+    assert props.findChild(QWidget, "dtpPropFontColor") is not None
+    assert props.findChild(QWidget, "dtpPropTool_select") is not None
+    assert _WIN._doc_host.isAncestorOf(_WIN.dtp_pane)
+    _WIN.dtp_pane.clear_dirty()
+    assert _WIN._leave_layout_mode() is True
+    pump(_APP, 0.05)
+    assert not host.isVisible()

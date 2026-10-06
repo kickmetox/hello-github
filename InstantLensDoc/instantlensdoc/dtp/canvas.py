@@ -19,6 +19,7 @@ from PySide6.QtGui import (
     QWheelEvent,
 )
 from PySide6.QtWidgets import (
+    QButtonGroup,
     QColorDialog,
     QComboBox,
     QFileDialog,
@@ -38,6 +39,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QListWidget,
     QListWidgetItem,
+    QPushButton,
     QSizePolicy,
     QToolButton,
     QVBoxLayout,
@@ -918,6 +920,7 @@ class DtpPane(QWidget):
         self.set_ruler_unit(getattr(self.doc, "ruler_unit", "mm") or "mm")
         self.set_tool("select", apply=False)
         self._block_font = False
+        self._build_props_panel()
         self.apply_shared_print_overlays()
 
     def set_word_window_embedded(self, embedded: bool = True) -> None:
@@ -931,6 +934,55 @@ class DtpPane(QWidget):
         ):
             if w is not None:
                 w.setVisible(show_own)
+        props = getattr(self, "props_panel", None)
+        if props is not None and not getattr(self, "_side_adopted", False):
+            props.hide()
+
+    def _build_props_panel(self) -> None:
+        """Eigenschaften für die rechte Werkzeugspalte (eine Spalte, kein zweites Dock)."""
+        panel = QWidget(self)
+        panel.setObjectName("dtpPropsPanel")
+        panel.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Minimum)
+        lay = QVBoxLayout(panel)
+        lay.setContentsMargins(4, 4, 4, 2)
+        lay.setSpacing(4)
+        head = QLabel("DTP")
+        head.setObjectName("dtpPropsHead")
+        head.setStyleSheet("font-weight:600; padding:4px 0 2px 0;")
+        lay.addWidget(head)
+        self._prop_tool_btns: dict[str, QToolButton] = {}
+        group = QButtonGroup(panel)
+        group.setExclusive(True)
+        for name, label in (
+            ("select", "Auswählen"),
+            ("text", "Text"),
+            ("image", "Bild"),
+            ("shape", "Form"),
+        ):
+            btn = QToolButton()
+            btn.setObjectName(f"dtpPropTool_{name}")
+            btn.setText(label)
+            btn.setCheckable(True)
+            btn.setToolButtonStyle(Qt.ToolButtonTextOnly)
+            btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+            btn.clicked.connect(lambda _=False, n=name: self.set_tool(n))
+            group.addButton(btn)
+            self._prop_tool_btns[name] = btn
+            lay.addWidget(btn)
+        self._prop_tool_btns["select"].setChecked(True)
+        for obj, label, slot in (
+            ("dtpPropFill", "Füllung…", lambda: self.apply_fill(dialog=True)),
+            ("dtpPropStroke", "Kontur…", lambda: self.apply_stroke(dialog=True)),
+            ("dtpPropFont", "Schrift…", lambda: self.apply_font(dialog=True)),
+            ("dtpPropFontColor", "Schriftfarbe…", lambda: self.apply_font_color(dialog=True)),
+            ("dtpPropWrap", "Umfluss…", lambda: self.apply_wrap_mode(dialog=True)),
+        ):
+            b = QPushButton(label)
+            b.setObjectName(obj)
+            b.clicked.connect(slot)
+            lay.addWidget(b)
+        panel.hide()
+        self.props_panel = panel
 
     def set_document(self, doc: DtpDocument) -> None:
         self.doc = doc
@@ -1018,6 +1070,11 @@ class DtpPane(QWidget):
             btn.blockSignals(True)
             btn.setChecked(True)
             btn.blockSignals(False)
+        pbtn = getattr(self, "_prop_tool_btns", {}).get(n)
+        if pbtn is not None and not pbtn.isChecked():
+            pbtn.blockSignals(True)
+            pbtn.setChecked(True)
+            pbtn.blockSignals(False)
         if n == "select":
             self.view.setDragMode(QGraphicsView.RubberBandDrag)
         else:
@@ -2071,28 +2128,41 @@ class DtpPane(QWidget):
         self._side_user_on = bool(self.side_panel.isVisible())
 
     def adopt_side_panel(self, host: QWidget | None) -> None:
-        """Ebenenleiste in die rechte Werkzeugspalte legen — keine zweite rechte Leiste."""
+        """Eigenschaften und Ebenen in die rechte Werkzeugspalte — keine zweite Leiste."""
+        props = getattr(self, "props_panel", None)
         sp = getattr(self, "side_panel", None)
-        if sp is None:
-            return
         if host is not None:
             lay = host.layout()
-            if lay is not None:
-                lay.addWidget(sp)
-            try:
-                sp.setMaximumWidth(16777215)
-            except Exception:
-                pass
-            sp.show()
+            for w in (props, sp):
+                if w is None:
+                    continue
+                if lay is not None:
+                    lay.addWidget(w)
+                try:
+                    w.setMaximumWidth(16777215)
+                except Exception:
+                    pass
+                if w is sp:
+                    lst = getattr(self, "layer_list", None)
+                    if lst is not None:
+                        lst.setMaximumWidth(16777215)
+                w.show()
             host.show()
             self._side_adopted = True
             return
+        if props is not None:
+            props.setParent(self)
+            props.hide()
         body = getattr(self, "_body_layout", None)
-        if body is not None:
-            body.addWidget(sp)
-        sp.setMaximumWidth(168)
-        if not getattr(self, "_side_user_on", False):
-            sp.hide()
+        if sp is not None:
+            if body is not None:
+                body.addWidget(sp)
+            sp.setMaximumWidth(168)
+            lst = getattr(self, "layer_list", None)
+            if lst is not None:
+                lst.setMaximumWidth(168)
+            if not getattr(self, "_side_user_on", False):
+                sp.hide()
         self._side_adopted = False
 
     def set_zoom(self, percent: float) -> None:

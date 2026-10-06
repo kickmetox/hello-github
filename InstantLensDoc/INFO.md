@@ -2,7 +2,7 @@
 
 ### 2.6.59 — Release
 
-Word-Suite (Absatz/Seitenlayout/Kopf/Fuß/Ersatzzeichen, Formatvorlagen, Tabellen, Serienbrief), PDF-Menü live, OCR-Layout/Felder, DTP-Lineale/Rahmen im selben Dokumentfenster (Word-Menüs bleiben; Speichern/Nicht speichern/Abbrechen bei Layout-Änderung; Hilfe/F1 im DTP schließbar; Schriftfarbe QColorDialog auf Textrahmen; Druckermarken geteilt mit PDF, Satzspiegel als Geometrie), Word-Chrome Klassisch/Ribbon/Kombiniert. Pack `InstantLensDoc-2.6.59-pack.zip`. VERSION **2.6.59**. HEAD `8f01af3` (Ersatzzeichen) auf Chrome/Klick `d1e74c6`.
+Word-Suite (Absatz/Seitenlayout/Kopf/Fuß/Ersatzzeichen, Formatvorlagen, Tabellen, Serienbrief), PDF-Menü live, OCR-Layout/Felder, DTP-Lineale/Rahmen im selben Dokumentfenster (Word-Menüs bleiben; Eigenschaften in der rechten Werkzeugspalte; Speichern/Nicht speichern/Abbrechen bei Layout-Änderung; Hilfe/F1 im DTP schließbar; Schriftfarbe QColorDialog auf Textrahmen; Druckermarken geteilt mit PDF, Satzspiegel als Geometrie), Word-Chrome Klassisch/Ribbon/Kombiniert. Pack `InstantLensDoc-2.6.59-pack.zip`. VERSION **2.6.59**. HEAD `8f01af3` (Ersatzzeichen) auf Chrome/Klick `d1e74c6`.
 
 **Windows-Rebuild (Andreas Meyer)** — gleicher Ablauf wie 2.6.58, Ziel `D:\AI_Temp\InstantLensDoc-2659`:
 
