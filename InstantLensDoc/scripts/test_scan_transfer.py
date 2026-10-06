@@ -252,6 +252,26 @@ class TestPlanAndRun(unittest.TestCase):
         steps = plan_steps(job)
         self.assertEqual(steps[0].kind, "escl")
 
+    def test_plan_auto_network_uses_escl_not_wia(self) -> None:
+        job = ScanJob(
+            device_id="{6BDD}\\net",
+            device_name="Kyocera (Netzwerk)",
+            device_backend="WIA",
+            backend=BACKEND_AUTO,
+            fallback_devices=[
+                ("native-escl:http://192.168.1.9:80", "Kyocera", "ScanTuxio/eSCL"),
+            ],
+        )
+        with patch("instantlensdoc.core.scan_transfer.is_windows", return_value=True), patch(
+            "instantlensdoc.core.scan_transfer.naps2_console_path",
+            return_value=r"C:\Program Files\NAPS2\NAPS2.Console.exe",
+        ):
+            steps = plan_steps(job)
+        kinds = [s.kind for s in steps]
+        self.assertEqual(kinds[0], "escl")
+        self.assertNotIn("wia", kinds)
+        self.assertNotIn("wia-dialog", kinds)
+
     def test_run_scan_naps2_writes_file(self) -> None:
         with tempfile.TemporaryDirectory(prefix="ild-scan-test-") as raw:
             d = Path(raw)
@@ -432,6 +452,25 @@ class TestScannerChoices(unittest.TestCase):
         choices = scanner_choices([wia, escl], backend="escl", include_wia_dialog=False)
         self.assertEqual(len(choices), 1)
         self.assertEqual(choices[0].primary.name, "Kyocera")
+
+    def test_network_prefers_escl_over_wia(self) -> None:
+        wia = DeviceInfo(
+            kind=DeviceKind.SCANNER,
+            name="Kyocera ECOSYS",
+            device_id="{6BDD1FC6-810F-11D0-BEC7-08002BE2092F}\\0001",
+            scope=DeviceScope.NETWORK,
+            backend="WIA",
+        )
+        escl = DeviceInfo(
+            kind=DeviceKind.SCANNER,
+            name="Kyocera ECOSYS",
+            device_id="native-escl:http://192.168.1.9:80",
+            scope=DeviceScope.NETWORK,
+            backend="ScanTuxio/eSCL",
+        )
+        choices = scanner_choices([wia, escl], backend="auto", include_wia_dialog=False)
+        self.assertEqual(len(choices), 1)
+        self.assertTrue(choices[0].primary.device_id.startswith("native-escl:"))
 
 
 class TestAcquireBridge(unittest.TestCase):

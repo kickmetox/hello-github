@@ -8,6 +8,7 @@ Gerätefilter, ScanTuxio-Übergabe.
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QTimer
@@ -50,7 +51,14 @@ from instantlensdoc.core.devices import (
     DeviceScope,
     discover_devices,
     format_discovery_status,
+    load_cached_discovery,
     scanner_choices,
+)
+from instantlensdoc.core.device_io import (
+    ACQUIRE_OK_TIMEOUT_S,
+    DEVICE_IO_TIMEOUT_S,
+    DEVICE_TIMEOUT_DE,
+    io_timeout_s,
 )
 from instantlensdoc.core.ocr import (
     INSTALL_HINT_DE,
@@ -74,9 +82,11 @@ from instantlensdoc.core.scan_transfer import (
     DPI_CHOICES,
     SOURCE_LABELS_DE,
     SOURCES,
+    classify_device_id,
     scan_log,
     scan_log_path,
 )
+from instantlensdoc.ui.async_worker import watch_worker
 from instantlensdoc.ui.scan_settings import ScanBackendSettingsWidget
 
 try:
@@ -112,18 +122,31 @@ def _st_ui_available() -> bool:
 class ScanDialog(QDialog):
     """Ein Scan-Dialog: Gerät + Optionen + Scannen. Erweitert zuklappbar."""
 
-    def __init__(self, pdf_view, parent=None, *, auto_launch_scantuxio: bool = False):
+    def __init__(
+        self,
+        pdf_view,
+        parent=None,
+        *,
+        auto_launch_scantuxio: bool = False,
+        preferred_device_id: str | None = None,
+    ):
         super().__init__(parent)
         self.pdf_view = pdf_view
         self._discovery = DeviceDiscoveryResult()
         self._pending_images: list[Path] = []
         self._choices = []
         self._auto_launch_scantuxio = bool(auto_launch_scantuxio)
+        self._preferred_device_id = str(preferred_device_id or "").strip()
         self._st_proc = None
         self._st_handshake: Path | None = None
         self._st_watch: list[Path] = []
         self._st_snapshot: dict[str, tuple[int, int]] = {}
         self._last_result = None
+        self._io_busy = False
+        self._insert_after_acquire = False
+        self._discover_watch = None
+        self._acquire_watch = None
+        self._discover_inflight = False
         self.setWindowTitle("Scannen")
         self.setWindowModality(Qt.WindowModal)
         self.setObjectName("scanDialog")
@@ -343,7 +366,9 @@ class ScanDialog(QDialog):
         self._st_timer.setInterval(1200)
         self._st_timer.timeout.connect(self._poll_scantuxio_output)
         self._load_prefs()
-        self.refresh_devices()
+        # Sofort aus Cache füllen — keine Hardware-Suche im GUI-Thread.
+        self._apply_discovery(load_cached_discovery(), from_cache=True)
+        QTimer.singleShot(0, self._start_discovery_bg)
         if self._auto_launch_scantuxio:
             QTimer.singleShot(0, self._launch_scantuxio_ui)
 
@@ -438,29 +463,19 @@ class ScanDialog(QDialog):
         return [p.name for p in self._discovery.printers]
 
     def refresh_devices(self) -> None:
-        self.device_status.setText("Suche Geräte…")
-        self.btn_refresh.setEnabled(False)
-        self.btn_rescan.setEnabled(False)
-        try:
-            try:
-                from PySide6.QtWidgets import QApplication
+        """Geräteliste: Cache sofort, Live-Suche im Hintergrund — nie GUI-blockierend."""
+        self._apply_discovery(load_cached_discovery(), from_cache=True)
+        self._start_discovery_bg()
 
-                app = QApplication.instance()
-                if app is not None:
-                    app.processEvents()
-            except Exception:
-                pass
-            self._discovery = discover_devices()
-        except Exception as e:
-            self._discovery = DeviceDiscoveryResult(
-                warnings=[f"Geräteerkennung fehlgeschlagen: {e}"]
-            )
-        finally:
-            self.btn_refresh.setEnabled(True)
-            self.btn_rescan.setEnabled(True)
+    def _apply_discovery(self, result: DeviceDiscoveryResult, *, from_cache: bool = False) -> None:
+        self._discovery = result or DeviceDiscoveryResult()
         self._populate_device_combo()
         self._populate_device_list()
         msg = format_discovery_status(self._discovery)
+        if from_cache and (self._discovery.scanners or self._discovery.printers):
+            msg = "Zwischengespeichert: " + msg + " — Suche im Hintergrund…"
+        elif from_cache:
+            msg = "Suche Geräte im Hintergrund… (letzte Liste leer)"
         self.device_status.setText(msg)
         self.device_status.setAccessibleName(msg)
         self.device_status.setToolTip(
@@ -480,10 +495,54 @@ class ScanDialog(QDialog):
             if not (self.device_status.text() or "").strip():
                 self.device_status.setText(NO_DEVICE_STATUS_DE)
 
+    def _start_discovery_bg(self) -> None:
+        if self._io_busy:
+            return
+        if getattr(self, "_discover_inflight", False):
+            return
+        self._discover_inflight = True
+        self.btn_refresh.setEnabled(False)
+        self.btn_rescan.setEnabled(False)
+        if not (self._discovery.scanners or self._discovery.printers):
+            self.device_status.setText("Suche Geräte…")
+        timeout = io_timeout_s(45.0)
+
+        def _done(result) -> None:
+            self._discover_inflight = False
+            self.btn_refresh.setEnabled(True)
+            self.btn_rescan.setEnabled(True)
+            if isinstance(result, Exception):
+                self._discovery = DeviceDiscoveryResult(
+                    warnings=[f"Geräteerkennung fehlgeschlagen: {result}"]
+                )
+                self._apply_discovery(self._discovery)
+                return
+            if isinstance(result, DeviceDiscoveryResult):
+                self._apply_discovery(result)
+
+        def _to() -> None:
+            self._discover_inflight = False
+            self.btn_refresh.setEnabled(True)
+            self.btn_rescan.setEnabled(True)
+            if not (self._discovery.scanners or self._discovery.printers):
+                self.device_status.setText(
+                    DEVICE_TIMEOUT_DE.format(seconds=int(timeout))
+                )
+
+        self._discover_watch = watch_worker(
+            self,
+            discover_devices,
+            timeout=timeout,
+            on_done=_done,
+            on_timeout=_to,
+            on_error=lambda e: _done(e),
+        )
+
     def _populate_device_combo(self) -> None:
         backend = self.current_backend()
         self._choices = scanner_choices(self._discovery.scanners, backend=backend)
         remembered = get_scan_last_device(backend)
+        prefer = self._preferred_device_id or remembered
         self.device_combo.blockSignals(True)
         self.device_combo.clear()
         restore = 0
@@ -493,7 +552,7 @@ class ScanDialog(QDialog):
             for a in ch.alternates:
                 ids.add(a.device_id)
                 ids.add(a.name)
-            if remembered and remembered in ids:
+            if prefer and prefer in ids:
                 restore = i
         if not self._choices:
             self.device_combo.addItem("Kein Scanner — ↻ oder Bilder importieren", None)
@@ -584,6 +643,36 @@ class ScanDialog(QDialog):
         self.device_status.setText(msg)
         self.device_status.setToolTip(msg)
         self.device_status.setAccessibleName(msg[:120] if msg else "Gerätestatus")
+
+    def _set_io_busy(self, busy: bool) -> None:
+        self._io_busy = bool(busy)
+        enable = not busy
+        self.btn_scan.setEnabled(enable and (bool(self._choices) or self.current_backend() == "external"))
+        self.btn_refresh.setEnabled(enable)
+        self.btn_rescan.setEnabled(enable)
+        self.btn_acquire.setEnabled(enable)
+        self.device_combo.setEnabled(enable)
+        self.device_list.setEnabled(enable)
+        try:
+            self.backend_widget.setEnabled(enable)
+        except Exception:
+            pass
+
+    def _acquire_timeout_s(self) -> float:
+        override = io_timeout_s(DEVICE_IO_TIMEOUT_S)
+        if os.environ.get("ILD_DEVICE_IO_TIMEOUT"):
+            return override
+        scanner = self.selected_scanner()
+        be = (self.current_backend() or "").lower()
+        cls = ""
+        if scanner is not None:
+            try:
+                cls = classify_device_id(scanner.device_id, scanner.backend)
+            except Exception:
+                cls = ""
+        if be == "wia" or cls == "wia":
+            return DEVICE_IO_TIMEOUT_S
+        return ACQUIRE_OK_TIMEOUT_S
 
     def _retry_scan_flow(self) -> None:
         self.refresh_devices()
@@ -726,50 +815,84 @@ class ScanDialog(QDialog):
         }
 
     def _acquire_scan(self) -> bool:
+        """Startet Acquire asynchron. Rückgabe immer False (Ergebnis kommt im Callback)."""
+        self._start_acquire(insert=False)
+        return False
+
+    def _do_scan_and_insert(self) -> None:
+        self._start_acquire(insert=True)
+
+    def _start_acquire(self, *, insert: bool) -> None:
+        if self._io_busy:
+            return
         if self.current_backend() == BACKEND_SCANTUXIO:
             self._launch_scantuxio_ui()
-            return False
+            return
         scanner = self.selected_scanner()
         if scanner is None and self._discovery.scanners and self.current_backend() != "external":
             self._set_acquire_status("Bitte einen Scanner im Dropdown auswählen.")
-            return False
+            return
         if scanner is None and not self._discovery.scanners and self.current_backend() != "external":
             st_hint = (
                 missing_scantuxio_hint_de()
                 if callable(missing_scantuxio_hint_de)
                 else "Optional: ScanTuxio unter D:\\AI_Temp\\ScanTuxio Win installieren."
             )
-            self._set_acquire_status("Kein Scanner erkannt.\n\n" + WINDOWS_SCANNER_DRIVER_HINT_DE + "\n\n" + st_hint)
-            return False
-        self._save_scan_prefs()
-        self._set_acquire_status("Scanne… bitte warten (Scannerlampe/Motor).")
-        try:
-            from PySide6.QtWidgets import QApplication
-
-            app = QApplication.instance()
-            if app is not None:
-                app.processEvents()
-        except Exception:
-            pass
-        try:
-            paths = acquire_from_scanner(scanner, **self._scan_kwargs())
-        except Exception as e:
             self._set_acquire_status(
-                f"{e}\n\nDie App bleibt stabil — bitte ScanTuxio öffnen oder Bilder importieren.\n\n"
-                + WINDOWS_SCAN_DEPS_HINT
+                "Kein Scanner erkannt.\n\n" + WINDOWS_SCANNER_DRIVER_HINT_DE + "\n\n" + st_hint
             )
-            return False
+            return
+        self._save_scan_prefs()
+        self._insert_after_acquire = bool(insert)
+        timeout = self._acquire_timeout_s()
+        kwargs = self._scan_kwargs()
+        self._set_io_busy(True)
+        self._set_acquire_status("Scanne… die Oberfläche bleibt bedienbar. Abbrechen schließt den Dialog.")
+
+        def _work():
+            return acquire_from_scanner(scanner, **kwargs)
+
+        def _done(paths) -> None:
+            self._set_io_busy(False)
+            if isinstance(paths, Exception):
+                self._set_acquire_status(
+                    f"{paths}\n\nDie App bleibt stabil — bitte ScanTuxio öffnen oder Bilder importieren.\n\n"
+                    + WINDOWS_SCAN_DEPS_HINT
+                )
+                return
+            self._finish_acquire(list(paths or []))
+
+        def _to() -> None:
+            self._set_io_busy(False)
+            seconds = max(1, int(round(timeout)))
+            msg = DEVICE_TIMEOUT_DE.format(seconds=seconds)
+            self._set_acquire_status(msg)
+            scan_log(f"UI: Timeout {seconds}s — {msg}")
+
+        self._acquire_watch = watch_worker(
+            self,
+            _work,
+            timeout=timeout,
+            on_done=_done,
+            on_timeout=_to,
+            on_error=lambda e: _done(e),
+        )
+
+    def _finish_acquire(self, paths: list) -> None:
         if not paths:
             detail = last_acquire_error()
             res = last_acquire_result()
             if res is not None and getattr(res, "cancelled", False):
                 self._set_acquire_status("Scan abgebrochen.")
-                return False
+                return
             if "ausgelastet" in (detail or "").lower() or "busy" in (detail or "").lower():
                 body = (
                     wia_busy_user_hint_de(detail)
                     if callable(wia_busy_user_hint_de)
-                    else ("WIA-Gerät ausgelastet. Bitte ScanTuxio / Windows Fax und Scan schließen.\n" + (detail or ""))
+                    else (
+                        "WIA-Gerät ausgelastet. Bitte ScanTuxio / Windows Fax und Scan schließen.\n"
+                        + (detail or "")
+                    )
                 )
             else:
                 body = detail or "Kein Bild vom Scanner erhalten."
@@ -777,18 +900,12 @@ class ScanDialog(QDialog):
                     body += f"\n\nLog: {scan_log_path()}"
             self._set_acquire_status(body)
             scan_log(f"UI: kein Bild — {body[:400]}")
-            return False
+            return
         self._pending_images.extend(paths)
         self._update_pending_label()
         self._set_acquire_status(f"{len(paths)} Seite(n) gescannt.")
-        return True
-
-    def _do_scan_and_insert(self) -> None:
-        if not self._acquire_scan():
-            return
-        if not self._pending_images:
-            return
-        self._insert_into_document()
+        if self._insert_after_acquire:
+            self._insert_into_document()
 
     def _import_images(self) -> None:
         from instantlensdoc.core.app_settings import dialog_start_dir, remember_recent_dir

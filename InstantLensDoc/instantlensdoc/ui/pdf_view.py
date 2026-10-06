@@ -14475,7 +14475,12 @@ class PdfViewer(QWidget):
         from instantlensdoc.ui.scan_dialog import ScanDialog
 
         parent = self.window() if hasattr(self, "window") else self
-        ScanDialog(self, parent).exec()
+        prefer = ""
+        try:
+            prefer = str(getattr(parent, "_preferred_scan_device_id", "") or "")
+        except Exception:
+            prefer = ""
+        ScanDialog(self, parent, preferred_device_id=prefer or None).exec()
 
     def insert_pages_from_other_pdf(
         self,
