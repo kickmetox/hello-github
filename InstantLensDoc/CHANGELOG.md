@@ -1,3 +1,9 @@
+## 2.6.58 - Release: Auswahl-Gummiband per Mausziehen
+
+Pack `InstantLensDoc-2.6.58-pack.zip`; VERSION **2.6.58**. HEAD `56d90a4` (Auswahl-Gummiband per Mausziehen). Nach 2.6.57-Pack (`42eebb7`).
+
+- **Gummiband:** Leere Fläche ziehen selektiert alle sich schneidenden Annotationen (`rubber_band_finished` / `_on_rubber_band`); bereits ausgewähltes Objekt ziehen verschiebt. Klick bleibt Hit-Test. Test 7c ohne Fallback-Aufruf von `_on_rubber_band`.
+
 ## 2.6.57 - Release: Scan-Timeout/eSCL-first, Bearbeiten-Klick, Strich auf aktuelles Objekt
 
 Pack `InstantLensDoc-2.6.57-pack.zip`; VERSION **2.6.57**. HEAD `d7e0ad7` (Merge `cursor/scan-timeout-c22f` inkl. `6722fdf` / `51b66a7` / `39deb09`) plus `4a62b9a` Bearbeiten-Klick und `94f11d1` Strich auf aktuelles Objekt. Nach 2.6.56-Pack (`d617265`).

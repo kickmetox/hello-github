@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.6.57.
+"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.6.58.
 
 Leichtgewichtig. Exit-Codes:
   0  OK  (ok=true)
@@ -14,12 +14,12 @@ Aufruf:
   python scripts/smoke_ild.py -h
 
 JSON-Schema (--json), Erfolg:
-  {"ok": true, "version": "2.6.57", "duration_ms": 1234,
+  {"ok": true, "version": "2.6.58", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 
 JSON bei Fail: checks[] enthält Objekt mit error-Text (max 200 Zeichen, Truncate …);
 Exitcode spiegelt ok (0↔true, 1↔false) — 2.2.0:
-  {"ok": false, "version": "2.6.57", "duration_ms": 12,
+  {"ok": false, "version": "2.6.58", "duration_ms": 12,
    "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 """
 
@@ -41,7 +41,7 @@ if str(ROOT) not in sys.path:
 # Headless/CI: Qt ohne Display
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-EXPECTED_VERSION = "2.6.57"
+EXPECTED_VERSION = "2.6.58"
 FAIL_ERROR_MAX_LEN = 200
 
 EXIT_OK = 0
@@ -688,6 +688,19 @@ def check_version() -> None:
     if not (ROOT / "scripts" / "test_scan_timeout_2657.py").is_file():
         _fail("scripts/test_scan_timeout_2657.py fehlt (2.6.57)")
     _ok("2.6.57 scan-timeout/eSCL-first/wia-orphans/edit-click/stroke-current: OK")
+    # 2.6.58: Auswahl-Gummiband per Mausziehen
+    if "def _on_rubber_band(" not in pv:
+        _fail("pdf_view.py fehlt _on_rubber_band (2.6.58 Gummiband)")
+    if "_band_click_hit" not in pv:
+        _fail("pdf_view.py fehlt _band_click_hit (2.6.58 Klick vs. Drag)")
+    if "rubber_band_finished.emit" not in pv:
+        _fail("pdf_view.py fehlt rubber_band_finished.emit (2.6.58 Drag-Select)")
+    if "Leerklick/Ziehen = Gummiband" not in pv:
+        _fail("pdf_view.py fehlt Gummiband-Auswahl-Tool (2.6.58)")
+    audit_2654 = (ROOT / "scripts" / "test_ui_audit_2654.py").read_text(encoding="utf-8")
+    if "Gummiband-Drag:" not in audit_2654:
+        _fail("test_ui_audit_2654.py fehlt Gummiband-Drag (2.6.58, 7c ohne Fallback)")
+    _ok("2.6.58 rubber-band drag-select: OK")
 
 
 def check_imports(*, with_qt: bool) -> None:
@@ -1587,6 +1600,8 @@ def check_changelog() -> None:
         _fail("CHANGELOG fehlt ## 2.6.49")
     if "## 2.6.51" not in cl:
         _fail("CHANGELOG fehlt ## 2.6.51")
+    if "## 2.6.58" not in cl:
+        _fail("CHANGELOG fehlt ## 2.6.58")
     if "## 2.6.57" not in cl:
         _fail("CHANGELOG fehlt ## 2.6.57")
     if "## 2.6.56" not in cl:
@@ -3062,11 +3077,11 @@ Exit-Codes:
 Laufzeit: am Ende als „Laufzeit: N ms“ (oder duration_ms im JSON).
 
 Beispiel --json (Erfolg):
-  {"ok": true, "version": "2.6.57", "duration_ms": 1234,
+  {"ok": true, "version": "2.6.58", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 
 Beispiel --json (Fail):
-  {"ok": false, "version": "2.6.57", "duration_ms": 12,
+  {"ok": false, "version": "2.6.58", "duration_ms": 12,
    "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 """.rstrip()
     )

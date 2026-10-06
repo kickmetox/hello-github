@@ -1,4 +1,9 @@
-InstantLens Doc 2.6.57 - Installation
+InstantLens Doc 2.6.58 - Installation
+
+Neu in 2.6.58:
+- Auswahl-Gummiband: leere Flaeche ziehen selektiert sich schneidende Annotationen
+- Bereits ausgewaehltes Objekt ziehen verschiebt; Klick bleibt Hit-Test
+- Pack InstantLensDoc-2.6.58-pack.zip
 
 Neu in 2.6.57:
 - Scan: Timeout im Worker, Geraete-Menue aus Cache, Netzwerk/ECOSYS eSCL-first

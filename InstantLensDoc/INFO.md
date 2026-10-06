@@ -1,5 +1,9 @@
 # InstantLens Doc — Kurzinfo
 
+### 2.6.58 — Release
+
+Auswahl-Gummiband per Mausziehen: leere Fläche ziehen selektiert sich schneidende Annotationen; bereits ausgewähltes Objekt ziehen verschiebt; Klick bleibt Hit-Test. Pack `InstantLensDoc-2.6.58-pack.zip`. VERSION **2.6.58**. HEAD `56d90a4`.
+
 ### 2.6.57 — Release
 
 Scan-Timeout im Worker, Geräte-Menü aus Cache, Netzwerk/ECOSYS **eSCL-first**, WIA-Waisen (`reap_orphan_scan_children` / `wiaacmgr`) bei Timeout/Quit/Start. Bearbeiten/Format-Mausklick eine Spalte (gleicher Slot wie Kürzel). Strich/Farbe/Deckkraft/Schrift nur auf aktuelles Objekt / sichtbare Seite. Pack `InstantLensDoc-2.6.57-pack.zip`. VERSION **2.6.57**. HEAD `d7e0ad7` (Scan-Merge) + `4a62b9a` + `94f11d1`.
@@ -31,7 +35,7 @@ Menü **Geräte** (Scanner / Scannen…, Drucker, Erkennen), PDF → Scannen, To
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **2.6.57** |
+| Version | **2.6.58** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |
