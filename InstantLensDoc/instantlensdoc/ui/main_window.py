@@ -6,7 +6,7 @@ import json
 import time
 from pathlib import Path
 
-from PySide6.QtCore import QEvent, QPoint, QPointF, QRectF, Qt, QTimer, Signal
+from PySide6.QtCore import QEvent, QPoint, QPointF, QRect, QRectF, QSize, Qt, QTimer, Signal
 from PySide6.QtGui import QAction, QActionGroup, QColor, QIcon, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QAbstractItemView,
@@ -283,6 +283,7 @@ class MainWindow(QMainWindow):
 
         self.setAcceptDrops(True)
         self.setWindowTitle(self._app_title())
+        self.setMinimumSize(1024, 640)
         self.resize(1200, 800)
         icon = QIcon()
         for p in icon_paths_for_qt():
@@ -308,6 +309,7 @@ class MainWindow(QMainWindow):
         except Exception:
             pass
         self._restore_window_geometry()
+        self._fit_window_to_screen()
         try:
             self._apply_chrome_mode()
         except Exception:
@@ -347,12 +349,53 @@ class MainWindow(QMainWindow):
         if get_update_check_on_start():
             QTimer.singleShot(1500, lambda: self._check_updates(silent=True))
 
+    def minimumSizeHint(self) -> QSize:  # noqa: N802
+        """Nicht die Summe aller Ribbon-/DTP-Hints — sonst min. = ganzer 32"-Monitor."""
+        return QSize(1024, 640)
+
+    def _available_screen_rect(self) -> QRect:
+        from PySide6.QtWidgets import QApplication
+
+        screen = None
+        try:
+            screen = self.screen()
+        except Exception:
+            screen = None
+        if screen is None:
+            app = QApplication.instance()
+            screen = app.primaryScreen() if app is not None else None
+        if screen is None:
+            return QRect(0, 0, 1280, 800)
+        try:
+            return QRect(screen.availableGeometry())
+        except Exception:
+            return QRect(0, 0, 1280, 800)
+
+    def _fit_window_to_screen(self) -> None:
+        """Start und Restore: in availableGeometry, verkleinerbar unter Vollbild."""
+        ag = self._available_screen_rect()
+        margin = 24
+        max_w = max(1024, ag.width() - margin)
+        max_h = max(640, ag.height() - margin)
+        self.setMinimumSize(1024, 640)
+        if self.isMaximized() or self.isFullScreen():
+            if self.width() > ag.width() + 8 or self.height() > ag.height() + 8:
+                self.showNormal()
+            else:
+                return
+        w = min(max(self.width(), 1024), max_w)
+        h = min(max(self.height(), 640), max_h)
+        x = max(ag.x(), min(self.x(), ag.x() + ag.width() - w))
+        y = max(ag.y(), min(self.y(), ag.y() + ag.height() - h))
+        self.setGeometry(x, y, w, h)
+
     def _restore_window_geometry(self) -> None:
         import base64
 
         from PySide6.QtCore import QByteArray
 
         if not get_restore_window_geometry_on_start():
+            self._fit_window_to_screen()
             return
         geo = get_window_geometry_b64()
         state = get_window_state_b64()
@@ -366,6 +409,7 @@ class MainWindow(QMainWindow):
                 self.restoreState(QByteArray(base64.b64decode(state)))
             except Exception:
                 pass
+        self._fit_window_to_screen()
 
     def _save_window_geometry(self) -> None:
         import base64
@@ -1400,6 +1444,8 @@ class MainWindow(QMainWindow):
         self.dtp_pane = DtpPane(self, doc=getattr(self, "dtp_doc", None))
         self.dtp_pane.statusMessage.connect(self._set_status)
         self._dtp_tools_on = False
+        self._dtp_switching = False
+        self._dtp_leave_forced = False
         if hasattr(self.dtp_pane, "set_word_window_embedded"):
             self.dtp_pane.set_word_window_embedded(True)
         try:
@@ -3019,6 +3065,22 @@ class MainWindow(QMainWindow):
         )
         self._layout_mode_action.triggered.connect(self._on_layout_mode_triggered)
         m_view.addAction(self._layout_mode_action)
+        self._text_view_action = QAction("Textverarbeitung", self)
+        self._text_view_action.setObjectName("actTextverarbeitung")
+        self._text_view_action.setShortcut(QKeySequence("Ctrl+Alt+D"))
+        self._text_view_action.setToolTip(
+            "Zurück zur normalen Textverarbeitung: DTP-Beispiel/Füllung aus, "
+            "PDF oder Text in der zentralen Ansicht (gleicher Befehl wie Tab-Klick)"
+        )
+        self._text_view_action.triggered.connect(self._leave_dtp_to_document)
+        m_view.addAction(self._text_view_action)
+        self._show_document_action = QAction("Dokument zeigen", self)
+        self._show_document_action.setObjectName("actShowDocument")
+        self._show_document_action.setToolTip(
+            "Wie Textverarbeitung: DTP-Overlay aus, geladenes Dokument im Host"
+        )
+        self._show_document_action.triggered.connect(self._leave_dtp_to_document)
+        m_view.addAction(self._show_document_action)
         self._act_ink_input = QAction("Stifteingabe", self)
         self._act_ink_input.setObjectName("actInkInput")
         self._act_ink_input.setCheckable(True)
@@ -3288,14 +3350,18 @@ class MainWindow(QMainWindow):
         self._ribbon_action.setChecked(_get_ribbon())
         self._ribbon_action.setObjectName("actRibbon")
         self._ribbon_action.setToolTip(
-            "Ribbon-ähnliche Werkzeugleiste (partiell) — 2.6.19"
+            "Ribbon einblenden. Genau: Ansicht → Oberfläche → Ribbon "
+            "oder Kombiniert; Extras → Einstellungen → Allgemein → Oberfläche"
         )
         self._ribbon_action.toggled.connect(self._toggle_ribbon)
         m_view.addAction(self._ribbon_action)
         self._chrome_mode_actions: dict = {}
-        m_chrome = m_view.addMenu("Oberfläche")
+        m_chrome = m_view.addMenu("Oberfläche: Klassisch / Ribbon / Kombiniert")
         m_chrome.setObjectName("menuChromeMode")
-        m_chrome.setToolTip("Klassisch (Pull-down), Ribbon oder kombiniert")
+        m_chrome.setToolTip(
+            "Klassisch (Pull-down), Ribbon oder Kombiniert — auch unter "
+            "Extras → Einstellungen → Allgemein → Oberfläche"
+        )
         chrome_group = QActionGroup(self)
         chrome_group.setExclusive(True)
         chrome_group.setObjectName("actGroupChromeMode")
@@ -4658,6 +4724,11 @@ class MainWindow(QMainWindow):
         m_dtp.setToolTip(
             "DTP-Werkzeuge in derselben Ansicht wie Text und PDF"
         )
+        if getattr(self, "_text_view_action", None) is not None:
+            m_dtp.addAction(self._text_view_action)
+        if getattr(self, "_show_document_action", None) is not None:
+            m_dtp.addAction(self._show_document_action)
+        m_dtp.addSeparator()
         self._dtp_view_action = QAction("DTP-Werkzeuge", self)
         self._dtp_view_action.setObjectName("actDtpView")
         self._dtp_view_action.setCheckable(True)
@@ -5921,6 +5992,8 @@ class MainWindow(QMainWindow):
             got = bool(caps.get("rich_text")), str(caps.get("rich_text_reason") or "")
         elif aid.startswith("dtp_"):
             if aid == "dtp_layout":
+                got = True, ""
+            elif aid in ("dtp_show_document", "dtp_text_view"):
                 got = True, ""
             elif aid == "dtp_font":
                 got = bool(caps.get("font")), str(caps.get("font_reason") or "")
@@ -9738,6 +9811,8 @@ class MainWindow(QMainWindow):
             ("toggle_doc_tabs", "_doc_tabs_action"),
             ("toggle_ribbon", "_ribbon_action"),
             ("dtp_layout", "_layout_mode_action"),
+            ("dtp_show_document", "_show_document_action"),
+            ("dtp_text_view", "_text_view_action"),
             ("width_marks", "_width_marks_action"),
             ("print_marks", "_editor_print_marks_action"),
             ("header_footer_marks", "_header_footer_marks_action"),
@@ -9902,7 +9977,9 @@ class MainWindow(QMainWindow):
             "devices_discover": self._show_devices_dialog,
             "devices_printers": lambda: self._show_devices_dialog(filter_kind="printer"),
             "devices_refresh": lambda: self._show_devices_dialog(auto_refresh=True),
-            "dtp_layout": self._enter_layout_mode,
+            "dtp_layout": self._on_layout_mode_triggered,
+            "dtp_show_document": self._leave_dtp_to_document,
+            "dtp_text_view": self._leave_dtp_to_document,
             "ink_input": self._toggle_ink_input,
             "ink_color": self._choose_ink_color,
             "ink_width": self._choose_ink_width,
@@ -10727,14 +10804,18 @@ class MainWindow(QMainWindow):
         if not path:
             return
         self._dismiss_chrome_menus()
+        # Tab-Klick = Textverarbeitung: Overlay/Füllung weg, Dokument im Host.
+        if not self._leave_dtp_to_document():
+            return
         cur = ""
         try:
             if self.doc and self.doc.path:
                 cur = str(Path(self.doc.path))
         except Exception:
             cur = ""
+        same = False
         try:
-            same = bool(cur) and str(Path(path)) == str(Path(cur))
+            same = bool(cur) and Path(path).resolve() == Path(cur).resolve()
         except Exception:
             same = bool(cur) and cur == str(path)
         if same:
@@ -11251,12 +11332,18 @@ class MainWindow(QMainWindow):
             pass
 
     def _reveal_document_host(self) -> None:
-        """Geöffnetes Dokument in der zentralen Ansicht zeigen, nicht nur als Tab.
+        """Geöffnetes Dokument in der zentralen Ansicht — DTP-Beispiel darf nicht oben bleiben.
 
-        DTP bleibt Overlay in derselben Ansicht, wenn der Layout-Modus aktiv ist;
-        sonst darf die DTP-Fläche den Stack nicht verdecken.
+        DTP-Overlay nur über ``_enter_layout_mode``. Tab-Klick, Öffnen und
+        Ansicht/DTP ▸ Textverarbeitung blenden Sample und Füllung aus.
         """
         self._dismiss_chrome_menus()
+        entering_dtp = bool(
+            getattr(self, "_dtp_switching", False)
+            and getattr(self, "_dtp_tools_on", False)
+        )
+        if not entering_dtp:
+            self._hide_dtp_overlay()
         stack = getattr(self, "stack", None)
         if stack is None:
             return
@@ -11275,24 +11362,19 @@ class MainWindow(QMainWindow):
             want.show()
             stack.setCurrentWidget(want)
             stack.show()
+            stack.raise_()
         except Exception:
             pass
-        pane = getattr(self, "dtp_pane", None)
-        if pane is not None:
-            try:
-                if self._layout_mode_active():
-                    pane.show()
-                    pane.raise_()
-                else:
-                    pane.hide()
-            except Exception:
-                pass
         host = getattr(self, "_doc_host", None)
         if host is not None:
             try:
                 host.show()
             except Exception:
                 pass
+        try:
+            self._sync_host_layout_marks_overlay()
+        except Exception:
+            pass
 
     def _show_welcome_if_empty(self) -> bool:
         """Willkommensseite anzeigen wenn keine Tabs / kein Dokument — 1.0.0."""
@@ -16169,9 +16251,9 @@ class MainWindow(QMainWindow):
                 pass
             if hasattr(pane, "set_word_window_embedded"):
                 pane.set_word_window_embedded(True)
+            self._dtp_tools_on = True
             pane.show()
             pane.raise_()
-            self._dtp_tools_on = True
             if hasattr(pane, "apply_shared_print_overlays"):
                 pane.apply_shared_print_overlays()
             self._sync_host_layout_marks_overlay()
@@ -16183,7 +16265,7 @@ class MainWindow(QMainWindow):
                 except Exception:
                     pass
             self._merge_dtp_into_right_toolbox()
-            self._set_status("DTP-Werkzeuge (gleiche Ansicht)")
+            self._set_status("DTP-Werkzeuge (gleiche Ansicht) — zurück: Dokument zeigen")
             try:
                 self._sync_editor_only_actions()
                 self._sync_menu_enablement()
@@ -16194,26 +16276,71 @@ class MainWindow(QMainWindow):
         finally:
             self._dtp_switching = False
 
-    def _leave_layout_mode(self) -> bool:
-        """DTP-Overlay ausblenden; Dokument-Stack bleibt Text/PDF."""
-        if not self._layout_mode_active():
+    def _dtp_overlay_blocking(self) -> bool:
+        pane = getattr(self, "dtp_pane", None)
+        return bool(
+            getattr(self, "_dtp_tools_on", False)
+            or (pane is not None and pane.isVisible())
+        )
+
+    def _hide_dtp_overlay(self) -> None:
+        """Sample/Beispieldokument vom Host nehmen — Stack (PDF/Text) bleibt."""
+        self._dtp_tools_on = False
+        pane = getattr(self, "dtp_pane", None)
+        if pane is not None:
+            try:
+                pane.hide()
+                pane.lower()
+            except Exception:
+                pass
+        try:
             self._sync_layout_mode_checked(False)
+        except Exception:
+            pass
+        session = getattr(self, "_ink_session", None)
+        fill = getattr(session, "fill_mode", "none") if session is not None else "none"
+        if str(fill or "none") != "none":
+            try:
+                self._set_ink_fill("none")
+            except Exception:
+                pass
+        stack = getattr(self, "stack", None)
+        if stack is not None:
+            try:
+                stack.show()
+                stack.raise_()
+            except Exception:
+                pass
+
+    def _leave_dtp_to_document(self) -> bool:
+        """Ansicht/DTP ▸ Textverarbeitung; Tab-Klick; Overlay/Füllung weg."""
+        self._dtp_leave_forced = True
+        try:
+            if not self._leave_layout_mode():
+                return False
+            self._reveal_document_host()
             return True
-        if getattr(self, "_dtp_switching", False):
+        finally:
+            self._dtp_leave_forced = False
+
+    def _leave_layout_mode(self) -> bool:
+        """DTP-Overlay ausblenden; PDF/Text in ``_doc_host`` zeigen."""
+        if not self._dtp_overlay_blocking():
+            self._hide_dtp_overlay()
+            return True
+        if getattr(self, "_dtp_switching", False) and not getattr(
+            self, "_dtp_leave_forced", False
+        ):
             return True
         self._dtp_switching = True
         try:
             if not self._confirm_dtp_unsaved():
                 self._sync_layout_mode_checked(True)
                 return False
-            pane = getattr(self, "dtp_pane", None)
-            if pane is not None:
-                pane.hide()
-            self._dtp_tools_on = False
+            self._hide_dtp_overlay()
             self._sync_host_layout_marks_overlay()
-            self._sync_layout_mode_checked(False)
             self._merge_dtp_into_right_toolbox()
-            self._set_status("DTP-Werkzeuge aus")
+            self._set_status("Textverarbeitung (PDF/Text)")
             try:
                 self._sync_editor_only_actions()
                 self._sync_menu_enablement()
@@ -21509,6 +21636,11 @@ class MainWindow(QMainWindow):
                             return
                     if self.stack.currentWidget() is not self.pdf_view:
                         self.stack.setCurrentWidget(self.pdf_view)
+                    try:
+                        self._hide_dtp_overlay()
+                        self.stack.raise_()
+                    except Exception:
+                        pass
                     if self.pdf_view.pdf_path and not self.pdf_view._canvas_has_page_image():
                         self.pdf_view._ensure_page_painted(warn=False)
 

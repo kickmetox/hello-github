@@ -1,4 +1,18 @@
-InstantLens Doc 2.6.61 - Installation
+InstantLens Doc 2.6.62 - Installation
+
+Neu in 2.6.62:
+- Ansicht/DTP -> Textverarbeitung (Ctrl+Alt+D); Tab-Klick zeigt das Dokument
+- DTP-Beispiel/Fuellung nicht mehr ueber dem PDF (ohne „Keine Fuellung“)
+- Text-bearbeiten-Dialog schliesst mit einem Klick (OK/Abbrechen/Esc/X)
+- Acht Angriffspunkte an Rahmen/Annotationen/Formen/Stempeln
+- Startfenster passt auf den Monitor; min. 1024x640
+- Pack InstantLensDoc-2.6.62-pack.zip
+- Windows-Rebuild: nach D:\AI_Temp\InstantLensDoc-2662 entpacken
+  powershell -ExecutionPolicy Bypass -File "D:\AI_Temp\sync-ild.ps1" -LocalPack D:\AI_Temp\InstantLensDoc-2.6.62-pack.zip -Dest D:\AI_Temp\InstantLensDoc-2662 -Swap -SkipStart
+  cd D:\AI_Temp\InstantLensDoc
+  python -m pip install -r requirements.txt
+  powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
+  powershell -ExecutionPolicy Bypass -File .\scripts\install-ild.ps1
 
 Neu in 2.6.61:
 - Ein Menue pro Klick (keine gestapelten Pulldowns)

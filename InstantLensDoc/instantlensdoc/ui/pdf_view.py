@@ -91,6 +91,8 @@ from ild_pdf.text_edit import (
     hit_test_text,
     insert_text_at,
     map_to_standard_font,
+    sanitize_font_family_label,
+    sanitize_pdf_edit_text,
     text_span_from_selection,
 )
 from ild_pdf.object_edit import (
@@ -477,11 +479,29 @@ class StampPickDialog(QDialog):
         return None
 
 
+def _label_ok_cancel(box: QDialogButtonBox) -> None:
+    """Deutsche Schließen-Beschriftung — ohne Qt-Translator bleibt sonst Cancel."""
+    ok = box.button(QDialogButtonBox.Ok)
+    if ok is not None:
+        ok.setObjectName("inlineTextEditOk")
+        ok.setText("OK")
+        ok.setDefault(True)
+        ok.setAutoDefault(True)
+    cancel = box.button(QDialogButtonBox.Cancel)
+    if cancel is not None:
+        cancel.setObjectName("inlineTextEditCancel")
+        cancel.setText("Abbrechen")
+
+
 class TextOverlayEditDialog(QDialog):
     """Annotation-Text bearbeiten (Notiz/Kommentar/Overlay; Sidecar)."""
 
     def __init__(self, ann: Annotation, parent=None):
         super().__init__(parent)
+        self.setObjectName("textOverlayEditDialog")
+        self.setWindowModality(Qt.WindowModal)
+        self.setWindowFlag(Qt.WindowCloseButtonHint, True)
+        self.setWindowFlag(Qt.WindowContextHelpButtonHint, False)
         kind = {
             AnnotationType.STICKY: "Notiz",
             AnnotationType.TEXT: "Text",
@@ -496,7 +516,7 @@ class TextOverlayEditDialog(QDialog):
         layout = QVBoxLayout(self)
         form = QFormLayout()
         self.text = QPlainTextEdit()
-        self.text.setPlainText(ann.text or "")
+        self.text.setPlainText(sanitize_pdf_edit_text(ann.text or ""))
         form.addRow("Text:", self.text)
         self.font_size = QDoubleSpinBox()
         self.font_size.setRange(6, 96)
@@ -537,9 +557,22 @@ class TextOverlayEditDialog(QDialog):
             form.addRow("Drehung (°):", self.rotation)
         layout.addLayout(form)
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons.setObjectName("textOverlayEditButtons")
+        _label_ok_cancel(buttons)
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
+
+    def keyPressEvent(self, event) -> None:  # noqa: N802
+        if event.key() == Qt.Key_Escape:
+            self.reject()
+            event.accept()
+            return
+        super().keyPressEvent(event)
+
+    def closeEvent(self, event) -> None:  # noqa: N802
+        event.accept()
+        super().closeEvent(event)
 
     def values(self) -> dict:
         from ild_pdf.annotate import normalize_tags
@@ -573,12 +606,16 @@ class InlineTextEditDialog(QDialog):
         super().__init__(parent)
         self.setObjectName("inlineTextEditDialog")
         self.setWindowTitle(title)
+        self.setWindowModality(Qt.WindowModal)
+        self.setWindowFlag(Qt.WindowCloseButtonHint, True)
+        self.setWindowFlag(Qt.WindowContextHelpButtonHint, False)
         self.resize(480, 340)
         self._insert_mode = bool(insert_mode)
         layout = QVBoxLayout(self)
         hint = QLabel(
             "Text ändern/löschen/hinzufügen · Zeilenumbruch in Box-Breite · "
-            "Schriftart/Größe/Farbe aus Kontext (Standard-14-Mapping) — 2.6.5"
+            "Schriftart/Größe/Farbe aus Kontext (Standard-14-Mapping). "
+            "Schließen: OK, Abbrechen, Esc oder das Fenster-X."
         )
         hint.setWordWrap(True)
         hint.setObjectName("inlineTextEditHint")
@@ -586,7 +623,7 @@ class InlineTextEditDialog(QDialog):
         form = QFormLayout()
         self.text = QPlainTextEdit()
         self.text.setObjectName("inlineTextEditBody")
-        self.text.setPlainText(text or "")
+        self.text.setPlainText(sanitize_pdf_edit_text(text or ""))
         self.text.setMinimumHeight(120)
         form.addRow("Text:", self.text)
         self.font_family = QFontComboBox()
@@ -600,7 +637,7 @@ class InlineTextEditDialog(QDialog):
                 self.font_family.addItem(fam)
         except Exception:
             pass
-        current_fam = style.font_family or "Helvetica"
+        current_fam = sanitize_font_family_label(style.font_family or "Helvetica")
         idx = self.font_family.findText(current_fam)
         if idx >= 0:
             self.font_family.setCurrentIndex(idx)
@@ -628,9 +665,22 @@ class InlineTextEditDialog(QDialog):
         self.font_family.currentTextChanged.connect(self._refresh_mapping)
         layout.addLayout(form)
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons.setObjectName("inlineTextEditButtons")
+        _label_ok_cancel(buttons)
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
+
+    def keyPressEvent(self, event) -> None:  # noqa: N802
+        if event.key() == Qt.Key_Escape:
+            self.reject()
+            event.accept()
+            return
+        super().keyPressEvent(event)
+
+    def closeEvent(self, event) -> None:  # noqa: N802
+        event.accept()
+        super().closeEvent(event)
 
     def _refresh_mapping(self, _text: str = "") -> None:
         base = map_to_standard_font(self.font_family.currentText().strip() or "Helvetica")
@@ -1391,11 +1441,16 @@ class PdfCanvas(QLabel):
     def _object_handle_rects(self, obj: DocumentObject) -> dict[str, tuple[float, float, float, float]]:
         hs = 8.0
         x, y, w, h = obj.x, obj.y, obj.width, obj.height
+        mx, my = x + w / 2.0, y + h / 2.0
         return {
-            "br": (x + w - hs * 0.5, y + h - hs * 0.5, hs, hs),
-            "tr": (x + w - hs * 0.5, y - hs * 0.5, hs, hs),
-            "bl": (x - hs * 0.5, y + h - hs * 0.5, hs, hs),
             "tl": (x - hs * 0.5, y - hs * 0.5, hs, hs),
+            "t": (mx - hs * 0.5, y - hs * 0.5, hs, hs),
+            "tr": (x + w - hs * 0.5, y - hs * 0.5, hs, hs),
+            "r": (x + w - hs * 0.5, my - hs * 0.5, hs, hs),
+            "br": (x + w - hs * 0.5, y + h - hs * 0.5, hs, hs),
+            "b": (mx - hs * 0.5, y + h - hs * 0.5, hs, hs),
+            "bl": (x - hs * 0.5, y + h - hs * 0.5, hs, hs),
+            "l": (x - hs * 0.5, my - hs * 0.5, hs, hs),
         }
 
     def _hit_object_handle(self, x: float, y: float) -> str | None:
@@ -2176,7 +2231,7 @@ class PdfCanvas(QLabel):
                     painter.setPen(sel)
                     painter.setBrush(Qt.NoBrush)
                     painter.drawRect(int(x0) - 2, int(y0) - 2, int(x1 - x0) + 4, int(y1 - y0) + 4)
-                    if (self._select_mode or self._drag_tool is None) and not self._annotations_locked:
+                    if not bool(getattr(ann, "locked", False)):
                         painter.setBrush(QColor(30, 144, 255))
                         painter.setPen(QPen(QColor(255, 255, 255), 1))
                         for hx, hy, hw, hh in handle_rects.values():
@@ -2268,27 +2323,18 @@ class PdfCanvas(QLabel):
                 else (0.0, 0.0)
             )
             ox, oy, ow, oh = o.x + odx, o.y + ody, o.width, o.height
-            if self._object_drag_mode in ("br", "tr", "bl", "tl") and self._object_drag_origin:
-                # Resize-Vorschau vom Ursprung
+            if self._object_drag_mode == "move":
+                pass
+            elif self._object_drag_mode and self._object_drag_origin:
                 rx0, ry0 = self._object_drag_origin
                 cx = rx0 + self._object_drag_delta[0]
                 cy = ry0 + self._object_drag_delta[1]
-                if self._object_drag_mode == "br":
-                    ow = max(8.0, cx - o.x)
-                    oh = max(8.0, cy - o.y)
-                    ox, oy = o.x, o.y
-                elif self._object_drag_mode == "tr":
-                    ow = max(8.0, cx - o.x)
-                    oh = max(8.0, o.y + o.height - cy)
-                    ox, oy = o.x, cy
-                elif self._object_drag_mode == "bl":
-                    ow = max(8.0, o.x + o.width - cx)
-                    oh = max(8.0, cy - o.y)
-                    ox, oy = cx, o.y
-                elif self._object_drag_mode == "tl":
-                    ow = max(8.0, o.x + o.width - cx)
-                    oh = max(8.0, o.y + o.height - cy)
-                    ox, oy = cx, cy
+                ox, oy, ow, oh = self._apply_handle_resize(
+                    (o.x, o.y, o.width, o.height),
+                    self._object_drag_mode,
+                    cx,
+                    cy,
+                )
             painter.setPen(QPen(QColor(16, 140, 90), 2, Qt.DashLine))
             painter.setBrush(QColor(16, 140, 90, 28))
             painter.drawRect(int(ox), int(oy), max(int(ow), 2), max(int(oh), 2))
@@ -2322,6 +2368,22 @@ class PdfCanvas(QLabel):
             self.adjustSize()
         self.update()
 
+    def release_pointer_grab(self) -> None:
+        """Maus-Grab lösen, sonst blockiert exec() von Text-Dialogen OK/X/Esc."""
+        try:
+            grabber = QWidget.mouseGrabber()
+            if grabber is not None:
+                grabber.releaseMouse()
+        except Exception:
+            try:
+                self.releaseMouse()
+            except Exception:
+                pass
+        try:
+            self.unsetCursor()
+        except Exception:
+            pass
+
     def mousePressEvent(self, event):
         pt = self._map_to_page(event)
         if pt is None:
@@ -2353,6 +2415,7 @@ class PdfCanvas(QLabel):
             return
         if self._inline_edit_mode and event.button() == Qt.LeftButton:
             # Annotation-Doppelpfad: Overlay zuerst, sonst nativer Text — 2.6.5
+            self.release_pointer_grab()
             hit = self._hit_overlay(x, y)
             if hit:
                 self.overlay_edit_requested.emit(hit.id)
@@ -2657,6 +2720,10 @@ class PdfCanvas(QLabel):
         super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event):
+        try:
+            self.releaseMouse()
+        except Exception:
+            pass
         if self._hand_mode and event.button() == Qt.LeftButton:
             self._hand_origin = None
             self._hand_scroll = None
@@ -2734,17 +2801,14 @@ class PdfCanvas(QLabel):
                 else:
                     self._repaint_overlay()
                 return
-            # resize via corner
             cx = origin[0] + dx
             cy = origin[1] + dy
-            if mode == "br":
-                nw, nh = max(8.0, cx - o.x), max(8.0, cy - o.y)
-            elif mode == "tr":
-                nw, nh = max(8.0, cx - o.x), max(8.0, o.y + o.height - cy)
-            elif mode == "bl":
-                nw, nh = max(8.0, o.x + o.width - cx), max(8.0, cy - o.y)
-            else:
-                nw, nh = max(8.0, o.x + o.width - cx), max(8.0, o.y + o.height - cy)
+            nx, ny, nw, nh = self._apply_handle_resize(
+                (o.x, o.y, o.width, o.height), mode, cx, cy
+            )
+            mdx, mdy = nx - o.x, ny - o.y
+            if abs(mdx) > 2 or abs(mdy) > 2:
+                self.object_moved.emit(float(mdx), float(mdy))
             if abs(nw - o.width) > 2 or abs(nh - o.height) > 2:
                 self.object_resized.emit(float(nw), float(nh))
             else:
@@ -2919,6 +2983,7 @@ class PdfCanvas(QLabel):
                 if hit.id not in self._selected_ids:
                     self.set_selected_ids({hit.id})
                 self.annotation_selected.emit(hit.id)
+                self.release_pointer_grab()
                 self.overlay_edit_requested.emit(hit.id)
                 return
             hit_any = self._hit_annotation(*pt)
@@ -2934,6 +2999,7 @@ class PdfCanvas(QLabel):
                 return
             # Doppelklick auf nativen Text → Inline-Edit (Auswahl/Inline-Modus) — 2.6.5
             if self._select_mode or self._inline_edit_mode:
+                self.release_pointer_grab()
                 self.inline_text_edit_requested.emit(pt[0], pt[1])
                 return
         super().mouseDoubleClickEvent(event)
@@ -3994,7 +4060,7 @@ class PdfViewer(QWidget):
         self.canvas.ink_finished.connect(self._on_ink)
         self._sync_ink_preview_style()
         self.canvas.text_selection_finished.connect(self._on_text_selection)
-        self.canvas.overlay_edit_requested.connect(self._edit_overlay)
+        self.canvas.overlay_edit_requested.connect(self._on_overlay_edit_requested)
         self.canvas.inline_text_edit_requested.connect(self._on_inline_text_edit_at)
         self.canvas.object_edit_requested.connect(self._on_object_edit_at)
         self.canvas.object_moved.connect(self._on_object_moved)
@@ -11120,9 +11186,25 @@ class PdfViewer(QWidget):
         except Exception as e:
             QMessageBox.warning(self, "Einbrennen", str(e))
 
+    def _release_canvas_grab(self) -> None:
+        canvas = getattr(self, "canvas", None)
+        if canvas is not None and hasattr(canvas, "release_pointer_grab"):
+            try:
+                canvas.release_pointer_grab()
+            except Exception:
+                pass
+        else:
+            try:
+                grabber = QWidget.mouseGrabber()
+                if grabber is not None:
+                    grabber.releaseMouse()
+            except Exception:
+                pass
+
     def _on_inline_text_edit_at(self, x: float, y: float) -> None:
         """Klick im Inline-Edit-Modus / Doppelklick Auswahl — 2.6.5."""
-        self.edit_inline_text_at(x, y)
+        self._release_canvas_grab()
+        QTimer.singleShot(0, lambda: self.edit_inline_text_at(x, y))
 
     def edit_inline_text_at(self, x: float, y: float) -> bool:
         """Text am Punkt bearbeiten oder neuen Text einfügen — 2.6.5."""
@@ -11228,7 +11310,16 @@ class PdfViewer(QWidget):
             title="Text einfügen" if insert_mode else "Text bearbeiten",
             insert_mode=insert_mode,
         )
-        if dlg.exec() != QDialog.Accepted:
+        self._release_canvas_grab()
+        if getattr(self, "_inline_edit_dialog_open", False):
+            return False
+        self._inline_edit_dialog_open = True
+        try:
+            result = dlg.exec()
+        finally:
+            self._inline_edit_dialog_open = False
+            self._release_canvas_grab()
+        if result != QDialog.Accepted:
             return False
         new_text, new_style = dlg.values()
         # Style wieder in Render-Skalierung für apply (font_size wird /scale gerechnet)
@@ -12066,6 +12157,10 @@ class PdfViewer(QWidget):
                 pass
             return Image.new("RGB", (iw, ih), (220, 220, 220))
 
+    def _on_overlay_edit_requested(self, ann_id: str) -> None:
+        self._release_canvas_grab()
+        QTimer.singleShot(0, lambda aid=ann_id: self._edit_overlay(aid))
+
     def _edit_overlay(self, ann_id: str):
         """Notiz-/Kommentar-/Overlay-Text nachträglich bearbeiten."""
         if not self.store:
@@ -12124,7 +12219,16 @@ class PdfViewer(QWidget):
         if ann.type not in editable:
             return
         dlg = TextOverlayEditDialog(ann, self)
-        if dlg.exec() != QDialog.Accepted:
+        self._release_canvas_grab()
+        if getattr(self, "_overlay_edit_dialog_open", False):
+            return
+        self._overlay_edit_dialog_open = True
+        try:
+            result = dlg.exec()
+        finally:
+            self._overlay_edit_dialog_open = False
+            self._release_canvas_grab()
+        if result != QDialog.Accepted:
             return
         vals = dlg.values()
         self.store.update(ann_id, **vals)

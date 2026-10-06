@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.6.61.
+"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.6.62.
 
 Leichtgewichtig. Exit-Codes:
   0  OK  (ok=true)
@@ -14,12 +14,12 @@ Aufruf:
   python scripts/smoke_ild.py -h
 
 JSON-Schema (--json), Erfolg:
-  {"ok": true, "version": "2.6.61", "duration_ms": 1234,
+  {"ok": true, "version": "2.6.62", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 
 JSON bei Fail: checks[] enthält Objekt mit error-Text (max 200 Zeichen, Truncate …);
 Exitcode spiegelt ok (0↔true, 1↔false) — 2.2.0:
-  {"ok": false, "version": "2.6.61", "duration_ms": 12,
+  {"ok": false, "version": "2.6.62", "duration_ms": 12,
    "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 """
 
@@ -41,7 +41,7 @@ if str(ROOT) not in sys.path:
 # Headless/CI: Qt ohne Display
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-EXPECTED_VERSION = "2.6.61"
+EXPECTED_VERSION = "2.6.62"
 FAIL_ERROR_MAX_LEN = 200
 
 EXIT_OK = 0
@@ -844,6 +844,19 @@ def check_version() -> None:
         _fail("tests/test_settings_general_scroll_2667.py fehlt (2.6.61)")
     if not (ROOT / "tests" / "test_tab_open_host_2667.py").is_file():
         _fail("tests/test_tab_open_host_2667.py fehlt (2.6.61)")
+    mw = (ROOT / "instantlensdoc" / "ui" / "main_window.py").read_text(encoding="utf-8")
+    if "actTextverarbeitung" not in mw or "_leave_dtp_to_document" not in mw:
+        _fail("main_window.py fehlt Textverarbeitung / leave-DTP (2.6.62)")
+    if "_hide_dtp_overlay" not in mw:
+        _fail("main_window.py fehlt _hide_dtp_overlay (2.6.62)")
+    pv = (ROOT / "instantlensdoc" / "ui" / "pdf_view.py").read_text(encoding="utf-8")
+    if "release_pointer_grab" not in pv or "inlineTextEditCancel" not in pv:
+        _fail("pdf_view.py fehlt Text-bearbeiten-Dialog-Close (2.6.62)")
+    if not (ROOT / "tests" / "test_dtp_leave_2668.py").is_file():
+        _fail("tests/test_dtp_leave_2668.py fehlt (2.6.62)")
+    if not (ROOT / "tests" / "test_inline_text_edit_2668.py").is_file():
+        _fail("tests/test_inline_text_edit_2668.py fehlt (2.6.62)")
+    _ok("2.6.62 textverarbeitung/leave-DTP/text-edit-dialog: OK")
     _ok("2.6.61 exclusive-menus/settings-scroll/tab-host: OK")
     _ok("2.6.60 unified-view/ribbon-scroll/protect/formats/layout-marks: OK")
     inst_ps1 = (ROOT / "scripts" / "install-ild.ps1").read_text(encoding="utf-8-sig")
@@ -1751,6 +1764,8 @@ def check_changelog() -> None:
         _fail("CHANGELOG fehlt ## 2.6.49")
     if "## 2.6.51" not in cl:
         _fail("CHANGELOG fehlt ## 2.6.51")
+    if "## 2.6.62" not in cl:
+        _fail("CHANGELOG fehlt ## 2.6.62")
     if "## 2.6.61" not in cl:
         _fail("CHANGELOG fehlt ## 2.6.61")
     if "## 2.6.60" not in cl:
@@ -3234,11 +3249,11 @@ Exit-Codes:
 Laufzeit: am Ende als „Laufzeit: N ms“ (oder duration_ms im JSON).
 
 Beispiel --json (Erfolg):
-  {"ok": true, "version": "2.6.61", "duration_ms": 1234,
+  {"ok": true, "version": "2.6.62", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 
 Beispiel --json (Fail):
-  {"ok": false, "version": "2.6.61", "duration_ms": 12,
+  {"ok": false, "version": "2.6.62", "duration_ms": 12,
    "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 """.rstrip()
     )

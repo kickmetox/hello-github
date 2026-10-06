@@ -1,3 +1,24 @@
+## 2.6.62 - Textverarbeitung, DTP-Overlay, Text-bearbeiten-Dialog, Fenster
+
+Pack `InstantLensDoc-2.6.62-pack.zip`; VERSION **2.6.62**. Nach 2.6.61-Pack (`8201b36`).
+
+- **Zurück zur Textverarbeitung:** Ansicht und DTP ▸ **Textverarbeitung** (Ctrl+Alt+D). Tab-Klick auf die geladene Datei macht dasselbe. DTP-Beispiel und Tinten-Füllung gehen automatisch aus (kein Umweg über Ansicht → „Keine Füllung“). DTP-Werkzeuge und Füllung-Befehle bleiben.
+- **Dokumenthost:** Öffnen / Tab / Verlassen-DTP zeigt PDF oder Text in `_doc_host`; Overlay sitzt nicht mehr oben drauf.
+- **Text bearbeiten:** Dialog über offenem PDF schließt mit einem Klick (OK, Abbrechen, Esc, Fenster-X). Canvas-`grabMouse` wird vor `exec()` gelöst. Buttons **OK** / **Abbrechen** (kein englisches Cancel). Steuerzeichen/Mojibake im Textfeld werden bereinigt.
+- **Angriffspunkte:** acht Resize-Griffe an ausgewählten DTP-Rahmen, PDF-Annotationen, Formen, Stempeln; Ziehen verschiebt.
+- **Fenster:** Start/Restore in `availableGeometry`; Minimum 1024×640, verkleinerbar unter Vollbild des 32"-Monitors.
+- **Oberfläche:** Ansicht → **Oberfläche: Klassisch / Ribbon / Kombiniert**; Extras → Einstellungen → Allgemein → Oberfläche.
+
+Windows-Rebuild (Andreas Meyer):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File "D:\AI_Temp\sync-ild.ps1" -LocalPack D:\AI_Temp\InstantLensDoc-2.6.62-pack.zip -Dest D:\AI_Temp\InstantLensDoc-2662 -Swap -SkipStart
+cd D:\AI_Temp\InstantLensDoc
+python -m pip install -r requirements.txt
+powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
+powershell -ExecutionPolicy Bypass -File .\scripts\install-ild.ps1
+```
+
 ## 2.6.61 - UI: ein Menü pro Klick, Einstellungen scrollbar, Tab zeigt Dokument
 
 Pack `InstantLensDoc-2.6.61-pack.zip`; VERSION **2.6.61**. Nach 2.6.60-Pack (`667f9d4`).

@@ -1,5 +1,19 @@
 # InstantLens Doc — Kurzinfo
 
+### 2.6.62 — Textverarbeitung, DTP-Overlay, Text-bearbeiten-Dialog, Fenster
+
+Ansicht/DTP ▸ **Textverarbeitung** (Tab-Klick gleich); DTP-Beispiel und Füllung aus ohne „Keine Füllung“; Text-bearbeiten-Dialog über PDF schließt mit einem Klick; acht Angriffspunkte; Fenster min. 1024×640. Pack `InstantLensDoc-2.6.62-pack.zip`. VERSION **2.6.62**.
+
+**Windows-Rebuild (Andreas Meyer)** — Ziel `D:\AI_Temp\InstantLensDoc-2662`:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File "D:\AI_Temp\sync-ild.ps1" -LocalPack D:\AI_Temp\InstantLensDoc-2.6.62-pack.zip -Dest D:\AI_Temp\InstantLensDoc-2662 -Swap -SkipStart
+cd D:\AI_Temp\InstantLensDoc
+python -m pip install -r requirements.txt
+powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
+powershell -ExecutionPolicy Bypass -File .\scripts\install-ild.ps1
+```
+
 ### 2.6.61 — UI: ein Menü pro Klick, Einstellungen scrollbar, Tab zeigt Dokument
 
 Ein Pulldown zur Zeit (Enablement öffnet keine Stapel-Popups); Allgemein-Tab scrollbar; Tab-X/Öffnen ohne Extra-Popups; geöffnete Datei in der zentralen Ansicht. Pack `InstantLensDoc-2.6.61-pack.zip`. VERSION **2.6.61**.
@@ -71,7 +85,7 @@ Menü **Geräte** (Scanner / Scannen…, Drucker, Erkennen), PDF → Scannen, To
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **2.6.61** |
+| Version | **2.6.62** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |

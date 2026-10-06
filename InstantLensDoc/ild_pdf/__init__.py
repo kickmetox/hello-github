@@ -383,6 +383,8 @@ from .text_edit import (
     insert_text_at,
     map_to_standard_font,
     reflow_lines,
+    sanitize_font_family_label,
+    sanitize_pdf_edit_text,
     text_span_from_selection,
 )
 from .object_edit import (
@@ -727,6 +729,8 @@ __all__ = [
     "detect_text_style_at",
     "hit_test_text",
     "text_span_from_selection",
+    "sanitize_pdf_edit_text",
+    "sanitize_font_family_label",
     "reflow_lines",
     "apply_inline_text_edit",
     "insert_text_at",
@@ -812,4 +816,4 @@ __all__ = [
     "sections_sidecar_path_for",
 ]
 
-__version__ = "2.6.61"
+__version__ = "2.6.62"

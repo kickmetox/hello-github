@@ -70,15 +70,18 @@ class ResizeHandle(QGraphicsRectItem):
     """Ecken-/Kantengriff zum Skalieren des Eltern-Rahmens."""
 
     ROLES = ("tl", "tm", "tr", "ml", "mr", "bl", "bm", "br")
+    SIZE = 10.0
 
     def __init__(self, role: str, parent: "FrameItem"):
-        super().__init__(-3.5, -3.5, 7.0, 7.0, parent)
+        half = self.SIZE / 2.0
+        super().__init__(-half, -half, self.SIZE, self.SIZE, parent)
         self.role = role
         self.setBrush(QBrush(QColor("#FFFFFF")))
-        self.setPen(QPen(QColor("#0B3D91"), 1.0))
-        self.setZValue(80)
+        self.setPen(QPen(QColor("#0B3D91"), 1.2))
+        self.setZValue(1000)
         self.setAcceptedMouseButtons(Qt.LeftButton)
         self.setFlag(QGraphicsItem.ItemIsSelectable, False)
+        self.setFlag(QGraphicsItem.ItemIgnoresTransformations, True)
         cursors = {
             "tl": Qt.SizeFDiagCursor,
             "br": Qt.SizeFDiagCursor,
@@ -167,6 +170,7 @@ class FrameItem(QGraphicsRectItem):
         if not self.is_locked():
             flags |= QGraphicsItem.ItemIsMovable
         self.setFlags(flags)
+        self.setFlag(QGraphicsItem.ItemClipsChildrenToShape, False)
         self.setAcceptHoverEvents(True)
         self._refresh_look()
         self._install_text()
@@ -259,8 +263,12 @@ class FrameItem(QGraphicsRectItem):
             hdl.setPos(x, y)
 
     def set_handles_visible(self, visible: bool) -> None:
+        show = bool(visible) and not self.is_locked()
         for hdl in self._handles:
-            hdl.setVisible(bool(visible) and not self.is_locked())
+            hdl.setVisible(show)
+            if show:
+                hdl.setZValue(1000)
+                hdl.show()
 
     def paint(self, painter: QPainter, option, widget=None) -> None:  # type: ignore[override]
         from instantlensdoc.dtp.export import paint_frame_local
@@ -479,7 +487,7 @@ class FrameItem(QGraphicsRectItem):
 
     def itemChange(self, change, value):  # type: ignore[override]
         if change == QGraphicsItem.ItemSelectedHasChanged:
-            self.set_handles_visible(bool(value))
+            self.set_handles_visible(self.isSelected())
         if change == QGraphicsItem.ItemPositionChange and self.scene() and not self._editing:
             if self.is_locked():
                 return self.pos()
@@ -1168,6 +1176,11 @@ class DtpPane(QWidget):
             self._prop_tool_btns[name] = btn
             lay.addWidget(btn)
         self._prop_tool_btns["select"].setChecked(True)
+        btn_tv = QPushButton("Textverarbeitung")
+        btn_tv.setObjectName("dtpPropTextverarbeitung")
+        btn_tv.setToolTip("DTP-Beispiel aus; PDF oder Text in der zentralen Ansicht")
+        btn_tv.clicked.connect(self._chrome_show_document)
+        lay.addWidget(btn_tv)
         for obj, label, slot in (
             ("dtpPropFill", "Füllung…", lambda: self.apply_fill(dialog=True)),
             ("dtpPropStroke", "Kontur…", lambda: self.apply_stroke(dialog=True)),
@@ -2669,6 +2682,14 @@ class DtpPane(QWidget):
 
     def _chrome_script(self) -> None:
         self.statusMessage.emit("Script: Plugin-Hooks (kein Scribus-Scripter)")
+
+    def _chrome_show_document(self) -> None:
+        win = self.window()
+        leave = getattr(win, "_leave_dtp_to_document", None)
+        if callable(leave) and win is not self:
+            leave()
+            return
+        self.statusMessage.emit("Textverarbeitung")
 
     def _chrome_help(self) -> None:
         from instantlensdoc.dtp.help_dialog import show_dtp_help

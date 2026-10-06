@@ -75,7 +75,8 @@ class _OverflowPanel(QWidget):
         self._hidden_specs = []
 
     def minimumSizeHint(self) -> QSize:  # noqa: N802
-        return self.sizeHint()
+        h = max(28, int(super().sizeHint().height() or 28))
+        return QSize(120, h)
 
     def sizeHint(self) -> QSize:  # noqa: N802
         h = super().sizeHint().height()
@@ -437,6 +438,8 @@ class RibbonBar(QWidget):
             g_dtp = _RibbonGroup("DTP-Werkzeuge", wrap)
             g_dtp.setObjectName("ribbonDtpToolsGroup")
             g_dtp.panel.overflow_picked.connect(self.action_triggered.emit)
+            _add_button(g_dtp.panel, "dtp_text_view", "Textverarbeitung")
+            _add_button(g_dtp.panel, "dtp_show_document", "Dokument zeigen")
             _add_button(g_dtp.panel, "dtp_layout", "DTP-Werkzeuge")
             _add_button(g_dtp.panel, "dtp_text_frame", "Textrahmen")
             _add_button(g_dtp.panel, "dtp_link", "Verketten")
@@ -570,6 +573,8 @@ class RibbonBar(QWidget):
             (
                 "DTP",
                 (
+                    ("dtp_text_view", "Textverarbeitung"),
+                    ("dtp_show_document", "Dokument zeigen"),
                     ("dtp_layout", "DTP-Werkzeuge"),
                     ("dtp_text_frame", "Textrahmen"),
                     ("dtp_link", "Verketten"),
@@ -704,11 +709,6 @@ class RibbonBar(QWidget):
         if notify:
             self.categorySelected.emit((btn.text() or "").strip())
         page = self._stack.currentWidget()
-        if page is not None:
-            try:
-                self._stack.setMinimumWidth(max(1, int(page.sizeHint().width())))
-            except Exception:
-                pass
         host = getattr(self, "_body_scroll", None)
         if host is not None and hasattr(host, "_fit"):
             try:

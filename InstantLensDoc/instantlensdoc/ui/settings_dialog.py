@@ -499,9 +499,10 @@ class SettingsDialog(QDialog):
                 chrome_pick = i
         self.chrome_mode.setCurrentIndex(chrome_pick)
         self.chrome_mode.setToolTip(
-            "Klassisch (nur Menüs), Ribbon oder kombiniert — ohne Dokumentverlust"
+            "Klassisch (Pull-down), Ribbon oder Kombiniert — ohne Dokumentverlust. "
+            "Auch: Ansicht → Oberfläche: Klassisch / Ribbon / Kombiniert"
         )
-        form.addRow("Oberfläche", self.chrome_mode)
+        form.addRow("Oberfläche (Klassisch / Ribbon / Kombiniert)", self.chrome_mode)
 
         self.lang_combo = QComboBox()
         cur_lang = get_ocr_lang()

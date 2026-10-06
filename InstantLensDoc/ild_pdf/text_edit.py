@@ -77,6 +77,47 @@ class TextStyle:
         return raw[:16]
 
 
+def sanitize_pdf_edit_text(text: str | None) -> str:
+    """Steuerzeichen und typisches PDF-Mojibake aus dem Bearbeiten-Dialog."""
+    raw = str(text or "")
+    if not raw:
+        return ""
+    if "Ã" in raw or "Â" in raw:
+        try:
+            fixed = raw.encode("latin-1").decode("utf-8")
+            if fixed:
+                raw = fixed
+        except (UnicodeDecodeError, UnicodeEncodeError):
+            pass
+    out: list[str] = []
+    for ch in raw:
+        o = ord(ch)
+        if ch in "\n\t":
+            out.append(ch)
+        elif ch == "\r":
+            if not out or out[-1] != "\n":
+                out.append("\n")
+        elif o < 32 or o == 127 or (0x80 <= o < 0xA0) or ch == "\ufffd":
+            continue
+        else:
+            out.append(ch)
+    cleaned = "".join(out)
+    cleaned = re.sub(r"[ \t]{2,}", " ", cleaned)
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+    return cleaned.strip("\n")
+
+
+def sanitize_font_family_label(name: str | None) -> str:
+    """Subset-Namen wie ``Calibri-0-400`` / ``ABCDEF+Calibri`` lesbar machen."""
+    raw = str(name or "").strip() or "Helvetica"
+    if "+" in raw:
+        raw = raw.split("+", 1)[-1].strip() or raw
+    parts = raw.split("-")
+    if len(parts) >= 3 and parts[-1].isdigit() and parts[-2].isdigit():
+        raw = "-".join(parts[:-2]).strip() or raw
+    return raw or "Helvetica"
+
+
 @dataclass
 class EditableTextSpan:
     """Editierbarer Textspan einer Seite (PDF-Punkte, Y von oben)."""

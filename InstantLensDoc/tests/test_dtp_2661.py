@@ -140,7 +140,7 @@ def test_menubar_dtp_about_to_show_opens_pane() -> None:
     menu = find_menubar_menu(_WIN, "DTP")
     assert menu is not None
     texts = [a.text() for a in menu.actions() if not a.isSeparator()]
-    assert texts[0] == "DTP-Werkzeuge"
+    assert texts[0] == "Textverarbeitung"
     menu.aboutToShow.emit()
     pump(_APP, 0.05)
     assert _WIN._layout_mode_active()

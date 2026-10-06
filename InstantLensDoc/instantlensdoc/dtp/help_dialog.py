@@ -49,7 +49,8 @@ und Pinsel — keine zweite rechte Leiste.</li>
 
 <h3>Rahmen</h3>
 <ul>
-<li><b>Textrahmen</b>: Doppelklick setzt den Caret; Eckengriffe skalieren.</li>
+<li><b>Textrahmen</b>: Doppelklick setzt den Caret; acht Angriffspunkte (Ecken+Kanten)
+skalieren, Ziehen verschiebt.</li>
 <li><b>Bildrahmen / Form</b>: Bild ersetzen, Grafik importieren, schweißen.</li>
 <li><b>Lineale</b> mm / pt / in (Ecke oder Menü Ansicht). Ziehen setzt
 Hilfslinien mit Snap.</li>
@@ -62,7 +63,9 @@ des Texteditors.</li>
 <h3>Tastatur</h3>
 <ul>
 <li><b>F1</b> — diese DTP-Hilfe (im Layout-Modus).</li>
-<li><b>Ctrl+Alt+L</b> — Layout-Modus ein/aus (Ansicht → Layout-Modus).</li>
+<li><b>Ctrl+Alt+L</b> — DTP-Werkzeuge ein/aus (Ansicht → DTP-Werkzeuge).</li>
+<li><b>Ctrl+Alt+D</b> — zurück zur <b>Textverarbeitung</b> (Ansicht / DTP-Menü / Tab-Klick).
+DTP-Beispiel und Füllung gehen aus; PDF oder Text liegt wieder im Host.</li>
 <li><b>Esc</b> — diesen Dialog schließen.</li>
 <li>Mausrad zoomen; Statuszeile zeigt Zoom, Seite, Koordinaten.</li>
 </ul>
