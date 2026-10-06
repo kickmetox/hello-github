@@ -506,6 +506,28 @@ ALWAYS_ACTION_IDS = frozenset(
         "save_as",
     }
 )
+INK_ACTION_IDS = frozenset(
+    {
+        "ink_input",
+        "ink_pen_ballpoint",
+        "ink_pen_felt",
+        "ink_pen_highlighter",
+        "ink_brush",
+        "ink_color",
+        "ink_width",
+        "ink_fill_none",
+        "ink_fill_closed",
+        "ink_fill_flood",
+        "recognize_handwriting",
+        "stamp_place",
+        "stamp_frame",
+        "stamp_color",
+        "stamp_text_only",
+        "stamp_shadow",
+        "stamp_outline",
+        "stamp_edit",
+    }
+)
 VIEW_ACTION_IDS = frozenset(
     {
         "view_print",

@@ -119,6 +119,41 @@ def test_font_enabled_on_txt_and_docx() -> None:
     assert _WIN.ribbon_bar.is_enabled("bold")
 
 
+def test_ink_stays_enabled_without_ocr() -> None:
+    """837c277 hat Ink dauerhaft aus; Sibling Stift/Maus/Touch bleibt an (außer Schreibschutz)."""
+    from instantlensdoc.ui.word_ribbon import DISABLED_REASONS, INK_ACTION_IDS
+
+    assert "ink_tools" not in DISABLED_REASONS
+    assert "ink_input" not in DISABLED_REASONS
+    load_state(_WIN, _APP, "empty", _FIXTURES)
+    pump(_APP, 0.1)
+    _WIN._sync_menu_enablement()
+    for aid in ("ink_input", "ink_pen_ballpoint", "ink_pen_highlighter", "ink_brush"):
+        assert aid in _WIN.ribbon_bar._actions, aid
+        assert _WIN.ribbon_bar.is_enabled(aid), aid
+    load_state(_WIN, _APP, "pdf20", _FIXTURES)
+    pump(_APP, 0.25)
+    _WIN._sync_menu_enablement()
+    caps = _WIN._view_capability_state()
+    assert caps["font"] is False
+    assert caps["pdf"] is True
+    assert not _WIN.ribbon_bar.is_enabled("font")
+    for aid in ("ink_input", "ink_pen_ballpoint", "ink_pen_felt", "ink_color", "ink_width"):
+        assert _WIN.ribbon_bar.is_enabled(aid), aid
+    _p, _h, stift = _leaf("Ansicht", "Stifteingabe")
+    assert stift.isEnabled()
+    assert _WIN._set_write_protect(True, interactive=False, password="") is True
+    pump(_APP, 0.05)
+    _WIN._sync_menu_enablement()
+    assert not _WIN.ribbon_bar.is_enabled("ink_input")
+    tip = _WIN.ribbon_bar._actions["ink_input"].toolTip() or ""
+    assert "Dokument ist schreibgeschützt" in tip
+    _WIN._set_write_protect(False, interactive=False, password="")
+    for aid in INK_ACTION_IDS:
+        if aid in _WIN.ribbon_bar._actions:
+            assert aid not in DISABLED_REASONS
+
+
 def test_font_gray_on_image_pdf_tooltip_ocr() -> None:
     load_state(_WIN, _APP, "pdf20", _FIXTURES)
     pump(_APP, 0.25)
@@ -139,6 +174,8 @@ def test_font_gray_on_image_pdf_tooltip_ocr() -> None:
     assert "OCR" in rtip
     assert _WIN.ribbon_bar.is_enabled("page_layout")
     assert _WIN.ribbon_bar.is_enabled("page_margins")
+    assert _WIN.ribbon_bar.is_enabled("ink_input")
+    assert _WIN.ribbon_bar.is_enabled("ink_pen_highlighter")
     assert not _WIN.ribbon_bar.is_enabled("mail_merge")
     mtip = _WIN.ribbon_bar._actions["mail_merge"].toolTip() or ""
     assert REASON_MAIL.split("(")[0].strip() in mtip or "Seriendruck" in mtip

@@ -5330,6 +5330,44 @@ class MainWindow(QMainWindow):
         return any(n in t for n in needles)
 
     @staticmethod
+    def _action_is_ink(act) -> bool:
+        """Stifteingabe (Sibling: Stift/Maus/Touch) — nicht als Schrift/OCR-Cap behandeln."""
+        if act is None:
+            return False
+        try:
+            name = str(act.objectName() or "")
+        except Exception:
+            name = ""
+        if name.startswith("actInk") or name.startswith("actStamp"):
+            return True
+        try:
+            from instantlensdoc.ui.word_ribbon import INK_ACTION_IDS
+
+            aid = str(act.property("ildRibbonId") or "")
+            if aid in INK_ACTION_IDS:
+                return True
+        except Exception:
+            pass
+        t = ""
+        try:
+            t = (act.text() or "").replace("&", "").strip().lower()
+        except Exception:
+            t = ""
+        ink_labels = (
+            "stifteingabe",
+            "kugelschreiber",
+            "filzstift",
+            "tintenfarbe",
+            "tintenstärke",
+            "tintenstaerke",
+            "keine füllung",
+            "strich füllen",
+            "loop-füllung",
+            "handschrift erkennen",
+        )
+        return any(n in t for n in ink_labels)
+
+    @staticmethod
     def _label_is_page_setup(label: str) -> bool:
         t = (label or "").strip().lower()
         needles = (
@@ -5417,6 +5455,8 @@ class MainWindow(QMainWindow):
                     _walk(sub, mode, st)
                     continue
                 t = (a.text() or "").replace("&", "").lower()
+                if self._action_is_ink(a):
+                    continue
                 if mode == "pdf":
                     from ild_pdf.menu_policy import (
                         pdf_menu_disable_reason,
@@ -5772,10 +5812,13 @@ class MainWindow(QMainWindow):
             REASON_WRITE_PROTECT,
             RICH_TEXT_ACTION_IDS,
             TABLE_ACTION_IDS,
+            INK_ACTION_IDS,
         )
 
         got: tuple[bool, str] | None
         if aid in ALWAYS_ACTION_IDS:
+            got = True, ""
+        elif aid in INK_ACTION_IDS or aid.startswith("ink_") or aid.startswith("stamp_"):
             got = True, ""
         elif aid in FONT_ACTION_IDS:
             got = bool(caps.get("font")), str(caps.get("font_reason") or "")
@@ -12516,6 +12559,8 @@ class MainWindow(QMainWindow):
         caps = self._view_capability_state()
         for act in getattr(self, "_editor_only_actions", None) or []:
             try:
+                if self._action_is_ink(act):
+                    continue
                 label = (act.text() or "").replace("&", "")
                 src = ""
                 try:

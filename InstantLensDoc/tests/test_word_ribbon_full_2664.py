@@ -205,6 +205,9 @@ def test_disabled_ribbon_click_sets_status() -> None:
     ):
         assert aid in _WIN.ribbon_bar._actions, aid
         assert _WIN.ribbon_bar._actions[aid].isEnabled(), aid
+    for aid in ("ink_input", "ink_pen_ballpoint", "ink_pen_highlighter"):
+        assert aid in _WIN.ribbon_bar._actions, aid
+        assert _WIN.ribbon_bar._actions[aid].isEnabled(), aid
 
 
 def test_single_view_dtp_keeps_word_tabs() -> None:
