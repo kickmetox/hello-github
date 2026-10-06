@@ -853,6 +853,10 @@ class PdfCanvas(QLabel):
         self.setMouseTracking(True)
         self.setFocusPolicy(Qt.StrongFocus)
         self.setContextMenuPolicy(Qt.CustomContextMenu)
+        try:
+            self.setAttribute(Qt.WA_AcceptTouchEvents, True)
+        except Exception:
+            pass
 
     def _pdf_viewer(self):
         """PdfViewer über ScrollArea finden (Hit-Test gegen Store in PDF-Punkten)."""

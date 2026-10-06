@@ -617,6 +617,13 @@ class DtpView(QGraphicsView):
         self._base_width = 2.2
         self.setMouseTracking(True)
         self._create_origin: tuple[float, float] | None = None
+        try:
+            from instantlensdoc.ui.ink_input import accept_touch_events
+
+            accept_touch_events(self)
+            accept_touch_events(self.viewport())
+        except Exception:
+            pass
 
     def _dtp_pane(self):
         w = self.parent()

@@ -2794,6 +2794,32 @@ class MainWindow(QMainWindow):
         )
         self._layout_mode_action.triggered.connect(self._on_layout_mode_triggered)
         m_view.addAction(self._layout_mode_action)
+        self._act_ink_input = QAction("Stifteingabe", self)
+        self._act_ink_input.setObjectName("actInkInput")
+        self._act_ink_input.setCheckable(True)
+        self._act_ink_input.setToolTip(
+            "Finger oder Stift auf der Seite schreiben (Touch/Tablet, Maus-Linksklick als Fallback)"
+        )
+        self._act_ink_input.toggled.connect(self._toggle_ink_input)
+        m_view.addAction(self._act_ink_input)
+        self._act_ink_color = QAction("Tintenfarbe…", self)
+        self._act_ink_color.setObjectName("actInkColor")
+        self._act_ink_color.setToolTip("Farbe der Stifteingabe")
+        self._act_ink_color.triggered.connect(self._choose_ink_color)
+        m_view.addAction(self._act_ink_color)
+        self._act_ink_width = QAction("Tintenstärke…", self)
+        self._act_ink_width.setObjectName("actInkWidth")
+        self._act_ink_width.setToolTip("Strichstärke der Stifteingabe")
+        self._act_ink_width.triggered.connect(self._choose_ink_width)
+        m_view.addAction(self._act_ink_width)
+        self._act_recognize_handwriting = QAction("Handschrift erkennen", self)
+        self._act_recognize_handwriting.setObjectName("actRecognizeHandwriting")
+        self._act_recognize_handwriting.setToolTip(
+            "Auswahl oder letzte Tintenstriche mit Tesseract/OCR erkennen "
+            "und als Rich-Text einfügen (gleiche Sprachen wie OCR)"
+        )
+        self._act_recognize_handwriting.triggered.connect(self._recognize_ink_handwriting)
+        m_view.addAction(self._act_recognize_handwriting)
         self._current_line_hl_action = QAction("Aktuelle Zeile hervorheben", self)
         self._current_line_hl_action.setCheckable(True)
         self._current_line_hl_action.setChecked(get_editor_current_line_highlight())
@@ -3974,6 +4000,7 @@ class MainWindow(QMainWindow):
 
         apply_clickable_popup_menus(self)
         self._bind_ribbon_qactions()
+        self._install_ink_input()
 
     _FORMAT_MENU_TEXTS = frozenset(
         {
@@ -5393,6 +5420,10 @@ class MainWindow(QMainWindow):
         try:
             self._sync_layout_arrange()
             self._sync_spellcheck_ribbon()
+        except Exception:
+            pass
+        try:
+            self._sync_ink_input_actions()
         except Exception:
             pass
 
@@ -8976,6 +9007,10 @@ class MainWindow(QMainWindow):
         "auto_index": "actEditAutoIndex",
         "shared_review": "actSharedReview",
         "dtp_layout": "actLayoutMode",
+        "ink_input": "actInkInput",
+        "ink_color": "actInkColor",
+        "ink_width": "actInkWidth",
+        "recognize_handwriting": "actRecognizeHandwriting",
         "ki_assistant": "actKiAssistant",
         "varfonts": "actVariableFonts",
         "pades_sign": "actPadesSign",
@@ -9017,6 +9052,10 @@ class MainWindow(QMainWindow):
             ("toggle_doc_tabs", "_doc_tabs_action"),
             ("toggle_ribbon", "_ribbon_action"),
             ("dtp_layout", "_layout_mode_action"),
+            ("ink_input", "_act_ink_input"),
+            ("ink_color", "_act_ink_color"),
+            ("ink_width", "_act_ink_width"),
+            ("recognize_handwriting", "_act_recognize_handwriting"),
             *CHROME_ACTION_ATTRS,
         ):
             if aid not in mapping:
@@ -9146,6 +9185,10 @@ class MainWindow(QMainWindow):
             "devices_printers": lambda: self._show_devices_dialog(filter_kind="printer"),
             "devices_refresh": lambda: self._show_devices_dialog(auto_refresh=True),
             "dtp_layout": self._enter_layout_mode,
+            "ink_input": self._toggle_ink_input,
+            "ink_color": self._choose_ink_color,
+            "ink_width": self._choose_ink_width,
+            "recognize_handwriting": self._recognize_ink_handwriting,
             "dtp_text_frame": self._dtp_add_text_frame,
             "dtp_link": self._dtp_link_frames,
             "dtp_grid": self._dtp_toggle_grid,
@@ -10300,6 +10343,10 @@ class MainWindow(QMainWindow):
             self._ann_lock_action.blockSignals(True)
             self._ann_lock_action.setChecked(bool(enabled))
             self._ann_lock_action.blockSignals(False)
+        try:
+            self._sync_ink_input_actions()
+        except Exception:
+            pass
 
     def _sync_page_boxes_action(self, enabled: bool):
         if hasattr(self, "_page_boxes_action") and self._page_boxes_action is not None:
@@ -11712,6 +11759,10 @@ class MainWindow(QMainWindow):
                 menu.setEnabled(on)
             except Exception:
                 pass
+        try:
+            self._sync_ink_input_actions()
+        except Exception:
+            pass
 
     def _toggle_bold(self) -> None:
         if self._layout_mode_active():
@@ -14021,6 +14072,180 @@ class MainWindow(QMainWindow):
             self._set_status(info.get("message") or "Stylus aktiv")
         except Exception as e:
             self._set_status(f"Stylus: {e}")
+
+    def _install_ink_input(self) -> None:
+        from instantlensdoc.ui.ink_input import install_ink_input
+
+        try:
+            install_ink_input(self)
+        except Exception:
+            self._ink_session = None
+        self._sync_ink_input_actions()
+
+    def _ink_session_or_none(self):
+        return getattr(self, "_ink_session", None)
+
+    def _sync_ink_input_actions(self, *_args) -> None:
+        from instantlensdoc.ui.ink_input import is_schreibschutz
+
+        locked = is_schreibschutz(self)
+        session = self._ink_session_or_none()
+        enabled_on = bool(session is not None and session.enabled)
+        reason = "Schreibschutz aktiv"
+        for act, on_when_locked in (
+            (getattr(self, "_act_ink_input", None), False),
+            (getattr(self, "_act_ink_color", None), False),
+            (getattr(self, "_act_ink_width", None), False),
+            (getattr(self, "_act_recognize_handwriting", None), False),
+        ):
+            self._set_action_available(act, (not locked) if not on_when_locked else True, reason)
+        if locked and enabled_on and session is not None:
+            try:
+                session.set_enabled(False)
+            except Exception:
+                pass
+            act = getattr(self, "_act_ink_input", None)
+            if act is not None:
+                try:
+                    act.blockSignals(True)
+                    act.setChecked(False)
+                    act.blockSignals(False)
+                except Exception:
+                    pass
+        rb = getattr(self, "ribbon_bar", None)
+        if rb is not None:
+            try:
+                rb.set_checked("ink_input", bool(session and session.enabled and not locked))
+                rb.set_enabled("ink_input", not locked)
+                rb.set_enabled("ink_color", not locked)
+                rb.set_enabled("ink_width", not locked)
+                rb.set_enabled("recognize_handwriting", not locked)
+            except Exception:
+                pass
+
+    def _toggle_ink_input(self, checked=None) -> None:
+        from instantlensdoc.ui.ink_input import is_schreibschutz
+
+        session = self._ink_session_or_none()
+        if session is None:
+            self._install_ink_input()
+            session = self._ink_session_or_none()
+        if session is None:
+            self._set_status("Stifteingabe nicht verfügbar")
+            return
+        if is_schreibschutz(self):
+            self._sync_ink_input_actions()
+            self._set_status("Stifteingabe: Schreibschutz")
+            return
+        act = getattr(self, "_act_ink_input", None)
+        if isinstance(checked, bool):
+            on = bool(checked)
+        elif act is not None:
+            on = not bool(session.enabled)
+            try:
+                act.blockSignals(True)
+                act.setChecked(on)
+                act.blockSignals(False)
+            except Exception:
+                pass
+        else:
+            on = not bool(session.enabled)
+        session.set_enabled(on)
+        try:
+            pane = getattr(self, "dtp_pane", None)
+            if pane is not None and hasattr(pane, "toggle_ink") and self._layout_mode_active():
+                if getattr(pane, "_ink_btn", None) is not None:
+                    pane._ink_btn.setChecked(on)
+                pane.view.ink_mode = bool(on)
+        except Exception:
+            pass
+        self._sync_ink_input_actions()
+        self._set_status("Stifteingabe " + ("an" if on else "aus"))
+
+    def _choose_ink_color(self) -> None:
+        from instantlensdoc.ui.ink_input import DEFAULT_INK_COLOR, is_schreibschutz
+
+        if is_schreibschutz(self):
+            self._sync_ink_input_actions()
+            return
+        session = self._ink_session_or_none()
+        if session is None:
+            return
+        from PySide6.QtGui import QColor
+        from PySide6.QtWidgets import QColorDialog
+
+        current = QColor(session.color or DEFAULT_INK_COLOR)
+        color = QColorDialog.getColor(current, self, "Tintenfarbe")
+        if color.isValid():
+            session.color = color.name()
+            self._set_status(f"Tintenfarbe {session.color}")
+
+    def _choose_ink_width(self) -> None:
+        from instantlensdoc.ui.ink_input import INK_WIDTHS, is_schreibschutz
+
+        if is_schreibschutz(self):
+            self._sync_ink_input_actions()
+            return
+        session = self._ink_session_or_none()
+        if session is None:
+            return
+        from PySide6.QtWidgets import QInputDialog
+
+        labels = [str(w) for w in INK_WIDTHS]
+        cur = str(session.width)
+        if cur not in labels:
+            labels.append(cur)
+        choice, ok = QInputDialog.getItem(
+            self, "Tintenstärke", "Strichstärke:", labels, max(0, labels.index(cur) if cur in labels else 1), False
+        )
+        if ok:
+            try:
+                session.width = float(choice)
+            except (TypeError, ValueError):
+                session.width = float(INK_WIDTHS[1])
+            self._set_status(f"Tintenstärke {session.width:g}")
+
+    def _recognize_ink_handwriting(self) -> None:
+        from instantlensdoc.ui.ink_input import (
+            insert_recognized_text,
+            is_schreibschutz,
+            recognize_ink_strokes,
+        )
+
+        if is_schreibschutz(self):
+            self._sync_ink_input_actions()
+            self._set_status("Handschrift erkennen: Schreibschutz")
+            return
+        session = self._ink_session_or_none()
+        if session is None:
+            self._set_status("Keine Tintenstriche")
+            return
+        strokes = session.selected_or_last()
+        if not strokes:
+            self._set_status("Keine Tintenstriche zum Erkennen")
+            return
+        result = recognize_ink_strokes(strokes)
+        if result.get("skipped"):
+            reason = result.get("reason") or ""
+            if reason in ("ocr_unavailable", "ocr_error"):
+                self._set_status(
+                    "Handschrift: Tesseract/tessdata nicht verfügbar — übersprungen"
+                )
+                return
+            self._set_status("Handschrift: " + (result.get("message") or reason or "übersprungen"))
+            return
+        html = result.get("html") or ""
+        text = result.get("text") or ""
+        if not text.strip():
+            self._set_status("Handschrift: kein Text erkannt")
+            return
+        where = insert_recognized_text(self, html, text, session.bbox(strokes))
+        session.clear()
+        self._sync_editor_only_actions()
+        self._set_status(
+            f"Handschrift erkannt → {'Textrahmen' if where == 'frame' else 'Caret'} "
+            f"({result.get('lang') or 'ocr'})"
+        )
 
     def _show_hooks_info(self) -> None:
         from instantlensdoc.core.plugin_hooks import list_hooks, write_hook_example
@@ -16457,6 +16682,10 @@ class MainWindow(QMainWindow):
             "ocr_region": self._run_ocr_region,
             "ocr_word_suite": self._ocr_word_suite_action,
             "ocr_handwriting": self._run_ocr_handwriting,
+            "ink_input": self._toggle_ink_input,
+            "ink_color": self._choose_ink_color,
+            "ink_width": self._choose_ink_width,
+            "recognize_handwriting": self._recognize_ink_handwriting,
             "settings_ui_lang": self._settings,
             "ki_document_wizard": self._ki_document_wizard_action,
             "doc_tags": self._edit_doc_tags,

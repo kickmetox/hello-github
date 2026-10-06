@@ -272,6 +272,10 @@ class TextEditor(QPlainTextEdit):
             self.setFocusPolicy(Qt.StrongFocus)
             self.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
             self.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+            from instantlensdoc.ui.ink_input import accept_touch_events
+
+            accept_touch_events(self)
+            accept_touch_events(self.viewport())
         except Exception:
             pass
 
@@ -2404,6 +2408,30 @@ class TextEditor(QPlainTextEdit):
             self.set_soft_wrap(self._soft_wrap)
         except Exception:
             pass
+
+    def insert_recognized_rich_text(self, html: str = "", plain: str = "") -> bool:
+        """OCR-/Handschrift-Text an den Caret — kein ¶/Form-Feed."""
+        from instantlensdoc.core.ocr_word_suite import sanitize_ocr_html, sanitize_ocr_visible_text
+        from instantlensdoc.ui.ink_input import recognized_text_to_html
+
+        text = sanitize_ocr_visible_text(plain or "").strip()
+        frag = sanitize_ocr_html(html or "")
+        if not frag and text:
+            frag = recognized_text_to_html(text)
+        if not frag and not text:
+            return False
+        self._ensure_rich_mode()
+        cur = self.textCursor()
+        cur.beginEditBlock()
+        try:
+            if frag:
+                cur.insertHtml(frag)
+            else:
+                cur.insertText(text)
+        finally:
+            cur.endEditBlock()
+        self.setTextCursor(cur)
+        return True
 
     def _iter_selected_blocks(self, *, empty_means_document: bool = True, all_blocks: bool = False):
         """Blöcke der Auswahl; ohne Auswahl das ganze Dokument (außer empty_means_document=False)."""

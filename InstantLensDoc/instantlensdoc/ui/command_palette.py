@@ -594,6 +594,30 @@ def default_palette_commands() -> list[PaletteCommand]:
             "OCR",
         ),
         PaletteCommand(
+            "ink_input",
+            "Stifteingabe",
+            "stift touch stylus finger touchscreen tinte handwriting",
+            "Ansicht",
+        ),
+        PaletteCommand(
+            "ink_color",
+            "Tintenfarbe…",
+            "tinte farbe stift ink color",
+            "Ansicht",
+        ),
+        PaletteCommand(
+            "ink_width",
+            "Tintenstärke…",
+            "tinte strichstärke stift width",
+            "Ansicht",
+        ),
+        PaletteCommand(
+            "recognize_handwriting",
+            "Handschrift erkennen",
+            "handschrift ocr tesseract tinte erkennen stift",
+            "OCR",
+        ),
+        PaletteCommand(
             "ki_document_wizard",
             "Dokument erstellen… (KI-Wizard)",
             "ki wizard formular anschreiben kaufvertrag rechnung dokument erstellen isoliert",

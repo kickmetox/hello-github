@@ -13,7 +13,6 @@ OFF_SHARE = "Freigabe über SharePoint/Cloud ist nicht lokal verfügbar."
 OFF_IMMERSIVE = "Immersiver Reader / Fokus ist in dieser Version nicht enthalten."
 OFF_RESEARCHER = "Researcher braucht Online-Quellen und ist nicht lokal verfügbar."
 OFF_MACROS = "Makros (VBA) sind nicht lokal verfügbar."
-OFF_INK = "Stifteingabe/Ink ist in dieser Word-Leiste nicht verfügbar."
 OFF_COPILOT = "Copilot ist nicht lokal verfügbar."
 OFF_TTS = "Vorlesen ist in dieser Version nicht enthalten (kein TTS)."
 OFF_THESAURUS = "Thesaurus ist nicht lokal verfügbar."
@@ -36,7 +35,6 @@ DISABLED_REASONS: dict[str, str] = {
     "focus_mode": OFF_IMMERSIVE,
     "researcher": OFF_RESEARCHER,
     "macros": OFF_MACROS,
-    "ink_tools": OFF_INK,
     "copilot": OFF_COPILOT,
     "read_aloud": OFF_TTS,
     "thesaurus": OFF_THESAURUS,
@@ -283,7 +281,6 @@ WORD_TAB_GROUPS: dict[str, tuple[tuple[str, tuple], ...]] = {
         (
             "Nicht lokal",
             (
-                ("ink_tools", "Stifteingabe", "off", OFF_INK),
                 ("copilot", "Copilot", "off", OFF_COPILOT),
                 ("macros", "Makros", "off", OFF_MACROS),
                 ("immersive_reader", "Fokus", "off", OFF_IMMERSIVE),
@@ -328,6 +325,15 @@ WORD_TAB_GROUPS: dict[str, tuple[tuple[str, tuple], ...]] = {
             (
                 ("doc_split", "Teilen"),
                 ("detach_window", "Neues Fenster"),
+            ),
+        ),
+        (
+            "Stift",
+            (
+                ("ink_input", "Stifteingabe"),
+                ("ink_color", "Tintenfarbe"),
+                ("ink_width", "Tintenstärke"),
+                ("recognize_handwriting", "Handschrift erkennen"),
             ),
         ),
     ),

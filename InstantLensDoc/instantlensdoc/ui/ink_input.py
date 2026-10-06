@@ -1,0 +1,896 @@
+"""Touch-/Stylus-Stifteingabe auf der einheitlichen Text/PDF/DTP-Ansicht.
+
+Finger oder Stift schreiben Tinte; Erkennung läuft über die vorhandene
+Tesseract-/ScanTuxio-OCR (gleiche Sprachen). Ergebnis wird als Rich-Text
+an den Caret oder als Textrahmen eingefügt — keine Steuerzeichen (¶/FF).
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import Iterable, Sequence
+
+from PySide6.QtCore import QEvent, QObject, QPointF, QTimer, Qt, Signal
+from PySide6.QtGui import QColor, QPainter, QPen
+from PySide6.QtWidgets import QWidget
+
+from instantlensdoc.core.ocr_word_suite import sanitize_ocr_html, sanitize_ocr_visible_text
+
+INK_WIDTHS: tuple[float, ...] = (1.5, 2.5, 3.5, 5.0, 8.0)
+DEFAULT_INK_COLOR = "#1A1A1A"
+DEFAULT_INK_WIDTH = 2.5
+LONG_PRESS_MS = 550
+TAP_SLOP_PX = 8.0
+PINCH_MIN_FACTOR = 0.85
+PINCH_MAX_FACTOR = 1.18
+
+
+@dataclass
+class InkStroke:
+    points: list[tuple[float, float, float]] = field(default_factory=list)
+    color: str = DEFAULT_INK_COLOR
+    width: float = DEFAULT_INK_WIDTH
+
+    def add(self, x: float, y: float, pressure: float = 0.5) -> None:
+        self.points.append((float(x), float(y), max(0.0, min(1.0, float(pressure)))))
+
+    def bbox(self) -> tuple[float, float, float, float] | None:
+        if not self.points:
+            return None
+        xs = [p[0] for p in self.points]
+        ys = [p[1] for p in self.points]
+        pad = max(4.0, float(self.width) * 2.0)
+        return min(xs) - pad, min(ys) - pad, max(xs) + pad, max(ys) + pad
+
+
+class InkSession(QObject):
+    """Gesammelte Handschrift-Striche der aktuellen Ansicht."""
+
+    changed = Signal()
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.enabled = False
+        self.color = DEFAULT_INK_COLOR
+        self.width = DEFAULT_INK_WIDTH
+        self.strokes: list[InkStroke] = []
+        self.current: InkStroke | None = None
+        self.selected: set[int] = set()
+
+    def set_enabled(self, on: bool) -> None:
+        self.enabled = bool(on)
+        if not self.enabled:
+            self.current = None
+        self.changed.emit()
+
+    def begin(self, x: float, y: float, pressure: float = 0.5) -> None:
+        self.current = InkStroke(color=self.color, width=self.width)
+        self.current.add(x, y, pressure)
+        self.changed.emit()
+
+    def move(self, x: float, y: float, pressure: float = 0.5) -> None:
+        if self.current is None:
+            return
+        last = self.current.points[-1]
+        if abs(x - last[0]) < 0.6 and abs(y - last[1]) < 0.6:
+            return
+        self.current.add(x, y, pressure)
+        self.changed.emit()
+
+    def end(self) -> InkStroke | None:
+        st = self.current
+        self.current = None
+        if st is None:
+            return None
+        if len(st.points) < 2:
+            self.changed.emit()
+            return None
+        self.strokes.append(st)
+        self.changed.emit()
+        return st
+
+    def cancel(self) -> None:
+        self.current = None
+        self.changed.emit()
+
+    def clear(self) -> None:
+        self.strokes.clear()
+        self.current = None
+        self.selected.clear()
+        self.changed.emit()
+
+    def all_for_paint(self) -> list[InkStroke]:
+        out = list(self.strokes)
+        if self.current is not None and self.current.points:
+            out.append(self.current)
+        return out
+
+    def selected_or_last(self) -> list[InkStroke]:
+        if self.selected:
+            picked = [self.strokes[i] for i in sorted(self.selected) if 0 <= i < len(self.strokes)]
+            if picked:
+                return picked
+        if self.strokes:
+            return [self.strokes[-1]]
+        if self.current is not None and len(self.current.points) >= 2:
+            return [self.current]
+        return []
+
+    def bbox(self, strokes: Sequence[InkStroke] | None = None) -> tuple[float, float, float, float] | None:
+        items = list(strokes if strokes is not None else self.selected_or_last())
+        boxes = [s.bbox() for s in items if s.bbox()]
+        if not boxes:
+            return None
+        x0 = min(b[0] for b in boxes)
+        y0 = min(b[1] for b in boxes)
+        x1 = max(b[2] for b in boxes)
+        y1 = max(b[3] for b in boxes)
+        return x0, y0, x1, y1
+
+
+def synthetic_stroke_list() -> list[InkStroke]:
+    """Offscreen-Testdaten: zwei Striche (kein echtes Tablet nötig)."""
+    return [
+        InkStroke(
+            points=[
+                (20.0, 40.0, 0.6),
+                (28.0, 22.0, 0.7),
+                (36.0, 40.0, 0.6),
+                (32.0, 32.0, 0.5),
+                (24.0, 32.0, 0.5),
+            ],
+            color=DEFAULT_INK_COLOR,
+            width=3.0,
+        ),
+        InkStroke(
+            points=[
+                (48.0, 22.0, 0.5),
+                (48.0, 40.0, 0.6),
+                (48.0, 31.0, 0.5),
+                (60.0, 31.0, 0.5),
+                (60.0, 22.0, 0.5),
+                (60.0, 40.0, 0.5),
+            ],
+            color=DEFAULT_INK_COLOR,
+            width=3.0,
+        ),
+    ]
+
+
+def accept_touch_events(widget: QWidget | None) -> None:
+    if widget is None:
+        return
+    try:
+        widget.setAttribute(Qt.WA_AcceptTouchEvents, True)
+    except Exception:
+        try:
+            widget.setAttribute(Qt.WidgetAttribute.WA_AcceptTouchEvents, True)
+        except Exception:
+            pass
+
+
+def paint_strokes(painter: QPainter, strokes: Iterable[InkStroke]) -> None:
+    painter.setRenderHint(QPainter.Antialiasing, True)
+    for st in strokes:
+        if len(st.points) < 1:
+            continue
+        color = QColor(st.color or DEFAULT_INK_COLOR)
+        if not color.isValid():
+            color = QColor(DEFAULT_INK_COLOR)
+        pen = QPen(color)
+        pen.setWidthF(max(0.8, float(st.width or DEFAULT_INK_WIDTH)))
+        pen.setCapStyle(Qt.RoundCap)
+        pen.setJoinStyle(Qt.RoundJoin)
+        painter.setPen(pen)
+        pts = st.points
+        if len(pts) == 1:
+            painter.drawPoint(QPointF(pts[0][0], pts[0][1]))
+            continue
+        for i in range(1, len(pts)):
+            p0, p1 = pts[i - 1], pts[i]
+            painter.drawLine(QPointF(p0[0], p0[1]), QPointF(p1[0], p1[1]))
+
+
+def strokes_to_pil(strokes: Sequence[InkStroke], *, scale: int = 3):
+    """Tinte auf Weiß → PIL-Bild für Tesseract. None wenn leer."""
+    from PIL import Image, ImageDraw
+
+    items = [s for s in strokes if s.points]
+    if not items:
+        return None
+    xs = [p[0] for s in items for p in s.points]
+    ys = [p[1] for s in items for p in s.points]
+    pad = 24.0
+    x0, y0 = min(xs) - pad, min(ys) - pad
+    x1, y1 = max(xs) + pad, max(ys) + pad
+    w = max(32, int((x1 - x0) * scale))
+    h = max(32, int((y1 - y0) * scale))
+    img = Image.new("L", (w, h), 255)
+    draw = ImageDraw.Draw(img)
+    for st in items:
+        pts = [
+            ((p[0] - x0) * scale, (p[1] - y0) * scale)
+            for p in st.points
+        ]
+        width = max(2, int(float(st.width or DEFAULT_INK_WIDTH) * scale))
+        if len(pts) == 1:
+            x, y = pts[0]
+            draw.ellipse((x - width, y - width, x + width, y + width), fill=0)
+        else:
+            draw.line(pts, fill=0, width=width, joint="curve")
+    return img
+
+
+def tessdata_ready() -> tuple[bool, str]:
+    from instantlensdoc.core.ocr import tesseract_available
+
+    return tesseract_available()
+
+
+def ocr_lang_for_ink() -> str:
+    try:
+        from instantlensdoc.core.app_settings import get_ocr_lang
+
+        return str(get_ocr_lang() or "deu+eng")
+    except Exception:
+        return "deu+eng"
+
+
+def recognize_ink_strokes(
+    strokes: Sequence[InkStroke] | Sequence[Sequence[float]],
+    *,
+    lang: str | None = None,
+    stub: bool = False,
+) -> dict:
+    """OCR auf Tintenstrichen. Ohne tessdata: skipped. Nie Steuerzeichen im Text."""
+    normalized: list[InkStroke] = []
+    for item in strokes or []:
+        if isinstance(item, InkStroke):
+            if item.points:
+                normalized.append(item)
+            continue
+        pts = []
+        for p in item:
+            if isinstance(p, (list, tuple)) and len(p) >= 2:
+                pr = float(p[2]) if len(p) >= 3 else 0.5
+                pts.append((float(p[0]), float(p[1]), pr))
+        if pts:
+            normalized.append(InkStroke(points=pts))
+    if stub:
+        return {
+            "ok": True,
+            "skipped": False,
+            "stub": True,
+            "text": "Handschrift",
+            "html": recognized_text_to_html("Handschrift"),
+            "lang": lang or ocr_lang_for_ink(),
+        }
+    if not normalized:
+        return {"ok": False, "skipped": True, "reason": "empty", "text": "", "html": ""}
+    ok, msg = tessdata_ready()
+    if not ok:
+        return {
+            "ok": False,
+            "skipped": True,
+            "reason": "ocr_unavailable",
+            "message": msg,
+            "text": "",
+            "html": "",
+        }
+    img = strokes_to_pil(normalized)
+    if img is None:
+        return {"ok": False, "skipped": True, "reason": "empty", "text": "", "html": ""}
+    code = lang or ocr_lang_for_ink()
+    try:
+        from instantlensdoc.core.ocr import ocr_image_handwriting
+
+        raw = ocr_image_handwriting(img, lang=code)
+    except Exception as exc:
+        return {
+            "ok": False,
+            "skipped": True,
+            "reason": "ocr_error",
+            "message": str(exc),
+            "text": "",
+            "html": "",
+        }
+    text = sanitize_ocr_visible_text(raw or "").strip()
+    html = recognized_text_to_html(text)
+    return {
+        "ok": bool(text),
+        "skipped": False,
+        "stub": False,
+        "text": text,
+        "html": html,
+        "lang": code,
+    }
+
+
+def recognized_text_to_html(text: str) -> str:
+    """Sichtbarer Rich-Text ohne ¶ / Form-Feed."""
+    from html import escape as html_escape
+
+    clean = sanitize_ocr_visible_text(text or "").strip()
+    if not clean:
+        return ""
+    paras = [p.strip() for p in clean.split("\n\n") if p.strip()]
+    if not paras:
+        paras = [ln.strip() for ln in clean.split("\n") if ln.strip()] or [clean]
+    chunks: list[str] = []
+    for para in paras:
+        inner = html_escape(para, quote=False).replace("\n", "<br/>")
+        chunks.append(
+            '<p style="margin:0 0 8pt 0; font-family:Calibri,Calibri; font-size:11pt;">'
+            f"{inner}</p>"
+        )
+    return sanitize_ocr_html("".join(chunks))
+
+
+def is_schreibschutz(window) -> bool:
+    """Schreibschutz: Editor read-only oder PDF-Annotationen gesperrt (Sibling-Policy)."""
+    try:
+        ed = getattr(window, "editor", None)
+        if ed is not None and bool(ed.isReadOnly()):
+            return True
+    except Exception:
+        pass
+    try:
+        if callable(getattr(window, "_pdf_tab_active", None)) and window._pdf_tab_active():
+            pdf = getattr(window, "pdf_view", None)
+            if pdf is not None and bool(getattr(pdf, "annotations_locked", lambda: False)()):
+                return True
+    except Exception:
+        pass
+    return False
+
+
+def _pointer_xy(event) -> tuple[float, float] | None:
+    try:
+        if hasattr(event, "position"):
+            p = event.position()
+            return float(p.x()), float(p.y())
+    except Exception:
+        pass
+    try:
+        p = event.pos()
+        return float(p.x()), float(p.y())
+    except Exception:
+        return None
+
+
+def _touch_points(event) -> list[tuple[float, float]]:
+    pts: list[tuple[float, float]] = []
+    seq = None
+    for name in ("points", "touchPoints"):
+        getter = getattr(event, name, None)
+        if callable(getter):
+            try:
+                seq = getter()
+                break
+            except Exception:
+                seq = None
+    if not seq:
+        return pts
+    for tp in seq:
+        try:
+            pos = tp.position() if hasattr(tp, "position") else tp.pos()
+            pts.append((float(pos.x()), float(pos.y())))
+        except Exception:
+            continue
+    return pts
+
+
+class InkGlass(QWidget):
+    """Transparente Tinten-Glasplatte über Editor/PDF/DTP — fängt keine Maus."""
+
+    def __init__(self, host: QWidget, session: InkSession):
+        super().__init__(host)
+        self._session = session
+        self.setObjectName("ildInkGlass")
+        self.setAttribute(Qt.WA_TransparentForMouseEvents, True)
+        self.setAttribute(Qt.WA_TranslucentBackground, True)
+        self.setFocusPolicy(Qt.NoFocus)
+        self.setAttribute(Qt.WA_AcceptTouchEvents, False)
+        self.resize(host.size())
+        self.show()
+        self.raise_()
+        session.changed.connect(self.update)
+        host.installEventFilter(self)
+
+    def eventFilter(self, obj, event) -> bool:  # noqa: N802
+        if obj is self.parent() and event.type() == QEvent.Type.Resize:
+            self.resize(obj.size())
+            self.raise_()
+        return False
+
+    def paintEvent(self, event) -> None:  # noqa: N802
+        painter = QPainter(self)
+        if painter.isActive():
+            paint_strokes(painter, self._session.all_for_paint())
+            painter.end()
+
+
+class TouchInkFilter(QObject):
+    """Touch + Tablet + Linksklick-Fallback; Pinch; Tippen setzt Caret; Long-Press-Menü.
+
+    Bei ausgeschalteter Stifteingabe: Ein-Finger-Events durchreichen (Maus bleibt).
+    Zwei Finger: Pinch-Zoom (auch ohne Stiftmodus).
+    """
+
+    def __init__(self, session: InkSession, window, parent=None):
+        super().__init__(parent)
+        self.session = session
+        self.window = window
+        self._press = None  # (x, y)
+        self._moved = False
+        self._pinching = False
+        self._pinch_dist = 0.0
+        self._long_timer = QTimer(self)
+        self._long_timer.setSingleShot(True)
+        self._long_timer.timeout.connect(self._fire_long_press)
+        self._long_pos: tuple[float, float] | None = None
+        self._long_widget: QWidget | None = None
+        self._tablet_active = False
+
+    def eventFilter(self, obj, event) -> bool:  # noqa: N802
+        if not isinstance(obj, QWidget):
+            return False
+        et = event.type()
+        try:
+            if et in (
+                QEvent.Type.TouchBegin,
+                QEvent.Type.TouchUpdate,
+                QEvent.Type.TouchEnd,
+                QEvent.Type.TouchCancel,
+            ):
+                return self._on_touch(obj, event)
+            if et in (
+                QEvent.Type.TabletPress,
+                QEvent.Type.TabletMove,
+                QEvent.Type.TabletRelease,
+            ):
+                return self._on_tablet(obj, event)
+            if et == QEvent.Type.MouseButtonPress:
+                return self._on_mouse_press(obj, event)
+            if et == QEvent.Type.MouseMove:
+                return self._on_mouse_move(obj, event)
+            if et == QEvent.Type.MouseButtonRelease:
+                return self._on_mouse_release(obj, event)
+        except Exception:
+            return False
+        return False
+
+    def _blocked(self) -> bool:
+        return is_schreibschutz(self.window)
+
+    def _ink_on(self) -> bool:
+        return bool(self.session.enabled) and not self._blocked()
+
+    def _on_touch(self, obj: QWidget, event) -> bool:
+        pts = _touch_points(event)
+        et = event.type()
+        if len(pts) >= 2:
+            self._long_timer.stop()
+            if self.session.current is not None:
+                self.session.cancel()
+            self._handle_pinch(obj, pts, begin=(et == QEvent.Type.TouchBegin))
+            event.accept()
+            return True
+        if not self._ink_on():
+            if et == QEvent.Type.TouchBegin and pts:
+                self._arm_long_press(obj, pts[0][0], pts[0][1])
+            elif et == QEvent.Type.TouchEnd and pts and not self._moved:
+                self._long_timer.stop()
+                self._place_caret(obj, pts[0][0], pts[0][1])
+            elif et in (QEvent.Type.TouchEnd, QEvent.Type.TouchCancel):
+                self._long_timer.stop()
+            return False
+        if not pts:
+            if et in (QEvent.Type.TouchEnd, QEvent.Type.TouchCancel):
+                self.session.end()
+                self._long_timer.stop()
+            event.accept()
+            return True
+        x, y = pts[0]
+        if et == QEvent.Type.TouchBegin:
+            self._press = (x, y)
+            self._moved = False
+            self._arm_long_press(obj, x, y)
+            self.session.begin(x, y, 0.55)
+            event.accept()
+            return True
+        if et == QEvent.Type.TouchUpdate:
+            if self._press and (
+                abs(x - self._press[0]) > TAP_SLOP_PX or abs(y - self._press[1]) > TAP_SLOP_PX
+            ):
+                self._moved = True
+                self._long_timer.stop()
+            self.session.move(x, y, 0.55)
+            event.accept()
+            return True
+        if et in (QEvent.Type.TouchEnd, QEvent.Type.TouchCancel):
+            self._long_timer.stop()
+            if not self._moved:
+                self.session.cancel()
+                self._place_caret(obj, x, y)
+            else:
+                self.session.end()
+            self._press = None
+            self._moved = False
+            event.accept()
+            return True
+        return False
+
+    def _on_tablet(self, obj: QWidget, event) -> bool:
+        if not self._ink_on():
+            return False
+        xy = _pointer_xy(event)
+        if xy is None:
+            return False
+        x, y = xy
+        try:
+            pressure = float(event.pressure())
+        except Exception:
+            pressure = 0.5
+        t = event.type()
+        if t == QEvent.Type.TabletPress:
+            self._tablet_active = True
+            self._press = (x, y)
+            self._moved = False
+            self.session.begin(x, y, pressure)
+            event.accept()
+            return True
+        if t == QEvent.Type.TabletMove and self._tablet_active:
+            if self._press and (
+                abs(x - self._press[0]) > TAP_SLOP_PX or abs(y - self._press[1]) > TAP_SLOP_PX
+            ):
+                self._moved = True
+            self.session.move(x, y, pressure)
+            event.accept()
+            return True
+        if t == QEvent.Type.TabletRelease and self._tablet_active:
+            if not self._moved:
+                self.session.cancel()
+                self._place_caret(obj, x, y)
+            else:
+                self.session.end()
+            self._tablet_active = False
+            self._press = None
+            self._moved = False
+            event.accept()
+            return True
+        return False
+
+    def _on_mouse_press(self, obj: QWidget, event) -> bool:
+        if self._tablet_active:
+            event.accept()
+            return True
+        if not self._ink_on():
+            if event.button() == Qt.RightButton:
+                return False
+            xy = _pointer_xy(event)
+            if xy:
+                self._arm_long_press(obj, xy[0], xy[1])
+            return False
+        if event.button() != Qt.LeftButton:
+            return False
+        xy = _pointer_xy(event)
+        if xy is None:
+            return False
+        x, y = xy
+        self._press = (x, y)
+        self._moved = False
+        self._arm_long_press(obj, x, y)
+        self.session.begin(x, y, 0.5)
+        event.accept()
+        return True
+
+    def _on_mouse_move(self, obj: QWidget, event) -> bool:
+        xy = _pointer_xy(event)
+        if xy and self._press:
+            if abs(xy[0] - self._press[0]) > TAP_SLOP_PX or abs(xy[1] - self._press[1]) > TAP_SLOP_PX:
+                self._moved = True
+                self._long_timer.stop()
+        if not self._ink_on() or self.session.current is None:
+            return False
+        if xy is None:
+            return False
+        self.session.move(xy[0], xy[1], 0.5)
+        event.accept()
+        return True
+
+    def _on_mouse_release(self, obj: QWidget, event) -> bool:
+        self._long_timer.stop()
+        if not self._ink_on() or self.session.current is None:
+            xy = _pointer_xy(event)
+            if xy and not self._moved and event.button() == Qt.LeftButton:
+                self._place_caret(obj, xy[0], xy[1])
+            self._press = None
+            self._moved = False
+            return False
+        if event.button() != Qt.LeftButton:
+            return False
+        xy = _pointer_xy(event) or self._press or (0.0, 0.0)
+        if not self._moved:
+            self.session.cancel()
+            self._place_caret(obj, xy[0], xy[1])
+        else:
+            self.session.end()
+        self._press = None
+        self._moved = False
+        event.accept()
+        return True
+
+    def _arm_long_press(self, widget: QWidget, x: float, y: float) -> None:
+        self._long_widget = widget
+        self._long_pos = (x, y)
+        self._long_timer.start(LONG_PRESS_MS)
+
+    def _fire_long_press(self) -> None:
+        w = self._long_widget
+        pos = self._long_pos
+        self._long_widget = None
+        self._long_pos = None
+        if w is None or pos is None or self._moved:
+            return
+        if self.session.current is not None:
+            self.session.cancel()
+        try:
+            from PySide6.QtCore import QPoint
+            from PySide6.QtGui import QContextMenuEvent
+
+            gp = w.mapToGlobal(QPoint(int(pos[0]), int(pos[1])))
+            ev = QContextMenuEvent(QContextMenuEvent.Reason.Mouse, QPoint(int(pos[0]), int(pos[1])), gp)
+            from PySide6.QtWidgets import QApplication
+
+            QApplication.sendEvent(w, ev)
+        except Exception:
+            try:
+                w.customContextMenuRequested.emit(
+                    w.mapFromGlobal(w.mapToGlobal(w.rect().center()))
+                )
+            except Exception:
+                pass
+
+    def _place_caret(self, widget: QWidget, x: float, y: float) -> None:
+        win = self.window
+        try:
+            from PySide6.QtCore import QPoint
+            from PySide6.QtGui import QTextCursor
+
+            ed = getattr(win, "editor", None)
+            vp = ed.viewport() if ed is not None else None
+            if ed is not None and (widget is ed or widget is vp):
+                cur = ed.cursorForPosition(QPoint(int(x), int(y)))
+                ed.setTextCursor(cur)
+                ed.setFocus(Qt.OtherFocusReason)
+                return
+        except Exception:
+            pass
+        try:
+            pane = getattr(win, "dtp_pane", None)
+            view = getattr(pane, "view", None) if pane is not None else None
+            if pane is not None and view is not None and (
+                widget is view or widget is getattr(view, "viewport", lambda: None)()
+            ):
+                item = pane.editing_item() if hasattr(pane, "editing_item") else None
+                if item is not None and getattr(item, "text_item", None) is not None:
+                    from PySide6.QtCore import QPoint
+
+                    sp = view.mapToScene(QPoint(int(x), int(y)))
+                    lp = item.text_item.mapFromScene(sp)
+                    cur = item.text_item.cursorForPosition(lp.toPoint())
+                    item.text_item.setTextCursor(cur)
+                    item.text_item.setFocus(Qt.OtherFocusReason)
+        except Exception:
+            pass
+
+    def _handle_pinch(self, widget: QWidget, pts: list[tuple[float, float]], *, begin: bool) -> None:
+        if len(pts) < 2:
+            self._pinching = False
+            return
+        dx = pts[0][0] - pts[1][0]
+        dy = pts[0][1] - pts[1][1]
+        dist = max(1.0, (dx * dx + dy * dy) ** 0.5)
+        if begin or not self._pinching or self._pinch_dist <= 1.0:
+            self._pinching = True
+            self._pinch_dist = dist
+            return
+        factor = dist / self._pinch_dist
+        if factor < PINCH_MIN_FACTOR or factor > PINCH_MAX_FACTOR:
+            apply_pinch_zoom(self.window, widget, factor)
+            self._pinch_dist = dist
+
+
+def apply_pinch_zoom(window, widget: QWidget, factor: float) -> None:
+    fac = max(0.7, min(1.4, float(factor)))
+    try:
+        pdf = getattr(window, "pdf_view", None)
+        canvas = getattr(pdf, "canvas", None) if pdf is not None else None
+        if pdf is not None and (
+            widget is canvas or widget is pdf or (canvas is not None and widget.parent() is canvas)
+        ):
+            if hasattr(pdf, "set_scale"):
+                base = float(getattr(pdf, "_pending_scale", None) or getattr(pdf, "scale", 1.0) or 1.0)
+                pdf.set_scale(max(0.25, min(6.0, base * fac)), immediate=True)
+            return
+    except Exception:
+        pass
+    try:
+        pane = getattr(window, "dtp_pane", None)
+        view = getattr(pane, "view", None) if pane is not None else None
+        if pane is not None and view is not None and (
+            widget is view or widget is view.viewport()
+        ):
+            pane.set_zoom(max(25.0, min(400.0, float(getattr(pane, "_zoom", 100.0)) * fac)))
+            return
+    except Exception:
+        pass
+    try:
+        ed = getattr(window, "editor", None)
+        if ed is not None and (widget is ed or widget is ed.viewport()):
+            f = ed.font()
+            size = float(f.pointSizeF() or f.pointSize() or 11.0)
+            size = max(7.0, min(36.0, size * fac))
+            f.setPointSizeF(size)
+            ed.setFont(f)
+    except Exception:
+        pass
+
+
+def install_ink_input(window) -> InkSession:
+    """Touch/Tablet auf Editor-, PDF- und DTP-Fläche; Glasplatte für Tinte."""
+    session = InkSession(window)
+    filt = TouchInkFilter(session, window, window)
+    glasses: list[InkGlass] = []
+    hosts: list[QWidget] = []
+    ed = getattr(window, "editor", None)
+    if ed is not None:
+        hosts.append(ed.viewport())
+        accept_touch_events(ed)
+        accept_touch_events(ed.viewport())
+    pdf = getattr(window, "pdf_view", None)
+    canvas = getattr(pdf, "canvas", None) if pdf is not None else None
+    if canvas is not None:
+        hosts.append(canvas)
+        accept_touch_events(canvas)
+    pane = getattr(window, "dtp_pane", None)
+    view = getattr(pane, "view", None) if pane is not None else None
+    if view is not None:
+        hosts.append(view.viewport() if hasattr(view, "viewport") else view)
+        accept_touch_events(view)
+        try:
+            accept_touch_events(view.viewport())
+        except Exception:
+            pass
+    for host in hosts:
+        if host is None:
+            continue
+        host.installEventFilter(filt)
+        glasses.append(InkGlass(host, session))
+    window._ink_session = session
+    window._ink_filter = filt
+    window._ink_glasses = glasses
+    return session
+
+
+def insert_recognized_text(window, html: str, plain: str, bbox=None) -> str:
+    """Caret-Rich-Text (Editor) oder Textrahmen (DTP/PDF). Rückgabe: Zielname."""
+    html = sanitize_ocr_html(html or "")
+    plain = sanitize_ocr_visible_text(plain or "").strip()
+    if not html and plain:
+        html = recognized_text_to_html(plain)
+    if not plain and not html:
+        return ""
+    try:
+        if callable(getattr(window, "_layout_mode_active", None)) and window._layout_mode_active():
+            return _insert_dtp_frame(window, plain, html, bbox)
+    except Exception:
+        pass
+    try:
+        if callable(getattr(window, "_pdf_tab_active", None)) and window._pdf_tab_active():
+            return _insert_pdf_overlay(window, plain, bbox)
+    except Exception:
+        pass
+    ed = getattr(window, "editor", None)
+    if ed is None:
+        return ""
+    try:
+        ed._ensure_rich_mode()
+    except Exception:
+        pass
+    from PySide6.QtGui import QTextCursor
+
+    cur = ed.textCursor()
+    cur.beginEditBlock()
+    try:
+        if html:
+            cur.insertHtml(html)
+        else:
+            cur.insertText(plain)
+    finally:
+        cur.endEditBlock()
+    ed.setTextCursor(cur)
+    try:
+        if callable(getattr(window, "_sync_editor_rich_meta", None)):
+            window._sync_editor_rich_meta()
+        if callable(getattr(window, "_sync_editor_only_actions", None)):
+            window._sync_editor_only_actions()
+    except Exception:
+        pass
+    return "caret"
+
+
+def _insert_dtp_frame(window, plain: str, html: str, bbox) -> str:
+    pane = getattr(window, "dtp_pane", None)
+    if pane is None or getattr(pane, "doc", None) is None:
+        return ""
+    x = y = 40.0
+    w, h = 220.0, 64.0
+    if bbox and len(bbox) == 4:
+        x, y = float(bbox[0]), float(bbox[1])
+        w = max(80.0, float(bbox[2] - bbox[0]))
+        h = max(36.0, float(bbox[3] - bbox[1]))
+    editing = pane.editing_item() if hasattr(pane, "editing_item") else None
+    if editing is not None and getattr(editing, "text_item", None) is not None:
+        cur = editing.text_item.textCursor()
+        if html:
+            cur.insertHtml(html)
+        else:
+            cur.insertText(plain)
+        editing.text_item.setTextCursor(cur)
+        if hasattr(editing, "commit_rich"):
+            editing.commit_rich()
+        return "caret"
+    fr = pane.doc.add_text_frame(plain, x=x, y=y, width=w, height=h, page=pane.doc.current_page)
+    if html:
+        try:
+            fr.rich_html = html
+            fr.text = plain
+        except Exception:
+            pass
+    pane.scene.rebuild()
+    try:
+        if callable(getattr(window, "_sync_editor_only_actions", None)):
+            window._sync_editor_only_actions()
+    except Exception:
+        pass
+    return "frame"
+
+
+def _insert_pdf_overlay(window, plain: str, bbox) -> str:
+    from ild_pdf.annotate import Annotation, AnnotationType
+
+    pdf = getattr(window, "pdf_view", None)
+    if pdf is None or getattr(pdf, "store", None) is None:
+        return ""
+    x = y = 36.0
+    w, h = 200.0, 36.0
+    if bbox and len(bbox) == 4:
+        x, y = float(bbox[0]), float(bbox[1])
+        w = max(40.0, float(bbox[2] - bbox[0]))
+        h = max(18.0, float(bbox[3] - bbox[1]))
+    page = int(getattr(pdf, "current_page", 0) or 0)
+    ann = Annotation(
+        page=page,
+        type=AnnotationType.TEXT_OVERLAY,
+        x=x,
+        y=y,
+        width=w,
+        height=h,
+        text=plain,
+        color="#1A5276",
+        font_size=14.0,
+    )
+    if hasattr(pdf, "_commit_ann"):
+        pdf._commit_ann(ann)
+    else:
+        pdf.store.add(ann)
+        if hasattr(pdf, "refresh"):
+            pdf.refresh()
+    try:
+        if callable(getattr(window, "_sync_editor_only_actions", None)):
+            window._sync_editor_only_actions()
+    except Exception:
+        pass
+    return "frame"
