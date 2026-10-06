@@ -3205,7 +3205,7 @@ class MainWindow(QMainWindow):
             ),
         ]:
             a = QAction(title, self)
-            a.triggered.connect(slot)
+            a.triggered.connect(lambda checked=False, t=title, s=slot: self._pdf_menu_call(t, s))
             m_pdf.addAction(a)
         act_cycle_color = QAction("Annotation-Farbe Palette-Zyklus", self)
         act_cycle_color.setShortcut(QKeySequence("Ctrl+Shift+C"))
@@ -3326,7 +3326,7 @@ class MainWindow(QMainWindow):
                     "setzen/entfernen — 2.6.7"
                 )
                 a.setShortcut(QKeySequence("Ctrl+Alt+Shift+P"))
-            a.triggered.connect(slot)
+            a.triggered.connect(lambda checked=False, t=title, s=slot: self._pdf_menu_call(t, s))
             m_pdf.addAction(a)
         # Batch Drehen/Spiegeln Shortcuts (Auswahl oder aktuelle Seite) — 1.8.1
         m_pdf.addSeparator()
@@ -3452,7 +3452,7 @@ class MainWindow(QMainWindow):
                 a.setToolTip(
                     "Textauswahl als Schwärzungs-Rechtecke markieren (Sidecar) — 2.6.5"
                 )
-            a.triggered.connect(slot)
+            a.triggered.connect(lambda checked=False, t=title, s=slot: self._pdf_menu_call(t, s))
             m_pdf.addAction(a)
 
         # Geräte-Menü idempotent nachziehen — 2.6.51
@@ -3897,6 +3897,55 @@ class MainWindow(QMainWindow):
         from instantlensdoc.ui.feature_dialog import FeatureDialog
 
         FeatureDialog(self, title=title, body=body, object_name=object_name).exec()
+
+    def _pdf_menu_call(self, title: str, fn) -> None:
+        """PDF-Menüslot: leere Voraussetzung → FeatureDialog, sonst echte Funktion."""
+        t = (title or "").replace("&", "").strip()
+        if not getattr(self.pdf_view, "pdf_path", None):
+            self._feature_dialog(t, "Bitte zuerst ein PDF öffnen.")
+            return
+        store = getattr(self.pdf_view, "store", None)
+        low = t.lower()
+        try:
+            if "formularfelder erkennen" in low:
+                from ild_pdf.acroform import detect_form_candidates
+
+                cands = detect_form_candidates(
+                    self.pdf_view.pdf_path, self.pdf_view.page_index
+                )
+                if not cands:
+                    self._feature_dialog(
+                        "Felder erkennen",
+                        "Keine Kandidaten auf dieser Seite (Labels „:“, ____, [ ]).",
+                    )
+                    return
+                n = len(store.list_measure_annotations()) if store is not None else 0
+                if n == 0:
+                    self._feature_dialog("Messwerte", "Keine Mess-Annotationen vorhanden.")
+                    return
+            if "overlay" in low and "einbrenn" in low:
+                n = len(store.text_overlays()) if store is not None and hasattr(store, "text_overlays") else 0
+                if n == 0:
+                    self._feature_dialog("Einbrennen", "Keine TEXT/TEXT_OVERLAY Annotationen.")
+                    return
+            if ("schwärz" in low or "redaction" in low) and "auswahl" not in low:
+                n = 0
+                if store is not None:
+                    anns = store.all() if hasattr(store, "all") else []
+                    n = sum(
+                        1
+                        for a in anns
+                        if "redact" in str(getattr(getattr(a, "type", None), "value", a.type) or "").lower()
+                    )
+                if n == 0:
+                    self._feature_dialog(t, "Keine Schwärzungen vorhanden.")
+                    return
+        except Exception:
+            pass
+        try:
+            fn()
+        except Exception as e:
+            self._feature_dialog(t, str(e))
 
     def _require_pdf(self, title: str) -> bool:
         """True wenn ein PDF aktiv ist, sonst Status (keine Info-Box)."""
@@ -6011,6 +6060,10 @@ class MainWindow(QMainWindow):
                 filtered_ids=filtered_ids,
             )
             if n == 0:
+                self._feature_dialog(
+                    "Annotationen löschen",
+                    "Keine Annotationen auf dieser Seite.",
+                )
                 return
             self._ann_action_status(
                 f"{n} Annotation(en) auf Seite gelöscht (Ctrl+Z rückgängig)"
@@ -10546,7 +10599,7 @@ class MainWindow(QMainWindow):
 
     def _insert_page_image_to_editor(self):
         if not self.pdf_view.pdf_path:
-            self._set_status("Kein PDF geladen")
+            self._feature_dialog("Seitenbild", "Kein PDF geladen.")
             return
         idx = self.pdf_view.page_index
         try:
@@ -10561,7 +10614,7 @@ class MainWindow(QMainWindow):
 
     def _insert_all_page_images_to_editor(self):
         if not self.pdf_view.pdf_path:
-            self._set_status("Kein PDF geladen")
+            self._feature_dialog("Seitenbild", "Kein PDF geladen.")
             return
         n_pages = self.pdf_view.page_count
         if n_pages < 1:
@@ -10581,7 +10634,7 @@ class MainWindow(QMainWindow):
 
     def _extract_page_text_to_editor(self):
         if not self.pdf_view.pdf_path:
-            self._set_status("Kein PDF geladen")
+            self._feature_dialog("Text extrahieren", "Kein PDF geladen.")
             return
         pdf_path = self.pdf_view.pdf_path
         page_index = int(self.pdf_view.page_index or 0)
@@ -10624,7 +10677,7 @@ class MainWindow(QMainWindow):
 
     def _extract_all_text_to_editor(self):
         if not self.pdf_view.pdf_path:
-            self._set_status("Kein PDF geladen")
+            self._feature_dialog("Text extrahieren", "Kein PDF geladen.")
             return
         from PySide6.QtWidgets import QApplication, QProgressDialog
 
@@ -11826,6 +11879,10 @@ class MainWindow(QMainWindow):
         self.dtp_pane.link_selected()
 
     def _dtp_toggle_grid(self) -> None:
+        if self._pdf_tab_active():
+            on = not bool(getattr(self.pdf_view, "_show_alignment_grid", False))
+            self._toggle_alignment_grid(on)
+            return
         self._enter_layout_mode()
         self.dtp_pane.toggle_grid()
 
@@ -12457,16 +12514,18 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Bookmarks importieren", str(e))
             return
         if not pages:
-            QMessageBox.information(
-                self, "Bookmarks importieren", "Keine Outline-Einträge mit Seiten-Ziel."
+            self._feature_dialog(
+                "Bookmarks importieren",
+                "Keine Outline-Einträge mit Seiten-Ziel.",
             )
             return
         # Seiten in Favoriten übernehmen (Reihenfolge Outline DFS)
         n = int(self.pdf_view.page_count or 0)
         order = [p for p, _t in pages if 0 <= int(p) < n]
         if not order:
-            QMessageBox.information(
-                self, "Bookmarks importieren", "Keine gültigen Outline-Seiten."
+            self._feature_dialog(
+                "Bookmarks importieren",
+                "Keine gültigen Outline-Seiten.",
             )
             return
         existing = list(self.pdf_view.list_page_favorites())
@@ -12529,8 +12588,7 @@ class MainWindow(QMainWindow):
                 hint = (
                     "\n\nHinweis: Das aktuelle PDF hat ebenfalls keine Outlines."
                 )
-            QMessageBox.information(
-                self,
+            self._feature_dialog(
                 "Bookmarks exportieren",
                 "Keine Seiten-Favoriten — zuerst Bookmarks setzen oder Outline importieren."
                 + hint,
@@ -17228,6 +17286,11 @@ class MainWindow(QMainWindow):
             )
         else:
             self._set_status(f"Alles speichern: {saved} Datei(en)/Sidecar(s)")
+            if saved == 0:
+                self._feature_dialog(
+                    "Alles speichern",
+                    "Nichts zu speichern — keine Änderungen und keine Sidecars.",
+                )
 
     def save_as(self):
         if not self.doc:
@@ -18316,7 +18379,7 @@ class MainWindow(QMainWindow):
 
         ok, msg = ocr_mod.tesseract_available()
         if not ok:
-            QMessageBox.information(self, "OCR — Tesseract fehlt", msg)
+            self._feature_dialog("OCR — Tesseract fehlt", msg)
             self._set_status("OCR nicht verfügbar")
             return
         lang = dlg.lang_code()
@@ -18370,7 +18433,7 @@ class MainWindow(QMainWindow):
                     handwriting_psm=hw_psm,
                 )
         except ocr_mod.OcrUnavailable as e:
-            QMessageBox.information(self, "OCR — Tesseract fehlt", str(e))
+            self._feature_dialog("OCR — Tesseract fehlt", str(e))
             return
         except Exception as e:
             QMessageBox.warning(self, "OCR", f"OCR fehlgeschlagen:\n{e}")
@@ -18432,7 +18495,7 @@ class MainWindow(QMainWindow):
             return
 
         if not ok:
-            QMessageBox.information(self, "OCR — Tesseract fehlt", msg)
+            self._feature_dialog("OCR — Tesseract fehlt", msg)
             self._set_status("OCR nicht verfügbar")
             return
 
@@ -18544,7 +18607,7 @@ class MainWindow(QMainWindow):
                     handwriting_psm=hw_psm,
                 )
         except ocr_mod.OcrUnavailable as e:
-            QMessageBox.information(self, "OCR — Tesseract fehlt", str(e))
+            self._feature_dialog("OCR — Tesseract fehlt", str(e))
             return
         except Exception as e:
             QMessageBox.warning(self, "OCR", f"OCR fehlgeschlagen:\n{e}")
@@ -18787,7 +18850,7 @@ class MainWindow(QMainWindow):
                 progress=on_progress,
             )
         except ocr_mod.OcrUnavailable as e:
-            QMessageBox.information(self, "OCR — Tesseract fehlt", str(e))
+            self._feature_dialog("OCR — Tesseract fehlt", str(e))
             return
         except Exception as e:
             QMessageBox.warning(self, "OCR gesamtes PDF", f"OCR fehlgeschlagen:\n{e}")
@@ -19240,11 +19303,11 @@ class MainWindow(QMainWindow):
             return
         ok, msg = ocr_mod.tesseract_available()
         if not ok:
-            QMessageBox.information(self, "OCR — Tesseract fehlt", msg)
+            self._feature_dialog("OCR — Tesseract fehlt", msg)
             self._set_status("OCR nicht verfügbar")
             return
         if not self.pdf_view.begin_ocr_region_select():
-            QMessageBox.information(self, "OCR Region", "Kein PDF geladen.")
+            self._feature_dialog("OCR Region", "Kein PDF geladen.")
             return
         self.stack.setCurrentWidget(self.pdf_view)
         self.pdf_view.setFocus()
@@ -19362,7 +19425,7 @@ class MainWindow(QMainWindow):
                     cancelled = True
         except ocr_mod.OcrUnavailable as e:
             prog.close()
-            QMessageBox.information(self, "OCR — Tesseract fehlt", str(e))
+            self._feature_dialog("OCR — Tesseract fehlt", str(e))
             return
         except Exception as e:
             ocr_error = str(e)

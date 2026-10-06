@@ -285,6 +285,26 @@ def snapshot_state(win) -> dict[str, Any]:
         unit = str(get_page_size_unit() or "")
     except Exception:
         unit = ""
+    pdf_mtime = 0
+    sidecar_mtime = 0
+    pdf_grid = ""
+    try:
+        pth = getattr(pv, "pdf_path", None) if pv is not None else None
+        if pth:
+            pdf_mtime = int(Path(pth).stat().st_mtime_ns)
+    except Exception:
+        pdf_mtime = 0
+    try:
+        store = getattr(pv, "store", None) if pv is not None else None
+        sp = getattr(store, "sidecar_path", None) if store is not None else None
+        if sp:
+            sidecar_mtime = int(Path(sp).stat().st_mtime_ns)
+    except Exception:
+        sidecar_mtime = 0
+    try:
+        pdf_grid = str(int(bool(getattr(pv, "_show_alignment_grid", False)))) if pv is not None else ""
+    except Exception:
+        pdf_grid = ""
     checkables = "|".join(checks)
     return {
         "html": html,
@@ -316,6 +336,9 @@ def snapshot_state(win) -> dict[str, Any]:
         "snippets": snippets,
         "bookmarks": bms,
         "unit": unit,
+        "pdf_mtime": pdf_mtime,
+        "sidecar_mtime": sidecar_mtime,
+        "pdf_grid": pdf_grid,
     }
 
 
@@ -350,6 +373,9 @@ def state_changed(before: dict[str, Any], after: dict[str, Any]) -> list[str]:
         "snippets",
         "bookmarks",
         "unit",
+        "pdf_mtime",
+        "sidecar_mtime",
+        "pdf_grid",
     )
     hits = []
     for k in keys:
