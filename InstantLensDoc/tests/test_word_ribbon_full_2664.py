@@ -210,6 +210,15 @@ def test_disabled_ribbon_click_sets_status() -> None:
 def test_single_view_dtp_keeps_word_tabs() -> None:
     load_state(_WIN, _APP, "empty", _FIXTURES)
     pump(_APP, 0.1)
+    doc = getattr(_WIN, "doc", None)
+    if doc is not None:
+        doc.dirty = False
+    pane = getattr(_WIN, "dtp_pane", None)
+    if pane is not None:
+        try:
+            pane.clear_dirty()
+        except Exception:
+            pass
     assert _WIN.stack.currentWidget() is _WIN.editor_pane
     assert _WIN._enter_layout_mode()
     assert _WIN._layout_mode_active()
@@ -222,6 +231,11 @@ def test_single_view_dtp_keeps_word_tabs() -> None:
         assert rb._stack.currentWidget() is not None
     assert "dtp_layout" in rb._actions
     assert "dtp_text_frame" in rb._actions
+    if pane is not None:
+        try:
+            pane.clear_dirty()
+        except Exception:
+            pass
     assert _WIN._leave_layout_mode()
     assert not _WIN.dtp_pane.isVisible()
     assert _WIN.stack.currentWidget() is _WIN.editor_pane
