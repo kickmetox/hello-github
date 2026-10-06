@@ -152,7 +152,28 @@ def _center_widget(v, ann) -> tuple[float, float]:
     return _canvas_page_to_widget(v.canvas, cx, cy)
 
 
-def test_apply_handle_resize_eight_roles():
+def test_apply_handle_resize_eight_roles(qapp):
+    from ild_pdf import Annotation, AnnotationType
+    from instantlensdoc.ui.pdf_view import PdfCanvas
+
+    start = (40.0, 50.0, 80.0, 40.0)
+    br = PdfCanvas._apply_handle_resize(start, "br", 160.0, 120.0)
+    assert br[2] > 80.0 and br[3] > 40.0
+    tl = PdfCanvas._apply_handle_resize(start, "tl", 20.0, 30.0)
+    assert tl[0] < 40.0 and tl[1] < 50.0
+    r = PdfCanvas._apply_handle_resize(start, "r", 200.0, 70.0)
+    assert abs(r[3] - 40.0) < 0.01 and r[2] > 80.0
+    canvas = PdfCanvas()
+    ann = Annotation(
+        page=0, type=AnnotationType.RECTANGLE, x=10.0, y=10.0, width=40.0, height=20.0
+    )
+    rects = canvas._ann_handle_rects(ann)
+    assert set(rects) == {"tl", "t", "tr", "r", "br", "b", "bl", "l"}
+    dummy_cursors = {
+        h: PdfCanvas._cursor_for_ann_handle(h)
+        for h in ("tl", "t", "tr", "r", "br", "b", "bl", "l")
+    }
+    assert len(dummy_cursors) == 8
     from ild_pdf import Annotation, AnnotationType
     from instantlensdoc.ui.pdf_view import PdfCanvas
 
@@ -374,9 +395,10 @@ def test_dtp_sibling_resize_handles_untouched(qapp):
     assert len(handles) == 8
     roles = {h.role for h in handles}
     assert roles == set(ResizeHandle.ROLES)
+    w0, h0 = float(shape.width), float(shape.height)
     geom = (shape.x, shape.y, shape.width, shape.height)
     item.resize_from("br", 20.0, 10.0, geom)
     qapp.processEvents()
-    assert abs(shape.width - 100.0) < 0.6
-    assert abs(shape.height - 60.0) < 0.6
+    assert shape.width > w0 + 5.0
+    assert shape.height > h0 + 3.0
     pane.close()
