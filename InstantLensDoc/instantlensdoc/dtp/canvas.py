@@ -531,10 +531,13 @@ class FrameItem(QGraphicsRectItem):
             super().mousePressEvent(event)
             self.setFlag(QGraphicsItem.ItemIsMovable, False)
             return
-        additive = bool(
-            event.modifiers() & (Qt.ControlModifier | Qt.ShiftModifier | Qt.MetaModifier)
-        )
+        additive = bool(event.modifiers() & (Qt.ControlModifier | Qt.MetaModifier))
+        ranged = bool(event.modifiers() & Qt.ShiftModifier) and not additive
         sc = self.scene()
+        if isinstance(sc, DtpScene) and ranged:
+            sc.apply_range_selection(self.frame)
+            event.accept()
+            return
         if isinstance(sc, DtpScene) and not additive:
             self.setSelected(True)
             sc.apply_group_selection(self.frame, additive=False)
@@ -794,6 +797,37 @@ class DtpScene(QGraphicsScene):
                 it = self._items.get(mid)
                 if it is not None:
                     it.setSelected(want_on)
+        finally:
+            self._expanding_group = False
+
+    def apply_range_selection(self, frame: DtpFrame) -> None:
+        """Shift: alle Rahmen im Rechteck zwischen Anker und Klick."""
+        if self._expanding_group:
+            return
+        selected = list(self.selected_frames())
+        anchor = selected[0] if selected else None
+        if anchor is None:
+            it = self._items.get(frame.id)
+            if it is not None:
+                it.setSelected(True)
+            return
+        x0 = min(anchor.x, frame.x)
+        y0 = min(anchor.y, frame.y)
+        x1 = max(anchor.x + anchor.width, frame.x + frame.width)
+        y1 = max(anchor.y + anchor.height, frame.y + frame.height)
+        page = int(frame.page)
+        self._expanding_group = True
+        try:
+            self.clearSelection()
+            for fr in self.doc.frames:
+                if int(fr.page) != page:
+                    continue
+                fx1, fy1 = fr.x + fr.width, fr.y + fr.height
+                if fr.x > x1 or fx1 < x0 or fr.y > y1 or fy1 < y0:
+                    continue
+                it = self._items.get(fr.id)
+                if it is not None:
+                    it.setSelected(True)
         finally:
             self._expanding_group = False
 
@@ -1146,6 +1180,20 @@ class DtpPane(QWidget):
             b.setObjectName(obj)
             b.clicked.connect(slot)
             lay.addWidget(b)
+        grp_row = QHBoxLayout()
+        self.btn_grp = QPushButton("Grp")
+        self.btn_grp.setObjectName("dtpPropGrp")
+        self.btn_grp.setToolTip("Mindestens zwei Objekte markieren (Strg+Klick)")
+        self.btn_grp.setEnabled(False)
+        self.btn_grp.clicked.connect(self.group_selected)
+        self.btn_ungroup = QPushButton("Aufh.")
+        self.btn_ungroup.setObjectName("dtpPropUngroup")
+        self.btn_ungroup.setToolTip("Zuerst eine Gruppe auswählen")
+        self.btn_ungroup.setEnabled(False)
+        self.btn_ungroup.clicked.connect(self.ungroup_selected)
+        grp_row.addWidget(self.btn_grp)
+        grp_row.addWidget(self.btn_ungroup)
+        lay.addLayout(grp_row)
         panel.hide()
         self.props_panel = panel
 
@@ -1487,6 +1535,23 @@ class DtpPane(QWidget):
             frames = scene.selected_frames()
         except RuntimeError:
             return
+        n_sel = len(frames)
+        has_group = any(str(getattr(f, "group_id", "") or "").strip() for f in frames)
+        locked = bool(getattr(self, "_schreibschutz", False))
+        tip_g = (
+            "Auswahl gruppieren (Strg+Klick / Gummiband)"
+            if n_sel >= 2 and not locked
+            else "Mindestens zwei Objekte markieren (Strg+Klick)"
+        )
+        tip_u = "Gruppierung aufheben" if has_group and not locked else "Zuerst eine Gruppe auswählen"
+        btn = getattr(self, "btn_grp", None)
+        if btn is not None:
+            btn.setEnabled(n_sel >= 2 and not locked)
+            btn.setToolTip(tip_g)
+        ubtn = getattr(self, "btn_ungroup", None)
+        if ubtn is not None:
+            ubtn.setEnabled(bool(has_group) and not locked)
+            ubtn.setToolTip(tip_u)
         fill, stroke = "#D0E8FF", "#1A5276"
         family = ""
         if frames:
@@ -2075,6 +2140,7 @@ class DtpPane(QWidget):
         if first is not None:
             self.scene.apply_group_selection(first, additive=False)
         self.statusMessage.emit(f"{n} Objekte gruppiert")
+        self._on_selection_chrome()
         return n
 
     def ungroup_selected(self) -> int:
@@ -2096,6 +2162,7 @@ class DtpPane(QWidget):
             return 0
         self.mark_dirty()
         self.statusMessage.emit(f"Gruppierung aufgehoben ({n})")
+        self._on_selection_chrome()
         return n
 
     def prev_page(self) -> None:

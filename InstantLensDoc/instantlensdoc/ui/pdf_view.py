@@ -845,6 +845,7 @@ class PdfCanvas(QLabel):
         self._band_click_shift = False
         self._band_additive = False
         self._pending_additive = False
+        self._pending_range = False
         self._resize_id: str | None = None
         self._resize_handle: str | None = None
         self._resize_origin: tuple[float, float] | None = None
@@ -1364,6 +1365,7 @@ class PdfCanvas(QLabel):
         self._band_click_shift = False
         self._band_additive = False
         self._pending_additive = False
+        self._pending_range = False
         self._resize_id = None
         self._resize_handle = None
         self._resize_origin = None
@@ -1700,12 +1702,23 @@ class PdfCanvas(QLabel):
 
     @staticmethod
     def _event_additive(event) -> bool:
-        """Ctrl/Shift = Mehrfachauswahl wie DTP-QGraphicsView."""
+        """Strg/Ctrl/Meta: Objekt zur Auswahl hinzufügen oder entfernen."""
         try:
             mods = event.modifiers()
         except Exception:
             return False
-        return bool(mods & (Qt.ControlModifier | Qt.ShiftModifier | Qt.MetaModifier))
+        return bool(mods & (Qt.ControlModifier | Qt.MetaModifier))
+
+    @staticmethod
+    def _event_range(event) -> bool:
+        """Shift: Bereich zwischen Anker und Klick (ohne Strg)."""
+        try:
+            mods = event.modifiers()
+        except Exception:
+            return False
+        if mods & (Qt.ControlModifier | Qt.MetaModifier):
+            return False
+        return bool(mods & Qt.ShiftModifier)
 
     def _hit_ann_handle(self, x: float, y: float) -> tuple[str, Annotation] | None:
         if self._annotations_locked:
@@ -2374,13 +2387,17 @@ class PdfCanvas(QLabel):
             if hit_any:
                 self.annotation_erase_hit.emit(hit_any.id)
             return
-        selecting = bool(self._select_mode) or (
-            self._drag_tool is None
-            and not self._hand_mode
+        selecting = (
+            not self._hand_mode
             and not self._eraser_mode
             and not self._inline_edit_mode
             and not self._object_edit_mode
             and not self._text_mark_mode
+            and (
+                bool(self._select_mode)
+                or self._drag_tool is None
+                or self._drag_tool != AnnotationType.INK
+            )
         )
         if selecting and event.button() == Qt.LeftButton:
             # Auswahl bleibt Auswahl — kein URI-Diebstahl, kein Werkzeugwechsel
@@ -2412,8 +2429,9 @@ class PdfCanvas(QLabel):
                     event.accept()
                     return
             additive = self._event_additive(event)
-            # Overlay/Form getroffen: Klick = auswählen+ziehen; Ctrl/Shift = umschalten.
-            # Gummiband nur auf leerer Fläche (Ctrl/Shift = zur Auswahl addieren).
+            ranged = self._event_range(event)
+            # Overlay/Form getroffen: Klick = auswählen; Strg = umschalten; Shift = Bereich.
+            # Gummiband auf leerer Fläche (Strg = zur Auswahl addieren).
             if hit_any is not None:
                 if additive:
                     self._pending_additive = True
@@ -2421,6 +2439,14 @@ class PdfCanvas(QLabel):
                         self.annotation_selected.emit(hit_any.id)
                     finally:
                         self._pending_additive = False
+                    event.accept()
+                    return
+                if ranged:
+                    self._pending_range = True
+                    try:
+                        self.annotation_selected.emit(hit_any.id)
+                    finally:
+                        self._pending_range = False
                     event.accept()
                     return
                 if hit_any.id not in self._selected_ids:
@@ -2443,8 +2469,8 @@ class PdfCanvas(QLabel):
                 except Exception:
                     pass
                 return
-            # Leere Fläche: Create-Tool → deselektieren und zeichnen/platzieren
-            if not additive:
+            # Leere Fläche: Create-Tool zeichnet; sonst Gummiband (Strg addiert).
+            if not additive and not ranged:
                 self.set_selected_ids(set())
                 self.annotation_selected.emit("")
             self._move_ids = set()
@@ -2468,8 +2494,8 @@ class PdfCanvas(QLabel):
             self._band_start = (x, y)
             self._band_current = (x, y)
             self._band_click_hit = None
-            self._band_click_shift = additive
-            self._band_additive = additive
+            self._band_click_shift = additive or ranged
+            self._band_additive = additive or ranged
             event.accept()
             try:
                 self.grabMouse()
@@ -3243,16 +3269,18 @@ class PdfViewer(QWidget):
         btn_group = QPushButton("Grp")
         btn_group.setFixedWidth(28)
         btn_group.setObjectName("btnAnnGroup")
+        btn_group.setEnabled(False)
         btn_group.setToolTip(
             "Mindestens zwei Objekte markieren (Strg+Klick); dann Gruppieren"
         )
-        btn_group.clicked.connect(self.group_selected_annotations)
+        btn_group.clicked.connect(self._grp_button_clicked)
         self.btn_ann_group = btn_group
         btn_ungroup = QPushButton("Aufh.")
         btn_ungroup.setFixedWidth(36)
         btn_ungroup.setObjectName("btnAnnUngroup")
+        btn_ungroup.setEnabled(False)
         btn_ungroup.setToolTip("Zuerst eine Gruppe auswählen")
-        btn_ungroup.clicked.connect(self.ungroup_selected_annotations)
+        btn_ungroup.clicked.connect(self._ungrp_button_clicked)
         self.btn_ann_ungroup = btn_ungroup
         btn_group_lock = QPushButton("🔒")
         btn_group_lock.setFixedWidth(28)
@@ -5872,6 +5900,7 @@ class PdfViewer(QWidget):
         self.canvas.set_selected_ids(ids)
         n = len(ids)
         self.status.emit(f"{n} Annotation(en) ausgewählt" if n else "Auswahl aufgehoben")
+        self._notify_group_actions()
 
     def _on_erase_hit(self, ann_id: str) -> None:
         if not self.store or not ann_id:
@@ -6511,7 +6540,7 @@ class PdfViewer(QWidget):
         is_create = tool in DRAG_TYPES or tool in CREATE_PLACE_TYPES
         self.canvas.set_drag_tool(
             tool if tool in DRAG_TYPES else None,
-            select_mode=keep_sel,
+            select_mode=True,
             inline_edit_mode=False,
             place_on_empty=is_create,
         )
@@ -6669,21 +6698,111 @@ class PdfViewer(QWidget):
             pass
 
     def _notify_group_actions(self) -> None:
+        n = 0
+        has_group = False
+        try:
+            ids = list(self._selected_annotation_ids())
+            n = len(ids)
+            store = getattr(self, "store", None)
+            if store is not None:
+                has_group = any(
+                    str(getattr(store.get(i), "group_id", "") or "").strip() for i in ids
+                )
+        except Exception:
+            n = 0
+        tip_g = (
+            "Auswahl gruppieren (Strg+Klick / Gummiband)"
+            if n >= 2
+            else "Mindestens zwei Objekte markieren (Strg+Klick)"
+        )
+        tip_u = "Gruppierung aufheben" if has_group else "Zuerst eine Gruppe auswählen"
+        btn = getattr(self, "btn_ann_group", None)
+        if btn is not None:
+            try:
+                btn.setEnabled(n >= 2)
+                btn.setToolTip(tip_g)
+            except Exception:
+                pass
+        ubtn = getattr(self, "btn_ann_ungroup", None)
+        if ubtn is not None:
+            try:
+                ubtn.setEnabled(bool(has_group))
+                ubtn.setToolTip(tip_u)
+            except Exception:
+                pass
         win = self.window() if hasattr(self, "window") else None
         fn = getattr(win, "_sync_group_actions", None) if win is not None else None
-        if callable(fn):
+        if callable(fn) and win is not self:
             try:
                 fn()
             except Exception:
                 pass
 
+    def _grp_button_clicked(self) -> None:
+        win = self.window() if hasattr(self, "window") else None
+        fn = getattr(win, "_group_selected_annotations", None) if win is not None else None
+        if callable(fn) and win is not self:
+            fn()
+            return
+        self.group_selected_annotations()
+
+    def _ungrp_button_clicked(self) -> None:
+        win = self.window() if hasattr(self, "window") else None
+        fn = getattr(win, "_ungroup_selected_annotations", None) if win is not None else None
+        if callable(fn) and win is not self:
+            fn()
+            return
+        self.ungroup_selected_annotations()
+
+    def _range_select_ids(self, clicked_id: str) -> set[str]:
+        """Shift-Bereich: Bounding-Box vom Anker bis zum geklickten Objekt."""
+        aid = str(clicked_id or "").strip()
+        if not aid:
+            return set()
+        ids = list(self._selected_annotation_ids())
+        anchor = str(getattr(self, "_selected_ann_id", "") or "") or (ids[-1] if ids else "")
+        store = getattr(self, "store", None)
+        if store is None or not anchor:
+            return {aid}
+        a = store.get(anchor)
+        b = store.get(aid)
+        if a is None or b is None:
+            return {aid}
+        x0 = min(float(a.x), float(b.x))
+        y0 = min(float(a.y), float(b.y))
+        x1 = max(float(a.x) + float(a.width), float(b.x) + float(b.width))
+        y1 = max(float(a.y) + float(a.height), float(b.y) + float(b.height))
+        page = int(getattr(b, "page", 0) or 0)
+        out: set[str] = set()
+        for ann in store.for_page(page):
+            if not self.canvas._ann_type_is_visible(ann):
+                continue
+            if annotations_intersect_rect(ann, x0, y0, x1, y1):
+                out.add(ann.id)
+        return out or {aid}
+
     def _on_annotation_selected(self, ann_id: str):
-        """Auswahl setzen; Gruppe → alle Mitglieder; Ctrl/Shift+Klick Mehrfachauswahl."""
+        """Auswahl setzen; Gruppe → alle Mitglieder; Ctrl/Strg umschalten; Shift Bereich."""
         mods = QApplication.keyboardModifiers()
         additive = bool(getattr(self.canvas, "_pending_additive", False)) or bool(
-            mods & (Qt.ControlModifier | Qt.ShiftModifier | Qt.MetaModifier)
+            mods & (Qt.ControlModifier | Qt.MetaModifier)
+        )
+        ranged = bool(getattr(self.canvas, "_pending_range", False)) or (
+            bool(mods & Qt.ShiftModifier) and not additive
         )
         aid = ann_id or None
+        if ranged and aid:
+            ids = self._range_select_ids(aid)
+            allowed = self._visible_annotation_id_set()
+            if allowed:
+                ids = {i for i in ids if i in allowed} or {aid}
+            self._selected_ann_ids = set(ids)
+            self._selected_ann_id = aid
+            self.canvas.set_selected_ids(self._selected_ann_ids)
+            n = len(self._selected_ann_ids)
+            self.status.emit(f"{n} Annotationen ausgewählt (Shift-Bereich)" if n else "Auswahl aufgehoben")
+            self._notify_group_actions()
+            return
         if additive and aid:
             group_ids = set()
             if self.store:
@@ -9089,6 +9208,7 @@ class PdfViewer(QWidget):
         self.canvas.set_selected_ids(ids)
         self.annotations_changed.emit()
         self.status.emit(f"{n} Annotation(en) gruppiert ({gid})")
+        self._notify_group_actions()
         return n
 
     def ungroup_selected_annotations(self) -> int:
@@ -9124,6 +9244,7 @@ class PdfViewer(QWidget):
         self.canvas.set_selected_ids(ids)
         self.annotations_changed.emit()
         self.status.emit(f"{n} Annotation(en): Gruppierung aufgehoben")
+        self._notify_group_actions()
         return n
 
     def toggle_selected_group_lock(self) -> int:

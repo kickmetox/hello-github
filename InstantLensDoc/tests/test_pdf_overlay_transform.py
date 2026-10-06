@@ -435,11 +435,14 @@ def test_ctrl_click_multi_select_then_group_ungroup(qapp, viewer):
     _qclick(viewer.canvas, ax, ay)
     _pump(app, 0.12)
     assert a.id in viewer.canvas._selected_ids
+    assert not viewer.btn_ann_group.isEnabled()
     _qclick(viewer.canvas, bx, by, Qt.KeyboardModifier.ControlModifier)
     _pump(app, 0.12)
     assert a.id in viewer.canvas._selected_ids and b.id in viewer.canvas._selected_ids, (
         viewer.canvas._selected_ids
     )
+    viewer._notify_group_actions()
+    assert viewer.btn_ann_group.isEnabled()
     n = viewer.group_selected_annotations()
     assert n >= 2
     ga = viewer.store.get(a.id).group_id
@@ -493,7 +496,32 @@ def test_rubber_band_then_grp(qapp, viewer):
     _qdrag(viewer.canvas, x0, y0, x1, y1)
     _pump(app, 0.2)
     assert a.id in viewer.canvas._selected_ids and b.id in viewer.canvas._selected_ids
+    viewer._notify_group_actions()
+    assert viewer.btn_ann_group.isEnabled()
     n = viewer.group_selected_annotations()
     assert n >= 2
     assert viewer.store.get(a.id).group_id == viewer.store.get(b.id).group_id
     assert viewer.store.get(a.id).group_id
+
+
+def test_click_selects_object_with_create_tool(qapp, viewer):
+    from ild_pdf import AnnotationType
+    from PySide6.QtWidgets import QApplication
+
+    app = QApplication.instance() or qapp
+    shape = _add(
+        viewer,
+        type=AnnotationType.RECTANGLE,
+        x=90.0,
+        y=100.0,
+        width=80.0,
+        height=44.0,
+        color="#1A5276",
+    )
+    viewer.set_tool(AnnotationType.ELLIPSE)
+    qapp.processEvents()
+    wx, wy = _center_widget(viewer, viewer.store.get(shape.id) or shape)
+    _qclick(viewer.canvas, wx, wy)
+    _pump(app, 0.12)
+    assert shape.id in viewer.canvas._selected_ids
+    assert viewer.canvas._select_mode is True

@@ -256,6 +256,8 @@ def test_dtp_group_ctrl_click_and_ungroup(qapp):
     qapp.processEvents()
     pane.set_tool("select", apply=False)
     assert pane.view.dragMode() == QGraphicsView.RubberBandDrag
+    assert pane.btn_grp is not None and not pane.btn_grp.isEnabled()
+    assert pane.btn_grp.toolTip() == "Mindestens zwei Objekte markieren (Strg+Klick)"
 
     msgs: list[str] = []
     pane.statusMessage.connect(msgs.append)
@@ -274,6 +276,8 @@ def test_dtp_group_ctrl_click_and_ungroup(qapp):
     _click(pane.scene._items[b.id], Qt.KeyboardModifier.ControlModifier)
     sel = {f.id for f in pane.scene.selected_frames()}
     assert a.id in sel and b.id in sel, sel
+    qapp.processEvents()
+    assert pane.btn_grp.isEnabled()
     n = pane.group_selected()
     assert n >= 2
     ga = doc.frame_by_id(a.id).group_id
@@ -293,6 +297,8 @@ def test_dtp_group_ctrl_click_and_ungroup(qapp):
     assert n_ug >= 2
     assert doc.frame_by_id(a.id).group_id == ""
     assert doc.frame_by_id(b.id).group_id == ""
+    qapp.processEvents()
+    assert not pane.btn_ungroup.isEnabled()
     pane.close()
 
 
@@ -320,6 +326,9 @@ def test_dtp_group_model_and_main_window_routing():
     assert "_ensure_pdf_target" not in fn
     assert "group_selected()" in fn
     assert "_layout_mode_active" in fn
+    assert "_grp_button_clicked" in pv
+    assert "actAnnGroup" in mw
+    assert 'setEnabled(n >= 2)' in pv or "can_group" in mw
 
 
 def test_dtp_stamp_paint_frameless(qapp):
