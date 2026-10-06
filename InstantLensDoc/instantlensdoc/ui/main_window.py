@@ -2107,7 +2107,7 @@ class MainWindow(QMainWindow):
             a_st = QAction(label, self)
             a_st.setObjectName(f"actEditStyle_{sid}")
             a_st.triggered.connect(lambda _c=False, s=sid: self._apply_paragraph_style(s))
-            m_styles.addAction(a_st)
+            m_styles.addAction(self._track_editor_action(a_st))
         act_bullet = QAction("Aufzählungszeichen", self)
         act_bullet.setShortcut(QKeySequence("Ctrl+Shift+L"))
         act_bullet.setObjectName("actEditBulletList")
@@ -2468,6 +2468,7 @@ class MainWindow(QMainWindow):
         act_shared.triggered.connect(self._show_shared_review_dialog)
         m_review.addAction(act_shared)
         act_review = QAction("Änderungen nachverfolgen…", self)
+        act_review.setObjectName("actReviewMode")
         act_review.setShortcut(QKeySequence("Ctrl+Alt+Shift+R"))
         act_review.setToolTip(
             "Review-Modus: Einfügen/Löschen je Autor protokollieren (lokal) — 2.6.21 "
@@ -2477,6 +2478,7 @@ class MainWindow(QMainWindow):
         m_review.addAction(act_review)
         self._review_action = act_review
         act_comments = QAction("Kommentare…", self)
+        act_comments.setObjectName("actDocComments")
         act_comments.setShortcut(QKeySequence("Ctrl+Alt+M"))
         act_comments.setToolTip(
             "Feedback an Textstellen ohne Body-Änderung — 2.6.21"
@@ -2484,6 +2486,7 @@ class MainWindow(QMainWindow):
         act_comments.triggered.connect(self._show_comments_dialog)
         m_review.addAction(act_comments)
         act_versions = QAction("Versionsverlauf…", self)
+        act_versions.setObjectName("actVersionHistory")
         act_versions.setShortcut(QKeySequence("Ctrl+Alt+Shift+H"))
         act_versions.setToolTip(
             "Dokumentstände speichern und wiederherstellen (lokal) — 2.6.21"
@@ -2491,6 +2494,7 @@ class MainWindow(QMainWindow):
         act_versions.triggered.connect(self._show_version_history_dialog)
         m_review.addAction(act_versions)
         act_mail_merge = QAction("Seriendruck…", self)
+        act_mail_merge.setObjectName("actMailMerge")
         act_mail_merge.setToolTip(
             "Empfänger aus CSV/Excel → Briefe mit {{Feld}}-Platzhaltern — 2.6.21"
         )
@@ -8552,6 +8556,15 @@ class MainWindow(QMainWindow):
         "insert_hyperlink": "actEditHyperlink",
         "insert_table": "actEditInsertTable",
         "insert_break": "actEditInsertPageBreak",
+        "style_normal": "actEditStyle_normal",
+        "style_h1": "actEditStyle_h1",
+        "style_h2": "actEditStyle_h2",
+        "style_h3": "actEditStyle_h3",
+        "style_quote": "actEditStyle_quote",
+        "mail_merge": "actMailMerge",
+        "review_mode": "actReviewMode",
+        "doc_comments": "actDocComments",
+        "version_history": "actVersionHistory",
         "page_layout": "actPageLayout",
         "compare_pdfs": "actComparePdfs",
         "preflight": "actPreflight",

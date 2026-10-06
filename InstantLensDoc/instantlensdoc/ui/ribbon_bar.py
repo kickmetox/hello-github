@@ -105,6 +105,8 @@ class RibbonBar(QWidget):
                         ("find_replace", "Suchen/Ersetzen"),
                         ("insert_hyperlink", "Hyperlink"),
                         ("insert_table", "Tabelle"),
+                        ("style_h1", "Überschrift 1"),
+                        ("style_normal", "Normal"),
                         ("insert_break", "Umbruch"),
                         ("clear_formatting", "Format löschen"),
                         ("autocorrect_toggle", "Autokorrektur"),
