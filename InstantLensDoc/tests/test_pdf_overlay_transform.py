@@ -44,14 +44,15 @@ def _canvas_page_to_widget(canvas, vx: float, vy: float) -> tuple[float, float]:
     return float(vx) + lx, float(vy) + ly
 
 
-def _qclick(canvas, x: float, y: float) -> None:
+def _qclick(canvas, x: float, y: float, modifiers=None) -> None:
     from PySide6.QtCore import QPoint, Qt
     from PySide6.QtTest import QTest
 
+    mods = Qt.KeyboardModifier.NoModifier if modifiers is None else modifiers
     QTest.mouseClick(
         canvas,
         Qt.MouseButton.LeftButton,
-        Qt.KeyboardModifier.NoModifier,
+        mods,
         QPoint(int(round(x)), int(round(y))),
     )
 
@@ -402,3 +403,86 @@ def test_dtp_sibling_resize_handles_untouched(qapp):
     assert shape.width > w0 + 5.0
     assert shape.height > h0 + 3.0
     pane.close()
+
+
+def test_ctrl_click_multi_select_then_group_ungroup(qapp, viewer):
+    from ild_pdf import AnnotationType
+    from PySide6.QtCore import Qt
+    from PySide6.QtWidgets import QApplication
+
+    app = QApplication.instance() or qapp
+    a = _add(
+        viewer,
+        type=AnnotationType.TEXT_OVERLAY,
+        x=70.0,
+        y=80.0,
+        width=110.0,
+        height=34.0,
+        text="G1",
+        color="#1A5276",
+    )
+    b = _add(
+        viewer,
+        type=AnnotationType.RECTANGLE,
+        x=230.0,
+        y=160.0,
+        width=80.0,
+        height=44.0,
+        color="#2980B9",
+    )
+    ax, ay = _center_widget(viewer, a)
+    bx, by = _center_widget(viewer, b)
+    _qclick(viewer.canvas, ax, ay)
+    _pump(app, 0.12)
+    assert a.id in viewer.canvas._selected_ids
+    _qclick(viewer.canvas, bx, by, Qt.KeyboardModifier.ControlModifier)
+    _pump(app, 0.12)
+    assert a.id in viewer.canvas._selected_ids and b.id in viewer.canvas._selected_ids, (
+        viewer.canvas._selected_ids
+    )
+    n = viewer.group_selected_annotations()
+    assert n >= 2
+    ga = viewer.store.get(a.id).group_id
+    gb = viewer.store.get(b.id).group_id
+    assert ga and ga == gb
+    n_ug = viewer.ungroup_selected_annotations()
+    assert n_ug >= 2
+    assert viewer.store.get(a.id).group_id == ""
+    assert viewer.store.get(b.id).group_id == ""
+
+
+def test_rubber_band_then_grp(qapp, viewer):
+    from ild_pdf import AnnotationType
+    from PySide6.QtWidgets import QApplication
+
+    app = QApplication.instance() or qapp
+    a = _add(
+        viewer,
+        type=AnnotationType.STAMP,
+        x=80.0,
+        y=90.0,
+        width=70.0,
+        height=36.0,
+        text="OK",
+        color="#1E8449",
+    )
+    b = _add(
+        viewer,
+        type=AnnotationType.TEXT_OVERLAY,
+        x=240.0,
+        y=180.0,
+        width=100.0,
+        height=32.0,
+        text="Txt",
+        color="#1A5276",
+    )
+    s = viewer._view_scale()
+    x0, y0 = _canvas_page_to_widget(viewer.canvas, 20.0 * s, 20.0 * s)
+    x1, y1 = _canvas_page_to_widget(viewer.canvas, 360.0 * s, 250.0 * s)
+    _qdrag(viewer.canvas, x0, y0, x1, y1)
+    _pump(app, 0.2)
+    assert a.id in viewer.canvas._selected_ids and b.id in viewer.canvas._selected_ids
+    n = viewer.group_selected_annotations()
+    assert n >= 2
+    assert viewer.store.get(a.id).group_id == viewer.store.get(b.id).group_id
+    assert viewer.store.get(a.id).group_id

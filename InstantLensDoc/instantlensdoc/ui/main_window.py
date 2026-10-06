@@ -7249,16 +7249,14 @@ class MainWindow(QMainWindow):
         )
 
     def _group_selected_annotations(self):
-        if self.stack.currentWidget() is not self.pdf_view or not self.pdf_view.pdf_path:
-            self._set_status("Gruppieren nur im PDF-Modus")
+        if not self._ensure_pdf_target("Gruppieren"):
             return
         n = self.pdf_view.group_selected_annotations()
         if n:
             self._refresh_pdf_marks()
 
     def _ungroup_selected_annotations(self):
-        if self.stack.currentWidget() is not self.pdf_view or not self.pdf_view.pdf_path:
-            self._set_status("Entgruppieren nur im PDF-Modus")
+        if not self._ensure_pdf_target("Entgruppieren"):
             return
         n = self.pdf_view.ungroup_selected_annotations()
         if n:
