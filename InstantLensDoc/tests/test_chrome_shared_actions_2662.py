@@ -478,4 +478,10 @@ def test_absatz_seitenlayout_einfuegen_share_ribbon_qactions() -> None:
     assert _WIN.ribbon_bar.qaction("page_size_a4") is a4
     _p, _h, cols = _menu_action("Seitenlayout", "2 Spalten")
     assert _WIN.chrome_qactions()["page_columns_2"] is cols
+    assert _WIN.chrome_feature_qactions("Ausrichtung")["align_left"] is _WIN.chrome_qactions()[
+        "align_left"
+    ]
+    assert _WIN.chrome_feature_qactions("Listen")["numbered_list"] is _WIN.chrome_qactions()[
+        "numbered_list"
+    ]
 
