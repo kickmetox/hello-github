@@ -154,11 +154,14 @@ def test_narrow_ribbon_keeps_ink_font_dtp_reachable() -> None:
         wrap = rb._stack.currentWidget()
         for aid in aids:
             assert aid in rb._actions, aid
-            btn = rb._actions[aid]
-            assert btn.isVisibleTo(wrap), f"{tab}:{aid} unsichtbar"
+            btns = list(rb._action_buttons.get(aid) or ())
+            if not btns and rb._actions.get(aid) is not None:
+                btns = [rb._actions[aid]]
+            vis = [b for b in btns if b is not None and b.isVisibleTo(wrap)]
+            assert vis, f"{tab}:{aid} unsichtbar ({len(btns)} Instanzen)"
             assert not any(
                 aid in (spec[0], spec[1])
-                for p in rb.findChildren(_OverflowPanel)
+                for p in wrap.findChildren(_OverflowPanel)
                 for spec in p._hidden_specs
             )
     host = getattr(_WIN, "_ild_menubar_host", None)
@@ -173,7 +176,8 @@ def test_narrow_ribbon_keeps_ink_font_dtp_reachable() -> None:
         pump(_APP, 0.05)
         rb.select_tab("Ansicht")
         wrap = rb._stack.currentWidget()
-        assert rb._actions["ink_input"].isVisibleTo(wrap)
+        ink = list(rb._action_buttons.get("ink_input") or [rb._actions["ink_input"]])
+        assert any(b is not None and b.isVisibleTo(wrap) for b in ink)
 
 
 def test_overflow_menu_is_one_column_and_triggers_qaction() -> None:
