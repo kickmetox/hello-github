@@ -33,8 +33,9 @@ class EditorLayoutMarksDialog(QDialog):
 
         root = QVBoxLayout(self)
         hint = QLabel(
-            "Breitenmarken, Druckmarken und Kopf-/Fußzeilen-Marken lassen sich "
-            "unabhängig über Ansicht und die Editor-Leiste ein- und ausschalten. "
+            "Breitenmarken, Druckmarken und Kopf-/Fußzeilen-Marken gehören zur "
+            "gemeinsamen Dokumentansicht (Text, PDF, DTP-Werkzeuge) und lassen "
+            "sich unabhängig über Ansicht und die Leiste ein- und ausschalten. "
             "Hier nur Marken: Größen (mm), Farbe, Crop/Bleed/Register, Bildschirm "
             "vs. Druck/PDF. Satzspiegel und Seitenränder bleiben unter "
             "Layout → Seitenränder — kein zweites Ränder-Dialog."

@@ -6,7 +6,7 @@ import json
 import time
 from pathlib import Path
 
-from PySide6.QtCore import QEvent, Qt, QTimer, Signal
+from PySide6.QtCore import QEvent, QPoint, QPointF, QRectF, Qt, QTimer, Signal
 from PySide6.QtGui import QAction, QActionGroup, QColor, QIcon, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QAbstractItemView,
@@ -1393,6 +1393,55 @@ class MainWindow(QMainWindow):
         host_lay.addWidget(self.stack, 0, 0)
         host_lay.addWidget(self.dtp_pane, 0, 0)
         self.dtp_pane.hide()
+        try:
+            from instantlensdoc.ui.editor_layout_marks import (
+                DocHostLayoutMarksSource,
+                EditorLayoutMarksOverlay,
+            )
+
+            self._host_marks_source = DocHostLayoutMarksSource(self)
+            self._doc_host_marks_overlay = EditorLayoutMarksOverlay(
+                self._doc_host,
+                source=self._host_marks_source,
+                host_mode=True,
+            )
+            self._doc_host_marks_overlay.headerFooterClicked.connect(
+                self._edit_editor_header_footer
+            )
+            self._doc_host_marks_overlay.hide()
+        except Exception:
+            self._host_marks_source = None
+            self._doc_host_marks_overlay = None
+        try:
+            self.stack.currentChanged.connect(
+                lambda *_: self._sync_host_layout_marks_overlay()
+            )
+        except Exception:
+            pass
+        try:
+            self.pdf_view.scroll.verticalScrollBar().valueChanged.connect(
+                lambda *_: self._sync_host_layout_marks_overlay()
+            )
+            self.pdf_view.scroll.horizontalScrollBar().valueChanged.connect(
+                lambda *_: self._sync_host_layout_marks_overlay()
+            )
+            self.pdf_view.page_changed.connect(
+                lambda *_: self._sync_host_layout_marks_overlay()
+            )
+            self.pdf_view.zoom_changed.connect(
+                lambda *_: self._sync_host_layout_marks_overlay()
+            )
+        except Exception:
+            pass
+        try:
+            self.dtp_pane.view.horizontalScrollBar().valueChanged.connect(
+                lambda *_: self._sync_host_layout_marks_overlay()
+            )
+            self.dtp_pane.view.verticalScrollBar().valueChanged.connect(
+                lambda *_: self._sync_host_layout_marks_overlay()
+            )
+        except Exception:
+            pass
         self.stack.currentChanged.connect(lambda *_: self._apply_doc_split_sync_scroll())
         self.stack.currentChanged.connect(lambda *_: self._update_doc_status())
         self.stack.currentChanged.connect(lambda *_: self._sync_editor_toolbar_for_stack())
@@ -2858,7 +2907,7 @@ class MainWindow(QMainWindow):
         self._width_marks_action.setCheckable(True)
         self._width_marks_action.setChecked(bool(_marks0.show_width_marks))
         self._width_marks_action.setToolTip(
-            "Satzspiegel-/Breitenmarken (mm) am Seitenrand — Word-Suite Textmodus"
+            "Satzspiegel-/Breitenmarken (mm) in der Dokumentansicht (Text/PDF/DTP)"
         )
         self._width_marks_action.toggled.connect(self._toggle_width_marks)
         m_view.addAction(self._width_marks_action)
@@ -2867,7 +2916,8 @@ class MainWindow(QMainWindow):
         self._editor_print_marks_action.setCheckable(True)
         self._editor_print_marks_action.setChecked(bool(_marks0.show_print_marks))
         self._editor_print_marks_action.setToolTip(
-            "Crop/Bleed/Register/Farbkeil um die Editor-Seite (nicht PDF-Druckermarken)"
+            "Crop/Bleed/Register/Farbkeil um die Seite in der Dokumentansicht "
+            "(nicht PDF-Druckermarken)"
         )
         self._editor_print_marks_action.toggled.connect(self._toggle_editor_print_marks)
         m_view.addAction(self._editor_print_marks_action)
@@ -2876,7 +2926,8 @@ class MainWindow(QMainWindow):
         self._header_footer_marks_action.setCheckable(True)
         self._header_footer_marks_action.setChecked(bool(_marks0.show_header_footer_marks))
         self._header_footer_marks_action.setToolTip(
-            "Gepunktete Kopf-/Fußzeilen-Bänder — Klick öffnet Kopf-/Fußzeile"
+            "Gepunktete Kopf-/Fußzeilen-Bänder in der Dokumentansicht — "
+            "Klick öffnet Kopf-/Fußzeile"
         )
         self._header_footer_marks_action.toggled.connect(self._toggle_header_footer_marks)
         m_view.addAction(self._header_footer_marks_action)
@@ -12577,6 +12628,166 @@ class MainWindow(QMainWindow):
         pane = getattr(self, "editor_pane", None)
         if pane is not None and hasattr(pane, "_sync_layout_mark_buttons"):
             pane._sync_layout_mark_buttons()
+        self._sync_host_layout_marks_overlay()
+
+    def _map_widget_rect_to_host(self, widget, rect: QRectF) -> QRectF:
+        host = getattr(self, "_doc_host", None)
+        if host is None or widget is None or rect is None:
+            return QRectF()
+        try:
+            tl = widget.mapTo(
+                host, QPoint(int(round(rect.left())), int(round(rect.top())))
+            )
+            br = widget.mapTo(
+                host, QPoint(int(round(rect.right())), int(round(rect.bottom())))
+            )
+            return QRectF(QPointF(tl), QPointF(br)).normalized()
+        except Exception:
+            return QRectF(rect)
+
+    def _editor_layout_marks_geometry_in_host(self) -> dict | None:
+        ed = getattr(self, "editor", None)
+        if ed is None or not hasattr(ed, "layout_marks_geometry"):
+            return None
+        geom = ed.layout_marks_geometry()
+        if not geom:
+            return None
+        out = dict(geom)
+        page = geom.get("page")
+        area = geom.get("type_area")
+        if isinstance(page, QRectF):
+            out["page"] = self._map_widget_rect_to_host(ed, page)
+        if isinstance(area, QRectF):
+            out["type_area"] = self._map_widget_rect_to_host(ed, area)
+        return out
+
+    def _pdf_layout_marks_geometry(self) -> dict | None:
+        pv = getattr(self, "pdf_view", None)
+        if pv is None:
+            return None
+        canvas = getattr(pv, "canvas", None)
+        if canvas is None:
+            return None
+        from instantlensdoc.core.editor_layout_marks import mm_to_px
+
+        mb = getattr(canvas, "_mediabox_rect", None)
+        if mb and len(mb) == 4:
+            page = QRectF(float(mb[0]), float(mb[1]), float(mb[2]), float(mb[3]))
+        else:
+            pm = canvas.pixmap() if hasattr(canvas, "pixmap") else None
+            if pm is not None and not pm.isNull():
+                page = QRectF(0.0, 0.0, float(pm.width()), float(pm.height()))
+            else:
+                cr = canvas.contentsRect()
+                page = QRectF(
+                    float(cr.x()),
+                    float(cr.y()),
+                    float(max(1, cr.width())),
+                    float(max(1, cr.height())),
+                )
+        scale = max(float(getattr(pv, "scale", 1.0) or 1.0), 0.01)
+        dpi = 72.0 * scale
+        cols = 1
+        lay = None
+        try:
+            lay = self.editor.page_layout()
+        except Exception:
+            lay = None
+        if lay is not None:
+            ml = mm_to_px(float(getattr(lay, "margin_left_mm", 20.0) or 20.0), dpi)
+            mr = mm_to_px(float(getattr(lay, "margin_right_mm", 20.0) or 20.0), dpi)
+            mt = mm_to_px(float(getattr(lay, "margin_top_mm", 20.0) or 20.0), dpi)
+            mbm = mm_to_px(float(getattr(lay, "margin_bottom_mm", 20.0) or 20.0), dpi)
+            cols = int(getattr(lay, "columns", 1) or 1)
+        else:
+            ml = mr = mt = mbm = mm_to_px(20.0, dpi)
+        type_area = QRectF(
+            page.x() + ml,
+            page.y() + mt,
+            max(1.0, page.width() - ml - mr),
+            max(1.0, page.height() - mt - mbm),
+        )
+        return {
+            "page": self._map_widget_rect_to_host(canvas, page),
+            "type_area": self._map_widget_rect_to_host(canvas, type_area),
+            "dpi": dpi,
+            "columns": cols,
+        }
+
+    def _dtp_layout_marks_geometry(self) -> dict | None:
+        pane = getattr(self, "dtp_pane", None)
+        if pane is None:
+            return None
+        view = getattr(pane, "view", None)
+        doc = getattr(pane, "doc", None)
+        g = getattr(doc, "geometry", None) if doc is not None else None
+        if view is None or g is None:
+            return None
+        try:
+            from instantlensdoc.dtp.canvas import PAGE_OFFSET
+        except Exception:
+            PAGE_OFFSET = 40.0
+        try:
+            tl = view.mapFromScene(QPointF(PAGE_OFFSET, PAGE_OFFSET))
+            br = view.mapFromScene(
+                QPointF(PAGE_OFFSET + float(g.width_pt), PAGE_OFFSET + float(g.height_pt))
+            )
+            page_view = QRectF(QPointF(tl), QPointF(br)).normalized()
+            ta_tl = view.mapFromScene(
+                QPointF(
+                    PAGE_OFFSET + float(g.margin_left_pt),
+                    PAGE_OFFSET + float(g.margin_top_pt),
+                )
+            )
+            ta_br = view.mapFromScene(
+                QPointF(
+                    PAGE_OFFSET + float(g.width_pt) - float(g.margin_right_pt),
+                    PAGE_OFFSET + float(g.height_pt) - float(g.margin_bottom_pt),
+                )
+            )
+            area_view = QRectF(QPointF(ta_tl), QPointF(ta_br)).normalized()
+            tr = view.transform()
+            scale = abs(float(tr.m11()) or 1.0)
+            dpi = 72.0 * max(scale, 0.01)
+            cols = int(getattr(g, "columns", 1) or 1)
+            return {
+                "page": self._map_widget_rect_to_host(view, page_view),
+                "type_area": self._map_widget_rect_to_host(view, area_view),
+                "dpi": dpi,
+                "columns": cols,
+            }
+        except Exception:
+            return None
+
+    def _host_layout_marks_geometry(self) -> dict | None:
+        """Seite + Satzspiegel in ``_doc_host``-Koordinaten (Text/PDF/DTP)."""
+        if self._layout_mode_active():
+            geom = self._dtp_layout_marks_geometry()
+            if geom is not None:
+                return geom
+        if self._pdf_tab_active():
+            geom = self._pdf_layout_marks_geometry()
+            if geom is not None:
+                return geom
+        return self._editor_layout_marks_geometry_in_host()
+
+    def _sync_host_layout_marks_overlay(self) -> None:
+        ov = getattr(self, "_doc_host_marks_overlay", None)
+        host = getattr(self, "_doc_host", None)
+        if ov is None or host is None:
+            return
+        try:
+            ov.setGeometry(host.rect())
+            show_host = bool(self._layout_mode_active() or self._pdf_tab_active())
+            ov.setVisible(show_host)
+            if show_host:
+                ov.raise_()
+            ov.update()
+            ed_ov = getattr(getattr(self, "editor", None), "_marks_overlay", None)
+            if ed_ov is not None:
+                ed_ov.setVisible(not show_host)
+        except Exception:
+            pass
 
     def _show_editor_layout_marks_dialog(self) -> None:
         from instantlensdoc.ui.editor_layout_marks_dialog import EditorLayoutMarksDialog
@@ -15196,6 +15407,7 @@ class MainWindow(QMainWindow):
             self._dtp_tools_on = True
             if hasattr(pane, "apply_shared_print_overlays"):
                 pane.apply_shared_print_overlays()
+            self._sync_host_layout_marks_overlay()
             self._sync_layout_mode_checked(True)
             self._merge_dtp_into_right_toolbox()
             self._set_status("DTP-Werkzeuge (gleiche Ansicht)")
@@ -15225,6 +15437,7 @@ class MainWindow(QMainWindow):
             if pane is not None:
                 pane.hide()
             self._dtp_tools_on = False
+            self._sync_host_layout_marks_overlay()
             self._sync_layout_mode_checked(False)
             self._merge_dtp_into_right_toolbox()
             self._set_status("DTP-Werkzeuge aus")

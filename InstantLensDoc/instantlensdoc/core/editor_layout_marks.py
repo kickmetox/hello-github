@@ -1,8 +1,8 @@
-"""Layout-Marken für den Word-Suite-Texteditor (Breite / Druck / Kopf-Fuß).
+"""Layout-Marken der gemeinsamen Dokumentansicht (Breite / Druck / Kopf-Fuß).
 
-Metriken (mm, Farben) sind analog zu ``dtp.chrome`` / ``dtp.geometry`` gehalten.
-DTP-Crop/Register bleibt in ``dtp.print_marks`` (nicht umschreiben) — gemeinsame
-mm-Helfer hier, falls der Canvas sie später importiert.
+Gehören zur Word-Suite-Ansicht (Text, PDF und DTP-Werkzeuge im selben Fenster),
+nicht zum DTP-Canvas. Metriken (mm, Farben) analog zu ``dtp.chrome`` /
+``dtp.geometry``. DTP-Crop/Register bleibt in ``dtp.print_marks`` (kein Rewrite).
 """
 
 from __future__ import annotations

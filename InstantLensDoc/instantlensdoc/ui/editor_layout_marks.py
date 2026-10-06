@@ -1,8 +1,12 @@
-"""Overlay: Breiten-/Druck-/Kopf-Fuß-Marken im Texteditor (nicht DTP-Canvas)."""
+"""Overlay: Breiten-/Druck-/Kopf-Fuß-Marken der gemeinsamen Dokumentansicht.
+
+Zeichnet auf dem Texteditor und — im Host-Modus — über PDF/DTP in demselben
+Dokumentfenster. Kein DTP-Canvas-Rewrite; DTP-Crop bleibt in ``dtp.print_marks``.
+"""
 
 from __future__ import annotations
 
-from PySide6.QtCore import QPointF, QRectF, Qt, Signal
+from PySide6.QtCore import QEvent, QPointF, QRectF, Qt, Signal
 from PySide6.QtGui import QColor, QFont, QPainter, QPen
 from PySide6.QtWidgets import QWidget
 
@@ -166,20 +170,75 @@ def draw_header_footer_marks(
     painter.drawText(footer.adjusted(6, 2, -6, -2), Qt.AlignVCenter | Qt.AlignLeft, f_label)
 
 
+class DocHostLayoutMarksSource:
+    """Adapter: Overlay liest dieselben EditorLayoutMarks über Text/PDF/DTP."""
+
+    def __init__(self, window):
+        self._window = window
+
+    def layout_marks(self):
+        ed = getattr(self._window, "editor", None)
+        fn = getattr(ed, "layout_marks", None)
+        if callable(fn):
+            return fn()
+        return EditorLayoutMarks.from_settings()
+
+    def layout_marks_geometry(self):
+        fn = getattr(self._window, "_host_layout_marks_geometry", None)
+        return fn() if callable(fn) else None
+
+    def document_header(self):
+        ed = getattr(self._window, "editor", None)
+        fn = getattr(ed, "document_header", None)
+        return str(fn() if callable(fn) else "")
+
+    def document_footer(self):
+        ed = getattr(self._window, "editor", None)
+        fn = getattr(ed, "document_footer", None)
+        return str(fn() if callable(fn) else "")
+
+
 class EditorLayoutMarksOverlay(QWidget):
-    """Transparente Fläche über dem Editor: Marken zeichnen, Bänder klickbar."""
+    """Transparente Fläche: Marken zeichnen, Kopf-/Fuß-Bänder klickbar.
+
+    ``host_mode``: Kind von ``_doc_host`` — dieselbe Ansicht für Text/PDF/DTP,
+    nicht als DTP-Canvas-Chrome.
+    """
 
     headerFooterClicked = Signal(str)
 
-    def __init__(self, editor: QWidget):
-        super().__init__(editor)
-        self.setObjectName("editorLayoutMarksOverlay")
-        self._editor = editor
+    def __init__(self, parent: QWidget, source=None, *, host_mode: bool = False):
+        super().__init__(parent)
+        self._host_mode = bool(host_mode)
+        self.setObjectName(
+            "docHostLayoutMarksOverlay" if self._host_mode else "editorLayoutMarksOverlay"
+        )
+        self._editor = source if source is not None else parent
         self.setAttribute(Qt.WA_TransparentForMouseEvents, True)
         self.setAttribute(Qt.WA_NoSystemBackground, True)
         self.setAutoFillBackground(False)
         self._header = QRectF()
         self._footer = QRectF()
+        if self._host_mode and parent is not None:
+            parent.installEventFilter(self)
+            self.setGeometry(parent.rect())
+            self.raise_()
+
+    def eventFilter(self, obj, event) -> bool:  # noqa: N802
+        if self._host_mode and obj is self.parentWidget() and event is not None:
+            et = event.type()
+            if et in (
+                QEvent.Type.Resize,
+                QEvent.Type.Show,
+                QEvent.Type.LayoutRequest,
+            ):
+                try:
+                    self.setGeometry(obj.rect())
+                    self.raise_()
+                    self.update()
+                except Exception:
+                    pass
+        return False
 
     def hit_test(self, pos) -> str | None:
         return hit_test_band(

@@ -890,14 +890,20 @@ class TextEditor(QPlainTextEdit):
 
     def _sync_marks_overlay(self) -> None:
         ov = getattr(self, "_marks_overlay", None)
-        if ov is None:
-            return
-        try:
-            ov.setGeometry(self.rect())
-            ov.raise_()
-            ov.update()
-        except Exception:
-            pass
+        if ov is not None:
+            try:
+                ov.setGeometry(self.rect())
+                ov.raise_()
+                ov.update()
+            except Exception:
+                pass
+        win = self.window()
+        sync = getattr(win, "_sync_host_layout_marks_overlay", None)
+        if callable(sync) and win is not self:
+            try:
+                sync()
+            except Exception:
+                pass
 
     def mousePressEvent(self, event):  # noqa: N802
         ov = getattr(self, "_marks_overlay", None)
@@ -4488,7 +4494,7 @@ class EditorPane(QWidget):
                 "width_marks",
                 "Breitenmarken",
                 True,
-                "Satzspiegel-/Breitenmarken (mm) ein/aus — Ansicht",
+                "Satzspiegel-/Breitenmarken (mm) ein/aus — Ansicht (Text/PDF/DTP)",
             ),
             (
                 "print_marks",

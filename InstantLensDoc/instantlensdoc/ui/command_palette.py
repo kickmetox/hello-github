@@ -216,7 +216,7 @@ def default_palette_commands() -> list[PaletteCommand]:
         PaletteCommand(
             "width_marks",
             "Breitenmarken ein/aus",
-            "breitenmarken satzspiegel lineal mm type area",
+            "breitenmarken satzspiegel lineal mm type area ansicht pdf dtp",
             "Ansicht",
         ),
         PaletteCommand(

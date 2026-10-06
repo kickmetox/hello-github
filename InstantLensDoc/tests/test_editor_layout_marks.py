@@ -185,3 +185,69 @@ def test_menu_and_toolbar_actions_exist(main_win) -> None:
     ov = getattr(win.editor, "_marks_overlay", None)
     assert ov is not None
     assert ov.objectName() == "editorLayoutMarksOverlay"
+    host_ov = getattr(win, "_doc_host_marks_overlay", None)
+    assert host_ov is not None
+    assert host_ov.objectName() == "docHostLayoutMarksOverlay"
+    assert host_ov.parent() is win._doc_host
+
+
+def test_marks_overlay_on_unified_doc_host(main_win) -> None:
+    """Breiten-/Druck-/Kopf-Fuß-Marken liegen auf _doc_host, nicht am DTP-Canvas."""
+    app, win = main_win
+    ov = getattr(win, "_doc_host_marks_overlay", None)
+    assert ov is not None
+    assert ov.objectName() == "docHostLayoutMarksOverlay"
+    assert ov.parent() is win._doc_host
+    assert ov.parent() is not getattr(win, "dtp_pane", None)
+
+    win.stack.setCurrentWidget(win.pdf_view)
+    pump(app, 0.05)
+    win._sync_host_layout_marks_overlay()
+    assert ov.isVisible()
+    geom = win._host_layout_marks_geometry()
+    assert geom is not None
+    assert geom.get("page") is not None
+    win._toggle_width_marks(False)
+    pump(app, 0.05)
+    assert win.editor.show_width_marks() is False
+    win._toggle_editor_print_marks(True)
+    pump(app, 0.05)
+    assert win.editor.show_print_marks() is True
+    win._toggle_width_marks(True)
+    pump(app, 0.05)
+    assert win.editor.show_width_marks() is True
+
+    orig_dirty = win._document_is_dirty
+    win._document_is_dirty = lambda: False  # type: ignore[method-assign]
+    try:
+        pane = getattr(win, "dtp_pane", None)
+        if pane is not None and hasattr(pane, "clear_dirty"):
+            pane.clear_dirty()
+        assert win._enter_layout_mode()
+        pump(app, 0.1)
+        assert win._layout_mode_active()
+        assert ov.isVisible()
+        assert ov.parent() is win._doc_host
+        dtp_geom = win._dtp_layout_marks_geometry()
+        assert dtp_geom is not None
+        assert float(dtp_geom["page"].width()) > 0
+        from instantlensdoc.dtp.print_marks import WORD_EDITOR_OVERLAY_TAGS
+
+        scene = win.dtp_pane.scene
+        tags = {it.data(0) for it in scene.items() if it.data(0)}
+        assert not (tags & WORD_EDITOR_OVERLAY_TAGS)
+        ed_ov = getattr(win.editor, "_marks_overlay", None)
+        if ed_ov is not None:
+            assert not ed_ov.isVisible()
+    finally:
+        try:
+            win._leave_layout_mode()
+        except Exception:
+            pass
+        win._document_is_dirty = orig_dirty  # type: ignore[method-assign]
+        try:
+            win.stack.setCurrentWidget(win.editor_pane)
+        except Exception:
+            pass
+        win._sync_host_layout_marks_overlay()
+        pump(app, 0.05)
