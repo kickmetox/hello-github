@@ -371,3 +371,199 @@ WORD_TAB_GROUPS: dict[str, tuple[tuple[str, tuple], ...]] = {
 
 def disabled_reason(action_id: str) -> str | None:
     return DISABLED_REASONS.get(str(action_id or ""))
+
+
+# Eine Ansicht: nie ausblenden, nur ausgrauen — deutsche Gründe.
+REASON_FONT = (
+    "Schriftänderung erst nach OCR (Word-Suite) oder in txt/doc/docx/odt/DTP-Textrahmen verfügbar"
+)
+REASON_FONT_PDF = "Schriftänderung erst nach OCR (Word-Suite) verfügbar"
+REASON_PAGE = "Seitenränder und Seitenlayout brauchen eine geöffnete Seite"
+REASON_PDF = "Nur bei angezeigter PDF-Seite verfügbar"
+REASON_MAIL = "Seriendruck nur bei Textdokument (txt, doc, docx, odt)"
+REASON_TABLE = "Tabellenwerkzeuge nur in einer Tabelle"
+REASON_ARRANGE = "Anordnen nur bei ausgewähltem DTP-Rahmen"
+REASON_RICH = "Nur in txt, doc, docx, odt, DTP-Textrahmen oder nach OCR verfügbar"
+
+FONT_ACTION_IDS = frozenset(
+    {
+        "bold",
+        "italic",
+        "underline",
+        "strike",
+        "font",
+        "font_size",
+        "grow_font",
+        "shrink_font",
+        "subscript",
+        "superscript",
+        "font_color",
+        "highlight",
+        "highlight_color",
+        "clear_formatting",
+        "toggle_case",
+        "styles_pane",
+        "style_normal",
+        "style_h1",
+        "style_h2",
+        "style_h3",
+        "style_quote",
+        "style_title",
+        "style_list",
+        "format_painter",
+        "dtp_font",
+    }
+)
+PAGE_ACTION_IDS = frozenset(
+    {
+        "page_layout",
+        "page_margins",
+        "page_margins_normal",
+        "page_margins_narrow",
+        "page_margins_wide",
+        "page_margins_custom",
+        "page_orientation",
+        "page_portrait",
+        "page_landscape",
+        "page_size",
+        "page_size_a4",
+        "page_size_letter",
+        "page_size_legal",
+        "page_columns",
+        "page_columns_1",
+        "page_columns_2",
+        "page_columns_3",
+        "page_breaks",
+        "insert_break",
+        "section_break",
+        "line_numbers",
+        "header_footer",
+        "insert_header",
+        "insert_footer",
+        "insert_page_number",
+        "insert_cover_page",
+        "insert_blank_page",
+        "view_print",
+        "zoom_100",
+        "zoom_one_page",
+        "zoom_page_width",
+        "zoom_multi",
+    }
+)
+MAIL_ACTION_IDS = frozenset(
+    {
+        "mail_merge",
+        "mail_merge_data",
+        "mail_merge_field",
+        "mail_merge_preview",
+        "mail_merge_finish",
+        "mail_merge_recipients",
+        "mail_merge_address",
+        "mail_merge_greeting",
+        "mail_merge_highlight",
+        "envelopes",
+        "labels",
+    }
+)
+PDF_ACTION_IDS = frozenset(
+    {
+        "book_layout",
+        "page_by_page",
+        "continuous_scroll",
+    }
+)
+PDF_OPEN_ACTION_IDS = frozenset(
+    {
+        "preflight",
+        "apply_bleed",
+        "export_pdfx",
+    }
+)
+ALWAYS_ACTION_IDS = frozenset(
+    {
+        "open",
+        "scan_import",
+        "devices_discover",
+        "devices_printers",
+        "devices_refresh",
+        "toggle_ribbon",
+        "toggle_doc_tabs",
+        "settings",
+        "chrome_klassisch",
+        "chrome_ribbon",
+        "chrome_kombiniert",
+        "print",
+        "dtp_layout",
+    }
+)
+TABLE_ACTION_IDS = frozenset(
+    {
+        "table_add_row",
+        "table_add_col",
+        "table_del_row",
+        "table_del_col",
+        "table_merge",
+        "table_split",
+        "table_borders",
+        "table_header_row",
+        "table_align_left",
+        "table_align_center",
+        "table_align_right",
+    }
+)
+ARRANGE_ACTION_IDS = frozenset({"bring_forward", "send_backward"})
+RICH_TEXT_ACTION_IDS = frozenset(
+    {
+        "export_epub",
+        "export_pptx",
+        "insert_hyperlink",
+        "insert_shape",
+        "insert_snippet",
+        "insert_table",
+        "find_replace",
+        "replace",
+        "goto",
+        "spellcheck",
+        "auto_toc",
+        "auto_toc_update",
+        "auto_lof",
+        "auto_index",
+        "field_token",
+        "indent",
+        "outdent",
+        "bullet_list",
+        "numbered_list",
+        "paragraph",
+        "align_left",
+        "align_center",
+        "align_right",
+        "align_justify",
+        "line_spacing_15",
+        "insert_special_chars",
+        "insert_nbsp",
+        "insert_shy",
+        "hyphenate",
+        "drop_cap",
+        "insert_footnote",
+        "insert_endnote",
+        "insert_caption",
+        "insert_citation",
+        "bibliography",
+        "mark_index",
+        "insert_bookmark",
+        "insert_cross_ref",
+        "insert_text_box",
+        "insert_date",
+        "insert_equation",
+        "insert_signature",
+        "insert_symbol",
+        "select_all",
+        "show_special_chars",
+        "word_count",
+        "review_mode",
+        "review_accept",
+        "review_reject",
+        "doc_comments",
+        "autocorrect_toggle",
+    }
+)

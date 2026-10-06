@@ -758,20 +758,17 @@ class RibbonBar(QWidget):
         return self._stack.count()
 
     def set_table_tools_visible(self, visible: bool) -> None:
+        """Tabellentools bleiben sichtbar; Anwendbarkeit über Enablement, nicht Hide."""
         if self._table_tab_index < 0:
             return
         btn = self._cat_buttons[self._table_tab_index]
-        btn.setVisible(bool(visible))
-        if visible:
-            self._select_cat(self._table_tab_index)
-        elif self._stack.currentIndex() == self._table_tab_index:
-            start = self._tab_index.get("Start", 1)
-            self._select_cat(start)
+        btn.setVisible(True)
 
     def set_arrange_visible(self, visible: bool) -> None:
+        """Anordnen bleibt sichtbar; ausgegraut wenn kein Rahmen gewählt."""
         g = getattr(self, "_arrange_group", None)
         if g is not None:
-            g.setVisible(bool(visible))
+            g.setVisible(True)
 
     def set_dtp_tools_visible(self, visible: bool) -> None:
         """DTP-Gruppen bleiben in der Word-Leiste sichtbar (keine zweite Ansicht)."""
@@ -813,6 +810,29 @@ class RibbonBar(QWidget):
                 tb.setToolTip(tip)
             except Exception:
                 pass
+
+    def set_available(self, action_id: str, enabled: bool, reason: str = "") -> None:
+        """Ausgrauen mit deutschem Grund; Cloud-Buttons (ribbonUnavailable) unangetastet."""
+        extra = str(reason or "").strip()
+        for tb in self._action_buttons.get(action_id, ()) or ():
+            try:
+                if tb.property("ribbonUnavailable"):
+                    continue
+                src = tb.property("ildAvailTip")
+                if not src:
+                    src = tb.toolTip() or tb.text() or ""
+                    tb.setProperty("ildAvailTip", src)
+                tb.setEnabled(bool(enabled))
+                base = str(src).strip()
+                if enabled or not extra:
+                    tb.setToolTip(base)
+                else:
+                    tb.setToolTip(f"{base} — {extra}".strip(" —") if base else extra)
+            except Exception:
+                try:
+                    tb.setEnabled(bool(enabled))
+                except Exception:
+                    pass
 
     def bind_qactions(self, mapping: dict[str, QAction]) -> None:
         """Ribbon-Buttons lösen dieselbe QAction aus wie das Pulldown-Menü."""

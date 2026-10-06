@@ -1380,6 +1380,12 @@ class MainWindow(QMainWindow):
         self._dtp_tools_on = False
         if hasattr(self.dtp_pane, "set_word_window_embedded"):
             self.dtp_pane.set_word_window_embedded(True)
+        try:
+            self.dtp_pane.scene.selectionChanged.connect(
+                self._on_dtp_selection_enablement
+            )
+        except Exception:
+            pass
         self.stack.addWidget(self.editor_pane)  # 0
         self.stack.addWidget(self.pdf_view)  # 1
         self.stack.addWidget(self.image_label)  # 2
@@ -5236,50 +5242,110 @@ class MainWindow(QMainWindow):
         )
         return any(n in t for n in needles)
 
+    @staticmethod
+    def _label_is_font_format(label: str) -> bool:
+        t = (label or "").strip().lower()
+        needles = (
+            "fett",
+            "kursiv",
+            "unterstrichen",
+            "durchgestrichen",
+            "schriftart",
+            "schriftgröße",
+            "schriftgroesse",
+            "schriftfarbe",
+            "texthervorhebung",
+            "hintergrundfarbe",
+            "textmarker",
+            "formatierungen löschen",
+            "format löschen",
+            "formatvorlage",
+            "absatzstil",
+            "zeichenstil",
+            "stil-preset",
+            "groß-/klein",
+            "gross-/klein",
+            "alles groß",
+            "alles klein",
+            "format übertragen",
+        )
+        return any(n in t for n in needles)
+
+    @staticmethod
+    def _label_is_page_setup(label: str) -> bool:
+        t = (label or "").strip().lower()
+        needles = (
+            "seitenlayout",
+            "seitenränder",
+            "seitenraender",
+            "hochformat",
+            "querformat",
+            "us letter",
+            "a4",
+            "legal",
+            "1 spalte",
+            "2 spalten",
+            "3 spalten",
+            "seitenumbruch",
+            "abschnittsumbruch",
+            "kopfzeile",
+            "fußzeile",
+            "fusszeile",
+            "kopf-/fuß",
+            "kopf-/fuss",
+            "seitenzahl",
+            "deckblatt",
+            "leere seite",
+            "zeilennummern",
+        )
+        return any(n in t for n in needles)
+
+    @staticmethod
+    def _label_is_mail_merge(label: str) -> bool:
+        t = (label or "").strip().lower()
+        needles = (
+            "seriendruck",
+            "empfängerliste",
+            "adressblock",
+            "grußzeile",
+            "grusszeile",
+            "felder hervorheben",
+            "umschläge",
+            "umschlaege",
+            "etiketten",
+            "zusammenführen",
+            "zusammenfuehren",
+            "datenquelle",
+            "feld einfügen",
+        )
+        return any(n in t for n in needles)
+
+    def _on_dtp_selection_enablement(self, *_args) -> None:
+        """Nach DTP-Rahmenwahl Enablement neu rechnen (Schrift nur bei Textrahmen)."""
+        try:
+            self._sync_editor_only_actions()
+            self._sync_menu_enablement()
+        except Exception:
+            pass
+
     def _sync_menu_enablement(self) -> None:
-        """PDF-only / Editor-only Menüs an den aktuellen Dokumenttyp koppeln — 2.6.54."""
-        is_pdf = False
-        is_editor = False
-        is_dtp = False
-        has_ocr = False
+        """Eine Ansicht: alles sichtbar, ausgegraut wenn nicht anwendbar."""
+        if getattr(self, "_syncing_view_caps", False):
+            return
+        self._syncing_view_caps = True
         try:
-            is_pdf = bool(self._pdf_tab_active()) and bool(
-                getattr(self.pdf_view, "pdf_path", None)
-            )
-        except Exception:
-            try:
-                is_pdf = (
-                    self.stack.currentWidget() is self.pdf_view
-                    and bool(getattr(self.pdf_view, "pdf_path", None))
-                )
-            except Exception:
-                is_pdf = False
-        try:
-            is_dtp = bool(self._layout_mode_active())
-        except Exception:
-            is_dtp = False
-        try:
-            is_editor = bool(self._editor_document_active()) or bool(is_dtp)
-        except Exception:
-            try:
-                is_editor = self.stack.currentWidget() is self.editor_pane
-            except Exception:
-                is_editor = False
-        writable = bool(is_editor) and not self._document_is_readonly()
-        try:
-            has_ocr = bool(self._current_has_ocr())
-        except Exception:
-            has_ocr = False
+            self._sync_menu_enablement_body()
+        finally:
+            self._syncing_view_caps = False
+
+    def _sync_menu_enablement_body(self) -> None:
+        caps = self._view_capability_state()
+        is_pdf = bool(caps.get("pdf"))
+        is_editor = bool(caps.get("rich_text"))
         try:
             pdf_paths = self._open_pdf_paths()
         except Exception:
             pdf_paths = []
-        from instantlensdoc.ui.chrome_actions import (
-            FONT_TOOL_ACTION_IDS,
-            font_tools_allowed,
-            is_font_tool_id,
-            is_font_tool_label,
-        )
 
         def _walk(menu, mode: str, parent: str = "") -> None:
             if menu is None:
@@ -5338,11 +5404,23 @@ class MainWindow(QMainWindow):
                 elif mode == "insert":
                     if "musterseite" in t:
                         self._set_action_available(
-                            a, is_pdf, "Nur bei geöffnetem PDF verfügbar"
+                            a, is_pdf, caps.get("pdf_reason") or "Nur bei angezeigter PDF-Seite"
+                        )
+                    elif self._label_is_page_setup(t):
+                        self._set_action_available(
+                            a, bool(caps.get("page")), caps.get("page_reason") or ""
+                        )
+                    elif self._label_is_font_format(t):
+                        self._set_action_available(
+                            a, bool(caps.get("font")), caps.get("font_reason") or ""
+                        )
+                    elif self._label_is_mail_merge(t):
+                        self._set_action_available(
+                            a, bool(caps.get("mail_merge")), caps.get("mail_merge_reason") or ""
                         )
                     else:
                         self._set_action_available(
-                            a, is_editor, "Nur im Text- oder DOCX-Editor verfügbar"
+                            a, is_editor, caps.get("rich_text_reason") or ""
                         )
                 elif mode == "edit":
                     src = ""
@@ -5367,29 +5445,25 @@ class MainWindow(QMainWindow):
                             )
                         else:
                             self._set_action_available(
-                                a, is_pdf, "Nur bei geöffnetem PDF verfügbar"
+                                a,
+                                is_pdf,
+                                caps.get("pdf_reason") or "Nur bei angezeigter PDF-Seite",
                             )
-                    elif is_font_tool_label(label) or "schriftfarbe" in label:
-                        ok, reason = font_tools_allowed(
-                            is_editor=bool(self._editor_document_active()),
-                            is_dtp=bool(is_dtp),
-                            is_pdf=bool(is_pdf),
-                            has_ocr=bool(has_ocr),
+                    elif self._label_is_font_format(label) or "schriftfarbe" in label:
+                        self._set_action_available(
+                            a, bool(caps.get("font")), caps.get("font_reason") or ""
                         )
-                        if (
-                            ok
-                            and self._document_is_readonly()
-                            and not (is_pdf or is_dtp)
-                        ):
-                            ok, reason = False, "Schreibgeschützt"
-                        self._set_action_available(a, ok, reason)
+                    elif self._label_is_mail_merge(label):
+                        self._set_action_available(
+                            a, bool(caps.get("mail_merge")), caps.get("mail_merge_reason") or ""
+                        )
+                    elif self._label_is_page_setup(label):
+                        self._set_action_available(
+                            a, bool(caps.get("page")), caps.get("page_reason") or ""
+                        )
                     elif self._label_is_editor_only(label) or parent.strip().lower() == "absatz":
                         self._set_action_available(
-                            a,
-                            writable,
-                            "Schreibgeschützt"
-                            if self._document_is_readonly()
-                            else "Nur im Text- oder DOCX-Editor verfügbar",
+                            a, is_editor, caps.get("rich_text_reason") or ""
                         )
                 elif mode == "view-editor":
                     src = ""
@@ -5398,25 +5472,33 @@ class MainWindow(QMainWindow):
                     except Exception:
                         src = ""
                     label = (src or t).replace("&", "").lower()
-                    if self._label_is_editor_view_only(label):
+                    if self._label_is_page_setup(label):
+                        self._set_action_available(
+                            a, bool(caps.get("page")), caps.get("page_reason") or ""
+                        )
+                    elif self._label_is_editor_view_only(label):
                         self._set_action_available(
                             a,
-                            is_editor,
-                            "Nur im Text- oder DOCX-Editor verfügbar",
+                            bool(caps.get("text_doc")),
+                            caps.get("rich_text_reason") or "",
                         )
                     elif self._label_is_pdf_view(label, parent):
                         self._set_action_available(
-                            a, is_pdf, "Nur bei geöffnetem PDF verfügbar"
+                            a,
+                            is_pdf,
+                            caps.get("pdf_reason") or "Nur bei angezeigter PDF-Seite",
                         )
                 elif mode == "extra":
                     if self._label_is_pdf_extra(t):
                         self._set_action_available(
-                            a, is_pdf, "Nur bei geöffnetem PDF verfügbar"
+                            a,
+                            is_pdf,
+                            caps.get("pdf_reason") or "Nur bei angezeigter PDF-Seite",
                         )
                 elif mode == "export":
-                    want = is_editor
+                    want = bool(caps.get("text_doc"))
                     if "pdf" in t and "text" not in t:
-                        want = is_pdf or is_editor
+                        want = is_pdf or want
                     self._set_action_available(
                         a, want, "Nur bei geöffnetem Dokument verfügbar"
                     )
@@ -5567,138 +5649,24 @@ class MainWindow(QMainWindow):
 
         rb = getattr(self, "ribbon_bar", None)
         if rb is not None:
-            always = {
-                "open",
-                "scan_import",
-                "devices_discover",
-                "devices_printers",
-                "devices_refresh",
-                "toggle_ribbon",
-                "toggle_doc_tabs",
-                "settings",
-                "chrome_klassisch",
-                "chrome_ribbon",
-                "chrome_kombiniert",
-                "print",
-            }
-            pdf_ids = {
-                "compare_pdfs",
-                "preflight",
-                "apply_bleed",
-                "export_pdfx",
-                "book_layout",
-                "page_by_page",
-                "continuous_scroll",
-            }
-            editor_ids = {
-                "export_epub",
-                "export_pptx",
-                "insert_hyperlink",
-                "insert_shape",
-                "insert_snippet",
-                "insert_table",
-                "insert_break",
-                "find_replace",
-                "spellcheck",
-                "auto_toc",
-                "auto_lof",
-                "auto_index",
-                "page_layout",
-                "bold",
-                "italic",
-                "underline",
-                "strike",
-                "highlight",
-                "highlight_color",
-                "align_left",
-                "align_center",
-                "align_right",
-                "align_justify",
-                "bullet_list",
-                "numbered_list",
-                "paragraph",
-                "page_size_a4",
-                "page_size_letter",
-                "page_portrait",
-                "page_landscape",
-                "header_footer",
-                "field_token",
-                "indent",
-                "outdent",
-                "clear_formatting",
-                "font",
-                "paragraph",
-                "header_footer",
-                "insert_special_chars",
-                "insert_nbsp",
-                "insert_shy",
-                "styles_pane",
-                "mail_merge",
-                "mail_merge_data",
-                "mail_merge_field",
-                "mail_merge_preview",
-                "mail_merge_finish",
-                "table_add_row",
-                "table_add_col",
-                "table_del_row",
-                "table_del_col",
-                "table_merge",
-                "table_split",
-                "table_borders",
-                "table_header_row",
-                "table_align_left",
-                "table_align_center",
-                "table_align_right",
-            }
-            color_ids = FONT_TOOL_ACTION_IDS
-            for aid, btn in (getattr(rb, "_actions", {}) or {}).items():
-                if aid in always:
-                    on = True
-                    reason = ""
-                elif aid in pdf_ids:
-                    on = bool(is_pdf)
-                    reason = "" if on else "Nur bei geöffnetem PDF verfügbar"
-                elif is_font_tool_id(aid) or aid in color_ids:
-                    on, reason = font_tools_allowed(
-                        is_editor=bool(self._editor_document_active()),
-                        is_dtp=bool(is_dtp),
-                        is_pdf=bool(is_pdf),
-                        has_ocr=bool(has_ocr),
-                    )
-                    if (
-                        on
-                        and self._document_is_readonly()
-                        and not (is_pdf or is_dtp)
-                    ):
-                        on, reason = False, "Schreibgeschützt"
-                elif aid in editor_ids:
-                    on = bool(is_editor)
-                    reason = "" if on else "Nur im Text- oder DOCX-Editor verfügbar"
-                else:
-                    continue
-                if hasattr(rb, "set_enabled"):
-                    rb.set_enabled(aid, on)
-                else:
-                    btn.setEnabled(on)
-                act = None
-                try:
-                    act = rb.qaction(aid) if hasattr(rb, "qaction") else None
-                except Exception:
-                    act = None
-                if act is not None and reason:
-                    self._set_action_available(act, on, reason)
-                elif act is not None and on:
-                    self._set_action_available(act, True, "")
+            self._apply_ribbon_view_caps(rb, caps)
 
         pane = getattr(self, "editor_pane", None)
         if pane is not None:
+            font_on = bool(caps.get("font"))
             for _aid, tb in (getattr(pane, "_tool_buttons", {}) or {}).items():
                 try:
-                    tb.setEnabled(bool(is_editor))
+                    tb.setEnabled(font_on)
                 except Exception:
                     pass
+        for menu in getattr(self, "_editor_only_menus", None) or []:
+            try:
+                menu.setEnabled(True)
+            except Exception:
+                pass
         try:
             self._sync_layout_arrange()
+            self._sync_table_tools()
             self._sync_spellcheck_ribbon()
         except Exception:
             pass
@@ -5706,6 +5674,70 @@ class MainWindow(QMainWindow):
             self._sync_ink_input_actions()
         except Exception:
             pass
+
+    def _apply_ribbon_view_caps(self, rb, caps: dict) -> None:
+        from instantlensdoc.ui.word_ribbon import disabled_reason
+
+        mapping = getattr(self, "_ribbon_qactions", None) or {}
+        ids = set(getattr(rb, "_action_buttons", {}) or {})
+        ids.update(getattr(rb, "_actions", {}) or {})
+        ids.update(mapping.keys())
+        for aid in ids:
+            if disabled_reason(aid):
+                continue
+            got = self._cap_for_action_id(aid, caps)
+            if got is None:
+                continue
+            on, reason = got
+            if hasattr(rb, "set_available"):
+                rb.set_available(aid, on, reason)
+            elif hasattr(rb, "set_enabled"):
+                rb.set_enabled(aid, on)
+            act = mapping.get(aid)
+            if act is not None:
+                self._set_action_available(act, on, reason)
+
+    def _cap_for_action_id(self, aid: str, caps: dict) -> tuple[bool, str] | None:
+        from instantlensdoc.ui.word_ribbon import (
+            ALWAYS_ACTION_IDS,
+            ARRANGE_ACTION_IDS,
+            FONT_ACTION_IDS,
+            MAIL_ACTION_IDS,
+            PAGE_ACTION_IDS,
+            PDF_ACTION_IDS,
+            PDF_OPEN_ACTION_IDS,
+            RICH_TEXT_ACTION_IDS,
+            TABLE_ACTION_IDS,
+        )
+
+        if aid in ALWAYS_ACTION_IDS:
+            return True, ""
+        if aid in FONT_ACTION_IDS:
+            return bool(caps.get("font")), str(caps.get("font_reason") or "")
+        if aid in PAGE_ACTION_IDS:
+            return bool(caps.get("page")), str(caps.get("page_reason") or "")
+        if aid in PDF_OPEN_ACTION_IDS:
+            on = bool(caps.get("pdf_open") or caps.get("pdf"))
+            return on, ("" if on else str(caps.get("pdf_reason") or ""))
+        if aid in PDF_ACTION_IDS:
+            return bool(caps.get("pdf")), str(caps.get("pdf_reason") or "")
+        if aid in MAIL_ACTION_IDS:
+            return bool(caps.get("mail_merge")), str(caps.get("mail_merge_reason") or "")
+        if aid in TABLE_ACTION_IDS:
+            return bool(caps.get("table")), str(caps.get("table_reason") or "")
+        if aid in ARRANGE_ACTION_IDS:
+            return bool(caps.get("dtp_frame")), str(caps.get("dtp_frame_reason") or "")
+        if aid in RICH_TEXT_ACTION_IDS:
+            return bool(caps.get("rich_text")), str(caps.get("rich_text_reason") or "")
+        if aid.startswith("dtp_"):
+            if aid == "dtp_layout":
+                return True, ""
+            if aid == "dtp_font":
+                return bool(caps.get("font")), str(caps.get("font_reason") or "")
+            if aid in ("dtp_text_frame", "dtp_grid", "dtp_image", "dtp_graphic", "dtp_import"):
+                return True, ""
+            return bool(caps.get("dtp")), str(caps.get("dtp_reason") or "")
+        return None
 
     def _refresh_recent(self):
         # Fehlende Dateien aus der persistierten Liste streichen — 2.6.54
@@ -9208,13 +9240,7 @@ class MainWindow(QMainWindow):
         rb = getattr(self, "ribbon_bar", None)
         if rb is None or not hasattr(rb, "set_table_tools_visible"):
             return
-        in_table = False
-        try:
-            if self.stack.currentWidget() is self.editor_pane:
-                in_table = self.editor.current_qtext_table() is not None
-        except Exception:
-            in_table = False
-        rb.set_table_tools_visible(bool(in_table))
+        rb.set_table_tools_visible(True)
 
     _RIBBON_ACTION_OBJECT_NAMES: dict[str, str] = {
         "open": "actFileOpen",
@@ -9225,6 +9251,7 @@ class MainWindow(QMainWindow):
         "underline": "actEditUnderline",
         "strike": "actEditStrike",
         "font": "actEditFont",
+        "font_size": "actEditFontSize",
         "font_color": "actEditFontColor",
         "cut": "actEditCut",
         "copy": "actEditCopy",
@@ -9705,7 +9732,7 @@ class MainWindow(QMainWindow):
         """Seitenlayout des Texteditors (DTP-Presets, Ränder, Ausrichtung) — 2.6.53."""
         from instantlensdoc.ui.page_layout_dialog import PageLayoutDialog
 
-        if not self._guard_editor_action("Seitenlayout"):
+        if not self._guard_page_action("Seitenlayout"):
             return
         current = self.editor.page_layout()
         dlg = PageLayoutDialog(current, self, rich_document=self.editor.rich_mode())
@@ -9744,7 +9771,7 @@ class MainWindow(QMainWindow):
         margins_mm: tuple[float, float, float, float] | None = None,
     ) -> None:
         """Menü-Picker: bestehendes EditorPageLayout anwenden — kein neuer Dialog."""
-        if not self._guard_editor_action("Seitenlayout"):
+        if not self._guard_page_action("Seitenlayout"):
             return
         from instantlensdoc.core.editor_page_layout import EditorPageLayout
 
@@ -9802,7 +9829,7 @@ class MainWindow(QMainWindow):
 
     def _show_custom_margins_dialog(self) -> None:
         """Word: Seitenränder → Benutzerdefiniert (Millimeter)."""
-        if not self._guard_editor_action("Seitenränder"):
+        if not self._guard_page_action("Seitenränder"):
             return
         from instantlensdoc.ui.page_margins_dialog import PageMarginsDialog
 
@@ -9836,20 +9863,10 @@ class MainWindow(QMainWindow):
         rb = getattr(self, "ribbon_bar", None)
         if rb is None or not hasattr(rb, "set_arrange_visible"):
             return
-        on = False
-        try:
-            if self._layout_mode_active():
-                pane = getattr(self, "dtp_pane", None)
-                sel = []
-                if pane is not None and getattr(pane, "scene", None) is not None:
-                    sel = list(pane.scene.selected_frames() or [])
-                on = any(getattr(fr, "kind", "") in ("text", "image", "shape") for fr in sel)
-        except Exception:
-            on = False
-        rb.set_arrange_visible(on)
+        rb.set_arrange_visible(True)
 
     def _format_painter(self) -> None:
-        if not self._guard_editor_action("Format übertragen"):
+        if not self._guard_font_action("Format übertragen"):
             return
         if getattr(self, "_format_painter_armed", False):
             self.editor.apply_format_painter()
@@ -9862,35 +9879,35 @@ class MainWindow(QMainWindow):
         self._set_status("Format übertragen: Format kopiert — erneut klicken zum Anwenden")
 
     def _grow_font(self) -> None:
-        if not self._guard_editor_action("Schriftgröße"):
+        if not self._guard_font_action("Schriftgröße"):
             return
         self.editor.grow_font_selection(1.0)
         self._sync_editor_rich_meta()
         self._set_status("Schrift vergrößert")
 
     def _shrink_font(self) -> None:
-        if not self._guard_editor_action("Schriftgröße"):
+        if not self._guard_font_action("Schriftgröße"):
             return
         self.editor.shrink_font_selection(1.0)
         self._sync_editor_rich_meta()
         self._set_status("Schrift verkleinert")
 
     def _toggle_subscript(self) -> None:
-        if not self._guard_editor_action("Tiefgestellt"):
+        if not self._guard_font_action("Tiefgestellt"):
             return
         self.editor.toggle_subscript_selection()
         self._sync_editor_rich_meta()
         self._set_status("Tiefgestellt")
 
     def _toggle_superscript(self) -> None:
-        if not self._guard_editor_action("Hochgestellt"):
+        if not self._guard_font_action("Hochgestellt"):
             return
         self.editor.toggle_superscript_selection()
         self._sync_editor_rich_meta()
         self._set_status("Hochgestellt")
 
     def _insert_blank_page(self) -> None:
-        if not self._guard_editor_action("Leere Seite"):
+        if not self._guard_page_action("Leere Seite"):
             return
         self.editor.insert_blank_page()
         self._sync_editor_rich_meta()
@@ -10222,6 +10239,13 @@ class MainWindow(QMainWindow):
         rb = getattr(self, "ribbon_bar", None)
         if rb is None:
             return
+        caps = self._view_capability_state()
+        if not caps.get("rich_text"):
+            if hasattr(rb, "set_available"):
+                rb.set_available("spellcheck", False, caps.get("rich_text_reason") or "")
+            else:
+                rb.set_enabled("spellcheck", False)
+            return
         try:
             from instantlensdoc.core.app_settings import (
                 get_spellcheck_dict_path,
@@ -10232,14 +10256,18 @@ class MainWindow(QMainWindow):
         except Exception:
             ok = True
         if ok:
-            rb.set_enabled("spellcheck", True)
+            if hasattr(rb, "set_available"):
+                rb.set_available("spellcheck", True, "")
+            else:
+                rb.set_enabled("spellcheck", True)
             rb.set_action_tooltip("spellcheck", "Rechtschreibung")
         else:
-            rb.set_enabled("spellcheck", False)
-            rb.set_action_tooltip(
-                "spellcheck",
-                "Rechtschreibung: kein Wörterbuch und Builtin deaktiviert (Einstellungen).",
-            )
+            reason = "Rechtschreibung: kein Wörterbuch und Builtin deaktiviert (Einstellungen)."
+            if hasattr(rb, "set_available"):
+                rb.set_available("spellcheck", False, reason)
+            else:
+                rb.set_enabled("spellcheck", False)
+                rb.set_action_tooltip("spellcheck", reason)
 
     def _toggle_doc_split_from_ribbon(self) -> None:
         """Ribbon-Toggle für Fenster teilen — 2.6.20."""
@@ -12073,6 +12101,128 @@ class MainWindow(QMainWindow):
         pane = getattr(self, "dtp_pane", None)
         return bool(getattr(self, "_dtp_tools_on", False)) and pane is not None and pane.isVisible()
 
+    def _pdf_page_shown(self) -> bool:
+        """True nur wenn eine PDF-Seite tatsächlich angezeigt wird."""
+        stack = getattr(self, "stack", None)
+        pdf = getattr(self, "pdf_view", None)
+        if stack is None or pdf is None or stack.currentWidget() is not pdf:
+            return False
+        return bool(getattr(pdf, "pdf_path", None))
+
+    def _text_document_active(self) -> bool:
+        """txt/doc/docx/odt/RTF/HTML und Word-Suite nach OCR — nicht PDF/Bild/XLSX."""
+        if not self._editor_document_active():
+            return False
+        doc = getattr(self, "doc", None)
+        kind = getattr(doc, "kind", None) if doc is not None else None
+        if kind in (DocKind.PDF, DocKind.IMAGE, DocKind.XLSX):
+            return False
+        path = ""
+        try:
+            path = str(getattr(doc, "path", "") or "") if doc is not None else ""
+        except Exception:
+            path = ""
+        suffix = Path(path).suffix.lower() if path else ""
+        if suffix in {".xlsx", ".xls"}:
+            return False
+        return True
+
+    def _dtp_selected_frames(self) -> list:
+        if not self._layout_mode_active():
+            return []
+        pane = getattr(self, "dtp_pane", None)
+        if pane is None or getattr(pane, "scene", None) is None:
+            return []
+        try:
+            return list(pane.scene.selected_frames() or [])
+        except Exception:
+            return []
+
+    def _dtp_text_frame_selected(self) -> bool:
+        return any(getattr(fr, "kind", "") == "text" for fr in self._dtp_selected_frames())
+
+    def _dtp_any_frame_selected(self) -> bool:
+        return any(
+            getattr(fr, "kind", "") in ("text", "image", "shape")
+            for fr in self._dtp_selected_frames()
+        )
+
+    def _in_editor_table(self) -> bool:
+        try:
+            if self.stack.currentWidget() is self.editor_pane:
+                return self.editor.current_qtext_table() is not None
+        except Exception:
+            return False
+        return False
+
+    def _view_capability_state(self) -> dict:
+        from instantlensdoc.ui.word_ribbon import (
+            REASON_ARRANGE,
+            REASON_FONT,
+            REASON_FONT_PDF,
+            REASON_MAIL,
+            REASON_PAGE,
+            REASON_PDF,
+            REASON_RICH,
+            REASON_TABLE,
+        )
+
+        pdf = self._pdf_page_shown()
+        pdf_open = pdf
+        try:
+            pdf_open = pdf or bool(self._open_pdf_paths())
+        except Exception:
+            pdf_open = pdf
+        text_doc = self._text_document_active()
+        dtp = self._layout_mode_active()
+        dtp_text = self._dtp_text_frame_selected()
+        dtp_frame = self._dtp_any_frame_selected()
+        page = bool(pdf or text_doc or dtp)
+        has_ocr = False
+        try:
+            has_ocr = bool(self._current_has_ocr())
+        except Exception:
+            has_ocr = False
+        font = bool(text_doc or dtp_text or (pdf and has_ocr))
+        rich = bool(text_doc or dtp_text)
+        mail = bool(text_doc)
+        table = bool(self._in_editor_table())
+        readonly = False
+        try:
+            readonly = bool(self._document_is_readonly()) and not pdf and not dtp
+        except Exception:
+            readonly = False
+        font_reason = ""
+        if not font:
+            font_reason = REASON_FONT_PDF if pdf else REASON_FONT
+        elif readonly:
+            font = False
+            font_reason = "Schreibgeschützt"
+            rich = False
+            mail = False
+        return {
+            "pdf": pdf,
+            "pdf_open": bool(pdf_open),
+            "pdf_reason": "" if pdf else REASON_PDF,
+            "text_doc": text_doc,
+            "dtp": dtp,
+            "dtp_reason": "" if dtp else "DTP-Werkzeuge zuerst einschalten",
+            "dtp_text": dtp_text,
+            "dtp_frame": dtp_frame,
+            "dtp_frame_reason": "" if dtp_frame else REASON_ARRANGE,
+            "page": page,
+            "page_reason": "" if page else REASON_PAGE,
+            "font": font,
+            "font_reason": font_reason,
+            "rich_text": rich,
+            "rich_text_reason": "" if rich else ("Schreibgeschützt" if readonly else REASON_RICH),
+            "mail_merge": mail,
+            "mail_merge_reason": "" if mail else ("Schreibgeschützt" if readonly else REASON_MAIL),
+            "table": table,
+            "table_reason": "" if table else REASON_TABLE,
+            "scan": True,
+        }
+
     def _guard_editor_action(self, what: str) -> bool:
         """Editor-only Aktion: bei PDF/anderem Tab no-op, kein Stack-Wechsel — 2.6.54."""
         if self._document_is_readonly():
@@ -12081,6 +12231,20 @@ class MainWindow(QMainWindow):
         if self._editor_document_active() or self._layout_mode_active():
             return True
         self._set_status(f"{what} nur im Editor")
+        return False
+
+    def _guard_font_action(self, what: str) -> bool:
+        caps = self._view_capability_state()
+        if caps.get("font"):
+            return True
+        self._set_status(f"{what}: {caps.get('font_reason') or 'nicht anwendbar'}")
+        return False
+
+    def _guard_page_action(self, what: str) -> bool:
+        caps = self._view_capability_state()
+        if caps.get("page"):
+            return True
+        self._set_status(f"{what}: {caps.get('page_reason') or 'keine Seite'}")
         return False
 
     def _track_editor_action(self, act) -> object:
@@ -12133,59 +12297,32 @@ class MainWindow(QMainWindow):
 
     def _sync_editor_only_actions(self, *_args) -> None:
         """Aktionen grauen (Tooltip), Menüs bleiben sichtbar — nie setVisible(False)."""
-        on = (
-            self._editor_document_active() or self._layout_mode_active()
-        ) and not self._document_is_readonly()
-        from instantlensdoc.ui.chrome_actions import (
-            EDITOR_ACTION_DISABLE_REASON,
-            font_tools_allowed,
-            is_font_tool_label,
-            is_font_tool_object_name,
-        )
-
-        is_dtp = False
-        is_pdf = False
-        has_ocr = False
-        try:
-            is_dtp = bool(self._layout_mode_active())
-        except Exception:
-            is_dtp = False
-        try:
-            is_pdf = bool(self._pdf_tab_active()) and bool(
-                getattr(self.pdf_view, "pdf_path", None)
-            )
-        except Exception:
-            is_pdf = bool(self._pdf_tab_active())
-        try:
-            has_ocr = bool(self._current_has_ocr())
-        except Exception:
-            has_ocr = False
+        caps = self._view_capability_state()
         for act in getattr(self, "_editor_only_actions", None) or []:
             try:
-                name = str(act.objectName() or "")
-                text = (act.text() or "").replace("&", "")
-                if is_font_tool_object_name(name) or is_font_tool_label(text):
-                    ok, reason = font_tools_allowed(
-                        is_editor=bool(self._editor_document_active()),
-                        is_dtp=bool(is_dtp),
-                        is_pdf=bool(is_pdf),
-                        has_ocr=bool(has_ocr),
+                label = (act.text() or "").replace("&", "")
+                src = ""
+                try:
+                    src = str(act.property("ild_i18n_src") or "")
+                except Exception:
+                    src = ""
+                probe = (src or label).replace("&", "")
+                if self._label_is_font_format(probe):
+                    self._set_action_available(
+                        act, bool(caps.get("font")), caps.get("font_reason") or ""
                     )
-                    if (
-                        ok
-                        and self._document_is_readonly()
-                        and not (is_pdf or is_dtp)
-                    ):
-                        ok, reason = False, "Schreibgeschützt"
-                    self._set_action_available(act, ok, reason)
-                    continue
-                self._set_action_available(
-                    act,
-                    on,
-                    "Schreibgeschützt"
-                    if self._document_is_readonly()
-                    else EDITOR_ACTION_DISABLE_REASON,
-                )
+                elif self._label_is_mail_merge(probe):
+                    self._set_action_available(
+                        act, bool(caps.get("mail_merge")), caps.get("mail_merge_reason") or ""
+                    )
+                elif self._label_is_page_setup(probe):
+                    self._set_action_available(
+                        act, bool(caps.get("page")), caps.get("page_reason") or ""
+                    )
+                else:
+                    self._set_action_available(
+                        act, bool(caps.get("rich_text")), caps.get("rich_text_reason") or ""
+                    )
             except Exception:
                 pass
         for menu in getattr(self, "_editor_only_menus", None) or []:
@@ -12200,30 +12337,36 @@ class MainWindow(QMainWindow):
             pass
 
     def _toggle_bold(self) -> None:
-        if self._layout_mode_active():
+        if not self._guard_font_action("Fett"):
+            return
+        if self._dtp_text_frame_selected():
             self.dtp_pane.apply_font(bold=True, toggle=True)
             return
-        if not self._guard_editor_action("Fett"):
+        if not self._editor_document_active():
             return
         self.editor.toggle_bold_selection()
         self._sync_editor_rich_meta()
         self._set_status("Fett (Zeichenformat)")
 
     def _toggle_italic(self) -> None:
-        if self._layout_mode_active():
+        if not self._guard_font_action("Kursiv"):
+            return
+        if self._dtp_text_frame_selected():
             self.dtp_pane.apply_font(italic=True, toggle=True)
             return
-        if not self._guard_editor_action("Kursiv"):
+        if not self._editor_document_active():
             return
         self.editor.toggle_italic_selection()
         self._sync_editor_rich_meta()
         self._set_status("Kursiv (Zeichenformat)")
 
     def _toggle_underline(self) -> None:
-        if self._layout_mode_active():
+        if not self._guard_font_action("Unterstrichen"):
+            return
+        if self._dtp_text_frame_selected():
             self.dtp_pane.apply_font(underline=True, toggle=True)
             return
-        if not self._guard_editor_action("Unterstrichen"):
+        if not self._editor_document_active():
             return
         self.editor.toggle_underline_selection()
         self._sync_editor_rich_meta()
@@ -12283,13 +12426,18 @@ class MainWindow(QMainWindow):
         QTimer.singleShot(0, slot)
 
     def _choose_font(self) -> None:
-        if not self._guard_editor_action("Schriftart"):
+        if not self._guard_font_action("Schriftart"):
+            return
+        if self._dtp_text_frame_selected():
+            self._defer_format_dialog(lambda: self.dtp_pane.apply_font(dialog=True))
             return
         self._defer_format_dialog(self._run_font_dialog)
 
     def _run_font_dialog(self) -> None:
         """QFontDialog.getFont (QFontDatabase/Windows-Schriften), Auswahl oder Dokument."""
-        if not self._guard_editor_action("Schriftart"):
+        if not self._guard_font_action("Schriftart"):
+            return
+        if not self._editor_document_active():
             return
         from PySide6.QtGui import QFontDatabase
         from PySide6.QtWidgets import QFontDialog
@@ -12318,7 +12466,18 @@ class MainWindow(QMainWindow):
         self._set_status(f"Schriftart: {font.family()} {int(font.pointSize() or 0)} pt")
 
     def _choose_font_size(self) -> None:
-        if not self._guard_editor_action("Schriftgröße"):
+        if not self._guard_font_action("Schriftgröße"):
+            return
+        if self._dtp_text_frame_selected():
+            from PySide6.QtWidgets import QInputDialog
+
+            size, ok = QInputDialog.getInt(self, "Schriftgröße", "Punkt:", 11, 6, 96)
+            if not ok:
+                return
+            self.dtp_pane.apply_font(size=float(size), dialog=False)
+            self._set_status(f"Schriftgröße: {size} pt (DTP)")
+            return
+        if not self._editor_document_active():
             return
         from PySide6.QtWidgets import QInputDialog
 
@@ -12332,7 +12491,9 @@ class MainWindow(QMainWindow):
         self._set_status(f"Schriftgröße: {size} pt")
 
     def _choose_font_color(self) -> None:
-        """Glyphenfarbe in Editor/OCR/Klartext, PDF-Text und DTP-Rahmen."""
+        """Glyphenfarbe in Editor/OCR/Klartext und DTP-Textrahmen."""
+        if not self._guard_font_action("Schriftfarbe"):
+            return
         self._defer_format_dialog(self._run_font_color_dialog)
 
     def _probe_font_color(self) -> QColor:
@@ -12383,13 +12544,15 @@ class MainWindow(QMainWindow):
         self._apply_font_color(color)
 
     def _apply_font_color(self, color: str | QColor) -> None:
-        """Glyph-Farbe (setForeground / Annotation.color), kein Highlight-Fill."""
+        """Glyph-Farbe (setForeground), kein Highlight-Fill; nicht auf Bild-PDF ohne OCR."""
         qcolor = color if isinstance(color, QColor) else QColor(str(color or ""))
         if not qcolor.isValid():
             self._set_status("Schriftfarbe ungültig")
             return
+        if not self._guard_font_action("Schriftfarbe"):
+            return
         hexc = qcolor.name()
-        if self._layout_mode_active():
+        if self._dtp_text_frame_selected():
             pane = getattr(self, "dtp_pane", None)
             if pane is not None:
                 if hasattr(pane, "apply_font_color"):
@@ -12397,15 +12560,6 @@ class MainWindow(QMainWindow):
                 else:
                     pane.apply_font(color=hexc, dialog=False)
                 self._set_status(f"Schriftfarbe: {hexc} (DTP)")
-                return
-        if self._pdf_tab_active():
-            view = getattr(self, "pdf_view", None)
-            if view is not None and hasattr(view, "apply_font_color"):
-                n = view.apply_font_color(qcolor)
-                if n:
-                    self._set_status(f"Schriftfarbe: {hexc} ({n} PDF-Text)")
-                else:
-                    self._set_status("Schriftfarbe: kein PDF-Text in Auswahl/Seite")
                 return
         if self._editor_document_active() or (
             getattr(self, "stack", None) is not None
@@ -12419,12 +12573,12 @@ class MainWindow(QMainWindow):
         self._set_status("Schriftfarbe: kein Text-Dokument")
 
     def _choose_highlight_color(self) -> None:
-        if not self._guard_editor_action("Texthervorhebung"):
+        if not self._guard_font_action("Texthervorhebung"):
             return
         self._defer_format_dialog(self._run_highlight_color_dialog)
 
     def _run_highlight_color_dialog(self) -> None:
-        if not self._guard_editor_action("Texthervorhebung"):
+        if not self._guard_font_action("Texthervorhebung"):
             return
         import os
 
@@ -12451,14 +12605,14 @@ class MainWindow(QMainWindow):
         self._set_status(f"Hintergrundfarbe ({scope}): {color.name()}")
 
     def _clear_formatting(self) -> None:
-        if not self._guard_editor_action("Formatierungen löschen"):
+        if not self._guard_font_action("Formatierungen löschen"):
             return
         self.editor.clear_formatting()
         self._sync_editor_rich_meta()
         self._set_status("Formatierungen gelöscht")
 
     def _apply_paragraph_style(self, style_id: str) -> None:
-        if not self._guard_editor_action("Formatvorlage"):
+        if not self._guard_font_action("Formatvorlage"):
             return
         self.editor.apply_style_paragraph(style_id)
         self._sync_editor_rich_meta()

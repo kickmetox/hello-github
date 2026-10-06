@@ -191,13 +191,23 @@ def test_disabled_on_pdf_enabled_on_word_suite() -> None:
     for title, label in (
         ("Absatz", "Absatz zentriert"),
         ("Absatz", "Aufzählungszeichen"),
+        ("Bearbeiten", "Fett"),
+        ("Bearbeiten", "Schriftart…"),
+    ):
+        _p, _h, act = _leaf(title, label)
+        if act.isEnabled():
+            disabled.append(f"{title} ▸ {label} noch enabled auf PDF ohne OCR")
+    assert not disabled, "\n".join(disabled)
+    absatz = _menu("Absatz")
+    seiten = _menu("Seitenlayout")
+    assert absatz.isEnabled(), "Absatz-Menü darf nicht ausgeblendet/deaktiviert werden"
+    assert seiten.isEnabled(), "Seitenlayout-Menü darf nicht ausgeblendet werden"
+    for title, label in (
         ("Seitenlayout", "Seitenlayout…"),
         ("Seitenlayout", "A4"),
     ):
         _p, _h, act = _leaf(title, label)
-        if act.isEnabled():
-            disabled.append(f"{title} ▸ {label} noch enabled auf PDF")
-    assert not disabled, "\n".join(disabled)
+        assert act.isEnabled(), f"{title} ▸ {label} muss bei geöffneter PDF-Seite bedienbar sein"
 
     ok = _WIN.open_ocr_result(
         text="EINLEITUNG\n\nFliesstext Absatz zum Ausrichten.\n\n- Listenpunkt",
@@ -212,6 +222,8 @@ def test_disabled_on_pdf_enabled_on_word_suite() -> None:
         ("Absatz", "Absatz links"),
         ("Absatz", "Nummerierung"),
         ("Seitenlayout", "Hochformat"),
+        ("Bearbeiten", "Fett"),
+        ("Bearbeiten", "Schriftart…"),
     ):
         _p, _h, act = _leaf(title, label)
         assert act.isEnabled(), f"{title} ▸ {label} disabled auf Word-Suite"
