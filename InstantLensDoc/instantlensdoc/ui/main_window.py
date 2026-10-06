@@ -8907,12 +8907,6 @@ class MainWindow(QMainWindow):
             return all_tab_qactions(mapping)
         return pick_tab_qactions(mapping, tab)
 
-    def chrome_feature_qactions(self, feature: str) -> dict:
-        """Absatz / Ausrichtung / Listen / Seitenlayout / Kopf/Fuß / Ersatzzeichen."""
-        from instantlensdoc.ui.chrome_actions import pick_feature_qactions
-
-        return pick_feature_qactions(self.chrome_qactions(), feature)
-
     def _on_ribbon_action(self, action_id: str) -> None:
         """Ribbon: gebundene QAction (Pulldown-Parität), sonst Handler."""
         aid = str(action_id or "")

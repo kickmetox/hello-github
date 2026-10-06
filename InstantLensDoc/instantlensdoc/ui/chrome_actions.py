@@ -1,8 +1,7 @@
 """QActions für Word-Chrome: Start / Seitenlayout / Einfügen.
 
-Kein zweites Ribbon. Der Chrome-Worker (Klassisch/Ribbon/Kombiniert,
-Formatvorlagen, Tabellen, Serienbrief) platziert diese IDs auf den
-bestehenden Tabs. Ribbon-Tab „Layout“ = Seitenlayout. Pulldown und
+Kein zweites Ribbon. Der Chrome-Worker platziert diese IDs auf den
+bestehenden Tabs (Ribbon-Tab „Layout“ = Seitenlayout). Pulldown und
 Ribbon klicken dieselbe QAction (objectName).
 """
 
@@ -24,34 +23,15 @@ CHROME_TAB_ALIASES = {
     "insert": "Einfügen",
 }
 
-CHROME_FEATURE_ALIASES = {
-    "absatz": "Absatz",
-    "paragraph": "Absatz",
-    "ausrichtung": "Ausrichtung",
-    "align": "Ausrichtung",
-    "alignment": "Ausrichtung",
-    "listen": "Listen",
-    "lists": "Listen",
-    "aufzählung": "Listen",
-    "aufzaehlung": "Listen",
-    "seitenlayout": "Seitenlayout",
-    "layout": "Seitenlayout",
-    "kopf": "Kopf/Fuß",
-    "fuß": "Kopf/Fuß",
-    "fuss": "Kopf/Fuß",
-    "header": "Kopf/Fuß",
-    "footer": "Kopf/Fuß",
-    "kopf/fuß": "Kopf/Fuß",
-    "kopf/fuss": "Kopf/Fuß",
-    "ersatzzeichen": "Ersatzzeichen",
-    "felder": "Ersatzzeichen",
-    "fields": "Ersatzzeichen",
-}
-
-# Feature-Gruppen, die dieser Worker liefert — Chrome platziert sie.
-CHROME_FEATURE_ACTION_IDS: dict[str, tuple[str, ...]] = {
-    "Absatz": (
+CHROME_TAB_ACTION_IDS: dict[str, tuple[str, ...]] = {
+    "Start": (
         "paragraph",
+        "align_left",
+        "align_center",
+        "align_right",
+        "align_justify",
+        "bullet_list",
+        "numbered_list",
         "line_spacing_10",
         "line_spacing_115",
         "line_spacing_15",
@@ -59,23 +39,13 @@ CHROME_FEATURE_ACTION_IDS: dict[str, tuple[str, ...]] = {
         "line_spacing_exact",
         "keep_with_next",
         "widow_orphan",
-    ),
-    "Ausrichtung": (
-        "align_left",
-        "align_center",
-        "align_right",
-        "align_justify",
-        "cell_align_top",
-        "cell_align_middle",
-        "cell_align_bottom",
-    ),
-    "Listen": (
-        "bullet_list",
-        "numbered_list",
         "list_glyph",
         "list_restart",
         "list_indent",
         "list_outdent",
+        "cell_align_top",
+        "cell_align_middle",
+        "cell_align_bottom",
     ),
     "Seitenlayout": (
         "page_layout",
@@ -88,26 +58,11 @@ CHROME_FEATURE_ACTION_IDS: dict[str, tuple[str, ...]] = {
         "page_columns_2",
         "page_columns_3",
         "section_break",
-    ),
-    "Kopf/Fuß": ("header_footer",),
-    "Ersatzzeichen": ("field_token",),
-}
-
-CHROME_TAB_ACTION_IDS: dict[str, tuple[str, ...]] = {
-    "Start": (
-        *CHROME_FEATURE_ACTION_IDS["Absatz"],
-        *CHROME_FEATURE_ACTION_IDS["Ausrichtung"],
-        *CHROME_FEATURE_ACTION_IDS["Listen"],
-    ),
-    "Seitenlayout": (
-        *CHROME_FEATURE_ACTION_IDS["Seitenlayout"],
-        *CHROME_FEATURE_ACTION_IDS["Ausrichtung"][:4],
-        *CHROME_FEATURE_ACTION_IDS["Listen"][:2],
-        *CHROME_FEATURE_ACTION_IDS["Kopf/Fuß"],
+        "header_footer",
     ),
     "Einfügen": (
-        *CHROME_FEATURE_ACTION_IDS["Kopf/Fuß"],
-        *CHROME_FEATURE_ACTION_IDS["Ersatzzeichen"],
+        "header_footer",
+        "field_token",
         "insert_break",
         "section_break",
     ),
@@ -190,24 +145,3 @@ def pick_tab_qactions(
 def all_tab_qactions(mapping: Mapping[str, object] | None) -> dict[str, dict[str, object]]:
     src = mapping or {}
     return {tab: pick_tab_qactions(src, tab) for tab in CHROME_TABS}
-
-
-def normalize_chrome_feature(name: str | None) -> str:
-    raw = str(name or "").replace("&", "").strip()
-    if not raw:
-        return ""
-    if raw in CHROME_FEATURE_ACTION_IDS:
-        return raw
-    return CHROME_FEATURE_ALIASES.get(raw.lower(), raw)
-
-
-def feature_action_ids(feature: str | None) -> tuple[str, ...]:
-    return CHROME_FEATURE_ACTION_IDS.get(normalize_chrome_feature(feature), ())
-
-
-def pick_feature_qactions(
-    mapping: Mapping[str, object] | None,
-    feature: str | None,
-) -> dict[str, object]:
-    src = mapping or {}
-    return {aid: src[aid] for aid in feature_action_ids(feature) if aid in src}
