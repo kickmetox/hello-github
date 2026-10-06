@@ -238,3 +238,29 @@ def test_dirty_layout_discard_leaves_dtp(monkeypatch) -> None:
     assert not _WIN._layout_mode_active()
     assert not _WIN.dtp_pane.is_dirty()
     assert _WIN.stack.currentWidget() is _WIN.pdf_view
+
+
+def test_dtp_embedded_keeps_word_menus_hides_own_chrome() -> None:
+    _reload_pdf()
+    assert _WIN._enter_layout_mode() is True
+    assert _WIN._layout_mode_active()
+    assert _WIN.stack.currentWidget() is _WIN.pdf_view
+    assert _WIN.stack.currentWidget() is not _WIN.dtp_pane
+    assert _WIN.dtp_pane.isVisible()
+    assert getattr(_WIN.dtp_pane, "_word_embedded", False) is True
+    assert _WIN.dtp_pane.h_ruler.isVisible()
+    assert _WIN.dtp_pane.view.isVisible()
+    assert not _WIN.dtp_pane.menu_bar.isVisible()
+    assert not _WIN.dtp_pane.icon_bar.isVisible()
+    assert not _WIN.dtp_pane.status_bar.isVisible()
+    for title in ("Datei", "Bearbeiten", "Ansicht", "DTP"):
+        menu = find_menubar_menu(_WIN, title)
+        assert menu is not None, title
+    assert find_menubar_menu(_WIN, "DTP").objectName() == "menuDtp"
+    titles = [
+        (a.text() or "").replace("&", "")
+        for a in _WIN.menuBar().actions()
+        if (a.text() or "").strip()
+    ]
+    assert "DTP" in titles
+    assert "Datei" in titles

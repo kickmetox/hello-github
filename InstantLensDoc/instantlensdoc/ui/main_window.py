@@ -1359,6 +1359,8 @@ class MainWindow(QMainWindow):
         self.dtp_pane = DtpPane(self, doc=getattr(self, "dtp_doc", None))
         self.dtp_pane.statusMessage.connect(self._set_status)
         self._dtp_tools_on = False
+        if hasattr(self.dtp_pane, "set_word_window_embedded"):
+            self.dtp_pane.set_word_window_embedded(True)
         self.stack.addWidget(self.editor_pane)  # 0
         self.stack.addWidget(self.pdf_view)  # 1
         self.stack.addWidget(self.image_label)  # 2
@@ -1372,12 +1374,6 @@ class MainWindow(QMainWindow):
         host_lay.addWidget(self.stack, 0, 0)
         host_lay.addWidget(self.dtp_pane, 0, 0)
         self.dtp_pane.hide()
-        try:
-            mb = getattr(self.dtp_pane, "menu_bar", None)
-            if mb is not None:
-                mb.hide()
-        except Exception:
-            pass
         self.stack.currentChanged.connect(lambda *_: self._apply_doc_split_sync_scroll())
         self.stack.currentChanged.connect(lambda *_: self._update_doc_status())
         self.stack.currentChanged.connect(lambda *_: self._sync_editor_toolbar_for_stack())
@@ -14725,12 +14721,8 @@ class MainWindow(QMainWindow):
                     pane.set_document(DtpDocument.sample("A5"))
             except Exception:
                 pass
-            try:
-                mb = getattr(pane, "menu_bar", None)
-                if mb is not None:
-                    mb.hide()
-            except Exception:
-                pass
+            if hasattr(pane, "set_word_window_embedded"):
+                pane.set_word_window_embedded(True)
             pane.show()
             pane.raise_()
             self._dtp_tools_on = True

@@ -788,6 +788,7 @@ class DtpPane(QWidget):
         self._create_rect = None
         self._ghost = None
         self._dirty = False
+        self._word_embedded = False
         self._save_path: str | None = None
         self.scene = DtpScene(self.doc)
         self.view = DtpView(self.scene)
@@ -915,6 +916,18 @@ class DtpPane(QWidget):
         self.set_tool("select", apply=False)
         self._block_font = False
         self.apply_shared_print_overlays()
+
+    def set_word_window_embedded(self, embedded: bool = True) -> None:
+        """Ohne Datei/Icon/Status-Leiste: Word-Chrome gilt, Canvas bleibt im Dokument."""
+        self._word_embedded = bool(embedded)
+        show_own = not self._word_embedded
+        for w in (
+            getattr(self, "menu_bar", None),
+            getattr(self, "icon_bar", None),
+            getattr(self, "status_bar", None),
+        ):
+            if w is not None:
+                w.setVisible(show_own)
 
     def set_document(self, doc: DtpDocument) -> None:
         self.doc = doc

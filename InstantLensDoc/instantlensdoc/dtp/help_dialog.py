@@ -14,13 +14,14 @@ from PySide6.QtWidgets import (
 
 DTP_HELP_HTML = """
 <h2>DTP-Hilfe</h2>
-<p>Layout-Modus: Rahmen auf der Seite platzieren, nicht nur Text im Editor.
-Menü <b>DTP</b> oder Ribbon-Tab <b>DTP</b> öffnet die Ansicht sofort
-(auch bei offenem PDF) — nicht erst ein Unterpunkt.</p>
+<p>Menü <b>DTP</b> oder Ribbon-Tab <b>DTP</b> schaltet Lineale und Rahmen
+im selben Dokumentfenster ein (Text, PDF und DTP eine Ansicht).
+Die Word-Menüs bleiben; es gibt keine zweite DTP-Bühne.</p>
 
 <h3>Speichern</h3>
 <ul>
-<li>Vor dem Wechsel in den DTP-Modus und beim Verlassen, wenn etwas geändert wurde:
+<li>Vor dem Einschalten, wenn das Dokument geändert wurde, und beim Ausschalten,
+wenn das Layout geändert wurde:
 <b>Speichern</b> / <b>Nicht speichern</b> / <b>Abbrechen</b>.</li>
 <li><b>Abbrechen</b> bleibt in der aktuellen Ansicht. Der Ribbon-Tab springt
 zurück, wenn der Wechsel abgebrochen wird.</li>
@@ -37,7 +38,8 @@ ohne Auswahl entsteht ein neuer Rahmen.</li>
 <li><b>Schriftfarbe</b>: <code>QColorDialog</code> auf Textauswahl oder
 gewählten Textrahmen (Glyphen, nicht Rahmen-Füllung).</li>
 <li><b>Verketten</b>: Overflow von Textrahmen in den nächsten Rahmen.</li>
-<li>Icon-Leiste und DTP-Menü führen dieselben Aktionen aus.</li>
+<li>Word-Menüs und DTP-Werkzeuge in derselben Ansicht; Lineale und Rahmen
+im Dokumentbereich.</li>
 </ul>
 
 <h3>Rahmen</h3>
