@@ -1,4 +1,10 @@
-InstantLens Doc 2.6.55 - Installation
+InstantLens Doc 2.6.56 - Installation
+
+Neu in 2.6.56:
+- Menue-Audit 0 FAIL auf DOCX/OCR/PDF (Dialog oder sichtbarer Effekt)
+- Leere Voraussetzungen als FeatureDialog statt Status-No-Op
+- Enablement pro Zeile; Alles speichern / Tabs-links immer Dialog
+- Pack InstantLensDoc-2.6.56-pack.zip
 
 Neu in 2.6.55:
 - PDF-Objekte auswaehlbar; Werkzeug gilt auf der Auswahl (select-then-tool)

@@ -1,5 +1,9 @@
 # InstantLens Doc — Kurzinfo
 
+### 2.6.56 — Release
+
+Menü-Audit 0 FAIL auf DOCX/OCR/PDF (Dialog oder sichtbarer Effekt). Leere Voraussetzungen als FeatureDialog; Enablement pro Zeile; Speichern/Tabs immer Dialog. Pack `InstantLensDoc-2.6.56-pack.zip`. VERSION **2.6.56**.
+
 ### 2.6.55 — Release
 
 PDF-Objekte auswählbar, Werkzeug auf Auswahl; Bearbeiten echte Formate; OCR = Word-Suite; DTP-Spec + Scribus-Chrome; Menütest PASS nur bei Dialog/Effekt. Pack `InstantLensDoc-2.6.55-pack.zip`. VERSION **2.6.55**.
@@ -23,7 +27,7 @@ Menü **Geräte** (Scanner / Scannen…, Drucker, Erkennen), PDF → Scannen, To
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **2.6.55** |
+| Version | **2.6.56** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |

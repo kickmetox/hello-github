@@ -1,3 +1,11 @@
+## 2.6.56 - Release: Menü-Audit 0 FAIL (DOCX/OCR/PDF)
+
+Pack `InstantLensDoc-2.6.56-pack.zip`; VERSION **2.6.56**. HEAD nach 2.6.55-Pack (`2e87d56`) inkl. Menü-Audit `f5bca42` (0 FAIL auf DOCX/OCR/PDF).
+
+- **Menü-Audit 0 FAIL:** Walk Datei…Hilfe + Ribbon/Kontext in DOCX, OCR-Text und PDF — PASS nur bei Dialog oder sichtbarem Effekt (`docs/instantlensdoc-menu-test-2655.md`).
+- **Leere Voraussetzung:** Messwerte, Tabs, Zoom, Suche, Align, Extract, Bookmarks, OCR, Raster → FeatureDialog / `QMessageBox.question` statt Status-No-Op.
+- **Enablement pro Zeile:** Audit-Walk synchronisiert Enablement vor jedem Trigger; Alles speichern und Tabs-links immer Dialog.
+
 ## 2.6.55 - Release: Select-then-tool, Bearbeiten-Formate, OCR-Word-Suite, DTP/Scribus, Menü-Audit
 
 Pack `InstantLensDoc-2.6.55-pack.zip`; VERSION **2.6.55**. Arbeitspakete nach 2.6.54 (HEAD inkl. Menü-Audit `246a9e8`).
