@@ -20,6 +20,7 @@ sys.path.insert(0, str(ROOT / "tests"))
 
 from PySide6.QtCore import Qt  # noqa: E402
 from PySide6.QtTest import QTest  # noqa: E402
+from PySide6.QtWidgets import QToolButton  # noqa: E402
 
 from menu_effect_lib import DialogRecorder, pump  # noqa: E402
 from menu_smoke_lib import (  # noqa: E402
@@ -259,4 +260,203 @@ def test_formatvorlagen_submenu_one_column() -> None:
             overflow.append(f"{path} x={geo.x()}")
     styles.hide()
     assert not overflow, "Formatvorlagen zweite Spalte:\n" + "\n".join(overflow)
+
+
+def test_oberflaeche_submenu_one_column() -> None:
+    _seed()
+    menu = find_menubar_menu(_WIN, "Ansicht")
+    assert menu is not None
+    chrome = None
+    for act in menu.actions():
+        sub = act.menu() if hasattr(act, "menu") else None
+        if sub is not None and (sub.objectName() == "menuChromeMode" or "Oberfläche" in (sub.title() or "").replace("&", "")):
+            chrome = sub
+            break
+    assert chrome is not None, "Ansicht ▸ Oberfläche fehlt"
+    prepare_menu_for_clicks(chrome)
+    chrome.popup(chrome.pos() if chrome.pos().x() else menu.pos())
+    chrome.show()
+    pump(_APP, 0.08)
+    rect = chrome.rect()
+    overflow = []
+    for path, _h, act in iter_leaf_actions(chrome, "Oberfläche"):
+        geo = chrome.actionGeometry(act)
+        if geo.isValid() and geo.x() > rect.width():
+            overflow.append(f"{path} x={geo.x()}")
+    chrome.hide()
+    assert not overflow, "Oberfläche zweite Spalte:\n" + "\n".join(overflow)
+    labels = [
+        (act.text() or "").replace("&", "").strip()
+        for _p, _h, act in iter_leaf_actions(chrome, "Oberfläche")
+    ]
+    for need in ("Klassisch (Pull-down)", "Ribbon", "Kombiniert"):
+        assert need in labels, f"Chrome-Modus fehlt: {need} in {labels}"
+
+
+def test_qtest_mouseclick_chrome_modes_ribbon_and_menu() -> None:
+    from instantlensdoc.ui.chrome import CHROME_KOMBINIERT
+
+    _seed()
+    _WIN._set_chrome_mode(CHROME_KOMBINIERT)
+    pump(_APP, 0.05)
+    _p, host_k, act_klassisch = _menu_action("Ansicht", "Klassisch (Pull-down)")
+    _p2, host_r, act_ribbon = _menu_action("Ansicht", "Ribbon")
+    _p3, host_c, act_kombiniert = _menu_action("Ansicht", "Kombiniert")
+    tb = _ribbon_button("chrome_klassisch")
+    assert (_WIN._ribbon_qactions or {}).get("chrome_klassisch") is act_klassisch
+    assert tb.defaultAction() is act_klassisch
+    hits = {"n": 0}
+
+    def _hit(*_a, **_k):
+        hits["n"] += 1
+
+    act_klassisch.triggered.connect(_hit)
+    try:
+        QTest.mouseClick(tb, Qt.MouseButton.LeftButton)
+        pump(_APP, 0.12)
+    finally:
+        try:
+            act_klassisch.triggered.disconnect(_hit)
+        except Exception:
+            pass
+    assert hits["n"] >= 1, f"Ribbon Klassisch ohne triggered ({hits['n']})"
+    assert _WIN.menuBar().isVisible()
+    assert not _WIN.ribbon_bar.isVisible()
+
+    hits["n"] = 0
+    act_ribbon.triggered.connect(_hit)
+    try:
+        assert mouse_click_menu_action(_APP, host_r, act_ribbon)
+        pump(_APP, 0.12)
+    finally:
+        try:
+            act_ribbon.triggered.disconnect(_hit)
+        except Exception:
+            pass
+    assert hits["n"] >= 1, f"Pulldown Ribbon-Modus ohne triggered ({hits['n']})"
+    assert not _WIN.menuBar().isVisible()
+    assert _WIN.ribbon_bar.isVisible()
+
+    tb_k = _ribbon_button("chrome_kombiniert")
+    hits["n"] = 0
+    act_kombiniert.triggered.connect(_hit)
+    try:
+        QTest.mouseClick(tb_k, Qt.MouseButton.LeftButton)
+        pump(_APP, 0.12)
+    finally:
+        try:
+            act_kombiniert.triggered.disconnect(_hit)
+        except Exception:
+            pass
+    assert hits["n"] >= 1, f"Ribbon Kombiniert ohne triggered ({hits['n']})"
+    assert _WIN.menuBar().isVisible()
+    assert _WIN.ribbon_bar.isVisible()
+    _WIN._set_chrome_mode(CHROME_KOMBINIERT)
+
+
+def test_qtest_mouseclick_styles_pane_same_qaction() -> None:
+    _seed()
+    _p, host, act = _menu_action("Ansicht", "Formatvorlagen")
+    bound = (_WIN._ribbon_qactions or {}).get("styles_pane")
+    assert bound is act, f"styles_pane map={bound!r} menu={act!r}"
+    tb = _ribbon_button("styles_pane")
+    assert tb.defaultAction() is act
+    hits = {"n": 0}
+
+    def _hit(*_a, **_k):
+        hits["n"] += 1
+
+    act.triggered.connect(_hit)
+    try:
+        QTest.mouseClick(tb, Qt.MouseButton.LeftButton)
+        pump(_APP, 0.12)
+        assert hits["n"] >= 1, f"Ribbon Formatvorlagen ohne triggered ({hits['n']})"
+        hits["n"] = 0
+        assert mouse_click_menu_action(_APP, host, act)
+        pump(_APP, 0.12)
+        assert hits["n"] >= 1, f"Pulldown Formatvorlagen ohne triggered ({hits['n']})"
+    finally:
+        try:
+            act.triggered.disconnect(_hit)
+        except Exception:
+            pass
+    gallery = getattr(_WIN.ribbon_bar, "style_gallery", None)
+    if gallery is not None:
+        more = gallery.findChild(QToolButton, "styleGalleryMore")
+        if more is not None:
+            hits["n"] = 0
+            act.triggered.connect(_hit)
+            try:
+                QTest.mouseClick(more, Qt.MouseButton.LeftButton)
+                pump(_APP, 0.12)
+            finally:
+                try:
+                    act.triggered.disconnect(_hit)
+                except Exception:
+                    pass
+            assert hits["n"] >= 1, "Gallery Formatvorlagen… ohne QAction"
+
+
+def test_qtest_mouseclick_table_tools_and_mail_merge() -> None:
+    _seed()
+    _click_shared("mail_merge", "Bearbeiten", "Seriendruck…")
+    assert _REC.events, "Seriendruck ohne Dialog"
+    _WIN.editor.insert_table(2, 2)
+    pump(_APP, 0.08)
+    _WIN._sync_table_tools()
+    pump(_APP, 0.05)
+    tb = _ribbon_button("table_add_row")
+    rows_before = 0
+    table = _WIN.editor.current_qtext_table()
+    if table is None:
+        cur = _WIN.editor.textCursor()
+        cur.movePosition(cur.Start)
+        _WIN.editor.setTextCursor(cur)
+        table = _WIN.editor.current_qtext_table()
+    if table is not None:
+        rows_before = int(table.rows())
+    QTest.mouseClick(tb, Qt.MouseButton.LeftButton)
+    pump(_APP, 0.12)
+    table = _WIN.editor.current_qtext_table()
+    if table is None:
+        cur = _WIN.editor.textCursor()
+        cur.movePosition(cur.Start)
+        _WIN.editor.setTextCursor(cur)
+        table = _WIN.editor.current_qtext_table()
+    assert table is not None, "Tabelle nach Tabellentools-Klick weg"
+    assert int(table.rows()) >= rows_before, "Zeile + ohne Wirkung"
+
+
+def test_ribbon_overflow_one_column_triggers_bound_qaction() -> None:
+    _seed()
+    rb = _WIN.ribbon_bar
+    rb.setVisible(True)
+    _p, _h, act = _menu_action("Bearbeiten", "Fett")
+    hits = {"n": 0}
+
+    def _hit(*_a, **_k):
+        hits["n"] += 1
+
+    act.triggered.connect(_hit)
+    try:
+        from instantlensdoc.ui.menu_click import show_scrollable_menu
+
+        menu = show_scrollable_menu(
+            [("bold", "Fett"), ("mail_merge", "Seriendruck…")],
+            rb,
+            on_pick=rb._pick_overflow,
+        )
+        assert menu is not None
+        items = menu.findChildren(QToolButton, "ildOverflowItem")
+        assert items, "Overflow-Spalte ohne Einträge"
+        geos = [it.geometry() for it in items]
+        assert all(g.x() < 40 for g in geos), "Overflow nicht eine Spalte"
+        QTest.mouseClick(items[0], Qt.MouseButton.LeftButton)
+        pump(_APP, 0.12)
+    finally:
+        try:
+            act.triggered.disconnect(_hit)
+        except Exception:
+            pass
+    assert hits["n"] >= 1, f"Overflow-Klick ohne QAction.triggered ({hits['n']})"
 

@@ -8811,6 +8811,7 @@ class MainWindow(QMainWindow):
         "style_title": "actEditStyle_title",
         "style_list": "actEditStyle_list",
         "mail_merge": "actMailMerge",
+        "styles_pane": "actStylesPane",
         "chrome_klassisch": "actChrome_klassisch",
         "chrome_ribbon": "actChrome_ribbon",
         "chrome_kombiniert": "actChrome_kombiniert",

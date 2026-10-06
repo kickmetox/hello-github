@@ -97,11 +97,17 @@ class _OverflowPanel(QWidget):
         if not self._hidden_specs:
             return
         global_pos = self._overflow.mapToGlobal(QPoint(0, self._overflow.height()))
+        ribbon = self.parentWidget()
+        while ribbon is not None and not hasattr(ribbon, "_pick_overflow"):
+            ribbon = ribbon.parentWidget()
+        on_pick = ribbon._pick_overflow if ribbon is not None else (
+            lambda aid: self.overflow_picked.emit(str(aid))
+        )
         show_scrollable_menu(
             self._hidden_specs,
             self,
             pos=global_pos,
-            on_pick=lambda aid: self.overflow_picked.emit(aid),
+            on_pick=on_pick,
         )
 
 
@@ -605,6 +611,18 @@ class RibbonBar(QWidget):
 
     def qaction(self, action_id: str):
         return (getattr(self, "_qactions", None) or {}).get(action_id)
+
+    def _pick_overflow(self, aid: str) -> None:
+        """Overflow-Hit: gebundene Pulldown-QAction, sonst action_triggered."""
+        act = self.qaction(str(aid))
+        if act is not None:
+            try:
+                if act.isEnabled():
+                    act.trigger()
+                return
+            except Exception:
+                pass
+        self.action_triggered.emit(str(aid))
 
     def bind(self, handlers: dict[str, Callable[[], None]]) -> None:
         """Optional: direkte Handler statt Signal (Smoke/Tests)."""
