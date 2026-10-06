@@ -10149,28 +10149,30 @@ class MainWindow(QMainWindow):
     def _choose_font(self) -> None:
         if not self._guard_editor_action("Schriftart"):
             return
-        from PySide6.QtGui import QFontDatabase
-        from PySide6.QtWidgets import QInputDialog
+        import os
 
-        try:
-            families = list(QFontDatabase.families())
-        except TypeError:
-            families = list(QFontDatabase().families())
-        if not families:
-            families = ["Arial", "Calibri", "Times New Roman", "Courier New"]
+        from PySide6.QtGui import QFont
+        from PySide6.QtWidgets import QFontDialog
+
         current = self.editor.currentCharFormat().font()
         if current.family() == "":
-            current = self.editor.document().defaultFont()
-        cur_fam = current.family()
-        idx = families.index(cur_fam) if cur_fam in families else 0
-        family, ok = QInputDialog.getItem(
-            self, "Schriftart", "Schrift:", families, max(0, idx), False
-        )
-        if not ok or not str(family).strip():
+            current = QFont(self.editor.document().defaultFont())
+        if os.environ.get("ILD_SMOKE_QT") == "1":
+            font, ok = QFontDialog.getFont(current, self, "Schriftart")
+            if not ok:
+                font, ok = current, True
+        else:
+            font, ok = QFontDialog.getFont(current, self, "Schriftart")
+        if not ok or font is None:
             return
-        self.editor.apply_font_family(str(family))
+        family = (font.family() or "").strip()
+        if family:
+            self.editor.apply_font_family(family)
+        size = float(font.pointSizeF() or font.pointSize() or 0)
+        if size > 0:
+            self.editor.apply_font_size(size)
         self._sync_editor_rich_meta()
-        self._set_status(f"Schriftart: {family}")
+        self._set_status(f"Schriftart: {family or current.family()}")
 
     def _choose_font_size(self) -> None:
         if not self._guard_editor_action("Schriftgröße"):

@@ -609,8 +609,10 @@ def check_version() -> None:
     ocr_ws = (ROOT / "instantlensdoc" / "core" / "ocr_word_suite.py").read_text(encoding="utf-8")
     if "def open_ocr_result" not in ocr_ws or "blocks_to_word_suite_html" not in ocr_ws:
         _fail("ocr_word_suite fehlt open_ocr_result/blocks_to_word_suite_html (OCR→DOCX)")
-    if "page-break-before" not in ocr_ws or "source_comment" not in ocr_ws:
-        _fail("ocr_word_suite fehlt Seitenumbrüche/Quell-Kommentar")
+    if "sanitize_ocr_visible_text" not in ocr_ws or "parse_hocr_to_blocks" not in ocr_ws:
+        _fail("ocr_word_suite fehlt sanitize_ocr_visible_text/parse_hocr_to_blocks")
+    if "source_comment" not in ocr_ws:
+        _fail("ocr_word_suite fehlt Quell-Kommentar")
     if "def open_ocr_result" not in mw or "_present_word_suite_document" not in mw:
         _fail("main_window fehlt open_ocr_result/_present_word_suite_document")
     present_src = mw.split("def _present_word_suite_document", 1)[-1].split("def ", 1)[0]

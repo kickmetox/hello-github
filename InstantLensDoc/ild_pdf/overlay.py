@@ -128,7 +128,14 @@ def extract_text_blocks(
     blocks: List[TextBlock] = []
     for line in lines:
         line = sorted(line, key=lambda c: c[0])
-        text = "".join(c[4] for c in line).strip()
+        text = "".join(c[4] for c in line)
+        text = (
+            text.replace("\x0c", " ")
+            .replace("\u2028", " ")
+            .replace("\u2029", " ")
+            .replace("\ufffd", "")
+            .strip()
+        )
         if not text:
             continue
         x0 = min(c[0] for c in line)

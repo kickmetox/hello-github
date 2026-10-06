@@ -1637,6 +1637,16 @@ class TextEditor(QPlainTextEdit):
             pass
         if was_rich:
             self.set_soft_wrap(self._soft_wrap)
+            try:
+                from instantlensdoc.core.app_settings import get_editor_show_special_chars
+
+                self.set_special_chars_visible(bool(get_editor_show_special_chars()))
+            except Exception:
+                pass
+            try:
+                self.document().setDocumentMargin(4.0)
+            except Exception:
+                pass
             self._apply_page_layout()
 
     def clear_spelling(self) -> None:
@@ -1925,6 +1935,11 @@ class TextEditor(QPlainTextEdit):
         self._rich_mode = True
         self.set_soft_wrap(self._soft_wrap)  # erzwingt WidgetWidth im Rich-Modus
         try:
+            # Word-Suite/DOCX: keine ¶ · Tabs als sichtbare Steuerzeichen
+            self.set_special_chars_visible(False)
+        except Exception:
+            pass
+        try:
             self.setCurrentCharFormat(QTextCharFormat())
         except Exception:
             pass
@@ -1935,8 +1950,18 @@ class TextEditor(QPlainTextEdit):
         self._rich_base_font = QFont(font)
         # Vor setHtml: Importer leitet Standardgrößen vom Dokument-Default ab
         doc.setDefaultFont(font)
+        try:
+            from instantlensdoc.core.ocr_word_suite import sanitize_ocr_html
+
+            html = sanitize_ocr_html(html or "")
+        except Exception:
+            html = html or ""
         doc.setHtml(html or "")
         doc.setDefaultFont(font)
+        try:
+            doc.setDocumentMargin(8.0)
+        except Exception:
+            pass
         try:
             self.setCurrentCharFormat(QTextCharFormat())
         except Exception:

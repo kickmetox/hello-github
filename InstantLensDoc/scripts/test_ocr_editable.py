@@ -200,6 +200,8 @@ def test_editor_ocr_bold_find_save() -> None:
 
     test_ocr_selection_or_document_on_editor(win)
 
+    test_editor_no_control_glyphs_highlight_font_docx(win)
+
     assert app is not None
 
 
@@ -364,8 +366,162 @@ def test_scan_session_import() -> None:
     _ok("scan: Session → Word-Suite DOCX mit Seiten")
 
 
+_CONTROL_GLYPHS = ("\x0c", "\u2028", "\u2029", "\ufffd", "\u00b6", "\u200e", "\u200f", "\u202a")
+
+_HOCR_SAMPLE = """
+<div class='ocr_page' title='image "scan.png"; bbox 0 0 800 1100; ppageno 0'>
+<p class='ocr_par' title='bbox 220 40 580 88'>
+<span class='ocr_line' title='bbox 220 40 580 88'>
+<span class='ocrx_word' title='bbox 230 40 560 88; x_wconf 95; x_font Times_New_Roman_Bold; x_fsize 18'><strong>EINLEITUNG</strong></span>
+</span>
+</p>
+<p class='ocr_par' title='bbox 40 120 760 210'>
+<span class='ocr_line' title='bbox 40 120 760 160'>
+<span class='ocrx_word' title='bbox 40 120 200 150; x_font Calibri; x_fsize 11'>Fliesstext</span>
+<span class='ocrx_word' title='bbox 210 120 320 150; x_font Calibri_Italic; x_fsize 11'><em>kursiv</em></span>
+</span>
+</p>
+</div>
+"""
+
+
+def test_core_sanitize_and_hocr_layout() -> None:
+    from instantlensdoc.core.ocr_word_suite import (
+        blocks_to_word_suite_html,
+        open_ocr_result,
+        parse_hocr_to_blocks,
+        sanitize_ocr_visible_text,
+    )
+
+    dirty = "Hallo\x0cWelt\u2028Zeile\ufffd\u200e"
+    clean = sanitize_ocr_visible_text(dirty)
+    for g in _CONTROL_GLYPHS:
+        if g in clean:
+            _fail(f"sanitize liess Steuerzeichen {g!r}")
+    if "Hallo" not in clean or "Welt" not in clean:
+        _fail("sanitize hat Fließtext entfernt")
+
+    blocks = parse_hocr_to_blocks(_HOCR_SAMPLE)
+    if len(blocks) < 2:
+        _fail(f"hOCR-Absätze fehlen: {len(blocks)}")
+    joined = " ".join(b.text for b in blocks)
+    if "EINLEITUNG" not in joined or "Fliesstext" not in joined:
+        _fail(f"hOCR-Text fehlt: {joined!r}")
+    if not any(b.bold or b.is_heading for b in blocks):
+        _fail("hOCR ohne Fett/Überschrift")
+    if not any(b.italic for b in blocks):
+        _fail("hOCR ohne Kursiv")
+    if not any("Times" in (b.font_name or "") or "Calibri" in (b.font_name or "") for b in blocks):
+        _fail(f"hOCR ohne Fontnamen: {[b.font_name for b in blocks]}")
+    html = blocks_to_word_suite_html(blocks, title="hOCR")
+    low = html.lower()
+    if "font-family" not in low or "font-size" not in low or "text-align" not in low:
+        _fail(f"hOCR-HTML ohne Layout: {html[:400]}")
+    if "<b>" not in low and "<h1" not in low:
+        _fail("hOCR-HTML ohne Fett/Überschrift-Tag")
+    if "<i>" not in low:
+        _fail("hOCR-HTML ohne Kursiv-Tag")
+    for g in _CONTROL_GLYPHS:
+        if g in html:
+            _fail(f"hOCR-HTML enthält Steuerzeichen {g!r}")
+
+    dumped = open_ocr_result(
+        text="Dump\x0cmit\u2028Formfeed\ufffd",
+        auto_format=False,
+        title="Word-Suite — Dirty",
+    )
+    blob = (dumped.text or "") + str((dumped.meta or {}).get("html") or "")
+    for g in ("\x0c", "\u2028", "\ufffd"):
+        if g in blob:
+            _fail(f"open_ocr_result dumpte Steuerzeichen {g!r}")
+    if "Dump" not in dumped.text:
+        _fail("Dirty-OCR-Text verloren")
+    _ok("core: Steuerzeichen weg, hOCR Font/Fett/Kursiv/Align")
+
+
+def test_editor_no_control_glyphs_highlight_font_docx(win) -> None:
+    """OCR-Editor: keine sichtbaren Steuerzeichen; Highlighter + Schrift überleben DOCX."""
+    from PySide6.QtGui import QFont, QTextCursor
+
+    from instantlensdoc.core.documents import save_document
+
+    ok = win.open_ocr_result(
+        path=FIXTURE,
+        title="Word-Suite — OCR-Fixture",
+        auto_format=False,
+    )
+    if not ok:
+        _fail("open_ocr_result für Highlight/Font-Test fehlgeschlagen")
+
+    ed = win.editor
+    try:
+        if ed.special_chars_visible():
+            _fail("Rich-OCR zeigt Sonderzeichen (ShowTabsAndSpaces)")
+    except Exception:
+        pass
+    plain = ed.toPlainText()
+    for g in _CONTROL_GLYPHS:
+        if g in plain:
+            _fail(f"Editor-Plain enthält Steuerzeichen {g!r}")
+    html = ed.to_rich_html()
+    for g in ("\x0c", "\u2028", "\ufffd", "&#12;"):
+        if g in html:
+            _fail(f"Editor-HTML enthält Steuerzeichen {g!r}")
+
+    needle = "EINLEITUNG"
+    if needle not in plain:
+        _fail("EINLEITUNG fehlt vor Highlight/Font")
+    idx = plain.index(needle)
+    cur = ed.textCursor()
+    cur.setPosition(idx)
+    cur.setPosition(idx + len(needle), QTextCursor.KeepAnchor)
+    ed.setTextCursor(cur)
+    if not ed.apply_font_family("Arial"):
+        _fail("apply_font_family auf OCR-Auswahl fehlgeschlagen")
+    if not ed.highlight_selection("#FFE066"):
+        _fail("highlight_selection auf OCR-Auswahl fehlgeschlagen")
+    win._sync_editor_rich_meta()
+    html = ed.to_rich_html().lower()
+    if "arial" not in html:
+        _fail(f"to_rich_html ohne Arial nach Font-Picker-Pfad: {html[:360]}")
+    if "background" not in html and "ffe066" not in html:
+        _fail(f"to_rich_html ohne Highlight-Hintergrund: {html[:360]}")
+
+    with tempfile.TemporaryDirectory() as td:
+        out = Path(td) / "ocr-highlight-font.docx"
+        save_document(win.doc, out)
+        if not out.is_file():
+            _fail("DOCX nach Highlight/Font nicht geschrieben")
+        from docx import Document as DocxDocument
+
+        d = DocxDocument(str(out))
+        names = []
+        highs = []
+        body_parts = []
+        for para in d.paragraphs:
+            body_parts.append(para.text)
+            for run in para.runs:
+                if needle not in (run.text or "") and needle.title() not in (run.text or ""):
+                    if "EINLEITUNG" not in (run.text or "").upper():
+                        continue
+                if run.font.name:
+                    names.append(str(run.font.name))
+                hl = getattr(run.font, "highlight_color", None)
+                if hl is not None:
+                    highs.append(str(hl))
+        body = "\n".join(body_parts)
+        if "EINLEITUNG" not in body.upper():
+            _fail(f"DOCX ohne OCR-Überschrift: {body[:240]!r}")
+        if names and not any("arial" in n.lower() for n in names):
+            _fail(f"DOCX Font nicht Arial: {names}")
+        if not highs:
+            _fail(f"DOCX ohne persistentes Highlight: names={names}")
+    _ok("qt: keine Steuerzeichen; Highlight+Arial überleben DOCX")
+
+
 def main() -> int:
     test_core_ocr_fixture_to_docx()
+    test_core_sanitize_and_hocr_layout()
     test_pdf_extract_kind_not_pdf()
     test_scan_session_import()
     test_editor_ocr_bold_find_save()

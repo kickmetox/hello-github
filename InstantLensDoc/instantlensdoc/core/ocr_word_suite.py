@@ -31,9 +31,40 @@ PathLike = Union[str, Path]
 DEFAULT_BODY_FONT = "Calibri"
 DEFAULT_BODY_PT = 11.0
 DEFAULT_HEADING_PT = 16.0
+# Kein page-break-before: Qt speichert das als Form-Feed (\x0c) → Ersatzkasten.
 PAGE_BREAK_HTML = (
-    '<p style="page-break-before:always;-qt-paragraph-type:empty;'
-    'margin-top:0px;margin-bottom:0px;"><br/></p>'
+    '<p style="margin-top:22pt;margin-bottom:0pt;-qt-paragraph-type:empty;">'
+    "<br/></p>"
+)
+
+# Steuer-/Bidi-/Formatsteuerzeichen, die in QTextDocument als ¶ · Kästchen landen.
+_OCR_CONTROL_RE = re.compile(
+    "["
+    "\x00-\x08\x0b\x0c\x0e-\x1f\x7f"
+    "\u200b-\u200f"
+    "\u2028-\u202e"
+    "\u2060-\u2064"
+    "\u2066-\u2069"
+    "\ufeff"
+    "\ufff9-\ufffb"
+    "\ufffd"
+    "]"
+)
+_HOCR_TITLE_ATTR_RE = re.compile(r"\btitle=(['\"])(.*?)\1", re.I | re.S)
+_HOCR_BBOX_RE = re.compile(r"bbox\s+(-?\d+)\s+(-?\d+)\s+(-?\d+)\s+(-?\d+)")
+_HOCR_XFONT_RE = re.compile(r"x_font\s+([^;]+)")
+_HOCR_XFSIZE_RE = re.compile(r"x_fsize\s+([\d.]+)")
+_HOCR_PAR_OPEN_RE = re.compile(
+    r"<(?:p|div)\b[^>]*class=['\"][^'\"]*\bocr_par\b[^'\"]*['\"][^>]*>",
+    re.I,
+)
+_HOCR_WORD_RE = re.compile(
+    r"<span\b([^>]*ocrx_word[^>]*)>(.*?)</span>",
+    re.I | re.S,
+)
+_HOCR_PAGE_OPEN_RE = re.compile(
+    r"<(?:div|body)\b[^>]*class=['\"][^'\"]*\bocr_page\b[^'\"]*['\"][^>]*>",
+    re.I,
 )
 
 _BLOCK_META_RE = re.compile(
@@ -63,6 +94,7 @@ class WordSuiteBlock:
     italic: bool = False
     page: int = 0
     is_heading: bool = False
+    align: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -195,7 +227,7 @@ def _ws_blocks_from_ocr(
         out.append(
             WordSuiteBlock(
                 reading_order=int(b.reading_order),
-                text=(b.text or "").strip(),
+                text=sanitize_ocr_visible_text((b.text or "").strip()),
                 block_num=int(b.block_num),
                 left=int(b.left),
                 top=int(b.top),
@@ -209,6 +241,7 @@ def _ws_blocks_from_ocr(
                 italic=bool(getattr(b, "italic", False)),
                 page=int(getattr(b, "page", 0) or 0),
                 is_heading=bool(getattr(b, "is_heading", False)),
+                align=str(getattr(b, "align", "") or ""),
             )
         )
     out.sort(key=lambda x: (x.reading_order, x.top, x.left))
@@ -272,9 +305,10 @@ def _blocks_from_text(text: str) -> List[WordSuiteBlock]:
 
 
 def _split_paras(text: str) -> List[str]:
-    paras = [p.strip() for p in re.split(r"\n\s*\n", text or "") if p.strip()]
-    if not paras and (text or "").strip():
-        paras = [(text or "").strip()]
+    cleaned = sanitize_ocr_visible_text(text or "")
+    paras = [p.strip() for p in re.split(r"\n\s*\n", cleaned) if p.strip()]
+    if not paras and cleaned.strip():
+        paras = [cleaned.strip()]
     return paras
 
 
@@ -294,8 +328,187 @@ def _maybe_auto_format(text: str, *, enabled: bool) -> tuple[str, bool]:
         return text, False
 
 
+def sanitize_ocr_visible_text(text: str) -> str:
+    """Form-Feed, Bidi-Marken, Ersatzzeichen aus OCR/PDF-Text entfernen — kein ¶/Kasten."""
+    if not text:
+        return ""
+    s = (
+        str(text)
+        .replace("\x0c", "\n\n")
+        .replace("\u2028", "\n")
+        .replace("\u2029", "\n\n")
+    )
+    s = _OCR_CONTROL_RE.sub("", s)
+    s = s.replace("\r\n", "\n").replace("\r", "\n")
+    return s
+
+
+def sanitize_ocr_html(html: str) -> str:
+    """Steuerzeichen aus generiertem Word-Suite-HTML strippen (Tags bleiben)."""
+    if not html:
+        return ""
+    s = str(html).replace("\x0c", "").replace("\u2028", " ").replace("\u2029", " ")
+    return _OCR_CONTROL_RE.sub("", s)
+
+
 def _html_escape(text: str) -> str:
-    return html_lib.escape(text or "", quote=False).replace("\n", "<br/>")
+    return html_lib.escape(sanitize_ocr_visible_text(text), quote=False).replace(
+        "\n", "<br/>"
+    )
+
+
+def infer_align(left: float, width: float, page_width: float) -> str:
+    """Aus Block-BBox vs. Seitenbreite: left/center/right."""
+    if page_width <= 0 or width <= 0:
+        return "left"
+    left_gap = max(0.0, float(left))
+    right_gap = max(0.0, float(page_width) - (float(left) + float(width)))
+    if abs(left_gap - right_gap) < page_width * 0.12 and left_gap > page_width * 0.10:
+        return "center"
+    if left_gap > page_width * 0.38 and right_gap < page_width * 0.20:
+        return "right"
+    return "left"
+
+
+def _font_style_from_name(name: str) -> tuple[bool, bool, str]:
+    """``(bold, italic, family)`` aus Tesseract/pdfium-Fontnamen."""
+    raw = (name or "").replace("_", " ").replace("-", " ").strip()
+    if not raw:
+        return False, False, ""
+    low = raw.lower()
+    bold = any(t in low for t in ("bold", "black", "heavy", "semibold"))
+    italic = any(t in low for t in ("italic", "oblique"))
+    family = re.sub(
+        r"(?i)\b(bold|italic|oblique|regular|medium|light|black|heavy|roman|mt)\b",
+        " ",
+        raw,
+    )
+    family = re.sub(r"\s+", " ", family).strip(" ,")
+    return bold, italic, family or raw
+
+
+def _normalize_font_size_pt(size: float) -> float:
+    """hOCR ``x_fsize`` oft in Pixel; auf Punkt begrenzen."""
+    try:
+        val = float(size)
+    except (TypeError, ValueError):
+        return 0.0
+    if val <= 0:
+        return 0.0
+    if val > 48.0:
+        val = val * 0.75
+    return max(7.0, min(48.0, round(val, 1)))
+
+
+def _hocr_title_from_tag(tag: str) -> str:
+    m = _HOCR_TITLE_ATTR_RE.search(tag or "")
+    return m.group(2) if m else ""
+
+
+def _parse_hocr_title(title: str) -> dict[str, Any]:
+    out: dict[str, Any] = {}
+    m = _HOCR_BBOX_RE.search(title or "")
+    if m:
+        l, t, r, b = (int(m.group(1)), int(m.group(2)), int(m.group(3)), int(m.group(4)))
+        out["left"] = l
+        out["top"] = t
+        out["width"] = max(0, r - l)
+        out["height"] = max(0, b - t)
+    fm = _HOCR_XFONT_RE.search(title or "")
+    if fm:
+        out["font"] = fm.group(1).strip().strip("'\"")
+    sm = _HOCR_XFSIZE_RE.search(title or "")
+    if sm:
+        try:
+            out["size"] = float(sm.group(1))
+        except ValueError:
+            pass
+    return out
+
+
+def parse_hocr_to_blocks(hocr: str, *, page: int = 0) -> List[WordSuiteBlock]:
+    """Tesseract-hOCR → Absätze mit Font/Größe/Fett/Kursiv/Ausrichtung."""
+    html = hocr or ""
+    if "ocr" not in html.lower():
+        return []
+    page_w = 0
+    for pm in _HOCR_PAGE_OPEN_RE.finditer(html):
+        info = _parse_hocr_title(_hocr_title_from_tag(pm.group(0)))
+        page_w = max(page_w, int(info.get("width", 0) or 0) + int(info.get("left", 0) or 0))
+    opens = list(_HOCR_PAR_OPEN_RE.finditer(html))
+    blocks: List[WordSuiteBlock] = []
+    for i, m in enumerate(opens):
+        start = m.end()
+        end = opens[i + 1].start() if i + 1 < len(opens) else len(html)
+        chunk = html[start:end]
+        chunk = re.split(
+            r"(?i)<(?:div|p)\b[^>]*class=['\"][^'\"]*ocr_(?:carea|page|par)\b",
+            chunk,
+            maxsplit=1,
+        )[0]
+        par_info = _parse_hocr_title(_hocr_title_from_tag(m.group(0)))
+        words: List[str] = []
+        fonts: List[str] = []
+        sizes: List[float] = []
+        n_bold = 0
+        n_italic = 0
+        for wm in _HOCR_WORD_RE.finditer(chunk):
+            attrs, inner = wm.group(1), wm.group(2)
+            info = _parse_hocr_title(_hocr_title_from_tag(attrs))
+            text = re.sub(r"<[^>]+>", "", inner)
+            text = html_lib.unescape(text)
+            text = sanitize_ocr_visible_text(text).strip()
+            if not text:
+                continue
+            words.append(text)
+            if info.get("font"):
+                fonts.append(str(info["font"]))
+            if info.get("size"):
+                sizes.append(float(info["size"]))
+            inner_l = inner.lower()
+            attrs_l = (attrs or "").lower()
+            fb, fi, _fam = _font_style_from_name(str(info.get("font") or ""))
+            if fb or "<strong" in inner_l or "<b>" in inner_l or "ocr-bold" in attrs_l:
+                n_bold += 1
+            if fi or "<em" in inner_l or "<i>" in inner_l or "ocr-italic" in attrs_l:
+                n_italic += 1
+        if not words:
+            plain = re.sub(r"<br\s*/?>", "\n", chunk, flags=re.I)
+            plain = re.sub(r"<[^>]+>", " ", plain)
+            plain = sanitize_ocr_visible_text(html_lib.unescape(plain))
+            plain = re.sub(r"[ \t]+", " ", plain).strip()
+            if not plain:
+                continue
+            words = [plain]
+        body = sanitize_ocr_visible_text(" ".join(words))
+        body = re.sub(r" +", " ", body).strip()
+        if not body:
+            continue
+        font_name = fonts[0] if fonts else ""
+        _fb, _fi, family = _font_style_from_name(font_name)
+        if family:
+            font_name = family
+        n = max(1, len(words))
+        left = int(par_info.get("left", 0) or 0)
+        width = int(par_info.get("width", 0) or 0)
+        blocks.append(
+            WordSuiteBlock(
+                reading_order=len(blocks),
+                text=body,
+                left=left,
+                top=int(par_info.get("top", 0) or 0),
+                width=width,
+                height=int(par_info.get("height", 0) or 0),
+                font_name=font_name,
+                font_size_pt=_normalize_font_size_pt(_median_positive(sizes)),
+                bold=n_bold * 2 >= n,
+                italic=n_italic * 2 >= n,
+                page=int(page or 0),
+                align=infer_align(left, width, page_w),
+                lines=body.splitlines(),
+            )
+        )
+    return blocks
 
 
 def looks_like_heading(
@@ -337,10 +550,21 @@ def _median_positive(values: Sequence[float]) -> float:
 
 
 def infer_block_styles(blocks: Sequence[WordSuiteBlock]) -> None:
-    """Font/Überschrift an Blöcken setzen, wo Tesseract keine Fonts liefert."""
+    """Font/Überschrift/Ausrichtung an Blöcken setzen, wo Tesseract keine Fonts liefert."""
     sizes: List[float] = []
+    page_w = 0.0
     for b in blocks:
+        page_w = max(page_w, float(b.left or 0) + float(b.width or 0))
+        if b.font_name:
+            fb, fi, fam = _font_style_from_name(b.font_name)
+            if fam:
+                b.font_name = fam
+            if fb:
+                b.bold = True
+            if fi:
+                b.italic = True
         if b.font_size_pt and b.font_size_pt > 0:
+            b.font_size_pt = _normalize_font_size_pt(b.font_size_pt)
             sizes.append(float(b.font_size_pt))
             continue
         n_lines = max(1, len(b.lines) if b.lines else (1 if b.text else 1))
@@ -351,6 +575,7 @@ def infer_block_styles(blocks: Sequence[WordSuiteBlock]) -> None:
                 sizes.append(b.font_size_pt)
     median = _median_positive(sizes) or DEFAULT_BODY_PT
     for b in blocks:
+        b.text = sanitize_ocr_visible_text(b.text)
         if not b.font_name:
             b.font_name = DEFAULT_BODY_FONT
         n_lines = max(1, len(b.lines) if b.lines else 1)
@@ -368,6 +593,8 @@ def infer_block_styles(blocks: Sequence[WordSuiteBlock]) -> None:
                 b.font_size_pt = DEFAULT_HEADING_PT
         elif not b.font_size_pt:
             b.font_size_pt = DEFAULT_BODY_PT
+        if not (b.align or "").strip():
+            b.align = infer_align(b.left, b.width, page_w)
 
 
 def source_link_comment(
@@ -440,15 +667,19 @@ def blocks_to_word_suite_html(
         if b.bold or b.is_heading:
             inner = f"<b>{inner}</b>"
         tag = "h1" if b.is_heading else "p"
+        align = (b.align or "left").lower().strip()
+        if align not in ("left", "center", "right", "justify"):
+            align = "left"
         parts.append(
-            f'<{tag} style="font-family:{fam};font-size:{size:g}pt;">{inner}</{tag}>'
+            f'<{tag} style="font-family:{fam};font-size:{size:g}pt;'
+            f'text-align:{align};">{inner}</{tag}>'
         )
         wrote = True
     if not wrote and (text or "").strip():
         for para in _paragraphs_as_blocks(text):
             parts.append(f"<p>{_html_escape(para.text)}</p>")
     parts.append("</body></html>")
-    return "".join(parts)
+    return sanitize_ocr_html("".join(parts))
 
 
 def _int_meta(meta: dict[str, Any], key: str) -> int | None:
@@ -556,16 +787,18 @@ def build_word_suite_document(
                         italic=bool(b.get("italic")),
                         page=int(b.get("page") or 0),
                         is_heading=bool(b.get("is_heading")),
+                        align=str(b.get("align") or ""),
                     )
                 )
     body = ""
     if ws_blocks:
         body = blocks_to_word_suite_text(ws_blocks)
     if not body.strip():
-        body = (text or "").strip()
+        body = sanitize_ocr_visible_text(text or "").strip()
         if body:
             ws_blocks = _paragraphs_as_blocks(body)
     formatted, did_fmt = _maybe_auto_format(body, enabled=auto_format)
+    formatted = sanitize_ocr_visible_text(formatted)
     src_path = None
     src_page = _int_meta(dict(meta or {}), "page")
     if source:
@@ -599,15 +832,27 @@ def import_ildocr_sidecar(
     suffix = p.name.lower()
     raw = p.read_text(encoding="utf-8", errors="replace")
 
-    # hOCR: grob Text extrahieren
+    # hOCR: Fonts/Ausrichtung aus Tesseract, nicht als Monospace-Dump
     if suffix.endswith(".ildocr.hocr") or suffix.endswith(".hocr"):
+        hocr_blocks = parse_hocr_to_blocks(raw)
+        if hocr_blocks:
+            return build_word_suite_document(
+                text=blocks_to_word_suite_text(hocr_blocks),
+                blocks=hocr_blocks,
+                title=title or f"Word-Suite — {p.stem}",
+                source=str(p),
+                mode="hocr",
+                sidecar=str(p),
+                auto_format=auto_format,
+                meta={"format": "hocr"},
+            )
         plain = re.sub(r"<script[\s\S]*?</script>", " ", raw, flags=re.I)
         plain = re.sub(r"<style[\s\S]*?</style>", " ", plain, flags=re.I)
         plain = re.sub(r"<br\s*/?>", "\n", plain, flags=re.I)
         plain = re.sub(r"</p\s*>", "\n\n", plain, flags=re.I)
         plain = re.sub(r"<[^>]+>", " ", plain)
         plain = re.sub(r"[ \t]+", " ", plain)
-        plain = re.sub(r"\n{3,}", "\n\n", plain).strip()
+        plain = re.sub(r"\n{3,}", "\n\n", sanitize_ocr_visible_text(plain)).strip()
         return build_word_suite_document(
             text=plain,
             title=title or f"Word-Suite — {p.stem}",
@@ -687,6 +932,32 @@ def ocr_result_to_word_suite(
     title: str | None = None,
 ) -> WordSuiteDocument:
     """``OcrResult`` → Word-Suite-Dokument (Blöcke / Lesereihenfolge)."""
+    hocr = ""
+    layout = getattr(result, "layout", None)
+    if layout is not None:
+        hocr = str(getattr(layout, "hocr", "") or "")
+    if not hocr and getattr(result, "hocr_path", None):
+        try:
+            hocr = Path(str(result.hocr_path)).read_text(encoding="utf-8", errors="replace")
+        except Exception:
+            hocr = ""
+    hocr_blocks = parse_hocr_to_blocks(hocr) if hocr else []
+    if hocr_blocks:
+        return build_word_suite_document(
+            text=blocks_to_word_suite_text(hocr_blocks),
+            blocks=hocr_blocks,
+            title=title or f"Word-Suite — {result.source_label or 'OCR'}",
+            source=result.source_label or "",
+            lang=result.lang,
+            mode="hocr",
+            sidecar=str(result.sidecar) if result.sidecar else None,
+            auto_format=auto_format,
+            meta={
+                "format": "hocr",
+                "searchable_pdf": str(result.searchable_pdf) if result.searchable_pdf else "",
+                "hocr": str(result.hocr_path) if result.hocr_path else "",
+            },
+        )
     blocks = list(result.blocks or [])
     if not blocks and result.layout is not None:
         blocks = list(result.layout.blocks or [])
@@ -974,20 +1245,26 @@ def pdf_extracted_to_word_suite(
             paras = []
         if paras:
             for para in paras:
-                txt = (getattr(para, "text", "") or "").strip()
+                txt = sanitize_ocr_visible_text((getattr(para, "text", "") or "")).strip()
                 if not txt:
                     continue
                 fs = float(getattr(para, "font_size", 0.0) or 0.0)
+                left = int(getattr(para, "x", 0) or 0)
+                width = int(getattr(para, "width", 0) or 0)
+                font_name = str(getattr(para, "font_name", "") or "")
+                fb, fi, fam = _font_style_from_name(font_name)
                 blocks.append(
                     WordSuiteBlock(
                         reading_order=order,
                         text=txt,
-                        left=int(getattr(para, "x", 0) or 0),
+                        left=left,
                         top=int(getattr(para, "y", 0) or 0),
-                        width=int(getattr(para, "width", 0) or 0),
+                        width=width,
                         height=int(getattr(para, "height", 0) or 0),
                         font_size_pt=fs if fs > 0 else 0.0,
-                        font_name=str(getattr(para, "font_name", "") or ""),
+                        font_name=fam or font_name,
+                        bold=fb,
+                        italic=fi,
                         page=idx + 1,
                         lines=txt.splitlines(),
                     )
