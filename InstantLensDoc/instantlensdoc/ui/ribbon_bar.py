@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Callable
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QKeySequence, QShortcut
+from PySide6.QtGui import QAction, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
@@ -315,6 +315,31 @@ class RibbonBar(QWidget):
                 tb.setToolTip(tip)
             except Exception:
                 pass
+
+    def bind_qactions(self, mapping: dict[str, QAction]) -> None:
+        """Ribbon-Buttons lösen dieselbe QAction aus wie das Pulldown-Menü."""
+        self._qactions = {}
+        for aid, act in (mapping or {}).items():
+            if act is None:
+                continue
+            self._qactions[str(aid)] = act
+            for tb in self._action_buttons.get(aid, ()):
+                label = tb.text()
+                icon = tb.icon()
+                style = tb.toolButtonStyle()
+                try:
+                    tb.clicked.disconnect()
+                except TypeError:
+                    pass
+                tb.setDefaultAction(act)
+                if label:
+                    tb.setText(label)
+                if not icon.isNull():
+                    tb.setIcon(icon)
+                tb.setToolButtonStyle(style)
+
+    def qaction(self, action_id: str):
+        return (getattr(self, "_qactions", None) or {}).get(action_id)
 
     def bind(self, handlers: dict[str, Callable[[], None]]) -> None:
         """Optional: direkte Handler statt Signal (Smoke/Tests)."""
