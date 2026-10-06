@@ -226,6 +226,88 @@ def all_tab_qactions(mapping: Mapping[str, object] | None) -> dict[str, dict[str
     return {tab: pick_tab_qactions(src, tab) for tab in CHROME_TABS}
 
 
+FONT_TOOL_ACTION_IDS: frozenset[str] = frozenset(
+    {
+        "bold",
+        "italic",
+        "underline",
+        "strike",
+        "font",
+        "font_color",
+        "highlight",
+        "highlight_color",
+        "clear_formatting",
+    }
+)
+
+FONT_TOOL_OBJECT_NAMES: frozenset[str] = frozenset(
+    {
+        "actEditBold",
+        "actEditItalic",
+        "actEditUnderline",
+        "actEditStrike",
+        "actEditFont",
+        "actEditFontSize",
+        "actEditFontColor",
+        "actEditHighlight",
+        "actEditBackgroundColor",
+        "actEditClearFormatting",
+    }
+)
+
+FONT_TOOL_LABEL_NEEDLES: tuple[str, ...] = (
+    "fett",
+    "kursiv",
+    "unterstrichen",
+    "durchgestrichen",
+    "schriftart",
+    "schriftgröße",
+    "schriftfarbe",
+    "texthervorhebung",
+    "hintergrundfarbe",
+    "textmarker",
+    "formatierungen löschen",
+)
+
+FONT_TOOL_DISABLE_REASON = (
+    "Schriftwerkzeuge nach OCR oder in txt/doc/docx/odt/DTP"
+)
+
+EDITOR_ACTION_DISABLE_REASON = "Nur im Text- oder DOCX-Editor verfügbar"
+
+
+def is_font_tool_id(action_id: str | None) -> bool:
+    return str(action_id or "") in FONT_TOOL_ACTION_IDS
+
+
+def is_font_tool_object_name(name: str | None) -> bool:
+    return str(name or "") in FONT_TOOL_OBJECT_NAMES
+
+
+def is_font_tool_label(label: str | None) -> bool:
+    t = (label or "").replace("&", "").strip().lower()
+    return bool(t) and any(n in t for n in FONT_TOOL_LABEL_NEEDLES)
+
+
+def font_tools_allowed(
+    *,
+    is_editor: bool,
+    is_dtp: bool,
+    is_pdf: bool,
+    has_ocr: bool,
+) -> tuple[bool, str]:
+    """Schriftwerkzeuge: grauen + Tooltip, nie Menü ausblenden.
+
+    Enabled: txt/doc/docx/odt-Editor, DTP, oder PDF nach OCR.
+    Disabled: PDF ohne OCR (und sonstige Nicht-Text-Tabs).
+    """
+    if is_dtp or is_editor:
+        return True, ""
+    if is_pdf and has_ocr:
+        return True, ""
+    return False, FONT_TOOL_DISABLE_REASON
+
+
 def normalize_chrome_feature(name: str | None) -> str:
     raw = str(name or "").replace("&", "").strip()
     if not raw:

@@ -2120,7 +2120,7 @@ class MainWindow(QMainWindow):
             "DOCX, OCR, Klartext, PDF-Text, DTP-Rahmen"
         )
         act_font_color.triggered.connect(self._choose_font_color)
-        m_edit.addAction(act_font_color)
+        m_edit.addAction(self._track_editor_action(act_font_color))
         act_highlight = QAction("Texthervorhebung…", self)
         act_highlight.setObjectName("actEditHighlight")
         act_highlight.setToolTip(
@@ -5102,6 +5102,8 @@ class MainWindow(QMainWindow):
         """PDF-only / Editor-only Menüs an den aktuellen Dokumenttyp koppeln — 2.6.54."""
         is_pdf = False
         is_editor = False
+        is_dtp = False
+        has_ocr = False
         try:
             is_pdf = bool(self._pdf_tab_active()) and bool(
                 getattr(self.pdf_view, "pdf_path", None)
@@ -5115,9 +5117,11 @@ class MainWindow(QMainWindow):
             except Exception:
                 is_pdf = False
         try:
-            is_editor = bool(self._editor_document_active()) or bool(
-                self._layout_mode_active()
-            )
+            is_dtp = bool(self._layout_mode_active())
+        except Exception:
+            is_dtp = False
+        try:
+            is_editor = bool(self._editor_document_active()) or bool(is_dtp)
         except Exception:
             try:
                 is_editor = self.stack.currentWidget() is self.editor_pane
@@ -5125,9 +5129,19 @@ class MainWindow(QMainWindow):
                 is_editor = False
         writable = bool(is_editor) and not self._document_is_readonly()
         try:
+            has_ocr = bool(self._current_has_ocr())
+        except Exception:
+            has_ocr = False
+        try:
             pdf_paths = self._open_pdf_paths()
         except Exception:
             pdf_paths = []
+        from instantlensdoc.ui.chrome_actions import (
+            FONT_TOOL_ACTION_IDS,
+            font_tools_allowed,
+            is_font_tool_id,
+            is_font_tool_label,
+        )
 
         def _walk(menu, mode: str, parent: str = "") -> None:
             if menu is None:
@@ -5217,14 +5231,20 @@ class MainWindow(QMainWindow):
                             self._set_action_available(
                                 a, is_pdf, "Nur bei geöffnetem PDF verfügbar"
                             )
-                    elif "schriftfarbe" in label:
-                        self._set_action_available(
-                            a,
-                            bool(writable or is_pdf),
-                            "Schreibgeschützt"
-                            if self._document_is_readonly()
-                            else "Schriftfarbe: Editor, OCR, PDF-Text oder DTP",
+                    elif is_font_tool_label(label) or "schriftfarbe" in label:
+                        ok, reason = font_tools_allowed(
+                            is_editor=bool(self._editor_document_active()),
+                            is_dtp=bool(is_dtp),
+                            is_pdf=bool(is_pdf),
+                            has_ocr=bool(has_ocr),
                         )
+                        if (
+                            ok
+                            and self._document_is_readonly()
+                            and not (is_pdf or is_dtp)
+                        ):
+                            ok, reason = False, "Schreibgeschützt"
+                        self._set_action_available(a, ok, reason)
                     elif self._label_is_editor_only(label) or parent.strip().lower() == "absatz":
                         self._set_action_available(
                             a,
@@ -5393,6 +5413,20 @@ class MainWindow(QMainWindow):
                             a, n_p > 1 and idx < n_p - 1, "Keine Tabs rechts"
                         )
 
+        for top in mb.actions():
+            try:
+                top.setVisible(True)
+                top.setEnabled(True)
+            except Exception:
+                pass
+            menu = top.menu() if hasattr(top, "menu") else None
+            if menu is not None:
+                try:
+                    menu.setVisible(True)
+                    menu.setEnabled(True)
+                except Exception:
+                    pass
+
         rb = getattr(self, "ribbon_bar", None)
         if rb is not None:
             always = {
@@ -5478,22 +5512,45 @@ class MainWindow(QMainWindow):
                 "table_align_center",
                 "table_align_right",
             }
-            color_ids = {"font_color"}
+            color_ids = FONT_TOOL_ACTION_IDS
             for aid, btn in (getattr(rb, "_actions", {}) or {}).items():
                 if aid in always:
                     on = True
+                    reason = ""
                 elif aid in pdf_ids:
                     on = bool(is_pdf)
-                elif aid in color_ids:
-                    on = bool(is_editor or is_pdf)
+                    reason = "" if on else "Nur bei geöffnetem PDF verfügbar"
+                elif is_font_tool_id(aid) or aid in color_ids:
+                    on, reason = font_tools_allowed(
+                        is_editor=bool(self._editor_document_active()),
+                        is_dtp=bool(is_dtp),
+                        is_pdf=bool(is_pdf),
+                        has_ocr=bool(has_ocr),
+                    )
+                    if (
+                        on
+                        and self._document_is_readonly()
+                        and not (is_pdf or is_dtp)
+                    ):
+                        on, reason = False, "Schreibgeschützt"
                 elif aid in editor_ids:
                     on = bool(is_editor)
+                    reason = "" if on else "Nur im Text- oder DOCX-Editor verfügbar"
                 else:
                     continue
                 if hasattr(rb, "set_enabled"):
                     rb.set_enabled(aid, on)
                 else:
                     btn.setEnabled(on)
+                act = None
+                try:
+                    act = rb.qaction(aid) if hasattr(rb, "qaction") else None
+                except Exception:
+                    act = None
+                if act is not None and reason:
+                    self._set_action_available(act, on, reason)
+                elif act is not None and on:
+                    self._set_action_available(act, True, "")
 
         pane = getattr(self, "editor_pane", None)
         if pane is not None:
@@ -11855,16 +11912,107 @@ class MainWindow(QMainWindow):
         lst.append(act)
         return act
 
+    def _current_has_ocr(self) -> bool:
+        """True wenn OCR-Ergebnis (Word-Suite/Sidecar) zum aktuellen Dokument existiert."""
+        doc = getattr(self, "doc", None)
+        meta = (getattr(doc, "meta", None) or {}) if doc is not None else {}
+        if meta.get("ocr") or meta.get("word_suite") or meta.get("ocr_blocks"):
+            return True
+        title = str(getattr(doc, "title", "") or "")
+        if "ocr" in title.lower():
+            return True
+        path = None
+        try:
+            path = getattr(self.pdf_view, "pdf_path", None)
+        except Exception:
+            path = None
+        if not path and doc is not None and getattr(doc, "kind", None) == DocKind.PDF:
+            path = getattr(doc, "path", None)
+        last = getattr(self, "_last_ocr_pdf_path", None)
+        if path and last:
+            try:
+                if Path(str(path)).resolve() == Path(str(last)).resolve():
+                    return True
+            except Exception:
+                if str(path) == str(last):
+                    return True
+        if not path:
+            return False
+        try:
+            base = Path(str(path))
+            for cand in (
+                Path(str(base) + ".ildocr.txt"),
+                base.with_suffix(base.suffix + ".ildocr.txt"),
+                base.parent / f"{base.stem}.ildocr.txt",
+                base.parent / f"{base.name}.ildocr.txt",
+            ):
+                if cand.is_file():
+                    return True
+        except Exception:
+            return False
+        return False
+
     def _sync_editor_only_actions(self, *_args) -> None:
-        on = (self._editor_document_active() or self._layout_mode_active()) and not self._document_is_readonly()
+        """Aktionen grauen (Tooltip), Menüs bleiben sichtbar — nie setVisible(False)."""
+        on = (
+            self._editor_document_active() or self._layout_mode_active()
+        ) and not self._document_is_readonly()
+        from instantlensdoc.ui.chrome_actions import (
+            EDITOR_ACTION_DISABLE_REASON,
+            font_tools_allowed,
+            is_font_tool_label,
+            is_font_tool_object_name,
+        )
+
+        is_dtp = False
+        is_pdf = False
+        has_ocr = False
+        try:
+            is_dtp = bool(self._layout_mode_active())
+        except Exception:
+            is_dtp = False
+        try:
+            is_pdf = bool(self._pdf_tab_active()) and bool(
+                getattr(self.pdf_view, "pdf_path", None)
+            )
+        except Exception:
+            is_pdf = bool(self._pdf_tab_active())
+        try:
+            has_ocr = bool(self._current_has_ocr())
+        except Exception:
+            has_ocr = False
         for act in getattr(self, "_editor_only_actions", None) or []:
             try:
-                act.setEnabled(on)
+                name = str(act.objectName() or "")
+                text = (act.text() or "").replace("&", "")
+                if is_font_tool_object_name(name) or is_font_tool_label(text):
+                    ok, reason = font_tools_allowed(
+                        is_editor=bool(self._editor_document_active()),
+                        is_dtp=bool(is_dtp),
+                        is_pdf=bool(is_pdf),
+                        has_ocr=bool(has_ocr),
+                    )
+                    if (
+                        ok
+                        and self._document_is_readonly()
+                        and not (is_pdf or is_dtp)
+                    ):
+                        ok, reason = False, "Schreibgeschützt"
+                    self._set_action_available(act, ok, reason)
+                    continue
+                self._set_action_available(
+                    act,
+                    on,
+                    "Schreibgeschützt"
+                    if self._document_is_readonly()
+                    else EDITOR_ACTION_DISABLE_REASON,
+                )
             except Exception:
                 pass
         for menu in getattr(self, "_editor_only_menus", None) or []:
             try:
-                menu.setEnabled(on)
+                menu.setVisible(True)
+                menu.setEnabled(True)
             except Exception:
                 pass
         try:
@@ -21151,6 +21299,19 @@ class MainWindow(QMainWindow):
             ws = None
         else:
             return False
+        ocr_src = None
+        try:
+            ocr_src = (doc.meta or {}).get("source_path")
+        except Exception:
+            ocr_src = None
+        if not ocr_src and ws is not None:
+            ocr_src = getattr(ws, "source_path", None)
+        if not ocr_src:
+            try:
+                if self._pdf_tab_active():
+                    ocr_src = getattr(self.pdf_view, "pdf_path", None)
+            except Exception:
+                ocr_src = None
         try:
             self._capture_current_tab_view_state()
         except Exception:
@@ -21249,6 +21410,8 @@ class MainWindow(QMainWindow):
         except Exception:
             pass
         self.setWindowTitle(self._app_title(tab_title))
+        if ocr_src:
+            self._last_ocr_pdf_path = str(ocr_src)
         self._last_ocr_word_suite = ws if ws is not None else getattr(self, "_last_ocr_word_suite", None)
         n_blocks = 0
         if ws is not None:
