@@ -805,19 +805,26 @@ def import_pptx(path: str | Path) -> str:
     return "\n\n".join(parts).strip() + ("\n" if parts else "")
 
 
-def export_docx(text: str, path: str | Path, *, title: Optional[str] = None, html: Optional[str] = None) -> Path:
+def export_docx(
+    text: str,
+    path: str | Path,
+    *,
+    title: Optional[str] = None,
+    html: Optional[str] = None,
+    author: Optional[str] = None,
+) -> Path:
     """DOCX mit Absätzen; optional HTML mit Bold/Italic/Underline — 2.6.49."""
     if html:
         from instantlensdoc.core.richtext_docx import html_to_docx
 
-        return html_to_docx(html, path, title=title)
+        return html_to_docx(html, path, title=title, author=author)
 
     # Markdown-ähnliche Marker im Plaintext → echte Runs
     stripped = (text or "").lstrip().lower()
     if "<b>" in stripped or "<i>" in stripped or "<u>" in stripped or "<p" in stripped:
         from instantlensdoc.core.richtext_docx import html_to_docx
 
-        return html_to_docx(text, path, title=title)
+        return html_to_docx(text, path, title=title, author=author)
 
     try:
         from docx import Document as DocxDocument
@@ -829,6 +836,11 @@ def export_docx(text: str, path: str | Path, *, title: Optional[str] = None, htm
     d = DocxDocument()
     if title:
         d.core_properties.title = title
+    if author:
+        try:
+            d.core_properties.author = str(author)
+        except Exception:
+            pass
     style = d.styles["Normal"]
     style.font.name = "Calibri"
     style.font.size = Pt(11)

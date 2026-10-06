@@ -1522,6 +1522,15 @@ class MainWindow(QMainWindow):
         self.file_status_label.setMinimumWidth(120)
         self.file_status_label.setStyleSheet("padding-left: 6px; padding-right: 8px;")
         sb.addWidget(self.file_status_label, 1)
+        self.author_status_label = QLabel("Autor: —")
+        self.author_status_label.setObjectName("authorStatusLabel")
+        self.author_status_label.setStyleSheet("padding-right: 10px; color: #555;")
+        self.author_status_label.setToolTip("Textersteller — Klick öffnet Datei ▸ Informationen")
+        self.author_status_label.setCursor(Qt.PointingHandCursor)
+        self.author_status_label.mousePressEvent = (  # type: ignore[method-assign]
+            lambda _e: self._show_doc_info_dialog()
+        )
+        sb.addPermanentWidget(self.author_status_label)
         self.page_status_label = QLabel("Seite —")
         self.page_status_label.setStyleSheet("padding-right: 10px;")
         sb.addPermanentWidget(self.page_status_label)
@@ -2059,6 +2068,20 @@ class MainWindow(QMainWindow):
         act_print.setShortcut(QKeySequence.Print)
         act_print.triggered.connect(self._print)
         m_file.addAction(act_print)
+        act_info = QAction("Informationen…", self)
+        act_info.setObjectName("actFileInfo")
+        act_info.setToolTip("Datei ▸ Informationen: Textersteller / Autor")
+        act_info.triggered.connect(self._show_doc_info_dialog)
+        m_file.addAction(act_info)
+        act_protect = QAction("Dokument schützen", self)
+        act_protect.setObjectName("actWriteProtect")
+        act_protect.setCheckable(True)
+        act_protect.setToolTip(
+            "Schreibschutz wie in Word: Bearbeiten sperren, Lesen/Kopieren/Drucken bleiben"
+        )
+        act_protect.triggered.connect(self._toggle_write_protect)
+        m_file.addAction(act_protect)
+        self._write_protect_action = act_protect
         m_file.addSeparator()
         act_quit = QAction("Beenden", self)
         act_quit.setShortcut(QKeySequence.Quit)
@@ -2648,6 +2671,15 @@ class MainWindow(QMainWindow):
         )
         act_mail_merge.triggered.connect(self._run_mail_merge_dialog)
         m_review.addAction(act_mail_merge)
+        act_protect_review = QAction("Dokument schützen", self)
+        act_protect_review.setObjectName("actWriteProtectReview")
+        act_protect_review.setCheckable(True)
+        act_protect_review.setToolTip(
+            "Schreibschutz: alle Änderungen ausgegraut — Lesen, Kopieren, Drucken, Ansicht bleiben"
+        )
+        act_protect_review.triggered.connect(self._toggle_write_protect)
+        m_review.addAction(act_protect_review)
+        self._write_protect_review_action = act_protect_review
         m_edit.addSeparator()
         act_del_ann = QAction("Annotation löschen", self)
         act_del_ann.setShortcut(QKeySequence.Delete)
@@ -5698,6 +5730,10 @@ class MainWindow(QMainWindow):
             self._sync_ink_input_actions()
         except Exception:
             pass
+        try:
+            self._apply_write_protect_menu_overlay()
+        except Exception:
+            pass
 
     def _apply_ribbon_view_caps(self, rb, caps: dict) -> None:
         from instantlensdoc.ui.word_ribbon import disabled_reason
@@ -5730,38 +5766,46 @@ class MainWindow(QMainWindow):
             PAGE_ACTION_IDS,
             PDF_ACTION_IDS,
             PDF_OPEN_ACTION_IDS,
+            PROTECT_ALLOWED_ACTION_IDS,
+            REASON_WRITE_PROTECT,
             RICH_TEXT_ACTION_IDS,
             TABLE_ACTION_IDS,
         )
 
+        got: tuple[bool, str] | None
         if aid in ALWAYS_ACTION_IDS:
-            return True, ""
-        if aid in FONT_ACTION_IDS:
-            return bool(caps.get("font")), str(caps.get("font_reason") or "")
-        if aid in PAGE_ACTION_IDS:
-            return bool(caps.get("page")), str(caps.get("page_reason") or "")
-        if aid in PDF_OPEN_ACTION_IDS:
+            got = True, ""
+        elif aid in FONT_ACTION_IDS:
+            got = bool(caps.get("font")), str(caps.get("font_reason") or "")
+        elif aid in PAGE_ACTION_IDS:
+            got = bool(caps.get("page")), str(caps.get("page_reason") or "")
+        elif aid in PDF_OPEN_ACTION_IDS:
             on = bool(caps.get("pdf_open") or caps.get("pdf"))
-            return on, ("" if on else str(caps.get("pdf_reason") or ""))
-        if aid in PDF_ACTION_IDS:
-            return bool(caps.get("pdf")), str(caps.get("pdf_reason") or "")
-        if aid in MAIL_ACTION_IDS:
-            return bool(caps.get("mail_merge")), str(caps.get("mail_merge_reason") or "")
-        if aid in TABLE_ACTION_IDS:
-            return bool(caps.get("table")), str(caps.get("table_reason") or "")
-        if aid in ARRANGE_ACTION_IDS:
-            return bool(caps.get("dtp_frame")), str(caps.get("dtp_frame_reason") or "")
-        if aid in RICH_TEXT_ACTION_IDS:
-            return bool(caps.get("rich_text")), str(caps.get("rich_text_reason") or "")
-        if aid.startswith("dtp_"):
+            got = on, ("" if on else str(caps.get("pdf_reason") or ""))
+        elif aid in PDF_ACTION_IDS:
+            got = bool(caps.get("pdf")), str(caps.get("pdf_reason") or "")
+        elif aid in MAIL_ACTION_IDS:
+            got = bool(caps.get("mail_merge")), str(caps.get("mail_merge_reason") or "")
+        elif aid in TABLE_ACTION_IDS:
+            got = bool(caps.get("table")), str(caps.get("table_reason") or "")
+        elif aid in ARRANGE_ACTION_IDS:
+            got = bool(caps.get("dtp_frame")), str(caps.get("dtp_frame_reason") or "")
+        elif aid in RICH_TEXT_ACTION_IDS:
+            got = bool(caps.get("rich_text")), str(caps.get("rich_text_reason") or "")
+        elif aid.startswith("dtp_"):
             if aid == "dtp_layout":
-                return True, ""
-            if aid == "dtp_font":
-                return bool(caps.get("font")), str(caps.get("font_reason") or "")
-            if aid in ("dtp_text_frame", "dtp_grid", "dtp_image", "dtp_graphic", "dtp_import"):
-                return True, ""
-            return bool(caps.get("dtp")), str(caps.get("dtp_reason") or "")
-        return None
+                got = True, ""
+            elif aid == "dtp_font":
+                got = bool(caps.get("font")), str(caps.get("font_reason") or "")
+            elif aid in ("dtp_text_frame", "dtp_grid", "dtp_image", "dtp_graphic", "dtp_import"):
+                got = True, ""
+            else:
+                got = bool(caps.get("dtp")), str(caps.get("dtp_reason") or "")
+        else:
+            got = None
+        if caps.get("write_protect") and aid not in PROTECT_ALLOWED_ACTION_IDS:
+            return False, REASON_WRITE_PROTECT
+        return got
 
     def _refresh_recent(self):
         # Fehlende Dateien aus der persistierten Liste streichen — 2.6.54
@@ -6366,6 +6410,17 @@ class MainWindow(QMainWindow):
             else name
         )
         self.file_status_label.setToolTip(file_tip)
+        if hasattr(self, "author_status_label"):
+            author = "—"
+            try:
+                if self.doc is not None:
+                    author = self._current_author() or "—"
+            except Exception:
+                author = "—"
+            self.author_status_label.setText(f"Autor: {author}")
+            self.author_status_label.setToolTip(
+                f"Textersteller: {author} — Klick öffnet Datei ▸ Informationen"
+            )
         self.page_status_label.setText(page_txt)
         if hasattr(self, "size_status_label"):
             self.size_status_label.setText(size_txt)
@@ -9365,6 +9420,8 @@ class MainWindow(QMainWindow):
         "dtp_text_path": "actTextOnPath",
         "dtp_glyphs": "actGlyphPalette",
         "detach_window": "actDetachDocumentWindow",
+        "write_protect": "actWriteProtect",
+        "doc_info": "actFileInfo",
     }
 
     def _bind_ribbon_qactions(self) -> None:
@@ -9487,6 +9544,8 @@ class MainWindow(QMainWindow):
             "open": self.open_dialog,
             "save": self.save_doc,
             "save_as": self.save_as,
+            "write_protect": self._toggle_write_protect,
+            "doc_info": self._show_doc_info_dialog,
             "auto_lof": self._update_figure_list,
             "auto_index": self._update_index,
             "auto_toc": self._update_auto_toc,
@@ -12222,17 +12281,31 @@ class MainWindow(QMainWindow):
         rich = bool(text_doc or dtp_text)
         mail = bool(text_doc)
         table = bool(self._in_editor_table())
+        write_protect = False
+        try:
+            write_protect = bool(self._document_is_write_protected())
+        except Exception:
+            write_protect = False
         readonly = False
         try:
-            readonly = bool(self._document_is_readonly()) and not pdf and not dtp
+            readonly = write_protect or (
+                bool(self._document_is_preview_readonly()) and not pdf and not dtp
+            )
         except Exception:
-            readonly = False
+            readonly = write_protect
         font_reason = ""
-        if not font:
+        protect_reason = "Dokument ist schreibgeschützt"
+        if write_protect:
+            font = False
+            font_reason = protect_reason
+            rich = False
+            mail = False
+            table = False
+        elif not font:
             font_reason = REASON_FONT_PDF if pdf else REASON_FONT
         elif readonly:
             font = False
-            font_reason = "Schreibgeschützt"
+            font_reason = protect_reason
             rich = False
             mail = False
         return {
@@ -12240,28 +12313,29 @@ class MainWindow(QMainWindow):
             "pdf_open": bool(pdf_open),
             "pdf_reason": "" if pdf else REASON_PDF,
             "text_doc": text_doc,
-            "dtp": dtp,
-            "dtp_reason": "" if dtp else "DTP-Werkzeuge zuerst einschalten",
-            "dtp_text": dtp_text,
-            "dtp_frame": dtp_frame,
-            "dtp_frame_reason": "" if dtp_frame else REASON_ARRANGE,
+            "dtp": dtp and not write_protect,
+            "dtp_reason": protect_reason if write_protect else ("" if dtp else "DTP-Werkzeuge zuerst einschalten"),
+            "dtp_text": dtp_text and not write_protect,
+            "dtp_frame": dtp_frame and not write_protect,
+            "dtp_frame_reason": protect_reason if write_protect else ("" if dtp_frame else REASON_ARRANGE),
             "page": page,
             "page_reason": "" if page else REASON_PAGE,
             "font": font,
             "font_reason": font_reason,
             "rich_text": rich,
-            "rich_text_reason": "" if rich else ("Schreibgeschützt" if readonly else REASON_RICH),
+            "rich_text_reason": "" if rich else (protect_reason if readonly else REASON_RICH),
             "mail_merge": mail,
-            "mail_merge_reason": "" if mail else ("Schreibgeschützt" if readonly else REASON_MAIL),
+            "mail_merge_reason": "" if mail else (protect_reason if readonly else REASON_MAIL),
             "table": table,
-            "table_reason": "" if table else REASON_TABLE,
+            "table_reason": "" if table else (protect_reason if write_protect else REASON_TABLE),
             "scan": True,
+            "write_protect": write_protect,
         }
 
     def _guard_editor_action(self, what: str) -> bool:
         """Editor-only Aktion: bei PDF/anderem Tab no-op, kein Stack-Wechsel — 2.6.54."""
         if self._document_is_readonly():
-            self._set_status(f"{what} — Schreibschutz")
+            self._set_status(f"{what} — Dokument ist schreibgeschützt")
             return False
         if self._editor_document_active() or self._layout_mode_active():
             return True
@@ -14997,7 +15071,7 @@ class MainWindow(QMainWindow):
         locked = is_schreibschutz(self)
         session = self._ink_session_or_none()
         enabled_on = bool(session is not None and session.enabled)
-        reason = "Schreibschutz aktiv"
+        reason = "Dokument ist schreibgeschützt"
         for act, on_when_locked in (
             (getattr(self, "_act_ink_input", None), False),
             (getattr(self, "_act_ink_color", None), False),
@@ -15097,7 +15171,7 @@ class MainWindow(QMainWindow):
             return
         if is_schreibschutz(self):
             self._sync_ink_input_actions()
-            self._set_status("Stifteingabe: Schreibschutz")
+            self._set_status("Stifteingabe: Dokument ist schreibgeschützt")
             return
         act = getattr(self, "_act_ink_input", None)
         if isinstance(checked, bool):
@@ -15181,7 +15255,7 @@ class MainWindow(QMainWindow):
 
         if is_schreibschutz(self):
             self._sync_ink_input_actions()
-            self._set_status("Handschrift erkennen: Schreibschutz")
+            self._set_status("Handschrift erkennen: Dokument ist schreibgeschützt")
             return
         session = self._ink_session_or_none()
         if session is None:
@@ -20848,6 +20922,12 @@ class MainWindow(QMainWindow):
         if tid.startswith("user:") and text.lstrip().startswith("#"):
             kind = DocKind.MARKDOWN
         self.doc = Document(kind=kind, title=title, text=text)
+        try:
+            from instantlensdoc.core.document_author import default_author
+
+            self.doc.meta["author"] = default_author()
+        except Exception:
+            pass
         self.editor.setPlainText(text)
         self.editor.clear_extra_selections()
         self._editor_marks.clear()
@@ -21101,6 +21181,10 @@ class MainWindow(QMainWindow):
             self._update_doc_status()
             self._sync_preview_readonly_banner()
             self._apply_schreibschutz_ui()
+            try:
+                self._prompt_write_protect_on_open()
+            except Exception:
+                pass
             self._sync_sheet_bar()
             enc = self.doc.meta.get("encoding")
             mismatch = self.doc.meta.get("kind_mismatch")
@@ -21139,8 +21223,298 @@ class MainWindow(QMainWindow):
             _log.exception("Anzeige fehlgeschlagen: %s", path)
             QMessageBox.critical(self, "Öffnen", f"Anzeige fehlgeschlagen:\n{e}")
 
-    def _document_is_readonly(self) -> bool:
+    def _document_is_preview_readonly(self) -> bool:
         return bool(self.doc and (self.doc.meta or {}).get("readonly"))
+
+    def _document_is_write_protected(self) -> bool:
+        return bool(self.doc and (self.doc.meta or {}).get("write_protect"))
+
+    def _document_is_readonly(self) -> bool:
+        return bool(self._document_is_preview_readonly() or self._document_is_write_protected())
+
+    def _current_author(self) -> str:
+        from instantlensdoc.core.document_author import ensure_author
+
+        meta = (self.doc.meta if self.doc is not None else {}) or {}
+        return ensure_author(meta)
+
+    def _label_is_protect_allowed(self, label: str, parent: str = "") -> bool:
+        t = (label or "").replace("&", "").strip().lower()
+        p = (parent or "").replace("&", "").strip().lower()
+        if p in {"ansicht", "view", "fenster"}:
+            return True
+        keep = (
+            "kopieren",
+            "drucken",
+            "öffnen",
+            "speichern",
+            "informationen",
+            "dokument schützen",
+            "schreibschutz",
+            "beenden",
+            "alles auswählen",
+            "wörter zählen",
+            "sonderzeichen anzeigen",
+            "suchen",
+            "klassisch",
+            "ribbon",
+            "kombiniert",
+            "lineal",
+            "gitternetz",
+            "navigation",
+            "minimap",
+            "100 %",
+            "eine seite",
+            "seitenbreite",
+            "mehrere seiten",
+            "entwurf",
+            "weblayout",
+            "gliederung",
+            "dtp-werkzeuge",
+            "einstellungen",
+            "zuletzt geöffnet",
+            "projekt-ordner",
+            "alles speichern",
+            "als kopie",
+            "schließen",
+            "erneut öffnen",
+            "arbeitsverzeichnis",
+            "hilfe",
+            "exportieren",
+            "als html",
+            "als docx",
+            "als pdf",
+            "als txt",
+        )
+        if any(k in t for k in keep):
+            if "ausschneiden" in t or "einfügen" in t and "speichern" not in t and "export" not in t:
+                if t in {"einfügen", "einfügen…"}:
+                    return False
+            return True
+        return False
+
+    def _apply_write_protect_menu_overlay(self) -> None:
+        from instantlensdoc.ui.word_ribbon import (
+            PROTECT_ALLOWED_ACTION_IDS,
+            REASON_WRITE_PROTECT,
+        )
+
+        if not self._document_is_write_protected():
+            return
+        names = dict(getattr(self, "_RIBBON_ACTION_OBJECT_NAMES", {}) or {})
+        try:
+            from instantlensdoc.ui.chrome_actions import CHROME_ACTION_OBJECT_NAMES
+
+            names.update(CHROME_ACTION_OBJECT_NAMES)
+        except Exception:
+            pass
+        reverse = {v: k for k, v in names.items()}
+        mapping = getattr(self, "_ribbon_qactions", None) or {}
+        id_by_act = {id(act): aid for aid, act in mapping.items() if act is not None}
+
+        def _walk(menu, parent: str = "") -> None:
+            if menu is None:
+                return
+            for a in menu.actions():
+                if a.isSeparator():
+                    continue
+                sub = a.menu() if hasattr(a, "menu") else None
+                if sub is not None:
+                    st = (sub.title() or "").replace("&", "")
+                    _walk(sub, st)
+                    continue
+                obj = str(a.objectName() or "")
+                aid = reverse.get(obj) or id_by_act.get(id(a), "")
+                if aid in PROTECT_ALLOWED_ACTION_IDS:
+                    continue
+                label = (a.text() or "").replace("&", "")
+                if not aid and self._label_is_protect_allowed(label, parent):
+                    continue
+                if aid == "write_protect" or aid == "doc_info":
+                    continue
+                self._set_action_available(a, False, REASON_WRITE_PROTECT)
+
+        try:
+            mb = self.menuBar()
+        except Exception:
+            return
+        for top in mb.actions():
+            menu = top.menu() if hasattr(top, "menu") else None
+            title = ""
+            try:
+                title = (menu.title() if menu is not None else top.text() or "")
+            except Exception:
+                title = ""
+            _walk(menu, title.replace("&", ""))
+
+    def _sync_write_protect_actions(self) -> None:
+        on = self._document_is_write_protected()
+        for act in (
+            getattr(self, "_write_protect_action", None),
+            getattr(self, "_write_protect_review_action", None),
+        ):
+            if act is None:
+                continue
+            try:
+                act.blockSignals(True)
+                act.setChecked(on)
+                act.blockSignals(False)
+                act.setEnabled(True)
+            except Exception:
+                pass
+        rb = getattr(self, "ribbon_bar", None)
+        if rb is not None:
+            try:
+                rb.set_checked("write_protect", on)
+                rb.set_available("write_protect", True, "")
+            except Exception:
+                pass
+
+    def _should_prompt_write_protect(self) -> bool:
+        import os
+
+        if os.environ.get("ILD_SMOKE_QT") == "1":
+            return False
+        if os.environ.get("QT_QPA_PLATFORM") == "offscreen":
+            return False
+        if getattr(self, "_skip_write_protect_prompt", False):
+            return False
+        return True
+
+    def _prompt_write_protect_on_open(self) -> None:
+        if not self._document_is_write_protected():
+            return
+        if not self._should_prompt_write_protect():
+            return
+        box = QMessageBox(self)
+        box.setObjectName("writeProtectOpenPrompt")
+        box.setWindowTitle("Schreibschutz")
+        box.setText("Dokument ist schreibgeschützt")
+        box.setInformativeText(
+            "Bearbeiten ist gesperrt. Lesen, Kopieren, Drucken und Ansicht bleiben möglich."
+        )
+        open_btn = box.addButton("Öffnen", QMessageBox.AcceptRole)
+        unlock_btn = box.addButton("Schreibschutz aufheben…", QMessageBox.ActionRole)
+        box.addButton(QMessageBox.Cancel)
+        box.setDefaultButton(open_btn)
+        box.exec()
+        clicked = box.clickedButton()
+        if clicked is unlock_btn:
+            self._set_write_protect(False, interactive=True)
+
+    def _toggle_write_protect(self, checked: bool = False) -> None:
+        if self._document_is_write_protected():
+            self._set_write_protect(False, interactive=True)
+        else:
+            self._set_write_protect(True, interactive=True)
+
+    def _set_write_protect(self, enabled: bool, *, interactive: bool = False, password: str | None = None) -> bool:
+        if not self.doc:
+            self._set_status("Kein Dokument")
+            return False
+        from instantlensdoc.core.write_protect import password_hash, persist_protection, verify_password
+
+        if enabled:
+            pw = password
+            if pw is None and interactive:
+                from PySide6.QtWidgets import QInputDialog, QLineEdit
+
+                pw, ok = QInputDialog.getText(
+                    self,
+                    "Dokument schützen",
+                    "Passwort (leer = ohne Passwort):",
+                    QLineEdit.Password,
+                    "",
+                )
+                if not ok:
+                    self._sync_write_protect_actions()
+                    return False
+            pw = "" if pw is None else str(pw)
+            self.doc.meta["write_protect"] = True
+            self.doc.meta["write_protect_hash"] = password_hash(pw)
+            self.doc.meta["write_protect_password"] = pw
+        else:
+            stored = str((self.doc.meta or {}).get("write_protect_hash") or "")
+            pw = password
+            if stored and pw is None and interactive:
+                from PySide6.QtWidgets import QInputDialog, QLineEdit
+
+                pw, ok = QInputDialog.getText(
+                    self,
+                    "Schreibschutz aufheben",
+                    "Passwort:",
+                    QLineEdit.Password,
+                    "",
+                )
+                if not ok:
+                    self._sync_write_protect_actions()
+                    return False
+            if stored and not verify_password(stored, pw or ""):
+                if interactive:
+                    QMessageBox.warning(self, "Schreibschutz", "Passwort stimmt nicht.")
+                self._sync_write_protect_actions()
+                return False
+            self.doc.meta["write_protect"] = False
+            self.doc.meta.pop("write_protect_hash", None)
+            self.doc.meta.pop("write_protect_password", None)
+        try:
+            self.doc.dirty = True
+        except Exception:
+            pass
+        path = getattr(self.doc, "path", None)
+        if path:
+            try:
+                persist_protection(
+                    path,
+                    kind=str(getattr(self.doc.kind, "name", "") or ""),
+                    protected=bool(enabled),
+                    password_hash_value=str((self.doc.meta or {}).get("write_protect_hash") or ""),
+                    password=(self.doc.meta or {}).get("write_protect_password"),
+                )
+                self.doc.dirty = False
+            except Exception:
+                pass
+        self._apply_schreibschutz_ui()
+        self._sync_write_protect_actions()
+        self._update_doc_status()
+        self._set_status(
+            "Dokument ist schreibgeschützt" if enabled else "Schreibschutz aufgehoben"
+        )
+        return True
+
+    def _show_doc_info_dialog(self) -> None:
+        from instantlensdoc.ui.doc_info_dialog import DocInfoDialog
+
+        author = self._current_author()
+        filename = ""
+        if self.doc is not None:
+            if self.doc.path:
+                filename = Path(self.doc.path).name
+            else:
+                filename = str(self.doc.title or "")
+        writable = not self._document_is_write_protected()
+        dlg = DocInfoDialog(self, author=author, filename=filename, writable=writable)
+        if dlg.exec() != QDialog.Accepted or not writable:
+            return
+        new_author = dlg.author() or author
+        if self.doc is None:
+            return
+        self.doc.meta["author"] = new_author
+        try:
+            self.doc.dirty = True
+        except Exception:
+            pass
+        path = getattr(self.doc, "path", None)
+        if path:
+            try:
+                from instantlensdoc.core.document_author import persist_author
+
+                persist_author(path, new_author, kind=str(getattr(self.doc.kind, "name", "") or ""))
+                self.doc.dirty = False
+            except Exception:
+                pass
+        self._update_doc_status()
+        self._set_status(f"Textersteller: {new_author}")
 
     def _apply_schreibschutz_ui(self) -> None:
         """Editor ReadOnly + Schriftwerkzeuge ausgegraut bei Schreibschutz."""
@@ -21174,8 +21548,34 @@ class MainWindow(QMainWindow):
                 if aid:
                     try:
                         btn.setEnabled(not ro)
+                        if ro:
+                            tip = (btn.toolTip() or "").split(" — ")[0]
+                            btn.setToolTip(f"{tip} — Dokument ist schreibgeschützt" if tip else "Dokument ist schreibgeschützt")
                     except Exception:
                         pass
+        wp = self._document_is_write_protected()
+        try:
+            pdf = getattr(self, "pdf_view", None)
+            if pdf is not None and hasattr(pdf, "set_annotations_locked"):
+                if wp:
+                    pdf.set_annotations_locked(True, persist=False)
+                else:
+                    from instantlensdoc.core.app_settings import get_annotations_locked
+
+                    pdf.set_annotations_locked(bool(get_annotations_locked()), persist=False)
+        except Exception:
+            pass
+        try:
+            dtp = getattr(self, "dtp_pane", None)
+            view = getattr(dtp, "view", None) if dtp is not None else None
+            if view is not None and hasattr(view, "setInteractive"):
+                view.setInteractive(not wp)
+        except Exception:
+            pass
+        try:
+            self._sync_write_protect_actions()
+        except Exception:
+            pass
 
     def _sync_sheet_bar(self) -> None:
         pane = getattr(self, "editor_pane", None)

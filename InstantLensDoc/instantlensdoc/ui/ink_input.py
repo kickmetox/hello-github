@@ -590,7 +590,12 @@ def recognized_text_to_html(text: str) -> str:
 
 
 def is_schreibschutz(window) -> bool:
-    """Schreibschutz: Editor read-only oder PDF-Annotationen gesperrt (Sibling-Policy)."""
+    """Schreibschutz: Editor read-only, Dokument schützen, oder PDF-Annotationen gesperrt."""
+    try:
+        if callable(getattr(window, "_document_is_write_protected", None)) and window._document_is_write_protected():
+            return True
+    except Exception:
+        pass
     try:
         ed = getattr(window, "editor", None)
         if ed is not None and bool(ed.isReadOnly()):
