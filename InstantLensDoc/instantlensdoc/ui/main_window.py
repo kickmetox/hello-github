@@ -20183,8 +20183,11 @@ class MainWindow(QMainWindow):
         password: str | None = None,
         prefer_layout: bool = True,
         lang: str = "deu+eng",
+        image=None,
+        handwriting: bool | None = None,
+        handwriting_psm=None,
     ) -> bool:
-        """OCR/Sidecar/Scan/PDF-Text → Word-Suite-Editor (rich DOCX). Ctrl+Alt+Shift+W."""
+        """OCR/Sidecar/Scan/PDF-Text/Stroke-Bild → Word-Suite-Editor (rich DOCX). Ctrl+Alt+Shift+W."""
         from instantlensdoc.core.ocr_word_suite import open_ocr_result as core_open
 
         src = path if path is not None else source
@@ -20205,6 +20208,9 @@ class MainWindow(QMainWindow):
                 prefer_layout=prefer_layout,
                 source_path=source_path,
                 source_page=source_page,
+                image=image,
+                handwriting=handwriting,
+                handwriting_psm=handwriting_psm,
             )
         except Exception as e:
             QMessageBox.warning(

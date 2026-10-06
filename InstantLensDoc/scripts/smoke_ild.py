@@ -621,6 +621,8 @@ def check_version() -> None:
         _fail("ocr_word_suite fehlt Tabellen-HTML (kein Markdown-Dump/Steuerzeichen)")
     if "split_ocr_table_row" not in ocr_ws:
         _fail("ocr_word_suite fehlt split_ocr_table_row")
+    if "def open_ocr_stroke_image" not in ocr_ws or "def ocr_stroke_image_to_word_suite" not in ocr_ws:
+        _fail("ocr_word_suite fehlt open_ocr_stroke_image (Ink-Sibling PIL-Strokes)")
     if 'align="' not in ocr_ws or "margin-bottom" not in ocr_ws:
         _fail("ocr_word_suite HTML ohne align/margin (Absatz/Ausrichtung)")
     if "source_comment" not in ocr_ws:

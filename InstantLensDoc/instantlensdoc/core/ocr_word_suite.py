@@ -1995,15 +1995,29 @@ def open_ocr_result(
     source_path: PathLike | None = None,
     source_page: int | None = None,
     out: PathLike | None = None,
+    image: Any = None,
+    handwriting: bool | None = None,
+    handwriting_psm: int | str | None = None,
 ):
     """
-    Einheitlicher Einstieg: OCR / Sidecar / Scan / PDF-Text → ``Document`` (DOCX).
+    Einheitlicher Einstieg: OCR / Sidecar / Scan / PDF-Text / Stroke-Bild → ``Document`` (DOCX).
 
     Das Arbeitsdokument ist ein rich ``QTextDocument`` (gleiche Art wie ein
     geöffnetes DOCX). Scan-/PDF-Quelle bleibt in ``meta.sidecar`` / Kommentar.
+    ``image=``: PIL-Stroke-Bild vom Ink-Sibling (bestehende OCR, sanitized HTML).
     """
     ws: WordSuiteDocument
-    if scan is not None:
+    if image is not None:
+        ws = ocr_stroke_image_to_word_suite(
+            image,
+            lang=lang,
+            title=title,
+            auto_format=auto_format,
+            handwriting=True if handwriting is None else bool(handwriting),
+            handwriting_psm=handwriting_psm,
+            result=result,
+        )
+    elif scan is not None:
         ws = scan_session_to_word_suite(scan, auto_format=auto_format, title=title)
     elif result is not None and hasattr(result, "page_texts"):
         ws = ocr_document_result_to_word_suite(
@@ -2048,5 +2062,122 @@ def open_ocr_result(
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_text(ws.text or "", encoding="utf-8")
         ws.meta["out"] = str(dest)
+    return word_suite_to_document(ws)
+
+
+def _as_stroke_pil_image(image: Any):
+    """PIL-Image aus Ink-Capture (oder Pfad) — Sibling liefert Stroke-Raster."""
+    try:
+        from PIL import Image as PILImage
+    except Exception as e:
+        raise RuntimeError("PIL fehlt für Stroke-OCR") from e
+    if isinstance(image, PILImage.Image):
+        img = image
+    elif isinstance(image, (str, Path)):
+        from instantlensdoc.core.ocr import _load_image
+
+        img = _load_image(image)
+    else:
+        raise TypeError("Stroke-OCR erwartet ein PIL.Image (oder Bildpfad)")
+    try:
+        if img.mode == "1":
+            img = img.convert("L")
+        elif img.mode not in ("RGB", "L", "RGBA"):
+            img = img.convert("RGB")
+    except Exception:
+        pass
+    return img
+
+
+def ocr_stroke_image_to_word_suite(
+    image: Any,
+    *,
+    lang: str = "deu+eng",
+    title: str | None = None,
+    auto_format: bool = False,
+    handwriting: bool = True,
+    handwriting_psm: int | str | None = None,
+    result: Any = None,
+) -> WordSuiteDocument:
+    """Ink-Sibling: PIL-Stroke-Bild → Word-Suite-HTML ohne Steuerzeichen.
+
+    Ruft bestehende OCR (``run_ocr`` / Handschrift) auf. Capture-UI bleibt
+    beim Sibling; hier nur Sanitize/Layout-Pfad wie Sidecar/Scan.
+    """
+    from instantlensdoc.core.ocr import (
+        DEFAULT_HANDWRITING_PSM,
+        OcrOutputMode,
+        OcrResult,
+        run_ocr,
+    )
+
+    img = _as_stroke_pil_image(image)
+    ocr_result = result
+    if ocr_result is None:
+        kw: dict[str, Any] = {
+            "lang": lang,
+            "mode": OcrOutputMode.EDITABLE_TEXT,
+            "source_label": "Handschrift-Strokes",
+            "handwriting": bool(handwriting),
+            "write_hocr": False,
+            "write_tsv": False,
+            "write_csv": False,
+        }
+        if handwriting:
+            kw["handwriting_psm"] = (
+                handwriting_psm
+                if handwriting_psm is not None
+                else DEFAULT_HANDWRITING_PSM
+            )
+        ocr_result = run_ocr(img, **kw)
+    if not isinstance(ocr_result, OcrResult) and hasattr(ocr_result, "text"):
+        ocr_result = OcrResult(
+            text=str(getattr(ocr_result, "text", "") or ""),
+            lang=str(getattr(ocr_result, "lang", lang) or lang),
+            mode=getattr(ocr_result, "mode", OcrOutputMode.EDITABLE_TEXT),
+            source_label=str(
+                getattr(ocr_result, "source_label", "") or "Handschrift-Strokes"
+            ),
+        )
+    ws = ocr_result_to_word_suite(
+        ocr_result,
+        auto_format=auto_format,
+        title=title or "Word-Suite — Handschrift",
+    )
+    ws.mode = "handwriting_strokes"
+    ws.source = ws.source or "Handschrift-Strokes"
+    ws.meta["stroke_image"] = True
+    ws.meta["handwriting"] = bool(handwriting)
+    try:
+        ws.meta["stroke_size"] = (int(img.width), int(img.height))
+    except Exception:
+        pass
+    return _finalize_word_suite_document(ws)
+
+
+def open_ocr_stroke_image(
+    image: Any,
+    *,
+    lang: str = "deu+eng",
+    title: str | None = None,
+    auto_format: bool = False,
+    handwriting: bool = True,
+    handwriting_psm: int | str | None = None,
+    result: Any = None,
+    source_path: PathLike | None = None,
+):
+    """Ink-Sibling-Einstieg: PIL-Strokes → ``Document`` (DOCX, rich HTML)."""
+    ws = ocr_stroke_image_to_word_suite(
+        image,
+        lang=lang,
+        title=title,
+        auto_format=auto_format,
+        handwriting=handwriting,
+        handwriting_psm=handwriting_psm,
+        result=result,
+    )
+    if source_path and not ws.source_path:
+        ws.source_path = str(source_path)
+        ws.meta["source_path"] = str(source_path)
     return word_suite_to_document(ws)
 

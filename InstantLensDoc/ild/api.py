@@ -1503,6 +1503,50 @@ def open_ocr_result(
     return data
 
 
+def open_ocr_stroke_image(
+    image: Any,
+    *,
+    lang: str = "deu+eng",
+    title: str | None = None,
+    auto_format: bool = False,
+    handwriting: bool = True,
+    handwriting_psm: int | str | None = None,
+    out: PathLike | None = None,
+) -> dict[str, Any]:
+    """Ink-Strokes (PIL-Bild) → Word-Suite-``Document`` (DOCX/HTML, keine Steuerzeichen)."""
+    from instantlensdoc.core.ocr_word_suite import open_ocr_stroke_image as _open
+    from instantlensdoc.core.documents import Document
+
+    doc = _open(
+        image,
+        lang=lang,
+        title=title,
+        auto_format=auto_format,
+        handwriting=handwriting,
+        handwriting_psm=handwriting_psm,
+    )
+    html = (doc.meta or {}).get("html") or ""
+    data: dict[str, Any] = {
+        "title": doc.title,
+        "text": doc.text,
+        "kind": getattr(doc.kind, "value", str(doc.kind)),
+        "html": html,
+        "rich_text": True,
+        "stroke_image": True,
+        "handwriting": bool(handwriting),
+        "meta": dict(doc.meta or {}),
+        "version": __version__,
+    }
+    if isinstance(doc, Document):
+        data["block_count"] = int((doc.meta or {}).get("block_count") or 0)
+    if out is not None:
+        dest = _p(out)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_text(doc.text or "", encoding="utf-8")
+        data["out"] = str(dest.resolve())
+    return data
+
+
 def list_ki_wizards() -> list[dict[str, Any]]:
     """Isolierte KI-Dokument-Wizards auflisten — 2.6.16."""
     from instantlensdoc.core.ki_wizards import list_ki_wizards as _list

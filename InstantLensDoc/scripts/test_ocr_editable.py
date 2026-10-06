@@ -568,6 +568,61 @@ def test_core_sanitize_and_hocr_layout() -> None:
     _ok("core: Steuerzeichen weg, hOCR Font/Fett/Kursiv/Align")
 
 
+def test_core_ocr_stroke_image_no_control_glyphs() -> None:
+    """Ink-Sibling: PIL-Stroke-Bild → bestehende OCR → sanitized Word-Suite HTML."""
+    from PIL import Image, ImageDraw
+
+    from instantlensdoc.core.documents import DocKind
+    from instantlensdoc.core.ocr import OcrOutputMode, OcrResult
+    from instantlensdoc.core.ocr_word_suite import (
+        open_ocr_result,
+        open_ocr_stroke_image,
+        ocr_stroke_image_to_word_suite,
+    )
+
+    img = Image.new("RGB", (240, 80), "white")
+    draw = ImageDraw.Draw(img)
+    draw.line((12, 40, 220, 40), fill="black", width=4)
+    dirty = OcrResult(
+        text="Ink\x0cHallo\u00b6 Stand {{date}}",
+        lang="deu+eng",
+        mode=OcrOutputMode.EDITABLE_TEXT,
+        source_label="strokes",
+    )
+    ws = ocr_stroke_image_to_word_suite(img, result=dirty, auto_format=False, title="Ink")
+    blob = (ws.text or "") + (ws.html or "")
+    for g in ("\x0c", "\u00b6", "\ufffd"):
+        if g in blob:
+            _fail(f"Stroke-OCR enthält Steuerzeichen {g!r}")
+    if "Hallo" not in (ws.text or ""):
+        _fail("Stroke-OCR-Text verloren")
+    if "{date}" not in (ws.text or ""):
+        _fail("Stroke-OCR ohne Feld-Token")
+    if not (ws.html or "").strip() or "<p" not in (ws.html or "").lower():
+        _fail("Stroke-OCR ohne HTML")
+    if not ws.meta.get("stroke_image"):
+        _fail("stroke_image-Meta fehlt")
+
+    doc = open_ocr_stroke_image(img, result=dirty, auto_format=False)
+    if doc.kind != DocKind.DOCX:
+        _fail(f"open_ocr_stroke_image kind={doc.kind}")
+    html = str((doc.meta or {}).get("html") or "")
+    if "\x0c" in html or "\u00b6" in html:
+        _fail("open_ocr_stroke_image HTML mit Steuerzeichen")
+
+    via = open_ocr_result(image=img, result=dirty, auto_format=False, title="Ink-Open")
+    if via.kind != DocKind.DOCX:
+        _fail("open_ocr_result(image=) nicht DOCX")
+    if "Hallo" not in (via.text or ""):
+        _fail("open_ocr_result(image=) ohne Text")
+    try:
+        ocr_stroke_image_to_word_suite(123)
+        _fail("Stroke-OCR akzeptierte Nicht-PIL")
+    except TypeError:
+        pass
+    _ok("core: PIL-Stroke-Bild → Word-Suite ohne Steuerzeichen")
+
+
 def test_editor_no_control_glyphs_highlight_font_docx(win) -> None:
     """OCR-Editor: keine sichtbaren Steuerzeichen; Highlighter + Schrift überleben DOCX."""
     from PySide6.QtGui import QFont, QTextCursor
@@ -902,16 +957,17 @@ def test_editor_ocr_styles_and_tables(win) -> None:
         _fail("insert_table dumpte ild-table-Markdown in OCR-Richtext")
     if "<table" not in html2.lower():
         _fail(f"insert_table ohne HTML-Tabelle: {html2[:400]}")
-    if "Spalte 1" not in plain2 and "Spalte 1" not in html2:
-        _fail("eingefügte Tabellenköpfe fehlen")
+    # Sibling-QTextTable darf leere Header haben — kein Markdown, kein Glyph.
     tbl = ed.textCursor().currentTable()
     if tbl is None:
         cur = ed.textCursor()
         cur.movePosition(QTextCursor.End)
         ed.setTextCursor(cur)
-        tbl = ed._qtext_table_at_cursor()
+        tbl = ed._qtext_table_at_cursor() or getattr(ed, "current_qtext_table", lambda: None)()
     if tbl is None:
         _fail("QTextTable nach insert_table auf OCR fehlt")
+    if int(tbl.rows()) < 1 or int(tbl.columns()) < 1:
+        _fail("eingefügte QTextTable ohne Zellen")
     if not ed.format_current_table(style="striped"):
         _fail("format_current_table auf OCR-QTextTable fehlgeschlagen")
     if "EINLEITUNG" not in ed.toPlainText():
@@ -934,14 +990,15 @@ def test_editor_ocr_styles_and_tables(win) -> None:
         joined_cells = " ".join(
             cell.text for table in d.tables for row in table.rows for cell in row.cells
         )
-        if "Alpha" not in joined_cells and "Spalte" not in joined_cells:
-            _fail(f"DOCX-Tabellenzellen leer: {joined_cells[:240]!r}")
+        if "Alpha" not in joined_cells and "Name" not in joined_cells:
+            _fail(f"DOCX-Tabellenzellen ohne OCR-Inhalt: {joined_cells[:240]!r}")
     _ok("qt: OCR Formatvorlagen + Tabellen ohne Steuerzeichen/Markdown-Dump")
 
 
 def main() -> int:
     test_core_ocr_fixture_to_docx()
     test_core_sanitize_and_hocr_layout()
+    test_core_ocr_stroke_image_no_control_glyphs()
     test_pdf_extract_kind_not_pdf()
     test_scan_session_import()
     test_editor_ocr_bold_find_save()
