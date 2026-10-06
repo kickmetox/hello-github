@@ -642,6 +642,36 @@ def default_palette_commands() -> list[PaletteCommand]:
             "OCR",
         ),
         PaletteCommand(
+            "ink_pen_ballpoint",
+            "Kugelschreiber",
+            "stift kugelschreiber ballpoint pen maus touch",
+            "Ansicht",
+        ),
+        PaletteCommand(
+            "ink_brush",
+            "Pinsel",
+            "pinsel brush druck stift tinte",
+            "Ansicht",
+        ),
+        PaletteCommand(
+            "ink_fill_closed",
+            "Geschlossenen Strich füllen",
+            "füllung fill closed strich",
+            "Ansicht",
+        ),
+        PaletteCommand(
+            "right_toolbox",
+            "Rechter Werkzeugkasten",
+            "rechte spalte werkzeuge stift pinsel farbe stempel dock",
+            "Ansicht",
+        ),
+        PaletteCommand(
+            "stamp_place",
+            "Stempel setzen",
+            "stempel stamp rahmen schatten kontur",
+            "Einfügen",
+        ),
+        PaletteCommand(
             "ki_document_wizard",
             "Dokument erstellen… (KI-Wizard)",
             "ki wizard formular anschreiben kaufvertrag rechnung dokument erstellen isoliert",

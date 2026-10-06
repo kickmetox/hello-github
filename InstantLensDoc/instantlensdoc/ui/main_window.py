@@ -105,6 +105,8 @@ from instantlensdoc.core.app_settings import (
     get_update_dismissed_version,
     set_presentation_show_page_number,
     set_update_dismissed_version,
+    get_right_toolbox_visible,
+    get_right_toolbox_width,
     get_window_geometry_b64,
     get_window_state_b64,
     remember_recent_dir,
@@ -527,13 +529,24 @@ class MainWindow(QMainWindow):
             sp = getattr(self, "main_splitter", None)
             if sp is None:
                 return False
-            sp.setSizes([a, b])
+            if sp.count() >= 3:
+                pane = getattr(self, "ink_tools_pane", None)
+                from instantlensdoc.core.app_settings import get_right_toolbox_width
+
+                w = get_right_toolbox_width() if pane is not None and pane.isVisible() else 0
+                sp.setSizes([a, b, max(0, w)])
+            else:
+                sp.setSizes([a, b])
             return True
         except Exception:
             return False
 
     def _on_main_splitter_moved(self, *_args) -> None:
         """Splitter ziehen → Session merken (debounced über Timer)."""
+        try:
+            self._persist_right_toolbox_width()
+        except Exception:
+            pass
         if getattr(self, "_splitter_save_timer", None) is None:
             self._splitter_save_timer = QTimer(self)
             self._splitter_save_timer.setSingleShot(True)
@@ -1422,8 +1435,17 @@ class MainWindow(QMainWindow):
         self.doc_splitter.setStretchFactor(1, 2)
         self.secondary_wrap.setVisible(bool(get_editor_doc_split()))
         splitter.addWidget(self.doc_splitter)
+        from instantlensdoc.ui.ink_tools_pane import InkToolsPane
+
+        self.ink_tools_pane = InkToolsPane(self)
+        self.ink_tools_pane.setObjectName("ildRightToolbox")
+        splitter.addWidget(self.ink_tools_pane)
         splitter.setStretchFactor(1, 3)
+        splitter.setStretchFactor(2, 0)
+        right_on = bool(get_right_toolbox_visible())
+        self.ink_tools_pane.setVisible(right_on)
         splitter.splitterMoved.connect(self._on_main_splitter_moved)
+        QTimer.singleShot(0, self._apply_right_toolbox_width)
         root.addWidget(splitter)
 
         sb = QStatusBar()
@@ -2865,7 +2887,7 @@ class MainWindow(QMainWindow):
         self._act_ink_input.setObjectName("actInkInput")
         self._act_ink_input.setCheckable(True)
         self._act_ink_input.setToolTip(
-            "Finger oder Stift auf der Seite schreiben (Touch/Tablet, Maus-Linksklick als Fallback)"
+            "Finger, Stift oder Maus (Linksziehen) auf der Seite schreiben — gleiche Werkzeuge"
         )
         self._act_ink_input.toggled.connect(self._toggle_ink_input)
         m_view.addAction(self._act_ink_input)
@@ -2887,6 +2909,56 @@ class MainWindow(QMainWindow):
         )
         self._act_recognize_handwriting.triggered.connect(self._recognize_ink_handwriting)
         m_view.addAction(self._act_recognize_handwriting)
+        from instantlensdoc.ui.ink_input import INK_FILL_LABELS, INK_TOOL_LABELS
+
+        self._ink_pen_actions: dict[str, QAction] = {}
+        self._ink_pen_group = QActionGroup(self)
+        self._ink_pen_group.setExclusive(True)
+        for key, label in INK_TOOL_LABELS.items():
+            act = QAction(label, self)
+            act.setObjectName(
+                {
+                    "ballpoint": "actInkPenBallpoint",
+                    "felt": "actInkPenFelt",
+                    "highlighter": "actInkPenHighlighter",
+                    "brush": "actInkBrush",
+                }.get(key, f"actInkTool_{key}")
+            )
+            act.setCheckable(True)
+            act.setToolTip(f"{label}: Maus, Finger und Stift zeichnen gleich")
+            act.triggered.connect(lambda _=False, k=key: self._set_ink_tool(k))
+            self._ink_pen_group.addAction(act)
+            m_view.addAction(act)
+            self._ink_pen_actions[key] = act
+        self._ink_pen_actions["ballpoint"].setChecked(True)
+        self._ink_fill_actions: dict[str, QAction] = {}
+        self._ink_fill_group = QActionGroup(self)
+        self._ink_fill_group.setExclusive(True)
+        for key, label in INK_FILL_LABELS.items():
+            act = QAction(label, self)
+            act.setObjectName(
+                {
+                    "none": "actInkFillNone",
+                    "closed": "actInkFillClosed",
+                    "flood": "actInkFillFlood",
+                }.get(key, f"actInkFill_{key}")
+            )
+            act.setCheckable(True)
+            act.setToolTip(label)
+            act.triggered.connect(lambda _=False, k=key: self._set_ink_fill(k))
+            self._ink_fill_group.addAction(act)
+            m_view.addAction(act)
+            self._ink_fill_actions[key] = act
+        self._ink_fill_actions["none"].setChecked(True)
+        self._act_right_toolbox = QAction("Rechter Werkzeugkasten", self)
+        self._act_right_toolbox.setObjectName("actRightToolbox")
+        self._act_right_toolbox.setCheckable(True)
+        self._act_right_toolbox.setChecked(bool(get_right_toolbox_visible()))
+        self._act_right_toolbox.setToolTip(
+            "Rechte Spalte: Stifte, Pinsel, Farbe, Dicken, Füllungen, Stempel"
+        )
+        self._act_right_toolbox.toggled.connect(self._toggle_right_toolbox)
+        m_view.addAction(self._act_right_toolbox)
         self._current_line_hl_action = QAction("Aktuelle Zeile hervorheben", self)
         self._current_line_hl_action.setCheckable(True)
         self._current_line_hl_action.setChecked(get_editor_current_line_highlight())
@@ -9151,6 +9223,14 @@ class MainWindow(QMainWindow):
         "ink_color": "actInkColor",
         "ink_width": "actInkWidth",
         "recognize_handwriting": "actRecognizeHandwriting",
+        "ink_pen_ballpoint": "actInkPenBallpoint",
+        "ink_pen_felt": "actInkPenFelt",
+        "ink_pen_highlighter": "actInkPenHighlighter",
+        "ink_brush": "actInkBrush",
+        "ink_fill_none": "actInkFillNone",
+        "ink_fill_closed": "actInkFillClosed",
+        "ink_fill_flood": "actInkFillFlood",
+        "right_toolbox": "actRightToolbox",
         "ki_assistant": "actKiAssistant",
         "varfonts": "actVariableFonts",
         "pades_sign": "actPadesSign",
@@ -9200,12 +9280,30 @@ class MainWindow(QMainWindow):
             ("ink_color", "_act_ink_color"),
             ("ink_width", "_act_ink_width"),
             ("recognize_handwriting", "_act_recognize_handwriting"),
+            ("right_toolbox", "_act_right_toolbox"),
             *CHROME_ACTION_ATTRS,
         ):
             if aid not in mapping:
                 act = getattr(self, attr, None)
                 if act is not None:
                     mapping[aid] = act
+        for key, act in (getattr(self, "_ink_pen_actions", None) or {}).items():
+            aid = {
+                "ballpoint": "ink_pen_ballpoint",
+                "felt": "ink_pen_felt",
+                "highlighter": "ink_pen_highlighter",
+                "brush": "ink_brush",
+            }.get(key)
+            if aid and act is not None:
+                mapping[aid] = act
+        for key, act in (getattr(self, "_ink_fill_actions", None) or {}).items():
+            aid = {
+                "none": "ink_fill_none",
+                "closed": "ink_fill_closed",
+                "flood": "ink_fill_flood",
+            }.get(key)
+            if aid and act is not None:
+                mapping[aid] = act
         self._ribbon_qactions = mapping
         rb = getattr(self, "ribbon_bar", None)
         if rb is not None and hasattr(rb, "bind_qactions"):
@@ -9333,6 +9431,21 @@ class MainWindow(QMainWindow):
             "ink_color": self._choose_ink_color,
             "ink_width": self._choose_ink_width,
             "recognize_handwriting": self._recognize_ink_handwriting,
+            "ink_pen_ballpoint": lambda: self._set_ink_tool("ballpoint"),
+            "ink_pen_felt": lambda: self._set_ink_tool("felt"),
+            "ink_pen_highlighter": lambda: self._set_ink_tool("highlighter"),
+            "ink_brush": lambda: self._set_ink_tool("brush"),
+            "ink_fill_none": lambda: self._set_ink_fill("none"),
+            "ink_fill_closed": lambda: self._set_ink_fill("closed"),
+            "ink_fill_flood": lambda: self._set_ink_fill("flood"),
+            "right_toolbox": self._toggle_right_toolbox,
+            "stamp_place": lambda: self._ink_stamp_action("place"),
+            "stamp_frame": lambda: self._ink_stamp_action("frame"),
+            "stamp_color": lambda: self._ink_stamp_action("color"),
+            "stamp_text_only": lambda: self._ink_stamp_action("text_only"),
+            "stamp_shadow": lambda: self._ink_stamp_action("shadow"),
+            "stamp_outline": lambda: self._ink_stamp_action("outline"),
+            "stamp_edit": lambda: self._ink_stamp_action("edit"),
             "dtp_text_frame": self._dtp_add_text_frame,
             "dtp_link": self._dtp_link_frames,
             "dtp_grid": self._dtp_toggle_grid,
@@ -14440,7 +14553,21 @@ class MainWindow(QMainWindow):
             install_ink_input(self)
         except Exception:
             self._ink_session = None
+        pane = getattr(self, "ink_tools_pane", None)
+        if pane is not None and not getattr(self, "_ink_tools_bound", False):
+            try:
+                pane.toolChosen.connect(self._set_ink_tool)
+                pane.fillChosen.connect(self._set_ink_fill)
+                pane.colorChosen.connect(self._ink_color_from_pane)
+                pane.widthChosen.connect(self._ink_width_from_pane)
+                pane.recognizeRequested.connect(self._recognize_ink_handwriting)
+                pane.stampAction.connect(self._ink_stamp_action)
+                pane.bind_window(self)
+                self._ink_tools_bound = True
+            except Exception:
+                pass
         self._sync_ink_input_actions()
+        self._merge_dtp_into_right_toolbox()
 
     def _ink_session_or_none(self):
         return getattr(self, "_ink_session", None)
@@ -14480,8 +14607,62 @@ class MainWindow(QMainWindow):
                 rb.set_enabled("ink_color", not locked)
                 rb.set_enabled("ink_width", not locked)
                 rb.set_enabled("recognize_handwriting", not locked)
+                tool = getattr(session, "tool", "ballpoint") if session else "ballpoint"
+                fill = getattr(session, "fill_mode", "none") if session else "none"
+                for key in ("ballpoint", "felt", "highlighter", "brush"):
+                    aid = {
+                        "ballpoint": "ink_pen_ballpoint",
+                        "felt": "ink_pen_felt",
+                        "highlighter": "ink_pen_highlighter",
+                        "brush": "ink_brush",
+                    }[key]
+                    rb.set_checked(aid, tool == key)
+                    rb.set_enabled(aid, not locked)
+                for key, aid in (
+                    ("none", "ink_fill_none"),
+                    ("closed", "ink_fill_closed"),
+                    ("flood", "ink_fill_flood"),
+                ):
+                    rb.set_checked(aid, fill == key)
+                    rb.set_enabled(aid, not locked)
+                for aid in (
+                    "stamp_place",
+                    "stamp_frame",
+                    "stamp_color",
+                    "stamp_text_only",
+                    "stamp_shadow",
+                    "stamp_outline",
+                    "stamp_edit",
+                ):
+                    rb.set_enabled(aid, not locked)
             except Exception:
                 pass
+        pane = getattr(self, "ink_tools_pane", None)
+        if pane is not None:
+            try:
+                pane.set_locked(locked)
+                if session is not None:
+                    pane.sync_from_session(session)
+            except Exception:
+                pass
+        for key, act in (getattr(self, "_ink_pen_actions", None) or {}).items():
+            self._set_action_available(act, not locked, reason)
+            if session is not None and act is not None:
+                try:
+                    act.blockSignals(True)
+                    act.setChecked(session.tool == key)
+                    act.blockSignals(False)
+                except Exception:
+                    pass
+        for key, act in (getattr(self, "_ink_fill_actions", None) or {}).items():
+            self._set_action_available(act, not locked, reason)
+            if session is not None and act is not None:
+                try:
+                    act.blockSignals(True)
+                    act.setChecked(session.fill_mode == key)
+                    act.blockSignals(False)
+                except Exception:
+                    pass
 
     def _toggle_ink_input(self, checked=None) -> None:
         from instantlensdoc.ui.ink_input import is_schreibschutz
@@ -14537,7 +14718,11 @@ class MainWindow(QMainWindow):
         current = QColor(session.color or DEFAULT_INK_COLOR)
         color = QColorDialog.getColor(current, self, "Tintenfarbe")
         if color.isValid():
-            session.color = color.name()
+            if hasattr(session, "set_color"):
+                session.set_color(color.name())
+            else:
+                session.color = color.name()
+            self._sync_ink_input_actions()
             self._set_status(f"Tintenfarbe {session.color}")
 
     def _choose_ink_width(self) -> None:
@@ -14563,6 +14748,7 @@ class MainWindow(QMainWindow):
                 session.width = float(choice)
             except (TypeError, ValueError):
                 session.width = float(INK_WIDTHS[1])
+            self._sync_ink_input_actions()
             self._set_status(f"Tintenstärke {session.width:g}")
 
     def _recognize_ink_handwriting(self) -> None:
@@ -14597,15 +14783,278 @@ class MainWindow(QMainWindow):
         html = result.get("html") or ""
         text = result.get("text") or ""
         if not text.strip():
+            try:
+                from instantlensdoc.ui.ink_input import strokes_to_pil
+
+                img = strokes_to_pil(strokes)
+                if img is not None:
+                    if self.open_ocr_result(image=img, handwriting=True, title="Handschrift"):
+                        session.clear()
+                        self._sync_editor_only_actions()
+                        self._set_status("Handschrift erkannt → Word-Suite")
+                        return
+            except Exception:
+                pass
             self._set_status("Handschrift: kein Text erkannt")
             return
         where = insert_recognized_text(self, html, text, session.bbox(strokes))
+        if not where:
+            try:
+                from instantlensdoc.ui.ink_input import strokes_to_pil
+
+                img = strokes_to_pil(strokes)
+                if img is not None:
+                    self.open_ocr_result(image=img, handwriting=True, title="Handschrift")
+                    where = "caret"
+            except Exception:
+                pass
         session.clear()
         self._sync_editor_only_actions()
         self._set_status(
             f"Handschrift erkannt → {'Textrahmen' if where == 'frame' else 'Caret'} "
             f"({result.get('lang') or 'ocr'})"
         )
+
+    def _set_ink_tool(self, tool: str) -> None:
+        from instantlensdoc.ui.ink_input import is_schreibschutz, normalize_ink_tool
+
+        if is_schreibschutz(self):
+            self._sync_ink_input_actions()
+            return
+        session = self._ink_session_or_none()
+        if session is None:
+            self._install_ink_input()
+            session = self._ink_session_or_none()
+        if session is None:
+            return
+        session.set_tool(normalize_ink_tool(tool))
+        if not session.enabled:
+            self._toggle_ink_input(True)
+        self._sync_ink_input_actions()
+        self._set_status(f"Stift: {session.tool}")
+
+    def _set_ink_fill(self, mode: str) -> None:
+        from instantlensdoc.ui.ink_input import is_schreibschutz, normalize_ink_fill
+
+        if is_schreibschutz(self):
+            self._sync_ink_input_actions()
+            return
+        session = self._ink_session_or_none()
+        if session is None:
+            return
+        session.set_fill_mode(normalize_ink_fill(mode))
+        self._sync_ink_input_actions()
+        self._set_status(f"Füllung: {session.fill_mode}")
+
+    def _ink_color_from_pane(self, color: str) -> None:
+        from instantlensdoc.ui.ink_input import is_schreibschutz
+
+        if is_schreibschutz(self):
+            self._sync_ink_input_actions()
+            return
+        if not str(color or "").strip():
+            self._choose_ink_color()
+            return
+        session = self._ink_session_or_none()
+        if session is None:
+            return
+        session.set_color(color)
+        self._sync_ink_input_actions()
+        self._set_status(f"Tintenfarbe {session.color}")
+
+    def _ink_width_from_pane(self, width: float) -> None:
+        from instantlensdoc.ui.ink_input import is_schreibschutz
+
+        if is_schreibschutz(self):
+            self._sync_ink_input_actions()
+            return
+        session = self._ink_session_or_none()
+        if session is None:
+            return
+        try:
+            session.width = max(0.6, min(24.0, float(width)))
+        except (TypeError, ValueError):
+            return
+        pane = getattr(self, "ink_tools_pane", None)
+        if pane is not None:
+            session.width_unit = getattr(pane, "_width_unit", "pt")
+        self._set_status(f"Tintenstärke {session.width:g} pt")
+
+    def _toggle_right_toolbox(self, checked=None) -> None:
+        from instantlensdoc.core.app_settings import set_right_toolbox_visible
+
+        pane = getattr(self, "ink_tools_pane", None)
+        act = getattr(self, "_act_right_toolbox", None)
+        if isinstance(checked, bool):
+            on = checked
+        elif act is not None:
+            on = bool(act.isChecked())
+        else:
+            on = pane is None or not pane.isVisible()
+        if pane is not None:
+            pane.setVisible(on)
+        if act is not None:
+            try:
+                act.blockSignals(True)
+                act.setChecked(on)
+                act.blockSignals(False)
+            except Exception:
+                pass
+        try:
+            set_right_toolbox_visible(on)
+        except Exception:
+            pass
+        rb = getattr(self, "ribbon_bar", None)
+        if rb is not None:
+            try:
+                rb.set_checked("right_toolbox", on)
+            except Exception:
+                pass
+        self._merge_dtp_into_right_toolbox()
+        if on:
+            self._apply_right_toolbox_width()
+        self._set_status("Rechter Werkzeugkasten " + ("ein" if on else "aus"))
+
+    def _apply_right_toolbox_width(self) -> None:
+        from instantlensdoc.core.app_settings import get_right_toolbox_width
+
+        sp = getattr(self, "main_splitter", None)
+        pane = getattr(self, "ink_tools_pane", None)
+        if sp is None or pane is None or not pane.isVisible():
+            return
+        w = get_right_toolbox_width()
+        sizes = [int(x) for x in sp.sizes()]
+        if len(sizes) < 3:
+            return
+        rest = max(80, sizes[0] + sizes[1] + sizes[2] - w)
+        left = sizes[0] if sizes[0] > 0 else 220
+        mid = max(80, rest - left)
+        sp.setSizes([left, mid, w])
+
+    def _persist_right_toolbox_width(self) -> None:
+        from instantlensdoc.core.app_settings import set_right_toolbox_width
+
+        sp = getattr(self, "main_splitter", None)
+        pane = getattr(self, "ink_tools_pane", None)
+        if sp is None or pane is None or not pane.isVisible():
+            return
+        sizes = [int(x) for x in sp.sizes()]
+        if len(sizes) >= 3 and sizes[-1] > 0:
+            set_right_toolbox_width(sizes[-1])
+
+    def _merge_dtp_into_right_toolbox(self) -> None:
+        pane = getattr(self, "dtp_pane", None)
+        tools = getattr(self, "ink_tools_pane", None)
+        if pane is None or not hasattr(pane, "adopt_side_panel"):
+            return
+        host = getattr(tools, "dtp_host", None) if tools is not None else None
+        right_on = bool(tools is not None and tools.isVisible())
+        dtp_on = False
+        try:
+            dtp_on = bool(self._layout_mode_active())
+        except Exception:
+            dtp_on = False
+        if right_on and dtp_on and host is not None:
+            pane.adopt_side_panel(host)
+        else:
+            pane.adopt_side_panel(None)
+            if host is not None:
+                host.hide()
+
+    def _ink_stamp_action(self, kind: str) -> None:
+        from instantlensdoc.ui.ink_input import is_schreibschutz
+
+        if is_schreibschutz(self):
+            self._sync_ink_input_actions()
+            return
+        pdf = getattr(self, "pdf_view", None)
+        key = str(kind or "")
+        if key == "place" and pdf is not None and hasattr(pdf, "arm_quick_stamp"):
+            pdf.arm_quick_stamp()
+            self._set_status("Stempel: klicken zum Setzen")
+            return
+        if key == "edit" and pdf is not None:
+            fn = getattr(pdf, "edit_selected_annotation_text", None) or getattr(
+                pdf, "object_edit_dialog", None
+            )
+            if callable(fn):
+                fn()
+            return
+        self._apply_stamp_style(key)
+
+    def _apply_stamp_style(self, kind: str) -> None:
+        pdf = getattr(self, "pdf_view", None)
+        if pdf is None or not hasattr(pdf, "store"):
+            return
+        ids = []
+        try:
+            ids = list(pdf._selected_annotation_ids())
+        except Exception:
+            ids = []
+        from ild_pdf.annotate import AnnotationType
+
+        anns = []
+        for i in ids:
+            ann = pdf.store.get(i)
+            if ann is not None and getattr(ann, "type", None) == AnnotationType.STAMP:
+                anns.append(ann)
+        if not anns:
+            self._set_status("Kein Stempel ausgewählt")
+            return
+        for ann in anns:
+            if kind == "color":
+                from PySide6.QtWidgets import QColorDialog
+
+                cur = QColor(ann.color or "#C0392B")
+                color = QColorDialog.getColor(cur, self, "Stempelfarbe")
+                if color.isValid():
+                    ann.color = color.name()
+            elif kind == "frame":
+                cur = float(getattr(ann, "stroke_width", 3.0) or 0.0)
+                ann.stroke_width = 0.0 if cur > 0.5 else 3.0
+                if hasattr(ann, "stamp_frame"):
+                    ann.stamp_frame = ann.stroke_width > 0.5
+            elif kind == "text_only":
+                ann.stroke_width = 0.0
+                ann.fill_color = ""
+                if hasattr(ann, "stamp_text_only"):
+                    ann.stamp_text_only = True
+            elif kind == "shadow":
+                tags = list(getattr(ann, "tags", None) or [])
+                if "ild-stamp-shadow" in tags:
+                    tags = [t for t in tags if t != "ild-stamp-shadow"]
+                else:
+                    tags.append("ild-stamp-shadow")
+                ann.tags = tags
+                if hasattr(ann, "stamp_shadow"):
+                    ann.stamp_shadow = "ild-stamp-shadow" in tags
+            elif kind == "outline":
+                ann.stroke_width = max(2.0, float(getattr(ann, "stroke_width", 0) or 0) or 2.0)
+                if hasattr(ann, "stamp_outline"):
+                    ann.stamp_outline = True
+            if hasattr(ann, "touch"):
+                ann.touch()
+            kw = {
+                "color": ann.color,
+                "fill_color": getattr(ann, "fill_color", ""),
+                "tags": list(getattr(ann, "tags", None) or []),
+            }
+            sw = float(getattr(ann, "stroke_width", 3.0) or 0.0)
+            if sw >= 1.0:
+                kw["stroke_width"] = sw
+            else:
+                ann.stroke_width = 0.0
+                try:
+                    pdf.store.dirty = True
+                except Exception:
+                    pass
+            try:
+                pdf.store.update(ann.id, **kw)
+            except Exception:
+                pass
+        if hasattr(pdf, "refresh"):
+            pdf.refresh()
+        self._set_status(f"Stempel: {kind}")
 
     def _show_hooks_info(self) -> None:
         from instantlensdoc.core.plugin_hooks import list_hooks, write_hook_example
@@ -14729,6 +15178,7 @@ class MainWindow(QMainWindow):
             if hasattr(pane, "apply_shared_print_overlays"):
                 pane.apply_shared_print_overlays()
             self._sync_layout_mode_checked(True)
+            self._merge_dtp_into_right_toolbox()
             self._set_status("DTP-Werkzeuge (gleiche Ansicht)")
             try:
                 self._sync_editor_only_actions()
@@ -14757,6 +15207,7 @@ class MainWindow(QMainWindow):
                 pane.hide()
             self._dtp_tools_on = False
             self._sync_layout_mode_checked(False)
+            self._merge_dtp_into_right_toolbox()
             self._set_status("DTP-Werkzeuge aus")
             try:
                 self._sync_editor_only_actions()
@@ -17055,6 +17506,21 @@ class MainWindow(QMainWindow):
             "ink_color": self._choose_ink_color,
             "ink_width": self._choose_ink_width,
             "recognize_handwriting": self._recognize_ink_handwriting,
+            "ink_pen_ballpoint": lambda: self._set_ink_tool("ballpoint"),
+            "ink_pen_felt": lambda: self._set_ink_tool("felt"),
+            "ink_pen_highlighter": lambda: self._set_ink_tool("highlighter"),
+            "ink_brush": lambda: self._set_ink_tool("brush"),
+            "ink_fill_none": lambda: self._set_ink_fill("none"),
+            "ink_fill_closed": lambda: self._set_ink_fill("closed"),
+            "ink_fill_flood": lambda: self._set_ink_fill("flood"),
+            "right_toolbox": self._toggle_right_toolbox,
+            "stamp_place": lambda: self._ink_stamp_action("place"),
+            "stamp_frame": lambda: self._ink_stamp_action("frame"),
+            "stamp_color": lambda: self._ink_stamp_action("color"),
+            "stamp_text_only": lambda: self._ink_stamp_action("text_only"),
+            "stamp_shadow": lambda: self._ink_stamp_action("shadow"),
+            "stamp_outline": lambda: self._ink_stamp_action("outline"),
+            "stamp_edit": lambda: self._ink_stamp_action("edit"),
             "settings_ui_lang": self._settings,
             "ki_document_wizard": self._ki_document_wizard_action,
             "doc_tags": self._edit_doc_tags,

@@ -3549,6 +3549,33 @@ def set_show_rulers(enabled: bool) -> None:
     save_settings({"show_rulers": bool(enabled)})
 
 
+def get_right_toolbox_visible() -> bool:
+    """Rechte Werkzeugspalte (Stifte/Pinsel/Stempel)."""
+    return bool(load_settings().get("right_toolbox_visible", True))
+
+
+def set_right_toolbox_visible(enabled: bool) -> None:
+    save_settings({"right_toolbox_visible": bool(enabled)})
+
+
+def get_right_toolbox_width() -> int:
+    try:
+        val = int(load_settings().get("right_toolbox_width", 220) or 220)
+    except (TypeError, ValueError):
+        val = 220
+    return max(160, min(360, val))
+
+
+def set_right_toolbox_width(px: int) -> int:
+    try:
+        val = int(px)
+    except (TypeError, ValueError):
+        val = 220
+    val = max(160, min(360, val))
+    save_settings({"right_toolbox_width": val})
+    return val
+
+
 def get_show_alignment_grid() -> bool:
     """Ausrichtungsraster einblenden — 2.6.11."""
     return bool(load_settings().get("show_alignment_grid", False))

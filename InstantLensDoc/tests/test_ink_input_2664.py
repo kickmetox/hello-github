@@ -18,6 +18,7 @@ if str(ROOT) not in sys.path:
 sys.path.insert(0, str(ROOT / "tests"))
 
 from PySide6.QtCore import Qt  # noqa: E402
+from PySide6.QtWidgets import QWidget  # noqa: E402
 
 from menu_smoke_lib import create_main_window, install_headless_env, pump  # noqa: E402
 
@@ -151,3 +152,97 @@ def test_toggle_stifteingabe_enables_session() -> None:
     _WIN._toggle_ink_input(False)
     assert session.enabled is False
     session.clear()
+
+
+def test_pens_brush_fill_and_mouse_draw() -> None:
+    from instantlensdoc.ui.ink_input import (
+        FILL_CLOSED,
+        TOOL_BRUSH,
+        TOOL_FELT,
+        TOOL_HIGHLIGHTER,
+        InkSession,
+    )
+
+    session = _WIN._ink_session
+    _WIN.editor.setReadOnly(False)
+    _WIN._set_ink_tool("felt")
+    assert session.tool == TOOL_FELT
+    assert session.enabled is True
+    _WIN._set_ink_tool("highlighter")
+    assert session.tool == TOOL_HIGHLIGHTER
+    _WIN._set_ink_tool("brush")
+    assert session.tool == TOOL_BRUSH
+    _WIN._set_ink_fill("closed")
+    assert session.fill_mode == FILL_CLOSED
+    session.clear()
+    session.set_enabled(True)
+    session.begin(20, 20, 0.4)
+    session.move(80, 20, 0.7)
+    session.move(80, 70, 0.6)
+    session.move(20, 70, 0.5)
+    session.move(20, 22, 0.4)
+    st = session.end()
+    assert st is not None
+    assert st.filled is True
+    session.clear()
+    _WIN._set_ink_fill("none")
+    _WIN._set_ink_tool("ballpoint")
+    _WIN._toggle_ink_input(True)
+    filt = _WIN._ink_filter
+    p0 = filt._dynamic_pressure(0, 0)
+    p1 = filt._dynamic_pressure(400, 0)
+    assert 0.08 <= p0 <= 1.0
+    assert 0.08 <= p1 <= 1.0
+    session.begin(5, 5, p0)
+    session.move(40, 8, p1)
+    session.end()
+    assert len(session.strokes) == 1
+    session.clear()
+    _WIN._toggle_ink_input(False)
+
+
+def test_right_toolbox_and_schreibschutz_tools() -> None:
+    pane = getattr(_WIN, "ink_tools_pane", None)
+    assert pane is not None
+    assert pane.objectName() == "ildRightToolbox"
+    names = {w.objectName() for w in pane.findChildren(QWidget) if w.objectName()}
+    assert "inkTool_ballpoint" in names
+    assert "inkTool_brush" in names
+    assert "inkFill_closed" in names
+    assert "inkStamp_place" in names
+    act = _WIN._act_right_toolbox
+    assert act is not None
+    assert "Werkzeugkasten" in (act.text() or "")
+    _WIN._toggle_right_toolbox(True)
+    pump(_APP, 0.02)
+    assert pane.isVisible()
+    _WIN.editor.setReadOnly(True)
+    _WIN._sync_ink_input_actions()
+    pump(_APP, 0.02)
+    assert not _WIN._act_ink_input.isEnabled()
+    assert not pane._tool_btns["brush"].isEnabled()
+    _WIN.editor.setReadOnly(False)
+    _WIN._sync_ink_input_actions()
+    pump(_APP, 0.02)
+    assert pane._tool_btns["brush"].isEnabled()
+    rb = _WIN.ribbon_bar
+    rb.select_tab("Ansicht")
+    pump(_APP, 0.02)
+    assert "ink_brush" in rb._actions
+    assert "right_toolbox" in rb._actions
+
+
+def test_ocr_stroke_apis_used_by_recognize() -> None:
+    from instantlensdoc.core.ocr_word_suite import (
+        open_ocr_stroke_image,
+        ocr_stroke_image_to_word_suite,
+    )
+    from instantlensdoc.ui.ink_input import strokes_to_pil, synthetic_stroke_list
+
+    assert callable(open_ocr_stroke_image)
+    assert callable(ocr_stroke_image_to_word_suite)
+    assert callable(getattr(_WIN, "open_ocr_result", None))
+    img = strokes_to_pil(synthetic_stroke_list())
+    assert img is not None
+    assert img.size[0] >= 32
+

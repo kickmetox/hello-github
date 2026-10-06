@@ -878,6 +878,7 @@ class DtpPane(QWidget):
         mid.addWidget(self.view, 1)
         col.addLayout(mid, 1)
         body.addLayout(col, 1)
+        self._body_layout = body
         self.side_panel = QWidget()
         self.side_panel.setObjectName("dtpLayersPanel")
         side = QVBoxLayout(self.side_panel)
@@ -902,6 +903,8 @@ class DtpPane(QWidget):
         _ly_btns.addWidget(dn)
         side.addLayout(_ly_btns)
         self.side_panel.setVisible(False)
+        self._side_adopted = False
+        self._side_user_on = False
         body.addWidget(self.side_panel)
         root.addLayout(body, 1)
         self.status_bar = build_status_bar(self)
@@ -2062,7 +2065,35 @@ class DtpPane(QWidget):
         self.statusMessage.emit("Tabelle 2×3")
 
     def toggle_layers(self) -> None:
+        if getattr(self, "_side_adopted", False):
+            return
         self.side_panel.setVisible(not self.side_panel.isVisible())
+        self._side_user_on = bool(self.side_panel.isVisible())
+
+    def adopt_side_panel(self, host: QWidget | None) -> None:
+        """Ebenenleiste in die rechte Werkzeugspalte legen — keine zweite rechte Leiste."""
+        sp = getattr(self, "side_panel", None)
+        if sp is None:
+            return
+        if host is not None:
+            lay = host.layout()
+            if lay is not None:
+                lay.addWidget(sp)
+            try:
+                sp.setMaximumWidth(16777215)
+            except Exception:
+                pass
+            sp.show()
+            host.show()
+            self._side_adopted = True
+            return
+        body = getattr(self, "_body_layout", None)
+        if body is not None:
+            body.addWidget(sp)
+        sp.setMaximumWidth(168)
+        if not getattr(self, "_side_user_on", False):
+            sp.hide()
+        self._side_adopted = False
 
     def set_zoom(self, percent: float) -> None:
         z = max(10.0, min(400.0, float(percent)))

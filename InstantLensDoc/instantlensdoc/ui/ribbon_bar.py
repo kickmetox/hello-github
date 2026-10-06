@@ -230,6 +230,14 @@ class RibbonBar(QWidget):
             "width_marks",
             "print_marks",
             "header_footer_marks",
+            "ink_pen_ballpoint",
+            "ink_pen_felt",
+            "ink_pen_highlighter",
+            "ink_brush",
+            "ink_fill_none",
+            "ink_fill_closed",
+            "ink_fill_flood",
+            "right_toolbox",
         }
 
         def _icon_for(aid: str) -> QIcon | None:

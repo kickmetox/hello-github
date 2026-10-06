@@ -7,22 +7,73 @@ an den Caret oder als Textrahmen eingefügt — keine Steuerzeichen (¶/FF).
 
 from __future__ import annotations
 
+import math
+import time
 from dataclasses import dataclass, field
 from typing import Iterable, Sequence
 
 from PySide6.QtCore import QEvent, QObject, QPointF, QTimer, Qt, Signal
-from PySide6.QtGui import QColor, QPainter, QPen
+from PySide6.QtGui import QBrush, QColor, QPainter, QPainterPath, QPen, QPolygonF
 from PySide6.QtWidgets import QWidget
 
 from instantlensdoc.core.ocr_word_suite import sanitize_ocr_html, sanitize_ocr_visible_text
 
-INK_WIDTHS: tuple[float, ...] = (1.5, 2.5, 3.5, 5.0, 8.0)
+INK_WIDTHS: tuple[float, ...] = (1.0, 1.5, 2.5, 3.5, 5.0, 8.0, 12.0)
 DEFAULT_INK_COLOR = "#1A1A1A"
 DEFAULT_INK_WIDTH = 2.5
+DEFAULT_INK_TOOL = "ballpoint"
 LONG_PRESS_MS = 550
 TAP_SLOP_PX = 8.0
 PINCH_MIN_FACTOR = 0.85
 PINCH_MAX_FACTOR = 1.18
+PT_PER_MM = 72.0 / 25.4
+RECENT_COLOR_MAX = 8
+
+TOOL_BALLPOINT = "ballpoint"
+TOOL_FELT = "felt"
+TOOL_HIGHLIGHTER = "highlighter"
+TOOL_BRUSH = "brush"
+INK_TOOLS: tuple[str, ...] = (TOOL_BALLPOINT, TOOL_FELT, TOOL_HIGHLIGHTER, TOOL_BRUSH)
+INK_TOOL_LABELS = {
+    TOOL_BALLPOINT: "Kugelschreiber",
+    TOOL_FELT: "Filzstift",
+    TOOL_HIGHLIGHTER: "Textmarker",
+    TOOL_BRUSH: "Pinsel",
+}
+FILL_NONE = "none"
+FILL_CLOSED = "closed"
+FILL_FLOOD = "flood"
+INK_FILLS: tuple[str, ...] = (FILL_NONE, FILL_CLOSED, FILL_FLOOD)
+INK_FILL_LABELS = {
+    FILL_NONE: "Keine Füllung",
+    FILL_CLOSED: "Geschlossenen Strich füllen",
+    FILL_FLOOD: "Loop-Füllung",
+}
+
+
+def pt_to_mm(pt: float) -> float:
+    return float(pt) / PT_PER_MM
+
+
+def mm_to_pt(mm: float) -> float:
+    return float(mm) * PT_PER_MM
+
+
+def normalize_ink_tool(name: str | None) -> str:
+    key = str(name or DEFAULT_INK_TOOL).strip().lower()
+    return key if key in INK_TOOL_LABELS else DEFAULT_INK_TOOL
+
+
+def normalize_ink_fill(name: str | None) -> str:
+    key = str(name or FILL_NONE).strip().lower()
+    return key if key in INK_FILL_LABELS else FILL_NONE
+
+
+def _qcolor(value: str | None, fallback: str = DEFAULT_INK_COLOR) -> QColor:
+    color = QColor(value or fallback)
+    if not color.isValid():
+        color = QColor(fallback)
+    return color
 
 
 @dataclass
@@ -30,6 +81,10 @@ class InkStroke:
     points: list[tuple[float, float, float]] = field(default_factory=list)
     color: str = DEFAULT_INK_COLOR
     width: float = DEFAULT_INK_WIDTH
+    tool: str = DEFAULT_INK_TOOL
+    fill: str = FILL_NONE
+    fill_color: str = ""
+    filled: bool = False
 
     def add(self, x: float, y: float, pressure: float = 0.5) -> None:
         self.points.append((float(x), float(y), max(0.0, min(1.0, float(pressure)))))
@@ -42,20 +97,34 @@ class InkStroke:
         pad = max(4.0, float(self.width) * 2.0)
         return min(xs) - pad, min(ys) - pad, max(xs) + pad, max(ys) + pad
 
+    def is_closed(self, slop: float | None = None) -> bool:
+        if len(self.points) < 6:
+            return False
+        a, b = self.points[0], self.points[-1]
+        limit = float(slop if slop is not None else max(12.0, float(self.width) * 4.0))
+        return math.hypot(a[0] - b[0], a[1] - b[1]) <= limit
+
 
 class InkSession(QObject):
     """Gesammelte Handschrift-Striche der aktuellen Ansicht."""
 
     changed = Signal()
+    toolChanged = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.enabled = False
         self.color = DEFAULT_INK_COLOR
         self.width = DEFAULT_INK_WIDTH
+        self.tool = DEFAULT_INK_TOOL
+        self.fill_mode = FILL_NONE
+        self.fill_color = ""
+        self.width_unit = "pt"
+        self.recent_colors: list[str] = [DEFAULT_INK_COLOR, "#C0392B", "#1A5276", "#F1C40F"]
         self.strokes: list[InkStroke] = []
         self.current: InkStroke | None = None
         self.selected: set[int] = set()
+        self.fills: list[InkStroke] = []
 
     def set_enabled(self, on: bool) -> None:
         self.enabled = bool(on)
@@ -63,8 +132,34 @@ class InkSession(QObject):
             self.current = None
         self.changed.emit()
 
+    def set_tool(self, tool: str) -> None:
+        self.tool = normalize_ink_tool(tool)
+        self.toolChanged.emit()
+        self.changed.emit()
+
+    def set_fill_mode(self, mode: str) -> None:
+        self.fill_mode = normalize_ink_fill(mode)
+        self.toolChanged.emit()
+
+    def set_color(self, color: str) -> None:
+        q = _qcolor(color)
+        self.color = q.name()
+        if self.color not in self.recent_colors:
+            self.recent_colors.insert(0, self.color)
+            self.recent_colors = self.recent_colors[:RECENT_COLOR_MAX]
+        else:
+            self.recent_colors.remove(self.color)
+            self.recent_colors.insert(0, self.color)
+        self.changed.emit()
+
     def begin(self, x: float, y: float, pressure: float = 0.5) -> None:
-        self.current = InkStroke(color=self.color, width=self.width)
+        self.current = InkStroke(
+            color=self.color,
+            width=self.width,
+            tool=self.tool,
+            fill=self.fill_mode,
+            fill_color=self.fill_color or self.color,
+        )
         self.current.add(x, y, pressure)
         self.changed.emit()
 
@@ -85,6 +180,9 @@ class InkSession(QObject):
         if len(st.points) < 2:
             self.changed.emit()
             return None
+        if st.fill in (FILL_CLOSED, FILL_FLOOD) and st.is_closed():
+            st.filled = True
+            st.fill_color = st.fill_color or st.color
         self.strokes.append(st)
         self.changed.emit()
         return st
@@ -95,6 +193,7 @@ class InkSession(QObject):
 
     def clear(self) -> None:
         self.strokes.clear()
+        self.fills.clear()
         self.current = None
         self.selected.clear()
         self.changed.emit()
@@ -169,26 +268,58 @@ def accept_touch_events(widget: QWidget | None) -> None:
             pass
 
 
+def _stroke_pen(st: InkStroke, pressure: float = 0.55) -> QPen:
+    color = _qcolor(st.color)
+    tool = normalize_ink_tool(st.tool)
+    width = max(0.6, float(st.width or DEFAULT_INK_WIDTH))
+    if tool == TOOL_HIGHLIGHTER:
+        color.setAlpha(88)
+        width *= 2.4
+    elif tool == TOOL_FELT:
+        color.setAlpha(210)
+        width *= 1.25
+    elif tool == TOOL_BRUSH:
+        width *= 0.35 + 1.45 * max(0.08, min(1.0, pressure))
+        color.setAlpha(230)
+    pen = QPen(color)
+    pen.setWidthF(width)
+    pen.setCapStyle(Qt.RoundCap)
+    pen.setJoinStyle(Qt.RoundJoin)
+    return pen
+
+
 def paint_strokes(painter: QPainter, strokes: Iterable[InkStroke]) -> None:
     painter.setRenderHint(QPainter.Antialiasing, True)
     for st in strokes:
         if len(st.points) < 1:
             continue
-        color = QColor(st.color or DEFAULT_INK_COLOR)
-        if not color.isValid():
-            color = QColor(DEFAULT_INK_COLOR)
-        pen = QPen(color)
-        pen.setWidthF(max(0.8, float(st.width or DEFAULT_INK_WIDTH)))
-        pen.setCapStyle(Qt.RoundCap)
-        pen.setJoinStyle(Qt.RoundJoin)
-        painter.setPen(pen)
         pts = st.points
+        if st.filled and len(pts) >= 3:
+            poly = QPolygonF([QPointF(p[0], p[1]) for p in pts])
+            fill = _qcolor(st.fill_color or st.color)
+            if normalize_ink_tool(st.tool) == TOOL_HIGHLIGHTER:
+                fill.setAlpha(70)
+            else:
+                fill.setAlpha(140)
+            painter.setPen(Qt.NoPen)
+            painter.setBrush(QBrush(fill))
+            painter.drawPolygon(poly)
+        painter.setBrush(Qt.NoBrush)
         if len(pts) == 1:
+            painter.setPen(_stroke_pen(st, pts[0][2]))
             painter.drawPoint(QPointF(pts[0][0], pts[0][1]))
             continue
-        for i in range(1, len(pts)):
-            p0, p1 = pts[i - 1], pts[i]
-            painter.drawLine(QPointF(p0[0], p0[1]), QPointF(p1[0], p1[1]))
+        if normalize_ink_tool(st.tool) == TOOL_BRUSH:
+            for i in range(1, len(pts)):
+                p0, p1 = pts[i - 1], pts[i]
+                painter.setPen(_stroke_pen(st, (p0[2] + p1[2]) * 0.5))
+                painter.drawLine(QPointF(p0[0], p0[1]), QPointF(p1[0], p1[1]))
+            continue
+        path = QPainterPath(QPointF(pts[0][0], pts[0][1]))
+        for p in pts[1:]:
+            path.lineTo(QPointF(p[0], p[1]))
+        painter.setPen(_stroke_pen(st, 0.55))
+        painter.drawPath(path)
 
 
 def strokes_to_pil(strokes: Sequence[InkStroke], *, scale: int = 3):
@@ -282,13 +413,22 @@ def recognize_ink_strokes(
         return {"ok": False, "skipped": True, "reason": "empty", "text": "", "html": ""}
     code = lang or ocr_lang_for_ink()
     try:
-        from instantlensdoc.core.ocr_word_suite import ocr_stroke_image_to_word_suite
+        from instantlensdoc.core.ocr_word_suite import (
+            ocr_stroke_image_to_word_suite,
+            open_ocr_stroke_image,
+        )
 
         ws = ocr_stroke_image_to_word_suite(
             img, lang=code, auto_format=False, handwriting=True
         )
         raw = getattr(ws, "text", "") or ""
         html = sanitize_ocr_html(getattr(ws, "html", "") or "")
+        if not str(raw or "").strip():
+            doc = open_ocr_stroke_image(
+                img, lang=code, auto_format=False, handwriting=True
+            )
+            raw = getattr(doc, "text", "") or raw
+            html = sanitize_ocr_html(getattr(doc, "html", "") or html)
     except Exception as exc:
         try:
             from instantlensdoc.core.ocr import ocr_image_handwriting
@@ -444,6 +584,8 @@ class TouchInkFilter(QObject):
         self._long_pos: tuple[float, float] | None = None
         self._long_widget: QWidget | None = None
         self._tablet_active = False
+        self._last_ptr: tuple[float, float, float] | None = None
+        self._mouse_draw = False
 
     def eventFilter(self, obj, event) -> bool:  # noqa: N802
         if not isinstance(obj, QWidget):
@@ -479,6 +621,31 @@ class TouchInkFilter(QObject):
     def _ink_on(self) -> bool:
         return bool(self.session.enabled) and not self._blocked()
 
+    def _dynamic_pressure(self, x: float, y: float, event=None) -> float:
+        """Tablet-Druck, sonst Breite aus Zeigergeschwindigkeit (Maus = Stift)."""
+        if event is not None:
+            try:
+                if event.type() in (
+                    QEvent.Type.TabletPress,
+                    QEvent.Type.TabletMove,
+                    QEvent.Type.TabletRelease,
+                ):
+                    p = float(event.pressure())
+                    if p > 0.02:
+                        self._last_ptr = (time.monotonic(), x, y)
+                        return max(0.08, min(1.0, p))
+            except Exception:
+                pass
+        now = time.monotonic()
+        last = self._last_ptr
+        self._last_ptr = (now, x, y)
+        if last is None:
+            return 0.55
+        dt = max(1e-3, now - last[0])
+        speed = math.hypot(x - last[1], y - last[2]) / dt
+        t = max(0.0, min(1.0, speed / 900.0))
+        return max(0.15, min(1.0, 1.0 - 0.7 * t))
+
     def _on_touch(self, obj: QWidget, event) -> bool:
         pts = _touch_points(event)
         et = event.type()
@@ -508,8 +675,9 @@ class TouchInkFilter(QObject):
         if et == QEvent.Type.TouchBegin:
             self._press = (x, y)
             self._moved = False
+            self._last_ptr = None
             self._arm_long_press(obj, x, y)
-            self.session.begin(x, y, 0.55)
+            self.session.begin(x, y, self._dynamic_pressure(x, y, event))
             event.accept()
             return True
         if et == QEvent.Type.TouchUpdate:
@@ -518,7 +686,7 @@ class TouchInkFilter(QObject):
             ):
                 self._moved = True
                 self._long_timer.stop()
-            self.session.move(x, y, 0.55)
+            self.session.move(x, y, self._dynamic_pressure(x, y, event))
             event.accept()
             return True
         if et in (QEvent.Type.TouchEnd, QEvent.Type.TouchCancel):
@@ -541,10 +709,7 @@ class TouchInkFilter(QObject):
         if xy is None:
             return False
         x, y = xy
-        try:
-            pressure = float(event.pressure())
-        except Exception:
-            pressure = 0.5
+        pressure = self._dynamic_pressure(x, y, event)
         t = event.type()
         if t == QEvent.Type.TabletPress:
             self._tablet_active = True
@@ -593,8 +758,10 @@ class TouchInkFilter(QObject):
         x, y = xy
         self._press = (x, y)
         self._moved = False
+        self._mouse_draw = True
+        self._last_ptr = None
         self._arm_long_press(obj, x, y)
-        self.session.begin(x, y, 0.5)
+        self.session.begin(x, y, self._dynamic_pressure(x, y, event))
         event.accept()
         return True
 
@@ -604,22 +771,25 @@ class TouchInkFilter(QObject):
             if abs(xy[0] - self._press[0]) > TAP_SLOP_PX or abs(xy[1] - self._press[1]) > TAP_SLOP_PX:
                 self._moved = True
                 self._long_timer.stop()
-        if not self._ink_on() or self.session.current is None:
+        drawing = self._ink_on() and (self._mouse_draw or self.session.current is not None)
+        if not drawing:
             return False
         if xy is None:
             return False
-        self.session.move(xy[0], xy[1], 0.5)
+        self.session.move(xy[0], xy[1], self._dynamic_pressure(xy[0], xy[1], event))
         event.accept()
         return True
 
     def _on_mouse_release(self, obj: QWidget, event) -> bool:
         self._long_timer.stop()
-        if not self._ink_on() or self.session.current is None:
+        drawing = self._mouse_draw or (self._ink_on() and self.session.current is not None)
+        if not drawing:
             xy = _pointer_xy(event)
             if xy and not self._moved and event.button() == Qt.LeftButton:
                 self._place_caret(obj, xy[0], xy[1])
             self._press = None
             self._moved = False
+            self._mouse_draw = False
             return False
         if event.button() != Qt.LeftButton:
             return False
@@ -631,6 +801,7 @@ class TouchInkFilter(QObject):
             self.session.end()
         self._press = None
         self._moved = False
+        self._mouse_draw = False
         event.accept()
         return True
 
