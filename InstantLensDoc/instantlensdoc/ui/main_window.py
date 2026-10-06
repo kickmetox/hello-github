@@ -1276,6 +1276,12 @@ class MainWindow(QMainWindow):
             self.editor_pane.tool_action.connect(self._on_editor_toolbar_action)
         if hasattr(self.editor_pane, "sheet_changed"):
             self.editor_pane.sheet_changed.connect(self._on_spreadsheet_sheet_changed)
+        try:
+            ov = getattr(self.editor, "_marks_overlay", None)
+            if ov is not None:
+                ov.headerFooterClicked.connect(self._edit_editor_header_footer)
+        except Exception:
+            pass
         self.pdf_view = PdfViewer()
         self.pdf_view.status.connect(self._on_pdf_view_status)
         self.pdf_view.ocr_region_finished.connect(self._on_ocr_region_finished)
@@ -2811,6 +2817,43 @@ class MainWindow(QMainWindow):
         )
         self._satzspiegel_action.toggled.connect(self._toggle_satzspiegel)
         m_view.addAction(self._satzspiegel_action)
+        from instantlensdoc.core.editor_layout_marks import EditorLayoutMarks
+
+        _marks0 = EditorLayoutMarks.from_settings()
+        self._width_marks_action = QAction("Breitenmarken", self)
+        self._width_marks_action.setObjectName("actEditorWidthMarks")
+        self._width_marks_action.setCheckable(True)
+        self._width_marks_action.setChecked(bool(_marks0.show_width_marks))
+        self._width_marks_action.setToolTip(
+            "Satzspiegel-/Breitenmarken (mm) am Seitenrand — Word-Suite Textmodus"
+        )
+        self._width_marks_action.toggled.connect(self._toggle_width_marks)
+        m_view.addAction(self._width_marks_action)
+        self._editor_print_marks_action = QAction("Druckmarken", self)
+        self._editor_print_marks_action.setObjectName("actEditorPrintMarks")
+        self._editor_print_marks_action.setCheckable(True)
+        self._editor_print_marks_action.setChecked(bool(_marks0.show_print_marks))
+        self._editor_print_marks_action.setToolTip(
+            "Crop/Bleed/Register/Farbkeil um die Editor-Seite (nicht PDF-Druckermarken)"
+        )
+        self._editor_print_marks_action.toggled.connect(self._toggle_editor_print_marks)
+        m_view.addAction(self._editor_print_marks_action)
+        self._header_footer_marks_action = QAction("Kopf-/Fußzeilen-Marken", self)
+        self._header_footer_marks_action.setObjectName("actEditorHeaderFooterMarks")
+        self._header_footer_marks_action.setCheckable(True)
+        self._header_footer_marks_action.setChecked(bool(_marks0.show_header_footer_marks))
+        self._header_footer_marks_action.setToolTip(
+            "Gepunktete Kopf-/Fußzeilen-Bänder — Klick öffnet Kopf-/Fußzeile"
+        )
+        self._header_footer_marks_action.toggled.connect(self._toggle_header_footer_marks)
+        m_view.addAction(self._header_footer_marks_action)
+        self._layout_marks_action = QAction("Layout-Marken…", self)
+        self._layout_marks_action.setObjectName("actEditorLayoutMarks")
+        self._layout_marks_action.setToolTip(
+            "Maße (mm), Farbe, Crop/Bleed/Register, Bildschirm vs. Druck/PDF"
+        )
+        self._layout_marks_action.triggered.connect(self._show_editor_layout_marks_dialog)
+        m_view.addAction(self._layout_marks_action)
         self._layout_mode_action = QAction("DTP-Werkzeuge", self)
         self._layout_mode_action.setObjectName("actLayoutMode")
         self._layout_mode_action.setCheckable(True)
@@ -9045,6 +9088,10 @@ class MainWindow(QMainWindow):
         "auto_index": "actEditAutoIndex",
         "shared_review": "actSharedReview",
         "dtp_layout": "actLayoutMode",
+        "width_marks": "actEditorWidthMarks",
+        "print_marks": "actEditorPrintMarks",
+        "header_footer_marks": "actEditorHeaderFooterMarks",
+        "layout_marks": "actEditorLayoutMarks",
         "ink_input": "actInkInput",
         "ink_color": "actInkColor",
         "ink_width": "actInkWidth",
@@ -9090,6 +9137,10 @@ class MainWindow(QMainWindow):
             ("toggle_doc_tabs", "_doc_tabs_action"),
             ("toggle_ribbon", "_ribbon_action"),
             ("dtp_layout", "_layout_mode_action"),
+            ("width_marks", "_width_marks_action"),
+            ("print_marks", "_editor_print_marks_action"),
+            ("header_footer_marks", "_header_footer_marks_action"),
+            ("layout_marks", "_layout_marks_action"),
             ("ink_input", "_act_ink_input"),
             ("ink_color", "_act_ink_color"),
             ("ink_width", "_act_ink_width"),
@@ -9299,6 +9350,16 @@ class MainWindow(QMainWindow):
             "cell_align_middle": lambda: self._set_cell_vertical_align("middle"),
             "cell_align_bottom": lambda: self._set_cell_vertical_align("bottom"),
             "header_footer": self._header_footer_dialog,
+            "width_marks": lambda: self._toggle_width_marks(
+                not bool(self.editor.show_width_marks())
+            ),
+            "print_marks": lambda: self._toggle_editor_print_marks(
+                not bool(self.editor.show_print_marks())
+            ),
+            "header_footer_marks": lambda: self._toggle_header_footer_marks(
+                not bool(self.editor.show_header_footer_marks())
+            ),
+            "layout_marks": self._show_editor_layout_marks_dialog,
             "field_token": self._field_token_dialog,
             "chrome_klassisch": lambda: self._set_chrome_mode("klassisch"),
             "chrome_ribbon": lambda: self._set_chrome_mode("ribbon"),
@@ -12164,7 +12225,7 @@ class MainWindow(QMainWindow):
         self._sync_editor_rich_meta()
         self._set_status("Abschnittsumbruch eingefügt")
 
-    def _header_footer_dialog(self) -> None:
+    def _header_footer_dialog(self, focus_band: str | None = None) -> None:
         if not self._guard_editor_action("Kopf-/Fußzeile"):
             return
         from instantlensdoc.ui.header_footer_dialog import HeaderFooterDialog
@@ -12173,6 +12234,7 @@ class MainWindow(QMainWindow):
             self.editor.document_header(),
             self.editor.document_footer(),
             self,
+            focus_band=focus_band,
         )
         if dlg.exec() != QDialog.Accepted:
             return
@@ -12180,6 +12242,83 @@ class MainWindow(QMainWindow):
         self.editor.set_document_header_footer(header, footer)
         self._sync_editor_rich_meta()
         self._set_status("Kopf-/Fußzeile gesetzt")
+
+    def _edit_editor_header_footer(self, band: str = "header") -> None:
+        self._header_footer_dialog(focus_band=str(band or "header"))
+
+    def _toggle_width_marks(self, checked: bool = False) -> None:
+        on = bool(checked)
+        if hasattr(self.editor, "set_show_width_marks"):
+            self.editor.set_show_width_marks(on)
+        self._sync_editor_layout_mark_actions()
+        self._set_status("Breitenmarken an" if on else "Breitenmarken aus")
+
+    def _toggle_editor_print_marks(self, checked: bool = False) -> None:
+        on = bool(checked)
+        if hasattr(self.editor, "set_show_print_marks"):
+            self.editor.set_show_print_marks(on)
+        self._sync_editor_layout_mark_actions()
+        self._set_status("Druckmarken an" if on else "Druckmarken aus")
+
+    def _toggle_header_footer_marks(self, checked: bool = False) -> None:
+        on = bool(checked)
+        if hasattr(self.editor, "set_show_header_footer_marks"):
+            self.editor.set_show_header_footer_marks(on)
+        self._sync_editor_layout_mark_actions()
+        self._set_status(
+            "Kopf-/Fußzeilen-Marken an" if on else "Kopf-/Fußzeilen-Marken aus"
+        )
+
+    def _sync_editor_layout_mark_actions(self) -> None:
+        ed = getattr(self, "editor", None)
+        if ed is None:
+            return
+        flags = {
+            "_width_marks_action": bool(getattr(ed, "show_width_marks", lambda: True)()),
+            "_editor_print_marks_action": bool(
+                getattr(ed, "show_print_marks", lambda: False)()
+            ),
+            "_header_footer_marks_action": bool(
+                getattr(ed, "show_header_footer_marks", lambda: True)()
+            ),
+        }
+        for attr, on in flags.items():
+            act = getattr(self, attr, None)
+            if act is None:
+                continue
+            act.blockSignals(True)
+            try:
+                act.setChecked(on)
+            finally:
+                act.blockSignals(False)
+        rb = getattr(self, "ribbon_bar", None)
+        if rb is not None and hasattr(rb, "set_checked"):
+            rb.set_checked("width_marks", flags["_width_marks_action"])
+            rb.set_checked("print_marks", flags["_editor_print_marks_action"])
+            rb.set_checked("header_footer_marks", flags["_header_footer_marks_action"])
+        pane = getattr(self, "editor_pane", None)
+        if pane is not None and hasattr(pane, "_sync_layout_mark_buttons"):
+            pane._sync_layout_mark_buttons()
+
+    def _show_editor_layout_marks_dialog(self) -> None:
+        from instantlensdoc.ui.editor_layout_marks_dialog import EditorLayoutMarksDialog
+
+        current = self.editor.layout_marks()
+        dlg = EditorLayoutMarksDialog(current, self)
+        if dlg.exec() != QDialog.Accepted:
+            return
+        marks = dlg.result_marks()
+        self.editor.set_layout_marks(marks)
+        lay = self.editor.page_layout()
+        if lay is not None:
+            try:
+                lay.header_distance_mm = float(marks.header_height_mm)
+                lay.footer_distance_mm = float(marks.footer_height_mm)
+                self.editor.set_page_layout(lay)
+            except Exception:
+                pass
+        self._sync_editor_layout_mark_actions()
+        self._set_status("Layout-Marken übernommen")
 
     def _field_token_dialog(self) -> None:
         if not self._guard_editor_action("Ersatzzeichen"):
@@ -13689,6 +13828,18 @@ class MainWindow(QMainWindow):
         if aid == "mark" and self.stack.currentWidget() is self.pdf_view:
             self._mark_selection()
             return
+        if aid in ("width_marks", "print_marks", "header_footer_marks", "layout_marks"):
+            if aid == "width_marks":
+                self._toggle_width_marks(not bool(self.editor.show_width_marks()))
+            elif aid == "print_marks":
+                self._toggle_editor_print_marks(not bool(self.editor.show_print_marks()))
+            elif aid == "header_footer_marks":
+                self._toggle_header_footer_marks(
+                    not bool(self.editor.show_header_footer_marks())
+                )
+            else:
+                self._show_editor_layout_marks_dialog()
+            return
         if not self._guard_editor_action("Textformat"):
             return
         if aid == "select":
@@ -13750,6 +13901,16 @@ class MainWindow(QMainWindow):
             "page_size_legal": lambda: self._apply_page_size_preset("Legal"),
             "page_size_custom": self._show_page_layout_dialog,
             "header_footer": self._header_footer_dialog,
+            "width_marks": lambda: self._toggle_width_marks(
+                not bool(self.editor.show_width_marks())
+            ),
+            "print_marks": lambda: self._toggle_editor_print_marks(
+                not bool(self.editor.show_print_marks())
+            ),
+            "header_footer_marks": lambda: self._toggle_header_footer_marks(
+                not bool(self.editor.show_header_footer_marks())
+            ),
+            "layout_marks": self._show_editor_layout_marks_dialog,
             "field_token": self._field_token_dialog,
         }
         fn = extra.get(aid)
@@ -16662,6 +16823,16 @@ class MainWindow(QMainWindow):
             "paragraph": self._paragraph_format_dialog,
             "list_glyph": self._change_list_glyph_dialog,
             "header_footer": self._header_footer_dialog,
+            "width_marks": lambda: self._toggle_width_marks(
+                not bool(self.editor.show_width_marks())
+            ),
+            "print_marks": lambda: self._toggle_editor_print_marks(
+                not bool(self.editor.show_print_marks())
+            ),
+            "header_footer_marks": lambda: self._toggle_header_footer_marks(
+                not bool(self.editor.show_header_footer_marks())
+            ),
+            "layout_marks": self._show_editor_layout_marks_dialog,
             "field_token": self._field_token_dialog,
             "toggle_rulers": lambda: self._toggle_rulers(
                 not getattr(self.pdf_view, "_show_rulers", False)
@@ -18156,6 +18327,15 @@ class MainWindow(QMainWindow):
                 font_size=font_size,
                 margin=margin,
             )
+            try:
+                from instantlensdoc.core.editor_layout_marks import (
+                    EditorLayoutMarks,
+                    stamp_print_marks_pdf,
+                )
+
+                stamp_print_marks_pdf(out, EditorLayoutMarks.from_settings())
+            except Exception:
+                pass
             set_last_text_pdf_dir(str(out))
             set_last_export_dir(str(out))
             remember_recent_dir(str(out))
@@ -20455,7 +20635,12 @@ class MainWindow(QMainWindow):
             exp.export_document(text, path, fmt=fmt, title=title, html=rich_html)
             if fmt == "pdf":
                 from ild_pdf.pdf_sniff import validate_pdf_file
+                from instantlensdoc.core.editor_layout_marks import (
+                    EditorLayoutMarks,
+                    stamp_print_marks_pdf,
+                )
 
+                stamp_print_marks_pdf(path, EditorLayoutMarks.from_settings())
                 check = validate_pdf_file(path)
                 if not check.ok:
                     raise RuntimeError(check.message_de())

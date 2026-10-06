@@ -319,6 +319,10 @@ WORD_TAB_GROUPS: dict[str, tuple[tuple[str, tuple], ...]] = {
                 ("show_special_chars", "¶"),
                 ("dtp_layout", "DTP-Werkzeuge"),
                 ("dtp_grid", "Raster"),
+                ("width_marks", "Breitenmarken"),
+                ("print_marks", "Druckmarken"),
+                ("header_footer_marks", "Kopf-/Fußzeilen-Marken"),
+                ("layout_marks", "Layout-Marken…"),
             ),
         ),
         (

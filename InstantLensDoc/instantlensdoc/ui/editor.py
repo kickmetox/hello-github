@@ -5,7 +5,7 @@ from __future__ import annotations
 import tempfile
 from pathlib import Path
 
-from PySide6.QtCore import QRect, QSize, QUrl, Qt, Signal
+from PySide6.QtCore import QRect, QRectF, QSize, QUrl, Qt, Signal
 from PySide6.QtGui import (
     QBrush,
     QColor,
@@ -225,6 +225,8 @@ class TextEditor(QPlainTextEdit):
         self._in_margin_update = False
         self._doc_header = ""
         self._doc_footer = ""
+        self._layout_marks = None
+        self._marks_overlay = None
         self._field_tokens: dict[str, str] = {}
         self._field_token_specs: dict = {}
         try:
@@ -249,6 +251,28 @@ class TextEditor(QPlainTextEdit):
         self.set_indent_guides_visible(self._indent_guides)
         self.set_current_line_highlight(self._current_line_highlight)
         self.set_special_chars_visible(self._show_special)
+        try:
+            from instantlensdoc.core.editor_layout_marks import EditorLayoutMarks
+            from instantlensdoc.ui.editor_layout_marks import EditorLayoutMarksOverlay
+
+            self._layout_marks = EditorLayoutMarks.from_settings()
+            lay = getattr(self, "_page_layout", None)
+            if lay is not None:
+                if abs(float(self._layout_marks.header_height_mm) - 12.5) < 0.05:
+                    self._layout_marks.header_height_mm = float(
+                        getattr(lay, "header_distance_mm", 12.5) or 12.5
+                    )
+                if abs(float(self._layout_marks.footer_height_mm) - 12.5) < 0.05:
+                    self._layout_marks.footer_height_mm = float(
+                        getattr(lay, "footer_distance_mm", 12.5) or 12.5
+                    )
+            self._marks_overlay = EditorLayoutMarksOverlay(self)
+            self._marks_overlay.setGeometry(self.rect())
+            self._marks_overlay.show()
+            self._marks_overlay.raise_()
+        except Exception:
+            self._layout_marks = None
+            self._marks_overlay = None
         self._apply_page_layout()
         # Unbegrenzter Editor-Undo-Stack — 2.6.20
         try:
@@ -765,6 +789,126 @@ class TextEditor(QPlainTextEdit):
             pass
         self._update_side_areas()
         self.viewport().update()
+        self._sync_marks_overlay()
+
+    def layout_marks(self):
+        """Aktuelle Layout-Marken (Breite / Druck / Kopf-Fuß)."""
+        from instantlensdoc.core.editor_layout_marks import EditorLayoutMarks
+
+        m = getattr(self, "_layout_marks", None)
+        if m is None:
+            try:
+                m = EditorLayoutMarks.from_settings()
+            except Exception:
+                m = EditorLayoutMarks()
+            self._layout_marks = m
+        return m
+
+    def set_layout_marks(self, marks, *, persist: bool = True) -> None:
+        from instantlensdoc.core.editor_layout_marks import EditorLayoutMarks
+
+        if marks is None:
+            marks = EditorLayoutMarks()
+        elif not isinstance(marks, EditorLayoutMarks):
+            marks = EditorLayoutMarks.from_dict(marks)
+        self._layout_marks = EditorLayoutMarks.from_dict(marks.to_dict())
+        if persist:
+            try:
+                self._layout_marks.save()
+            except Exception:
+                pass
+        self._sync_marks_overlay()
+
+    def show_width_marks(self) -> bool:
+        return bool(self.layout_marks().show_width_marks)
+
+    def show_print_marks(self) -> bool:
+        return bool(self.layout_marks().show_print_marks)
+
+    def show_header_footer_marks(self) -> bool:
+        return bool(self.layout_marks().show_header_footer_marks)
+
+    def set_show_width_marks(self, enabled: bool) -> None:
+        m = self.layout_marks()
+        m.show_width_marks = bool(enabled)
+        self.set_layout_marks(m)
+
+    def set_show_print_marks(self, enabled: bool) -> None:
+        m = self.layout_marks()
+        m.show_print_marks = bool(enabled)
+        self.set_layout_marks(m)
+
+    def set_show_header_footer_marks(self, enabled: bool) -> None:
+        m = self.layout_marks()
+        m.show_header_footer_marks = bool(enabled)
+        self.set_layout_marks(m)
+
+    def layout_marks_geometry(self) -> dict | None:
+        """Seite + Satzspiegel in Editor-Koordinaten für das Overlay."""
+        from instantlensdoc.core.editor_layout_marks import mm_to_px
+
+        cr = self.contentsRect()
+        dpi = float(self.logicalDpiX() or 96.0)
+        vp = self.viewport()
+        type_area = QRectF(
+            float(vp.x()),
+            float(vp.y()),
+            float(max(1, vp.width())),
+            float(max(1, vp.height())),
+        )
+        marks = self.layout_marks()
+        pad = 0.0
+        if marks.screen_print():
+            pad = mm_to_px(float(marks.crop_mm) + float(marks.gap_mm) + 1.0, dpi)
+        lay = getattr(self, "_page_layout", None)
+        cols = 1
+        if lay is not None and self.page_layout_active():
+            m_top, _m_bot, m_left, _m_right = lay.margins_px(dpi)
+            pw, ph = lay.page_size_px(dpi)
+            page_w = min(float(pw), max(1.0, float(cr.width()) - 2.0 * pad))
+            page_h = min(float(ph), max(1.0, float(cr.height()) - 2.0 * pad))
+            page_x = type_area.left() - float(m_left)
+            page_y = type_area.top() - float(m_top)
+            if page_x < cr.left() + pad:
+                page_x = cr.left() + pad
+            if page_y < cr.top() + pad:
+                page_y = cr.top() + pad
+            page = QRectF(page_x, page_y, max(1.0, page_w), max(1.0, page_h))
+            cols = int(getattr(lay, "columns", 1) or 1)
+        else:
+            page = QRectF(
+                cr.left() + pad,
+                cr.top() + pad,
+                max(1.0, cr.width() - 2.0 * pad),
+                max(1.0, cr.height() - 2.0 * pad),
+            )
+        return {"page": page, "type_area": type_area, "dpi": dpi, "columns": cols}
+
+    def _sync_marks_overlay(self) -> None:
+        ov = getattr(self, "_marks_overlay", None)
+        if ov is None:
+            return
+        try:
+            ov.setGeometry(self.rect())
+            ov.raise_()
+            ov.update()
+        except Exception:
+            pass
+
+    def mousePressEvent(self, event):  # noqa: N802
+        ov = getattr(self, "_marks_overlay", None)
+        if ov is not None and event is not None:
+            try:
+                if int(event.button()) == int(Qt.LeftButton):
+                    pos = event.position().toPoint() if hasattr(event, "position") else event.pos()
+                    hit = ov.hit_test(pos)
+                    if hit:
+                        ov.headerFooterClicked.emit(hit)
+                        event.accept()
+                        return
+            except Exception:
+                pass
+        super().mousePressEvent(event)
 
     def soft_wrap_enabled(self) -> bool:
         return bool(self._soft_wrap)
@@ -1478,6 +1622,7 @@ class TextEditor(QPlainTextEdit):
         self._minimap_area.setGeometry(
             QRect(cr.right() - mm_w - extra + 1, cr.top() + top, mm_w, cr.height() - top)
         )
+        self._sync_marks_overlay()
 
     def paint_line_number_area(self, event) -> None:
         if not self._line_numbers:
@@ -2130,6 +2275,7 @@ class TextEditor(QPlainTextEdit):
         self._ensure_rich_mode()
         self._doc_header = header
         self._doc_footer = footer
+        self._sync_marks_overlay()
         return True
 
     def field_tokens(self) -> dict[str, str]:
@@ -2330,6 +2476,42 @@ class TextEditor(QPlainTextEdit):
                         QRectF(0, page_h - min(48.0, page_h * 0.08), page_w, min(48.0, page_h * 0.08)),
                         ftxt,
                     )
+                try:
+                    marks = self.layout_marks()
+                    dpi = float(printer.resolution() or 96.0)
+                    paper = QRectF(0.0, 0.0, page_w, page_h)
+                    from instantlensdoc.ui.editor_layout_marks import (
+                        draw_header_footer_marks,
+                        draw_print_marks,
+                        draw_width_marks,
+                    )
+                    from instantlensdoc.core.editor_layout_marks import (
+                        footer_band_rect,
+                        header_band_rect,
+                        mm_to_px,
+                    )
+
+                    if marks.include_print_on_print:
+                        draw_print_marks(painter, page=paper, marks=marks, dpi=dpi)
+                    if marks.include_width_on_print:
+                        draw_width_marks(
+                            painter, page=paper, type_area=paper, marks=marks, dpi=dpi
+                        )
+                    if marks.include_hf_on_print:
+                        hh = mm_to_px(marks.header_height_mm, dpi)
+                        fh = mm_to_px(marks.footer_height_mm, dpi)
+                        hr = header_band_rect(0.0, 0.0, page_w, height=hh)
+                        fr = footer_band_rect(0.0, 0.0, page_w, page_h, height=fh)
+                        draw_header_footer_marks(
+                            painter,
+                            header=QRectF(*hr),
+                            footer=QRectF(*fr),
+                            marks=marks,
+                            header_text=htxt,
+                            footer_text=ftxt,
+                        )
+                except Exception:
+                    pass
         finally:
             painter.end()
         return True
@@ -4212,6 +4394,7 @@ class EditorPane(QWidget):
         self.editor.textChanged.connect(self._sync_preview)
         self._sync_preview()
         self.set_active_tool("select")
+        self._sync_layout_mark_buttons()
 
     def _build_edit_toolbar(self, parent_layout) -> None:
         """Bearbeitungsleiste Auswahl…Markierungen für Text/DOCX/Word-Suite — 2.6.44."""
@@ -4297,6 +4480,30 @@ class EditorPane(QWidget):
                 "Alle Text-Markierungen entfernen — 2.6.44",
             ),
             ("find", "Suchen", False, "Suchen/Ersetzen — Ctrl+H"),
+            (
+                "width_marks",
+                "Breitenmarken",
+                True,
+                "Satzspiegel-/Breitenmarken (mm) ein/aus — Ansicht",
+            ),
+            (
+                "print_marks",
+                "Druckmarken",
+                True,
+                "Crop/Bleed/Register/Farbkeil um die Seite — unabhängig von PDF-Druckermarken",
+            ),
+            (
+                "header_footer_marks",
+                "Kopf-/Fußzeilen-Marken",
+                True,
+                "Gepunktete Kopf-/Fußzeilen-Bänder — Klick öffnet den Dialog",
+            ),
+            (
+                "layout_marks",
+                "Layout-Marken…",
+                False,
+                "Maße (mm), Farbe, Crop/Bleed/Register, Bildschirm vs. Druck/PDF",
+            ),
         )
         for aid, label, checkable, tip in specs:
             btn = QToolButton()
@@ -4352,11 +4559,33 @@ class EditorPane(QWidget):
         if aid not in ("select", "edit"):
             aid = "select"
         self._active_tool = aid
+        exclusive = {"select", "edit"}
         for key, btn in self._tool_buttons.items():
             if not btn.isCheckable():
                 continue
+            if key not in exclusive:
+                continue
             btn.blockSignals(True)
             btn.setChecked(key == aid)
+            btn.blockSignals(False)
+
+    def _sync_layout_mark_buttons(self) -> None:
+        ed = getattr(self, "editor", None)
+        if ed is None:
+            return
+        states = {
+            "width_marks": bool(getattr(ed, "show_width_marks", lambda: True)()),
+            "print_marks": bool(getattr(ed, "show_print_marks", lambda: False)()),
+            "header_footer_marks": bool(
+                getattr(ed, "show_header_footer_marks", lambda: True)()
+            ),
+        }
+        for aid, on in states.items():
+            btn = self._tool_buttons.get(aid)
+            if btn is None or not btn.isCheckable():
+                continue
+            btn.blockSignals(True)
+            btn.setChecked(on)
             btn.blockSignals(False)
 
     def active_tool(self) -> str:

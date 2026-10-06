@@ -14,7 +14,14 @@ from PySide6.QtWidgets import (
 class HeaderFooterDialog(QDialog):
     """Kopf-/Fußzeile als Dokument-Meta — nicht als ¶/Form-Feed im Fließtext."""
 
-    def __init__(self, header: str = "", footer: str = "", parent=None):
+    def __init__(
+        self,
+        header: str = "",
+        footer: str = "",
+        parent=None,
+        *,
+        focus_band: str | None = None,
+    ):
         super().__init__(parent)
         self.setObjectName("headerFooterDialog")
         self.setWindowTitle("Kopf- und Fußzeile")
@@ -39,6 +46,11 @@ class HeaderFooterDialog(QDialog):
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         root.addWidget(buttons)
+        band = str(focus_band or "").strip().lower()
+        if band == "footer":
+            self.footer_edit.setFocus()
+        else:
+            self.header_edit.setFocus()
 
     def result_header_footer(self) -> tuple[str, str]:
         return (self.header_edit.text() or "").strip(), (self.footer_edit.text() or "").strip()

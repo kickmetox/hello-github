@@ -145,6 +145,31 @@ DEFAULTS: dict[str, Any] = {
         "header_distance_mm": 12.5,
         "footer_distance_mm": 12.5,
     },
+    # Word-Suite Layout-Marken (Breite / Druck / Kopf-Fuß) — Bildschirm vs. Druck/PDF
+    "editor_layout_marks": {
+        "show_width_marks": True,
+        "show_print_marks": False,
+        "show_header_footer_marks": True,
+        "show_on_screen": True,
+        "include_width_on_print": False,
+        "include_print_on_print": True,
+        "include_hf_on_print": True,
+        "crop_mm": 5.0,
+        "bleed_mm": 3.0,
+        "register_mm": 4.0,
+        "color_bar_mm": 4.0,
+        "gap_mm": 1.0,
+        "header_height_mm": 12.5,
+        "footer_height_mm": 12.5,
+        "show_crop": True,
+        "show_bleed": True,
+        "show_register": True,
+        "show_color_bar": True,
+        "width_color": "#1A4DB3",
+        "print_color": "#1A1A1A",
+        "bleed_color": "#E30613",
+        "header_footer_color": "#5A6570",
+    },
     "editor_tab_width": 4,
     "editor_soft_tabs": True,
     "editor_indent_guides": True,
@@ -3207,6 +3232,23 @@ def get_editor_page_layout() -> dict:
 
 def set_editor_page_layout(layout: dict) -> None:
     save_settings({"editor_page_layout": dict(layout or {})})
+
+
+def get_editor_layout_marks() -> dict:
+    """Layout-Marken im Texteditor (Breite / Druck / Kopf-Fuß)."""
+    from instantlensdoc.core.editor_layout_marks import EditorLayoutMarks
+
+    base = dict(DEFAULTS.get("editor_layout_marks") or {})
+    raw = load_settings().get("editor_layout_marks")
+    if isinstance(raw, dict):
+        base.update(raw)
+    return EditorLayoutMarks.from_dict(base).to_dict()
+
+
+def set_editor_layout_marks(marks: dict) -> None:
+    from instantlensdoc.core.editor_layout_marks import EditorLayoutMarks
+
+    save_settings({"editor_layout_marks": EditorLayoutMarks.from_dict(marks or {}).to_dict()})
 
 
 def get_editor_show_special_chars() -> bool:

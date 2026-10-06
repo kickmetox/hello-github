@@ -901,6 +901,18 @@ def resolve_page_size(name_or_size: str | tuple[float, float] | None = None) -> 
 PDF_RICH_CREATOR = "InstantLens Doc (QTextDocument → QPdfWriter)"
 
 
+def _stamp_editor_print_marks(path: Path) -> None:
+    try:
+        from instantlensdoc.core.editor_layout_marks import (
+            EditorLayoutMarks,
+            stamp_print_marks_pdf,
+        )
+
+        stamp_print_marks_pdf(path, EditorLayoutMarks.from_settings())
+    except Exception:
+        pass
+
+
 def _export_pdf_rich_qt(
     html: str,
     dest: Path,
@@ -995,9 +1007,11 @@ def export_pdf(
     if html and str(html).strip():
         out = _export_pdf_rich_qt(str(html), dest, title=title, page_size_pt=size_pt)
         if out is not None:
+            _stamp_editor_print_marks(out)
             return out
     out = text_to_pdf(text or "", dest, title=title, page_size=size_pt)
     assert_valid_pdf(out)
+    _stamp_editor_print_marks(out)
     return out
 
 

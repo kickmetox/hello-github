@@ -227,6 +227,9 @@ class RibbonBar(QWidget):
             "show_special_chars",
             "toggle_minimap",
             "ink_input",
+            "width_marks",
+            "print_marks",
+            "header_footer_marks",
         }
 
         def _icon_for(aid: str) -> QIcon | None:

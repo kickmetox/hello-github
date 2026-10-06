@@ -214,6 +214,30 @@ def default_palette_commands() -> list[PaletteCommand]:
             "Absatz",
         ),
         PaletteCommand(
+            "width_marks",
+            "Breitenmarken ein/aus",
+            "breitenmarken satzspiegel lineal mm type area",
+            "Ansicht",
+        ),
+        PaletteCommand(
+            "print_marks",
+            "Druckmarken ein/aus",
+            "crop bleed register farbkeil prepress schnittmarken",
+            "Ansicht",
+        ),
+        PaletteCommand(
+            "header_footer_marks",
+            "Kopf-/Fußzeilen-Marken ein/aus",
+            "kopfzeile fusszeile header footer bänder",
+            "Ansicht",
+        ),
+        PaletteCommand(
+            "layout_marks",
+            "Layout-Marken…",
+            "layout marken konfigurieren crop bleed register mm",
+            "Ansicht",
+        ),
+        PaletteCommand(
             "toggle_rulers",
             "Lineal ein/aus",
             "lineal ruler horizontal vertikal",
