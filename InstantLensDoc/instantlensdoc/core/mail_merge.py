@@ -82,6 +82,52 @@ def load_recipients_xlsx(path: str | Path) -> list[dict[str, str]]:
     return out
 
 
+def load_recipients_ods(path: str | Path) -> list[dict[str, str]]:
+    """Erstes Tabellenblatt aus ODS (ZIP/XML) — ohne Extra-Abhängigkeit."""
+    import zipfile
+    from xml.etree import ElementTree as ET
+
+    p = Path(path)
+    ns = {
+        "table": "urn:oasis:names:tc:opendocument:xmlns:table:1.0",
+        "text": "urn:oasis:names:tc:opendocument:xmlns:text:1.0",
+        "office": "urn:oasis:names:tc:opendocument:xmlns:office:1.0",
+    }
+    with zipfile.ZipFile(p) as zf:
+        xml = zf.read("content.xml")
+    root = ET.fromstring(xml)
+    table = root.find(".//table:table", ns)
+    if table is None:
+        return []
+    rows_raw: list[list[str]] = []
+    for tr in table.findall("table:table-row", ns):
+        cells: list[str] = []
+        for td in tr.findall("table:table-cell", ns):
+            repeat = 1
+            try:
+                repeat = max(1, int(td.get(f"{{{ns['table']}}}number-columns-repeated") or "1"))
+            except ValueError:
+                repeat = 1
+            texts = [t.text or "" for t in td.findall(".//text:p", ns)]
+            value = "\n".join(t for t in texts if t is not None)
+            cells.extend([value] * min(repeat, 64))
+        if any(c.strip() for c in cells):
+            rows_raw.append(cells)
+    if not rows_raw:
+        return []
+    header = [str(h).strip() or f"col{i}" for i, h in enumerate(rows_raw[0])]
+    out: list[dict[str, str]] = []
+    for raw in rows_raw[1:]:
+        row = {
+            header[i]: (raw[i] if i < len(raw) else "")
+            for i in range(len(header))
+            if header[i]
+        }
+        if any(str(v).strip() for v in row.values()):
+            out.append(row)
+    return out
+
+
 def load_recipients(
     path: str | Path,
     *,
@@ -91,6 +137,8 @@ def load_recipients(
     suf = p.suffix.lower()
     if suf in (".xlsx", ".xlsm"):
         return load_recipients_xlsx(p)
+    if suf == ".ods":
+        return load_recipients_ods(p)
     return load_recipients_csv(p, delimiter=delimiter)
 
 
@@ -189,7 +237,16 @@ def _write_letter(path: Path, text: str, fmt: str) -> Path:
 
             export_docx(text, path, title=path.stem)
         except Exception:
-            # Fallback: plain text with .docx name avoided — write txt
+            path = path.with_suffix(".txt")
+            path.write_text(text, encoding="utf-8")
+        return path
+    if fmt_l == "pdf":
+        path = path.with_suffix(".pdf")
+        try:
+            from instantlensdoc.core.export import export_pdf
+
+            export_pdf(text, path, title=path.stem)
+        except Exception:
             path = path.with_suffix(".txt")
             path.write_text(text, encoding="utf-8")
         return path

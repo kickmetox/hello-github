@@ -2531,52 +2531,24 @@ class TextEditor(QPlainTextEdit):
         return self._apply_to_selected_blocks(_mut, all_blocks=bool(all_paragraphs)) > 0
 
     def apply_style_paragraph(self, style_id: str = "body") -> bool:
-        """Absatzstil (Normal/Überschrift/Zitat) als QText-Formate — 2.6.55."""
-        sid = (style_id or "body").strip().lower()
-        presets = {
-            "body": {"size": 11.0, "bold": False, "italic": False, "align": "left", "indent": 0.0},
-            "normal": {"size": 11.0, "bold": False, "italic": False, "align": "left", "indent": 0.0},
-            "h1": {"size": 18.0, "bold": True, "italic": False, "align": "left", "indent": 0.0},
-            "heading1": {"size": 18.0, "bold": True, "italic": False, "align": "left", "indent": 0.0},
-            "h2": {"size": 14.0, "bold": True, "italic": False, "align": "left", "indent": 0.0},
-            "heading2": {"size": 14.0, "bold": True, "italic": False, "align": "left", "indent": 0.0},
-            "h3": {"size": 12.0, "bold": True, "italic": True, "align": "left", "indent": 0.0},
-            "heading3": {"size": 12.0, "bold": True, "italic": True, "align": "left", "indent": 0.0},
-            "quote": {"size": 11.0, "bold": False, "italic": True, "align": "left", "indent": 36.0},
-            "zitat": {"size": 11.0, "bold": False, "italic": True, "align": "left", "indent": 36.0},
-        }
-        spec = presets.get(sid, presets["body"])
+        """Absatzstil (Normal/Überschrift/Titel/Zitat/Liste) als QText-Formate."""
         self._ensure_rich_mode()
-        char = QTextCharFormat()
-        char.setFontPointSize(float(spec["size"]))
-        char.setFontWeight(QFont.Bold if spec["bold"] else QFont.Normal)
-        char.setFontItalic(bool(spec["italic"]))
-        if sid in ("quote", "zitat"):
-            char.setForeground(QBrush(QColor("#4B5563")))
-        align_name = str(spec["align"])
-        indent = float(spec["indent"])
-        work, restore, expanded = self._global_format_cursor()
-        work.beginEditBlock()
-        try:
-            work.mergeCharFormat(char)
-            if not expanded:
-                self.setTextCursor(work)
+        from instantlensdoc.ui.styles import apply_style_to_document, resolve_style
 
-            def _mut(fmt: QTextBlockFormat) -> None:
-                mapping = {
-                    "left": Qt.AlignLeft | Qt.AlignAbsolute,
-                    "center": Qt.AlignHCenter,
-                    "right": Qt.AlignRight | Qt.AlignAbsolute,
-                    "justify": Qt.AlignJustify,
-                }
-                fmt.setAlignment(mapping.get(align_name, Qt.AlignLeft))
-                fmt.setLeftMargin(indent)
-
-            self._apply_to_selected_blocks(_mut)
-        finally:
-            work.endEditBlock()
-        self._restore_format_cursor(work, restore, expanded)
-        return True
+        spec = resolve_style(style_id)
+        restore = self.textCursor()
+        ok = apply_style_to_document(
+            self.document(),
+            str(spec.get("id") or style_id),
+            cursor=restore,
+        )
+        self.setTextCursor(restore)
+        if ok and spec.get("list"):
+            try:
+                self.toggle_list(ordered=False)
+            except Exception:
+                pass
+        return bool(ok)
 
     def apply_typography(
         self,
@@ -2845,17 +2817,30 @@ class TextEditor(QPlainTextEdit):
         align: str = "",
         style: str = "default",
     ) -> bool:
-        """Tabelle an Cursor: Rich-OCR als HTML, sonst Markdown — 2.6.14."""
+        """QTextTable an Cursor (DOCX/OCR-Rich-Text); HTML/Markdown-Fallback."""
+        self._ensure_rich_mode()
         from ild_pdf.tables import create_table, insert_table_into_text
+        from instantlensdoc.ui.tables import insert_qtext_table
 
-        table = create_table(rows, cols, header=header, align=align, style=style)
-        if self.rich_mode():
-            return self._insert_table_html(table)
         cur = self.textCursor()
+        qtable = insert_qtext_table(
+            self.document(), cur, rows, cols, header=header
+        )
+        if qtable is not None:
+            self.setTextCursor(qtable.lastCursorPosition())
+            return True
+        md = create_table(rows, cols, header=header, align=align, style=style)
+        if self.rich_mode() and hasattr(self, "_insert_table_html"):
+            return self._insert_table_html(md)
         at = cur.position()
-        new_text = insert_table_into_text(self.toPlainText(), table, at=at)
+        new_text = insert_table_into_text(self.toPlainText(), md, at=at)
         self._replace_all_text_undoable(new_text)
         return True
+
+    def current_qtext_table(self):
+        from instantlensdoc.ui.tables import current_table
+
+        return current_table(self.textCursor())
 
     def _table_index_at_cursor(self, found: list) -> int | None:
         """Index der Tabelle unter Cursor/Auswahl; ohne Treffer None (kein First-Table-Fallback)."""

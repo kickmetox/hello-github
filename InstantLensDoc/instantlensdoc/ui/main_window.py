@@ -7,7 +7,7 @@ import time
 from pathlib import Path
 
 from PySide6.QtCore import QEvent, Qt, QTimer, Signal
-from PySide6.QtGui import QAction, QColor, QIcon, QKeySequence, QShortcut
+from PySide6.QtGui import QAction, QActionGroup, QColor, QIcon, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QListWidget,
     QListWidgetItem,
+    QDockWidget,
     QMainWindow,
     QMenu,
     QMessageBox,
@@ -292,21 +293,15 @@ class MainWindow(QMainWindow):
         except Exception:
             pass
         try:
-            if not self._presentation_active:
-                self.menuBar().setVisible(True)
-        except Exception:
-            pass
-        try:
             apply_ui_language(self)
         except Exception:
             pass
         self._restore_window_geometry()
-        # restoreState darf Menüleiste nicht dauerhaft verstecken — 2.6.51
         try:
-            if not self._presentation_active:
-                self.menuBar().setVisible(True)
+            self._apply_chrome_mode()
         except Exception:
-            pass
+            if not getattr(self, "_presentation_active", False):
+                self.menuBar().setVisible(True)
         self.apply_tray_setting()
         self._refresh_recent()
         self._refresh_workspaces()
@@ -1149,7 +1144,6 @@ class MainWindow(QMainWindow):
 
         self.ribbon_bar = RibbonBar(self)
         self.ribbon_bar.action_triggered.connect(self._on_ribbon_action)
-        self.ribbon_bar.setVisible(get_ribbon_visible())
         outer.addWidget(self.ribbon_bar)
         self.doc_tab_bar = DocumentTabBar(self)
         self.doc_tab_bar.tab_activated.connect(self._on_doc_tab_activated)
@@ -1251,6 +1245,20 @@ class MainWindow(QMainWindow):
         self.editor.textChanged.connect(self._on_text_changed)
         self.editor.line_bookmarks_changed.connect(self._on_line_bookmarks_changed)
         self.editor.cursorPositionChanged.connect(self._on_editor_cursor_changed)
+        try:
+            from instantlensdoc.ui.styles import StylePane
+
+            self.style_pane = StylePane(self, on_apply=self._apply_paragraph_style)
+            self.style_dock = QDockWidget("Formatvorlagen", self)
+            self.style_dock.setObjectName("ildStyleDock")
+            self.style_dock.setWidget(self.style_pane)
+            self.style_dock.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
+            self.addDockWidget(Qt.RightDockWidgetArea, self.style_dock)
+            self.style_dock.hide()
+            self.style_pane.style_chosen.connect(self._apply_paragraph_style)
+        except Exception:
+            self.style_pane = None
+            self.style_dock = None
         # Word-Suite / Text-Toolbar (Auswahl…Markierungen) — 2.6.44
         if hasattr(self.editor_pane, "tool_action"):
             self.editor_pane.tool_action.connect(self._on_editor_toolbar_action)
@@ -2095,7 +2103,9 @@ class MainWindow(QMainWindow):
             ("h1", "Überschrift 1"),
             ("h2", "Überschrift 2"),
             ("h3", "Überschrift 3"),
+            ("title", "Titel"),
             ("quote", "Zitat"),
+            ("list", "Liste"),
         ):
             a_st = QAction(label, self)
             a_st.setObjectName(f"actEditStyle_{sid}")
@@ -2921,6 +2931,29 @@ class MainWindow(QMainWindow):
         )
         self._ribbon_action.toggled.connect(self._toggle_ribbon)
         m_view.addAction(self._ribbon_action)
+        self._chrome_mode_actions: dict = {}
+        m_chrome = m_view.addMenu("Oberfläche")
+        m_chrome.setObjectName("menuChromeMode")
+        m_chrome.setToolTip("Klassisch (Pull-down), Ribbon oder kombiniert")
+        chrome_group = QActionGroup(self)
+        chrome_group.setExclusive(True)
+        chrome_group.setObjectName("actGroupChromeMode")
+        for mode, label in (
+            ("klassisch", "Klassisch (Pull-down)"),
+            ("ribbon", "Ribbon"),
+            ("kombiniert", "Kombiniert"),
+        ):
+            act = QAction(label, self)
+            act.setCheckable(True)
+            act.setObjectName(f"actChrome_{mode}")
+            chrome_group.addAction(act)
+            act.triggered.connect(lambda _c=False, m=mode: self._set_chrome_mode(m))
+            m_chrome.addAction(act)
+            self._chrome_mode_actions[mode] = act
+        act_styles_pane = QAction("Formatvorlagen", self)
+        act_styles_pane.setObjectName("actStylesPane")
+        act_styles_pane.triggered.connect(self._toggle_style_pane)
+        m_view.addAction(act_styles_pane)
         self._ann_layer_action = QAction("Annotation-Layer", self)
         self._ann_layer_action.setCheckable(True)
         self._ann_layer_action.setChecked(get_annotations_visible())
@@ -4859,6 +4892,10 @@ class MainWindow(QMainWindow):
                 "toggle_ribbon",
                 "toggle_doc_tabs",
                 "settings",
+                "chrome_klassisch",
+                "chrome_ribbon",
+                "chrome_kombiniert",
+                "print",
             }
             pdf_ids = {
                 "compare_pdfs",
@@ -4900,6 +4937,28 @@ class MainWindow(QMainWindow):
                 "clear_formatting",
                 "font",
                 "font_color",
+                "paragraph",
+                "header_footer",
+                "insert_special_chars",
+                "insert_nbsp",
+                "insert_shy",
+                "styles_pane",
+                "mail_merge",
+                "mail_merge_data",
+                "mail_merge_field",
+                "mail_merge_preview",
+                "mail_merge_finish",
+                "table_add_row",
+                "table_add_col",
+                "table_del_row",
+                "table_del_col",
+                "table_merge",
+                "table_split",
+                "table_borders",
+                "table_header_row",
+                "table_align_left",
+                "table_align_center",
+                "table_align_right",
             }
             for aid, btn in (getattr(rb, "_actions", {}) or {}).items():
                 if aid in always:
@@ -5542,6 +5601,7 @@ class MainWindow(QMainWindow):
             self.page_status_label.setText(f"Zeile {line}/{total}")
             words, chars = self.editor.word_stats()
             self.word_status_label.setText(f"{words} Wörter · {chars} Z.")
+        self._sync_table_tools()
 
     def _path_key(self, path: str | Path | None) -> str | None:
         if not path:
@@ -6246,6 +6306,10 @@ class MainWindow(QMainWindow):
             except Exception:
                 pass
         self.menuBar().setVisible(bool(prev.get("menu", True)))
+        try:
+            self._apply_chrome_mode()
+        except Exception:
+            pass
         self.statusBar().setVisible(bool(prev.get("status", True)))
         self.sidebar.setVisible(bool(prev.get("sidebar", True)))
         if getattr(self, "favorites_bar", None) is not None:
@@ -7295,13 +7359,23 @@ class MainWindow(QMainWindow):
         )
         dlg.exec()
 
-    def _run_mail_merge_dialog(self):
+    def _run_mail_merge_dialog(self, focus: str | None = None):
+        if not isinstance(focus, str):
+            focus = None
         tpl_text = None
         if self.stack.currentWidget() is self.editor_pane:
             text = self.editor.toPlainText().strip()
-            if text and ("{{" in text or "«" in text):
+            if text:
                 tpl_text = text
-        dlg = MailMergeDialog(self, template_text=tpl_text)
+        dlg = MailMergeDialog(self, template_text=tpl_text, editor=self.editor)
+        if focus == "data":
+            QTimer.singleShot(0, dlg._pick_rec)
+        elif focus == "field":
+            QTimer.singleShot(0, dlg.insert_current_field)
+        elif focus == "preview":
+            QTimer.singleShot(0, dlg._preview)
+        elif focus == "run":
+            QTimer.singleShot(0, dlg._run)
         dlg.exec()
         data = dlg.result_data()
         if data:
@@ -8369,15 +8443,55 @@ class MainWindow(QMainWindow):
         if getattr(self, "ribbon_bar", None) is not None:
             self.ribbon_bar.set_checked("toggle_doc_tabs", bool(checked))
 
-    def _toggle_ribbon(self, checked: bool):
-        from instantlensdoc.core.app_settings import set_ribbon_visible
+    def _set_chrome_mode(self, mode: str) -> None:
+        from instantlensdoc.ui.chrome import apply_chrome, set_chrome_mode
 
-        set_ribbon_visible(bool(checked))
-        if getattr(self, "ribbon_bar", None) is not None:
-            self.ribbon_bar.setVisible(bool(checked))
+        resolved = set_chrome_mode(mode)
+        apply_chrome(self, resolved)
+        labels = {
+            "klassisch": "Klassisch (Pull-down)",
+            "ribbon": "Ribbon",
+            "kombiniert": "Kombiniert",
+        }
+        self._set_status(f"Oberfläche: {labels.get(resolved, resolved)}")
+
+    def _apply_chrome_mode(self, mode: str | None = None) -> None:
+        from instantlensdoc.ui.chrome import apply_chrome
+
+        apply_chrome(self, mode)
+
+    def _toggle_style_pane(self) -> None:
+        dock = getattr(self, "style_dock", None)
+        if dock is None:
+            return
+        dock.setVisible(not dock.isVisible())
+        pane = getattr(self, "style_pane", None)
+        if pane is not None and hasattr(pane, "refresh"):
+            pane.refresh()
+
+    def _toggle_ribbon(self, checked: bool):
+        from instantlensdoc.ui.chrome import CHROME_KLASSISCH, CHROME_KOMBINIERT
+
+        self._set_chrome_mode(CHROME_KOMBINIERT if checked else CHROME_KLASSISCH)
+
+    def _sync_table_tools(self) -> None:
+        rb = getattr(self, "ribbon_bar", None)
+        if rb is None or not hasattr(rb, "set_table_tools_visible"):
+            return
+        in_table = False
+        try:
+            if self.stack.currentWidget() is self.editor_pane:
+                in_table = self.editor.current_qtext_table() is not None
+        except Exception:
+            in_table = False
+        rb.set_table_tools_visible(bool(in_table))
 
     def _on_ribbon_action(self, action_id: str) -> None:
         """Ribbon-Chrome-Aktionen — 2.6.28 (Save-as / Alt-Parity)."""
+        aid = str(action_id or "")
+        if aid.startswith("style:"):
+            self._apply_paragraph_style(aid.split(":", 1)[1])
+            return
         handlers = {
             "open": self.open_dialog,
             "save": self.save_doc,
@@ -8476,12 +8590,40 @@ class MainWindow(QMainWindow):
             "ki_assistant": self._show_ki_assistant,
             "varfonts": self._show_variable_fonts,
             "pades_sign": self._show_pades_dialog,
+            "chrome_klassisch": lambda: self._set_chrome_mode("klassisch"),
+            "chrome_ribbon": lambda: self._set_chrome_mode("ribbon"),
+            "chrome_kombiniert": lambda: self._set_chrome_mode("kombiniert"),
+            "styles_pane": self._toggle_style_pane,
+            "paragraph": self._paragraph_format_dialog,
+            "header_footer": self._watermark_tools,
+            "insert_special_chars": lambda: self._toggle_special_chars(
+                not bool(getattr(self, "_special_chars_action", None) and self._special_chars_action.isChecked())
+            ),
+            "insert_nbsp": self._insert_nbsp,
+            "insert_shy": self._insert_soft_hyphen,
+            "print": self._print,
+            "settings": self._settings,
+            "mail_merge_data": lambda: self._run_mail_merge_dialog(focus="data"),
+            "mail_merge_field": lambda: self._run_mail_merge_dialog(focus="field"),
+            "mail_merge_preview": lambda: self._run_mail_merge_dialog(focus="preview"),
+            "mail_merge_finish": lambda: self._run_mail_merge_dialog(focus="run"),
+            "table_add_row": lambda: self._table_op("add_row"),
+            "table_add_col": lambda: self._table_op("add_col"),
+            "table_del_row": lambda: self._table_op("del_row"),
+            "table_del_col": lambda: self._table_op("del_col"),
+            "table_merge": lambda: self._table_op("merge"),
+            "table_split": lambda: self._table_op("split"),
+            "table_borders": lambda: self._table_op("borders"),
+            "table_header_row": lambda: self._table_op("header"),
+            "table_align_left": lambda: self._table_op("align_left"),
+            "table_align_center": lambda: self._table_op("align_center"),
+            "table_align_right": lambda: self._table_op("align_right"),
         }
-        fn = handlers.get(action_id)
+        fn = handlers.get(aid)
         if callable(fn):
             fn()
         else:
-            self._set_status(f"Ribbon-Aktion ohne Handler: {action_id}")
+            self._set_status(f"Ribbon-Aktion ohne Handler: {aid}")
 
     def _rich_base_font_for_doc(self):
         """Standardschrift des aktuellen Rich-Dokuments (DOCX Normal-Stil) — 2.6.53."""
@@ -14687,6 +14829,10 @@ class MainWindow(QMainWindow):
                     and self.ribbon_bar.isVisible()
                 )
             ),
+            "chrome_klassisch": lambda: self._set_chrome_mode("klassisch"),
+            "chrome_ribbon": lambda: self._set_chrome_mode("ribbon"),
+            "chrome_kombiniert": lambda: self._set_chrome_mode("kombiniert"),
+            "styles_pane": self._toggle_style_pane,
             "spellcheck": self._check_spelling,
             "spell_suggestions": self._show_spell_suggestions,
             "autocorrect_toggle": self._toggle_autocorrect,
@@ -17830,6 +17976,16 @@ class MainWindow(QMainWindow):
         self._sync_editor_rich_meta()
         try:
             save_document(self.doc)
+            try:
+                if self.doc.kind == DocKind.DOCX and self.doc.path:
+                    from instantlensdoc.ui.styles import persist_styles_in_docx
+
+                    persist_styles_in_docx(
+                        str(self.doc.path),
+                        html=(self.doc.meta or {}).get("html"),
+                    )
+            except Exception:
+                pass
             self._remember_path(self.doc.path)
             self._mark_unsaved(self.doc.path, False)
             self._clear_recovery_for_current()
@@ -18128,21 +18284,68 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "Export", f"Export fehlgeschlagen:\n{e}")
 
     def _insert_table_dialog(self) -> None:
-        """Tabelle einfügen — 2.6.14."""
-        from PySide6.QtWidgets import QInputDialog
+        """Tabelle einfügen — Rasterpicker, Smoke: 2×2 ohne Dialog."""
+        import os
 
         if not self._guard_editor_action("Tabelle"):
             return
-        rows, ok = QInputDialog.getInt(self, "Tabelle", "Zeilen:", 3, 1, 200)
-        if not ok:
+        if os.environ.get("ILD_SMOKE_QT") == "1":
+            if self.editor.insert_table(3, 3):
+                self._sync_editor_rich_meta()
+                self._sync_table_tools()
+                self._set_status("Tabelle 3×3 eingefügt")
             return
-        cols, ok = QInputDialog.getInt(self, "Tabelle", "Spalten:", 3, 1, 50)
-        if not ok:
+
+        def _insert(rows: int, cols: int) -> None:
+            if self.editor.insert_table(int(rows), int(cols)):
+                self._sync_editor_rich_meta()
+                self._sync_table_tools()
+                self._set_status(f"Tabelle {rows}×{cols} eingefügt")
+            else:
+                self._set_status("Tabelle nicht eingefügt")
+
+        from PySide6.QtGui import QCursor
+
+        from instantlensdoc.ui.tables import show_table_picker
+
+        show_table_picker(self, pos=QCursor.pos(), on_pick=_insert)
+
+    def _table_op(self, op: str) -> None:
+        if not self._guard_editor_action("Tabelle"):
             return
-        if self.editor.insert_table(rows, cols):
-            self._set_status(f"Tabelle {rows}×{cols} eingefügt")
+        from instantlensdoc.ui import tables as ild_tables
+
+        table = self.editor.current_qtext_table()
+        if table is None:
+            self._set_status("Keine Tabelle am Cursor — zuerst Tabelle einfügen")
+            return
+        cur = self.editor.textCursor()
+        ok = False
+        if op == "add_row":
+            ok = ild_tables.add_row(table)
+        elif op == "add_col":
+            ok = ild_tables.add_column(table)
+        elif op == "del_row":
+            ok = ild_tables.delete_row(table, cur)
+        elif op == "del_col":
+            ok = ild_tables.delete_column(table, cur)
+        elif op == "merge":
+            ok = ild_tables.merge_selected_cells(table, cur)
+        elif op == "split":
+            ok = ild_tables.split_current_cell(table, cur)
+        elif op == "borders":
+            fmt = table.format()
+            ok = ild_tables.set_borders(table, enabled=fmt.border() <= 0.1)
+        elif op == "header":
+            ok = ild_tables.set_header_row(table, enabled=True)
+        elif op.startswith("align_"):
+            ok = ild_tables.set_cell_alignment(table, cur, op.split("_", 1)[1])
+        if ok:
+            self._sync_editor_rich_meta()
+            self._sync_table_tools()
+            self._set_status(f"Tabelle: {op}")
         else:
-            self._set_status("Tabelle nicht eingefügt")
+            self._set_status(f"Tabelle: {op} nicht möglich")
 
     def _format_table_dialog(self) -> None:
         from PySide6.QtWidgets import QInputDialog

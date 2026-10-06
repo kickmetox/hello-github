@@ -2,17 +2,22 @@
 
 from __future__ import annotations
 
-from typing import Iterator
+from typing import Callable, Iterator, Sequence
 
-from PySide6.QtCore import QEvent, QObject, QPoint, Qt
-from PySide6.QtGui import QAction, QMouseEvent
+from PySide6.QtCore import QEvent, QObject, QPoint, Qt, Signal
+from PySide6.QtGui import QAction, QCursor, QMouseEvent
 from PySide6.QtWidgets import (
     QApplication,
+    QFrame,
     QMainWindow,
     QMenu,
     QMenuBar,
     QProxyStyle,
+    QScrollArea,
+    QSizePolicy,
     QStyle,
+    QToolButton,
+    QVBoxLayout,
     QWidget,
 )
 
@@ -219,3 +224,93 @@ def mouse_click_menu_action(app, menu: QMenu, action: QAction) -> bool:
         if app is not None:
             app.processEvents()
     return True
+
+
+ActionSpec = tuple[str, str]  # (action_id, label)
+
+
+class ScrollableActionMenu(QFrame):
+    """Ribbon-Overflow: eine Spalte, scrollbar — keine toten Hits."""
+
+    action_chosen = Signal(str)
+
+    def __init__(
+        self,
+        items: Sequence[ActionSpec],
+        parent: QWidget | None = None,
+        *,
+        max_height: int = 360,
+    ) -> None:
+        super().__init__(parent, Qt.Popup | Qt.FramelessWindowHint)
+        self.setObjectName("ildScrollableActionMenu")
+        self.setAttribute(Qt.WA_DeleteOnClose, True)
+        self.setStyleSheet(
+            "#ildScrollableActionMenu {"
+            " background: #FFFFFF; border: 1px solid #8FA3C0;"
+            "}"
+            "QToolButton#ildOverflowItem {"
+            " text-align: left; padding: 6px 12px; border: none;"
+            " background: transparent;"
+            "}"
+            "QToolButton#ildOverflowItem:hover { background: #D9E6F8; }"
+        )
+        root = QVBoxLayout(self)
+        root.setContentsMargins(2, 2, 2, 2)
+        root.setSpacing(0)
+        scroll = QScrollArea()
+        scroll.setObjectName("ildOverflowScroll")
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        scroll.setFrameShape(QFrame.NoFrame)
+        inner = QWidget()
+        col = QVBoxLayout(inner)
+        col.setContentsMargins(0, 0, 0, 0)
+        col.setSpacing(0)
+        self._buttons: list[QToolButton] = []
+        for aid, label in items:
+            tb = QToolButton()
+            tb.setObjectName("ildOverflowItem")
+            tb.setText(str(label or aid))
+            tb.setToolButtonStyle(Qt.ToolButtonTextOnly)
+            tb.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+            tb.setCursor(Qt.PointingHandCursor)
+            tb.clicked.connect(lambda _=False, a=str(aid): self._pick(a))
+            col.addWidget(tb)
+            self._buttons.append(tb)
+        col.addStretch(1)
+        scroll.setWidget(inner)
+        root.addWidget(scroll)
+        hint_h = max(28, len(items) * 28 + 8)
+        self.setFixedWidth(220)
+        self.setFixedHeight(min(int(max_height), hint_h + 6))
+
+    def _pick(self, action_id: str) -> None:
+        self.action_chosen.emit(action_id)
+        self.close()
+
+
+def show_scrollable_menu(
+    items: Sequence[ActionSpec],
+    parent: QWidget | None = None,
+    *,
+    pos: QPoint | None = None,
+    on_pick: Callable[[str], None] | None = None,
+) -> ScrollableActionMenu | None:
+    """Popup an ``pos`` (global) oder Cursor. Leere Listen werden ignoriert."""
+    specs = [(str(a), str(lbl)) for a, lbl in (items or ()) if a]
+    if not specs:
+        return None
+    menu = ScrollableActionMenu(specs, parent)
+    if on_pick is not None:
+        menu.action_chosen.connect(on_pick)
+    where = pos
+    if where is None:
+        where = QCursor.pos()
+    menu.move(where)
+    menu.show()
+    menu.raise_()
+    app = QApplication.instance()
+    if app is not None:
+        app.processEvents()
+    return menu

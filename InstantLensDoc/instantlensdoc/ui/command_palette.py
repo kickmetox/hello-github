@@ -458,6 +458,24 @@ def default_palette_commands() -> list[PaletteCommand]:
             "Ansicht",
         ),
         PaletteCommand(
+            "chrome_klassisch",
+            "Oberfläche: Klassisch (Pull-down)",
+            "menü pulldown klassisch chrome",
+            "Ansicht",
+        ),
+        PaletteCommand(
+            "chrome_ribbon",
+            "Oberfläche: Ribbon",
+            "ribbon chrome office",
+            "Ansicht",
+        ),
+        PaletteCommand(
+            "chrome_kombiniert",
+            "Oberfläche: Kombiniert",
+            "kombiniert chrome menü ribbon",
+            "Ansicht",
+        ),
+        PaletteCommand(
             "spellcheck",
             "Rechtschreibung prüfen…",
             "spellcheck rechtschreibung vorschläge grammar wörterbuch f7",
