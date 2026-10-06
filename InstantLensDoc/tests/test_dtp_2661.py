@@ -114,6 +114,9 @@ def _checked_ribbon_title() -> str:
 def test_ribbon_dtp_tab_opens_pane_for_pdf() -> None:
     _reload_pdf()
     assert _WIN.stack.currentWidget() is _WIN.pdf_view
+    _WIN.ribbon_bar.select_tab("Start")
+    pump(_APP, 0.05)
+    assert _checked_ribbon_title() == "Start"
     _WIN.ribbon_bar.select_tab("DTP")
     pump(_APP, 0.05)
     assert _WIN.stack.currentWidget() is _WIN.pdf_view
@@ -121,6 +124,14 @@ def test_ribbon_dtp_tab_opens_pane_for_pdf() -> None:
     assert _WIN.dtp_pane.isVisible()
     assert _WIN._layout_mode_action.isChecked()
     assert _WIN._dtp_view_action.isChecked()
+    assert _checked_ribbon_title() == "Start"
+    titles = [
+        (b.text() or "").strip()
+        for b in _WIN.ribbon_bar._cat_buttons
+        if b.isVisible()
+    ]
+    for need in ("Start", "Einfügen", "Layout"):
+        assert need in titles, need
 
 
 def test_menubar_dtp_about_to_show_opens_pane() -> None:
@@ -215,6 +226,17 @@ def test_dtp_help_from_menu_and_f1(monkeypatch) -> None:
     seen.clear()
     act.trigger()
     assert "ildDtpHelpDialog" in seen
+    from_hilfe = _WIN.findChild(QAction, "actDtpHelpFromHilfe")
+    assert from_hilfe is not None
+    seen.clear()
+    from_hilfe.trigger()
+    assert "ildDtpHelpDialog" in seen
+    help_btn = _WIN.dtp_pane.props_panel.findChild(QWidget, "dtpPropHelp")
+    assert help_btn is not None
+    seen.clear()
+    help_btn.click()
+    pump(_APP, 0.02)
+    assert "ildDtpHelpDialog" in seen
 
 
 def test_dirty_layout_cancel_stays_in_dtp(monkeypatch) -> None:
@@ -290,6 +312,7 @@ def test_dtp_properties_merge_into_one_right_column() -> None:
     assert props.findChild(QWidget, "dtpPropFill") is not None
     assert props.findChild(QWidget, "dtpPropFontColor") is not None
     assert props.findChild(QWidget, "dtpPropTool_select") is not None
+    assert props.findChild(QWidget, "dtpPropHelp") is not None
     assert _WIN._doc_host.isAncestorOf(_WIN.dtp_pane)
     _WIN.dtp_pane.clear_dirty()
     assert _WIN._leave_layout_mode() is True

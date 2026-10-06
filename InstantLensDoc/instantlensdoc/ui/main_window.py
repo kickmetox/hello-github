@@ -4168,6 +4168,11 @@ class MainWindow(QMainWindow):
         a.setToolTip("Hilfe; im DTP-Modus: Werkzeuge, Rahmen, Speichern, Tastatur")
         a.triggered.connect(self._show_help_dialog)
         m_help.addAction(a)
+        a = QAction("DTP-Hilfe…", self)
+        a.setObjectName("actDtpHelpFromHilfe")
+        a.setToolTip("Schließbare DTP-Hilfe: Werkzeuge, Rahmen, Speichern, Tastatur")
+        a.triggered.connect(self._show_dtp_help)
+        m_help.addAction(a)
         a = QAction("Logordner öffnen", self)
         a.setToolTip("Crash-/App-Logordner im Dateimanager öffnen")
         a.triggered.connect(self._open_log_folder)
@@ -15324,7 +15329,7 @@ class MainWindow(QMainWindow):
             pass
 
     def _on_ribbon_category(self, title: str) -> None:
-        """Ribbon-Tab DTP schaltet Werkzeuge ein, ohne die Dokumentansicht zu tauschen."""
+        """Ribbon-Tab DTP schaltet Werkzeuge ein, ohne Start/Einfügen/Layout zu tauschen."""
         if str(title or "").strip() != "DTP":
             return
         if getattr(self, "_dtp_switching", False):
@@ -15332,6 +15337,12 @@ class MainWindow(QMainWindow):
         if getattr(self, "_dtp_menu_showing", False):
             return
         self._enter_layout_mode()
+        rb = getattr(self, "ribbon_bar", None)
+        if rb is not None and hasattr(rb, "restore_previous_category"):
+            try:
+                rb.restore_previous_category()
+            except Exception:
+                pass
 
     def _on_layout_mode_triggered(self, checked: bool = True) -> None:
         if not checked:
@@ -15409,6 +15420,12 @@ class MainWindow(QMainWindow):
                 pane.apply_shared_print_overlays()
             self._sync_host_layout_marks_overlay()
             self._sync_layout_mode_checked(True)
+            tools = getattr(self, "ink_tools_pane", None)
+            if tools is not None and not tools.isVisible():
+                try:
+                    self._toggle_right_toolbox(True)
+                except Exception:
+                    pass
             self._merge_dtp_into_right_toolbox()
             self._set_status("DTP-Werkzeuge (gleiche Ansicht)")
             try:

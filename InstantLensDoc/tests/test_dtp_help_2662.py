@@ -27,6 +27,8 @@ def test_dtp_help_html_covers_required_topics() -> None:
         "ctrl+alt+l",
         "textrahmen",
         "schriftfarbe",
+        "dtp-hilfe",
+        "einfügen",
     ):
         assert needle in blob, needle
 

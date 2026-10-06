@@ -16,7 +16,10 @@ DTP_HELP_HTML = """
 <h2>DTP-Hilfe</h2>
 <p>Menü <b>DTP</b> oder Ribbon-Tab <b>DTP</b> schaltet Lineale und Rahmen
 im selben Dokumentfenster ein (Text, PDF und DTP eine Ansicht).
-Die Word-Menüs bleiben; es gibt keine zweite DTP-Bühne.</p>
+Die Word-Menüs und Ribbon-Tabs <b>Start</b> / <b>Einfügen</b> / <b>Layout</b>
+bleiben sichtbar; es gibt keine zweite DTP-Bühne.
+Hilfe: Menü <b>Hilfe → DTP-Hilfe…</b>, <b>F1</b> im Layout-Modus, oder
+<b>Hilfe…</b> in der rechten Werkzeugspalte.</p>
 
 <h3>Speichern</h3>
 <ul>
@@ -75,6 +78,8 @@ class DtpHelpDialog(QDialog):
         self.setObjectName("ildDtpHelpDialog")
         self.setWindowTitle("DTP-Hilfe")
         self.setModal(True)
+        self.setWindowModality(Qt.ApplicationModal)
+        self.setWindowFlag(Qt.Window, True)
         self.resize(560, 480)
         layout = QVBoxLayout(self)
         browser = QTextBrowser()

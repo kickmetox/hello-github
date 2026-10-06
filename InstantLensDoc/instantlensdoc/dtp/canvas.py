@@ -976,6 +976,7 @@ class DtpPane(QWidget):
             ("dtpPropFont", "Schrift…", lambda: self.apply_font(dialog=True)),
             ("dtpPropFontColor", "Schriftfarbe…", lambda: self.apply_font_color(dialog=True)),
             ("dtpPropWrap", "Umfluss…", lambda: self.apply_wrap_mode(dialog=True)),
+            ("dtpPropHelp", "Hilfe…", self._chrome_help),
         ):
             b = QPushButton(label)
             b.setObjectName(obj)
@@ -2215,4 +2216,5 @@ class DtpPane(QWidget):
     def _chrome_help(self) -> None:
         from instantlensdoc.dtp.help_dialog import show_dtp_help
 
-        show_dtp_help(self)
+        parent = self.window() if self.window() is not None else self
+        show_dtp_help(parent)
