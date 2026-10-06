@@ -63,10 +63,22 @@ def teardown_module() -> None:
 def _leave_dtp() -> None:
     load_state(_WIN, _APP, "empty", _FIXTURES)
     pump(_APP, 0.1)
+    pane = getattr(_WIN, "dtp_pane", None)
+    if pane is not None:
+        try:
+            pane.clear_dirty()
+        except Exception:
+            pass
+    doc = getattr(_WIN, "doc", None)
+    if doc is not None:
+        doc.dirty = False
     try:
-        _WIN.stack.setCurrentWidget(_WIN.editor_pane)
+        _WIN._leave_layout_mode()
     except Exception:
-        pass
+        try:
+            _WIN.stack.setCurrentWidget(_WIN.editor_pane)
+        except Exception:
+            pass
     pump(_APP, 0.05)
     assert not _WIN._layout_mode_active()
 

@@ -4378,15 +4378,19 @@ class MainWindow(QMainWindow):
         """Menütitel DTP: eine Spalte, sofort Layout-Modus (PDF inklusive)."""
         if getattr(self, "_dtp_switching", False):
             return
+        self._dtp_menu_showing = True
         try:
-            from instantlensdoc.ui.menu_click import prepare_menu_for_clicks
+            try:
+                from instantlensdoc.ui.menu_click import prepare_menu_for_clicks
 
-            menu = self.sender()
-            if menu is not None:
-                prepare_menu_for_clicks(menu)
-        except Exception:
-            pass
-        self._enter_layout_mode()
+                menu = self.sender()
+                if menu is not None:
+                    prepare_menu_for_clicks(menu)
+            except Exception:
+                pass
+            self._enter_layout_mode()
+        finally:
+            self._dtp_menu_showing = False
 
     def _on_word_suite_menu_about_to_show(self) -> None:
         """Eine Spalte + Enablement bevor Absatz/Seitenlayout/Format layoutet."""
@@ -13628,7 +13632,7 @@ class MainWindow(QMainWindow):
             self.stack.setCurrentWidget(pane)
             self._sync_layout_mode_checked(True)
             rb = getattr(self, "ribbon_bar", None)
-            if rb is not None:
+            if rb is not None and not getattr(self, "_dtp_menu_showing", False):
                 try:
                     rb.select_tab("DTP")
                 except Exception:
