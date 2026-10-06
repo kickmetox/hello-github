@@ -276,6 +276,7 @@ class RibbonBar(QWidget):
                     ("insert_shape", "Form"),
                     ("header_footer", "Kopf-/Fußzeile"),
                     ("field_token", "Ersatzzeichen"),
+                    ("section_break", "Abschnittsumbruch"),
                     ("insert_nbsp", "Geschütztes Leerzeichen"),
                     ("insert_shy", "Weiches Trennzeichen"),
                     ("insert_snippet", "Baustein"),
@@ -295,6 +296,16 @@ class RibbonBar(QWidget):
                     ("bullet_list", "Aufzählung"),
                     ("numbered_list", "Nummerierung"),
                     ("header_footer", "Kopf-/Fußzeile"),
+                    ("page_portrait", "Hochformat"),
+                    ("page_landscape", "Querformat"),
+                    ("page_size_a4", "A4"),
+                    ("page_size_letter", "Letter"),
+                    ("page_size_legal", "Legal"),
+                    ("page_columns_1", "1 Spalte"),
+                    ("page_columns_2", "2 Spalten"),
+                    ("page_columns_3", "3 Spalten"),
+                    ("section_break", "Abschnittsumbruch"),
+                    ("field_token", "Ersatzzeichen"),
                 ),
                 False,
                 False,
@@ -503,6 +514,9 @@ class RibbonBar(QWidget):
         cats.addStretch(1)
         root.addLayout(cats)
         root.addWidget(self._stack)
+        # Chrome-Tab „Seitenlayout“ = bestehendes Ribbon-Tab „Layout“ (kein zweites Ribbon).
+        if "Layout" in self._tab_index:
+            self._tab_index["Seitenlayout"] = self._tab_index["Layout"]
         self._select_cat(1 if self.category_count() > 1 else 0)
         self._install_alt_shortcuts()
         self.set_table_tools_visible(False)

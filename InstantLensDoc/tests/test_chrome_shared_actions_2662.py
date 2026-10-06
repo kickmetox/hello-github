@@ -460,3 +460,22 @@ def test_ribbon_overflow_one_column_triggers_bound_qaction() -> None:
             pass
     assert hits["n"] >= 1, f"Overflow-Klick ohne QAction.triggered ({hits['n']})"
 
+
+def test_absatz_seitenlayout_einfuegen_share_ribbon_qactions() -> None:
+    _seed()
+    _p, _h, para = _menu_action("Absatz", "Absatz…")
+    assert _WIN.ribbon_bar.qaction("paragraph") is para
+    assert _WIN.chrome_tab_qactions("Start")["paragraph"] is para
+    _p, _h, hf = _menu_action("Seitenlayout", "Kopf-/Fußzeile…")
+    assert _WIN.ribbon_bar.qaction("header_footer") is hf
+    assert _WIN.chrome_tab_qactions("Seitenlayout")["header_footer"] is hf
+    _p, _h, ft = _menu_action("Absatz", "Ersatzzeichen…")
+    assert _WIN.ribbon_bar.qaction("field_token") is ft
+    _p, _h, ft_ins = _menu_action("Einfügen", "Ersatzzeichen…")
+    assert ft_ins is ft
+    assert _WIN.chrome_tab_qactions("Einfügen")["field_token"] is ft
+    _p, _h, a4 = _menu_action("Seitenlayout", "A4")
+    assert _WIN.ribbon_bar.qaction("page_size_a4") is a4
+    _p, _h, cols = _menu_action("Seitenlayout", "2 Spalten")
+    assert _WIN.chrome_qactions()["page_columns_2"] is cols
+

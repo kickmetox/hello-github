@@ -423,3 +423,42 @@ def test_rich_lists_stdlib_no_control_glyphs() -> None:
     assert "\x0c" not in html
     info = parse_list_prefix(prefix_for(ordered=False) + "Text")
     assert info is not None and not info.ordered
+
+
+def test_chrome_can_place_start_layout_insert_qactions() -> None:
+    from instantlensdoc.ui.chrome_actions import CHROME_ACTION_OBJECT_NAMES, CHROME_TABS
+
+    load_state(_WIN, _APP, "empty", _FIXTURES)
+    pump(_APP, 0.1)
+    tabs = _WIN.chrome_tab_qactions()
+    assert set(tabs) == set(CHROME_TABS)
+    para = tabs["Start"]["paragraph"]
+    assert para.objectName() == "actEditParagraph"
+    assert _WIN.ribbon_bar.qaction("paragraph") is para
+    hf = tabs["Seitenlayout"]["header_footer"]
+    assert hf.objectName() == "actHeaderFooter"
+    assert tabs["Einfügen"]["header_footer"] is hf
+    ft = tabs["Einfügen"]["field_token"]
+    assert ft.objectName() == "actFieldToken"
+    assert _WIN.ribbon_bar.qaction("field_token") is ft
+    layout_alias = _WIN.chrome_tab_qactions("Layout")
+    assert layout_alias["page_layout"] is tabs["Seitenlayout"]["page_layout"]
+    assert _WIN.ribbon_bar._tab_index.get("Seitenlayout") == _WIN.ribbon_bar._tab_index.get(
+        "Layout"
+    )
+    for aid in (
+        "page_columns_2",
+        "section_break",
+        "line_spacing_115",
+        "keep_with_next",
+        "page_size_legal",
+    ):
+        act = _WIN.chrome_qactions().get(aid)
+        assert act is not None, aid
+        assert act.objectName() == CHROME_ACTION_OBJECT_NAMES[aid]
+    ribbons = [
+        w
+        for w in _WIN.findChildren(type(_WIN.ribbon_bar))
+        if w.objectName() == "ildRibbonBar"
+    ]
+    assert len(ribbons) == 1

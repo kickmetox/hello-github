@@ -8864,8 +8864,12 @@ class MainWindow(QMainWindow):
                     by_name[n] = act
         except Exception:
             by_name = {}
+        from instantlensdoc.ui.chrome_actions import CHROME_ACTION_ATTRS, CHROME_ACTION_OBJECT_NAMES
+
+        names = dict(self._RIBBON_ACTION_OBJECT_NAMES)
+        names.update(CHROME_ACTION_OBJECT_NAMES)
         mapping: dict[str, object] = {}
-        for aid, objn in self._RIBBON_ACTION_OBJECT_NAMES.items():
+        for aid, objn in names.items():
             act = by_name.get(objn)
             if act is not None:
                 mapping[aid] = act
@@ -8879,6 +8883,7 @@ class MainWindow(QMainWindow):
             ("toggle_doc_tabs", "_doc_tabs_action"),
             ("toggle_ribbon", "_ribbon_action"),
             ("dtp_layout", "_layout_mode_action"),
+            *CHROME_ACTION_ATTRS,
         ):
             if aid not in mapping:
                 act = getattr(self, attr, None)
@@ -8888,6 +8893,19 @@ class MainWindow(QMainWindow):
         rb = getattr(self, "ribbon_bar", None)
         if rb is not None and hasattr(rb, "bind_qactions"):
             rb.bind_qactions(mapping)
+
+    def chrome_qactions(self) -> dict:
+        """Alle gebundenen Ribbon/Pulldown-QActions (Chrome platziert, baut kein zweites Ribbon)."""
+        return dict(getattr(self, "_ribbon_qactions", {}) or {})
+
+    def chrome_tab_qactions(self, tab: str | None = None) -> dict:
+        """QActions für Start / Seitenlayout / Einfügen — eine QAction je ID."""
+        from instantlensdoc.ui.chrome_actions import all_tab_qactions, pick_tab_qactions
+
+        mapping = self.chrome_qactions()
+        if tab is None:
+            return all_tab_qactions(mapping)
+        return pick_tab_qactions(mapping, tab)
 
     def _on_ribbon_action(self, action_id: str) -> None:
         """Ribbon: gebundene QAction (Pulldown-Parität), sonst Handler."""
@@ -9006,6 +9024,13 @@ class MainWindow(QMainWindow):
             "list_restart": self._restart_list_numbering,
             "list_indent": lambda: self._adjust_list_indent(+1),
             "list_outdent": lambda: self._adjust_list_indent(-1),
+            "line_spacing_10": lambda: self._set_paragraph_line_spacing(1.0),
+            "line_spacing_115": lambda: self._set_paragraph_line_spacing(1.15),
+            "line_spacing_15": lambda: self._set_paragraph_line_spacing(1.5),
+            "line_spacing_20": lambda: self._set_paragraph_line_spacing(2.0),
+            "line_spacing_exact": self._paragraph_format_dialog,
+            "keep_with_next": lambda: self._set_keep_with_next(True),
+            "widow_orphan": lambda: self._set_widow_orphan(True),
             "section_break": self._insert_section_break,
             "page_size_a4": lambda: self._apply_page_size_preset("A4"),
             "page_size_letter": lambda: self._apply_page_size_preset("Letter"),
