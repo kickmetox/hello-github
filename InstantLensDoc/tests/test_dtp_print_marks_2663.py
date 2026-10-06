@@ -6,7 +6,8 @@ import os
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6.QtWidgets import QAction, QMenu
+from PySide6.QtGui import QAction
+from PySide6.QtWidgets import QMenu
 
 from instantlensdoc.core.app_settings import (
     get_show_printer_marks,
