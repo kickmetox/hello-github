@@ -15006,6 +15006,9 @@ class MainWindow(QMainWindow):
             self._set_status("Keine Tintenstriche zum Erkennen")
             return
         result = recognize_ink_strokes(strokes)
+        from instantlensdoc.ui.ink_input import strokes_to_pil
+
+        img = strokes_to_pil(strokes)
         if result.get("skipped"):
             reason = result.get("reason") or ""
             if reason in ("ocr_unavailable", "ocr_error"):
@@ -15018,29 +15021,22 @@ class MainWindow(QMainWindow):
         html = result.get("html") or ""
         text = result.get("text") or ""
         if not text.strip():
-            try:
-                from instantlensdoc.ui.ink_input import strokes_to_pil
-
-                img = strokes_to_pil(strokes)
-                if img is not None:
+            if img is not None:
+                try:
                     if self.open_ocr_result(image=img, handwriting=True, title="Handschrift"):
                         session.clear()
                         self._sync_editor_only_actions()
                         self._set_status("Handschrift erkannt → Word-Suite")
                         return
-            except Exception:
-                pass
+                except Exception:
+                    pass
             self._set_status("Handschrift: kein Text erkannt")
             return
         where = insert_recognized_text(self, html, text, session.bbox(strokes))
-        if not where:
+        if not where and img is not None:
             try:
-                from instantlensdoc.ui.ink_input import strokes_to_pil
-
-                img = strokes_to_pil(strokes)
-                if img is not None:
-                    self.open_ocr_result(image=img, handwriting=True, title="Handschrift")
-                    where = "caret"
+                self.open_ocr_result(image=img, handwriting=True, title="Handschrift")
+                where = "caret"
             except Exception:
                 pass
         session.clear()

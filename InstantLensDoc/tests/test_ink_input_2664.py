@@ -273,6 +273,66 @@ def test_ocr_stroke_apis_used_by_recognize() -> None:
     assert img.size[0] >= 32
 
 
+def test_recognize_ink_calls_sibling_stroke_apis(monkeypatch) -> None:
+    from instantlensdoc.ui.ink_input import recognize_ink_strokes, synthetic_stroke_list
+
+    calls: list[str] = []
+
+    class _WS:
+        text = "Hallo"
+        html = "<p>Hallo</p>"
+
+    def _suite(image, **kwargs):
+        calls.append("ocr_stroke_image_to_word_suite")
+        assert image is not None
+        assert kwargs.get("handwriting") is True
+        return _WS()
+
+    def _open_stroke(image, **kwargs):
+        calls.append("open_ocr_stroke_image")
+        assert image is not None
+        assert kwargs.get("result") is not None
+        return _WS()
+
+    monkeypatch.setattr(
+        "instantlensdoc.ui.ink_input.tessdata_ready", lambda: (True, "ok")
+    )
+    monkeypatch.setattr(
+        "instantlensdoc.core.ocr_word_suite.ocr_stroke_image_to_word_suite", _suite
+    )
+    monkeypatch.setattr(
+        "instantlensdoc.core.ocr_word_suite.open_ocr_stroke_image", _open_stroke
+    )
+    result = recognize_ink_strokes(synthetic_stroke_list())
+    assert "ocr_stroke_image_to_word_suite" in calls
+    assert "open_ocr_stroke_image" in calls
+    assert "Hallo" in (result.get("text") or "")
+    assert "\u00b6" not in (result.get("text") or "")
+    assert "\x0c" not in (result.get("html") or "")
+
+    opened: dict = {}
+
+    def _open_result(*_a, **kwargs):
+        opened["image"] = kwargs.get("image")
+        opened["handwriting"] = kwargs.get("handwriting")
+        return True
+
+    session = _WIN._ink_session
+    session.clear()
+    session.begin(10, 10, 0.5)
+    session.move(40, 12, 0.6)
+    session.end()
+    monkeypatch.setattr(
+        "instantlensdoc.ui.ink_input.recognize_ink_strokes",
+        lambda *_a, **_k: {"ok": False, "skipped": False, "text": "", "html": ""},
+    )
+    monkeypatch.setattr(_WIN, "open_ocr_result", _open_result)
+    _WIN.editor.setReadOnly(False)
+    _WIN._recognize_ink_handwriting()
+    assert opened.get("image") is not None
+    assert opened.get("handwriting") is True
+
+
 def test_mouse_left_drag_draws_same_tools_as_stylus() -> None:
     from PySide6.QtCore import QEvent, QPoint, QPointF
     from PySide6.QtGui import QMouseEvent

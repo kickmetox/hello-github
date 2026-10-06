@@ -512,6 +512,7 @@ def recognize_ink_strokes(
         return {"ok": False, "skipped": True, "reason": "empty", "text": "", "html": ""}
     code = lang or ocr_lang_for_ink()
     try:
+        from instantlensdoc.core.ocr import OcrOutputMode, OcrResult
         from instantlensdoc.core.ocr_word_suite import (
             ocr_stroke_image_to_word_suite,
             open_ocr_stroke_image,
@@ -522,10 +523,20 @@ def recognize_ink_strokes(
         )
         raw = getattr(ws, "text", "") or ""
         html = sanitize_ocr_html(getattr(ws, "html", "") or "")
+        reused = OcrResult(
+            text=str(raw or ""),
+            lang=code,
+            mode=OcrOutputMode.EDITABLE_TEXT,
+            source_label="Handschrift-Strokes",
+        )
+        doc = open_ocr_stroke_image(
+            img,
+            lang=code,
+            auto_format=False,
+            handwriting=True,
+            result=reused,
+        )
         if not str(raw or "").strip():
-            doc = open_ocr_stroke_image(
-                img, lang=code, auto_format=False, handwriting=True
-            )
             raw = getattr(doc, "text", "") or raw
             html = sanitize_ocr_html(getattr(doc, "html", "") or html)
     except Exception as exc:
