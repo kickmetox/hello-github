@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from PySide6.QtCore import QPointF, QSize, Qt, Signal
-from PySide6.QtGui import QAction, QColor, QFont, QIcon, QPainter, QPen, QPixmap, QPolygonF
+from PySide6.QtGui import QAction, QColor, QFont, QIcon, QKeySequence, QPainter, QPen, QPixmap, QPolygonF
 from PySide6.QtWidgets import (
     QButtonGroup,
     QHBoxLayout,
@@ -370,7 +370,15 @@ def build_menu_bar(pane: QWidget) -> QMenuBar:
     m_scr = bar.addMenu("&Script")
     m_scr.addAction("Plugin-Hooks…", pane._chrome_script)
     m_hlp = bar.addMenu("&Hilfe")
-    m_hlp.addAction("Layout-Modus", pane._chrome_help)
+    m_hlp.setObjectName("dtpHelpMenu")
+    act_help = QAction("Hilfe…", pane)
+    act_help.setObjectName("dtpHelpAction")
+    act_help.setShortcut(QKeySequence("F1"))
+    act_help.setShortcutContext(Qt.WidgetWithChildrenShortcut)
+    act_help.setToolTip("DTP-Hilfe: Werkzeuge, Rahmen, Speichern, Tastatur (F1)")
+    act_help.triggered.connect(pane._chrome_help)
+    m_hlp.addAction(act_help)
+    pane.addAction(act_help)
     return bar
 
 
@@ -467,6 +475,14 @@ def build_icon_bar(pane: QWidget) -> QWidget:
     pane._ink_btn.setToolTip("Drucksensitiver Stift")
     pane._ink_btn.clicked.connect(pane.toggle_ink)
     lay.addWidget(pane._ink_btn)
+    help_btn = QToolButton()
+    help_btn.setObjectName("dtpHelpBtn")
+    help_btn.setText("?")
+    help_btn.setAutoRaise(True)
+    help_btn.setFixedSize(24, 24)
+    help_btn.setToolTip("Hilfe (F1) — Werkzeuge, Rahmen, Speichern, Tastatur")
+    help_btn.clicked.connect(pane._chrome_help)
+    lay.addWidget(help_btn)
     lay.addStretch(1)
     return bar
 

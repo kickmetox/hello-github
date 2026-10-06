@@ -1930,6 +1930,6 @@ class DtpPane(QWidget):
         self.statusMessage.emit("Script: Plugin-Hooks (kein Scribus-Scripter)")
 
     def _chrome_help(self) -> None:
-        self.statusMessage.emit(
-            "Layout-Modus: Lineale mm/pt/in (ziehen = Hilfslinie), Werkzeuge auf Auswahl, Füllung/Kontur, QFontDialog"
-        )
+        from instantlensdoc.dtp.help_dialog import show_dtp_help
+
+        show_dtp_help(self)

@@ -3931,11 +3931,13 @@ class MainWindow(QMainWindow):
         m_help.addAction(a)
         a = QAction("Tastatur-Cheat-Sheet…", self)
         a.setShortcut(QKeySequence("F1"))
-        a.setToolTip("Shortcut-Liste (DE) — F1 — 2.4.0")
-        a.triggered.connect(lambda: KeyboardHelpDialog(self).exec())
+        a.setToolTip("Shortcut-Liste (DE) — F1 — 2.4.0; im DTP-Modus: DTP-Hilfe")
+        a.triggered.connect(self._show_keyboard_help)
         m_help.addAction(a)
         a = QAction("Hilfe…", self)
-        a.triggered.connect(lambda: HelpDialog(self).exec())
+        a.setObjectName("actHelp")
+        a.setToolTip("Hilfe; im DTP-Modus: Werkzeuge, Rahmen, Speichern, Tastatur")
+        a.triggered.connect(self._show_help_dialog)
         m_help.addAction(a)
         a = QAction("Logordner öffnen", self)
         a.setToolTip("Crash-/App-Logordner im Dateimanager öffnen")
@@ -4347,6 +4349,12 @@ class MainWindow(QMainWindow):
                 shared = None
             if shared is not None:
                 m_dtp.addAction(shared)
+        act_dtp_help = QAction("Hilfe…", self)
+        act_dtp_help.setObjectName("actDtpHelp")
+        act_dtp_help.setToolTip("DTP-Hilfe: Werkzeuge, Rahmen, Speichern, Tastatur (F1)")
+        act_dtp_help.triggered.connect(self._show_dtp_help)
+        m_dtp.addSeparator()
+        m_dtp.addAction(act_dtp_help)
         self._dtp_menu = m_dtp
 
         if extra_act is not None:
@@ -12807,6 +12815,23 @@ class MainWindow(QMainWindow):
         """Menü- und Ribbon-Pfeile an Editor- bzw. PDF-Undo-Stack koppeln — 2.6.54."""
         self._sync_undo_redo_ui()
 
+    def _show_dtp_help(self) -> None:
+        from instantlensdoc.dtp.help_dialog import show_dtp_help
+
+        show_dtp_help(self)
+
+    def _show_help_dialog(self) -> None:
+        if self._layout_mode_active():
+            self._show_dtp_help()
+            return
+        HelpDialog(self).exec()
+
+    def _show_keyboard_help(self) -> None:
+        if self._layout_mode_active():
+            self._show_dtp_help()
+            return
+        KeyboardHelpDialog(self).exec()
+
     def _show_getting_started_wizard(self) -> None:
         """Wizard manuell öffnen (Hilfe-Menü)."""
         GettingStartedWizard(self).exec()
@@ -16144,7 +16169,7 @@ class MainWindow(QMainWindow):
             AboutDialog(self).exec()
 
         def _kb():
-            KeyboardHelpDialog(self).exec()
+            self._show_keyboard_help()
 
         def _export_menu():
             # HTML-Export als Default-Schnellaktion
