@@ -28,6 +28,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from instantlensdoc.core.fs_path import native_fs_path, native_fs_paths
+
 
 class SplitPathLogEdit(QListWidget):
     """Pfad-Log: Mehrfachauswahl, Doppelklick, Kontextmenü — 1.2.5/1.2.6."""
@@ -545,7 +547,7 @@ class PdfToolsDialog(QDialog):
 
     def _merge_add(self):
         paths, _ = QFileDialog.getOpenFileNames(self, "PDFs wählen", "", "PDF (*.pdf)")
-        self._merge_add_paths(list(paths))
+        self._merge_add_paths(native_fs_paths(paths))
 
     def _merge_up(self):
         row = self.merge_list.currentRow()
@@ -675,6 +677,7 @@ class PdfToolsDialog(QDialog):
 
     def _merge_pick_dest(self):
         path, _ = QFileDialog.getSaveFileName(self, "Ziel-PDF", "", "PDF (*.pdf)")
+        path = native_fs_path(path)
         if path:
             if not path.lower().endswith(".pdf"):
                 path += ".pdf"
@@ -710,12 +713,13 @@ class PdfToolsDialog(QDialog):
 
     def _split_pick_src(self):
         path, _ = QFileDialog.getOpenFileName(self, "PDF", "", "PDF (*.pdf)")
+        path = native_fs_path(path)
         if path:
             self.split_src.setText(path)
             self._split_update_preview()
 
     def _split_pick_out(self):
-        path = QFileDialog.getExistingDirectory(self, "Ausgabeordner")
+        path = native_fs_path(QFileDialog.getExistingDirectory(self, "Ausgabeordner"))
         if path:
             self.split_out.setText(path)
 
@@ -798,7 +802,7 @@ class PdfToolsDialog(QDialog):
         """Erzeugte Pfade ins Split-Log schreiben — 1.2.2."""
         if not hasattr(self, "split_log"):
             return
-        lines = [f"[{i + 1}] {p}" for i, p in enumerate(paths)]
+        lines = [f"[{i + 1}] {native_fs_path(p)}" for i, p in enumerate(paths)]
         header = f"Erzeugt: {len(paths)} Datei(en)"
         text = header + ("\n" + "\n".join(lines) if lines else "")
         self._split_log_full_text = text
@@ -1017,7 +1021,7 @@ class PdfToolsDialog(QDialog):
                 "Eine oder mehrere Zeilen markieren (Ctrl/Shift).",
             )
             return
-        QApplication.clipboard().setText("\n".join(paths))
+        QApplication.clipboard().setText("\n".join(native_fs_paths(paths)))
         n = len(paths)
         QMessageBox.information(
             self,
@@ -1148,6 +1152,7 @@ class PdfToolsDialog(QDialog):
 
     def _ex_pick_src(self):
         path, _ = QFileDialog.getOpenFileName(self, "PDF", "", "PDF (*.pdf)")
+        path = native_fs_path(path)
         if path:
             self.ex_src.setText(path)
             try:
@@ -1165,8 +1170,10 @@ class PdfToolsDialog(QDialog):
 
     def _ex_pick_dest(self):
         if self.ex_one_per_range.isChecked():
-            path = QFileDialog.getExistingDirectory(
-                self, "Ausgabeordner (eine Datei pro Bereich)"
+            path = native_fs_path(
+                QFileDialog.getExistingDirectory(
+                    self, "Ausgabeordner (eine Datei pro Bereich)"
+                )
             )
             if path:
                 self.ex_dest.setText(path)
@@ -1174,6 +1181,7 @@ class PdfToolsDialog(QDialog):
         path, _ = QFileDialog.getSaveFileName(
             self, "Ziel-PDF", self.ex_dest.text(), "PDF (*.pdf)"
         )
+        path = native_fs_path(path)
         if path:
             if not path.lower().endswith(".pdf"):
                 path += ".pdf"

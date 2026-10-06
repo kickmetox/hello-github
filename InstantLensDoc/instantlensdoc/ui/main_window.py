@@ -54,6 +54,7 @@ from instantlensdoc.core.manual_backup import (
 from instantlensdoc.core import ocr as ocr_mod
 from instantlensdoc.core.layout import LayoutDocument
 from instantlensdoc.core import recent as recent_mod
+from instantlensdoc.core.fs_path import native_fs_path
 from instantlensdoc.core import recent_searches as recent_searches_mod
 from instantlensdoc.core import recent_tags as recent_tags_mod
 from instantlensdoc.license import LicenseManager
@@ -5869,7 +5870,12 @@ class MainWindow(QMainWindow):
             word_txt = f"{len(self.pdf_view.store.annotations) if self.pdf_view.store else 0} Ann."
             size_txt = self._format_current_page_size() or "—"
         self.file_status_label.setText(name)
-        self.file_status_label.setToolTip(str(self.doc.path) if self.doc and self.doc.path else name)
+        file_tip = (
+            native_fs_path(self.doc.path)
+            if self.doc and self.doc.path
+            else name
+        )
+        self.file_status_label.setToolTip(file_tip)
         self.page_status_label.setText(page_txt)
         if hasattr(self, "size_status_label"):
             self.size_status_label.setText(size_txt)
@@ -17808,7 +17814,7 @@ class MainWindow(QMainWindow):
                 clip = QApplication.clipboard()
                 if clip is None:
                     raise RuntimeError("Zwischenablage nicht verfügbar")
-                clip.setText(path_txt)
+                clip.setText(native_fs_path(path_txt) or path_txt)
             except Exception as e:
                 QMessageBox.warning(dlg, "Export-Preset", str(e))
                 msg = f"Export-Preset Pfad kopieren fehlgeschlagen: {name or '(ohne Name)'}"
@@ -18275,6 +18281,7 @@ class MainWindow(QMainWindow):
             "Dokumente (*.ild *.txt *.md *.html *.htm *.docx *.rtf *.pdf *.png *.jpg *.jpeg);;"
             "Alle (*.*)",
         )
+        path = native_fs_path(path)
         if path:
             remember_recent_dir(path)
             self.open_path(path)
@@ -18306,6 +18313,7 @@ class MainWindow(QMainWindow):
             start,
             "Textdokumente (*.txt *.md *.html *.htm *.log *.csv);;Alle (*.*)",
         )
+        path = native_fs_path(path)
         if path:
             remember_recent_dir(path)
             self.open_path(path, encoding=enc)
@@ -18313,6 +18321,7 @@ class MainWindow(QMainWindow):
     def open_path(
         self, path: str, *, encoding: str | None = None, readonly: bool = False
     ):
+        path = native_fs_path(path) or str(path or "")
         # Vor Tab-Wechsel Last-Page/Scroll des aktuellen Docs merken (0.9.1)
         try:
             self._capture_current_tab_view_state()
@@ -18878,7 +18887,7 @@ class MainWindow(QMainWindow):
             self._sync_editor_text_before_save()
             self.doc.text = self.editor.toPlainText()
         try:
-            dest = Path(path)
+            dest = Path(native_fs_path(path) or path)
             # Text → PDF ausschließlich über den PDF-Exporter — nie über save_document
             # (≤ 2.6.42 kopierte das die DOCX-Bytes unter .pdf-Namen → „Data format
             # error“ in PDFium/Edge). Formatiertes HTML (DOCX/HTML) geht mit — 2.6.54
@@ -20617,7 +20626,7 @@ class MainWindow(QMainWindow):
             "F4 → Ordner · F5 → Datei — 2.6.5"
         )
         if path:
-            tip = f"{tip}\n{path}"
+            tip = f"{tip}\n{native_fs_path(path)}"
         preview = self._ocr_region_text_preview()
         if preview:
             tip = f"{tip}\nVorschau: {preview}"
@@ -20841,7 +20850,7 @@ class MainWindow(QMainWindow):
             except Exception:
                 pass
             return False
-        text = str(path).strip()
+        text = native_fs_path(path)
         if not text:
             msg = "OCR-Region Pfad leer"
             self._set_status(msg)
@@ -21193,7 +21202,7 @@ class MainWindow(QMainWindow):
                 msg += f" · {stats}"
             if status_extra:
                 msg += f" · {status_extra}"
-            self._last_ocr_region_path = str(out_txt)
+            self._last_ocr_region_path = native_fs_path(out_txt) or str(out_txt)
             self._ocr_region_toast_active = True
             self._set_status(msg)
             try:

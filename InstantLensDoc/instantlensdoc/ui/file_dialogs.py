@@ -5,6 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from instantlensdoc.core.fs_path import native_fs_path
+
 if TYPE_CHECKING:
     from instantlensdoc.core.documents import DocKind
 
@@ -24,6 +26,66 @@ DOC_SAVE_FILTER_ENTRIES: tuple[tuple[str, tuple[str, ...]], ...] = (
 _DOC_SAVE_KNOWN_EXTS = frozenset(
     ext for _label, exts in DOC_SAVE_FILTER_ENTRIES for ext in exts
 ) | frozenset({".markdown", ".htm"})
+
+
+def picked_fs_path(path: str | Path | None) -> str:
+    """QFileDialog/QUrl result: accept ``/`` and ``\\``, return native separators."""
+    return native_fs_path(path) if path else ""
+
+
+def get_open_file_name(
+    parent: Any,
+    caption: str,
+    directory: str | Path = "",
+    filter: str = "Alle Dateien (*)",  # noqa: A002
+) -> tuple[str, str]:
+    """``QFileDialog.getOpenFileName`` with native-separator result."""
+    from PySide6.QtWidgets import QFileDialog
+
+    start = native_fs_path(directory) if directory else ""
+    path, selected = QFileDialog.getOpenFileName(parent, caption, start, filter)
+    return picked_fs_path(path), selected
+
+
+def get_open_file_names(
+    parent: Any,
+    caption: str,
+    directory: str | Path = "",
+    filter: str = "Alle Dateien (*)",  # noqa: A002
+) -> tuple[list[str], str]:
+    """``QFileDialog.getOpenFileNames`` with native-separator results."""
+    from PySide6.QtWidgets import QFileDialog
+
+    start = native_fs_path(directory) if directory else ""
+    paths, selected = QFileDialog.getOpenFileNames(parent, caption, start, filter)
+    return [picked_fs_path(p) for p in (paths or []) if p], selected
+
+
+def get_save_file_name(
+    parent: Any,
+    caption: str,
+    directory: str | Path = "",
+    filter: str = "Alle Dateien (*)",  # noqa: A002
+) -> tuple[str, str]:
+    """``QFileDialog.getSaveFileName`` with native-separator result."""
+    from PySide6.QtWidgets import QFileDialog
+
+    start = native_fs_path(directory) if directory else ""
+    path, selected = QFileDialog.getSaveFileName(parent, caption, start, filter)
+    return picked_fs_path(path), selected
+
+
+def get_existing_directory(
+    parent: Any,
+    caption: str,
+    directory: str | Path = "",
+) -> str:
+    """``QFileDialog.getExistingDirectory`` with native-separator result."""
+    from PySide6.QtWidgets import QFileDialog
+
+    start = native_fs_path(directory) if directory else ""
+    path = QFileDialog.getExistingDirectory(parent, caption, start)
+    return picked_fs_path(path)
 
 
 def document_save_name_filters() -> str:
@@ -142,7 +204,8 @@ def get_document_save_file_name(
 
     filt = name_filter or document_save_name_filters()
     suffix = (default_suffix or ".ild").lstrip(".") or "ild"
-    start_dir = str(directory)
+    # Qt accepts / and \\; start dir is native so the dialog shows Windows paths.
+    start_dir = native_fs_path(directory) if directory else ""
     dlg = QFileDialog(parent, title, start_dir)
     dlg.setAcceptMode(QFileDialog.AcceptSave)
     dlg.setFileMode(QFileDialog.AnyFile)
@@ -159,7 +222,7 @@ def get_document_save_file_name(
     path = files[0] if files else ""
     selected = dlg.selectedNameFilter()
     if path:
-        path = str(
+        path = native_fs_path(
             ensure_document_save_extension(
                 path, selected, default_suffix=f".{suffix}"
             )
@@ -281,7 +344,7 @@ def _export_dry_run_conflict_txt(
     conflict_titles: list[str] | None = None,
 ) -> Path | None:
     """Konfliktliste als TXT speichern (Dateidialog)."""
-    from PySide6.QtWidgets import QFileDialog, QMessageBox
+    from PySide6.QtWidgets import QMessageBox
     from instantlensdoc.core.app_settings import (
         dialog_start_dir,
         export_dry_run_conflict_list_txt,
@@ -290,7 +353,7 @@ def _export_dry_run_conflict_txt(
     )
 
     start = dialog_start_dir(get_last_export_dir())
-    path, _ = QFileDialog.getSaveFileName(
+    path, _ = get_save_file_name(
         parent,
         "Konfliktliste als TXT speichern",
         str(Path(start) / "ild-templates-dry-run.txt"),

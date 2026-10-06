@@ -764,6 +764,19 @@ def check_version() -> None:
         _fail("ribbon_bar.py fehlt bind_qactions (2.6.59 chrome_actions bind)")
     if "CHROME_FEATURE_ACTION_IDS" not in ca or "Ausrichtung" not in ca or "Listen" not in ca:
         _fail("chrome_actions.py fehlt Ausrichtung/Listen-Features (2.6.59 34c83b0)")
+    fs_path = ROOT / "instantlensdoc" / "core" / "fs_path.py"
+    if not fs_path.is_file():
+        _fail("core/fs_path.py fehlt (Windows-Pfadtrenner Copy/Anzeige)")
+    fs_t = fs_path.read_text(encoding="utf-8")
+    if "def native_fs_path(" not in fs_t or "ntpath.normpath" not in fs_t:
+        _fail("fs_path.py fehlt native_fs_path/ntpath.normpath")
+    wel_t = (ROOT / "instantlensdoc" / "ui" / "welcome.py").read_text(encoding="utf-8")
+    if "native_fs_path(path)" not in wel_t:
+        _fail("welcome.py Pfad kopieren ohne native_fs_path")
+    if "native_fs_path(path)" not in mw:
+        _fail("main_window.py open_path/Copy ohne native_fs_path")
+    if not (ROOT / "tests" / "test_native_fs_path.py").is_file():
+        _fail("tests/test_native_fs_path.py fehlt")
     _ok("2.6.59 word-suite/pdf-menu/ocr/dtp/chrome/ribbon: OK")
 
 

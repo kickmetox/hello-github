@@ -241,7 +241,9 @@ def detect_kind_mismatch(path: Path) -> tuple[DocKind, str] | None:
 
 
 def open_document(path: str | Path, *, encoding: str | None = None) -> Document:
-    path = Path(path)
+    from instantlensdoc.core.fs_path import as_native_path
+
+    path = as_native_path(path)
     if not path.exists():
         raise FileNotFoundError(f"Datei nicht gefunden: {path}")
     if not path.is_file():
@@ -468,7 +470,9 @@ def save_document(
     *,
     encoding: str | None = None,
 ) -> Path:
-    target = Path(path or doc.path or "unbenannt.txt")
+    from instantlensdoc.core.fs_path import as_native_path
+
+    target = as_native_path(path or doc.path or "unbenannt.txt")
     kind = detect_kind(target) if path else doc.kind
 
     # Optionale Backup-Kopie vor Überschreiben (Einstellungen → Backup .bak)

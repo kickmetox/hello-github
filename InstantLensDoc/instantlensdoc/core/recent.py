@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import List, Tuple
 
 from instantlensdoc.config import config_dir
+from instantlensdoc.core.fs_path import native_fs_path
 
 RECENT_MAX = 12
 RECENT_MAX_MIN = 3
@@ -49,7 +50,7 @@ def load_recent_entries(max_items: int | None = None) -> List[Tuple[str, bool]]:
     out: List[Tuple[str, bool]] = []
     seen: set[str] = set()
     for p in items:
-        key = str(Path(p))
+        key = native_fs_path(p) or str(Path(p))
         if key in seen:
             continue
         seen.add(key)
@@ -77,7 +78,7 @@ def save_recent(files: List[str], max_items: int | None = None) -> None:
     cleaned: List[str] = []
     seen: set[str] = set()
     for p in files:
-        key = str(Path(p))
+        key = native_fs_path(p) or str(Path(p))
         if key in seen:
             continue
         seen.add(key)
@@ -92,7 +93,7 @@ def save_recent(files: List[str], max_items: int | None = None) -> None:
 
 def add_recent(path: str | Path, max_items: int | None = None) -> List[str]:
     limit = _clamp_max(max_items)
-    path = str(Path(path))
+    path = native_fs_path(path) or str(Path(path))
     # Bestehende Liste inkl. fehlender behalten; neue Datei nach vorne
     files = [path] + [p for p in load_recent(max_items=limit * 2) if p != path]
     save_recent(files, max_items=limit)
@@ -102,7 +103,7 @@ def add_recent(path: str | Path, max_items: int | None = None) -> List[str]:
 def remove_recent(path: str | Path, max_items: int | None = None) -> List[str]:
     """Einzelnen Pfad aus der Recent-Liste entfernen."""
     limit = _clamp_max(max_items)
-    target = str(Path(path))
+    target = native_fs_path(path) or str(Path(path))
     files = [p for p in load_recent(max_items=limit * 2) if p != target]
     save_recent(files, max_items=limit)
     return load_recent(max_items=limit)

@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
 from instantlensdoc import __version__
 from instantlensdoc.config import DISPLAY_NAME
 from instantlensdoc.core import recent as recent_mod
+from instantlensdoc.core.fs_path import native_fs_path
 
 _CONTINUE_PATH_SNIPPET_LEN = 48
 _CONTINUE_TIP_MISSING = (
@@ -34,7 +35,7 @@ _CONTINUE_TIP_EMPTY = (
 
 def _path_snippet(path: str, max_len: int = _CONTINUE_PATH_SNIPPET_LEN) -> str:
     """Kurzes Pfad-Snippet (Ende bevorzugt) für Tooltips — 1.0.8."""
-    p = str(path or "").strip()
+    p = native_fs_path(path)
     if not p:
         return ""
     if len(p) <= max_len:
@@ -516,16 +517,17 @@ class WelcomePage(QWidget):
             tags_by_path = {}
         shown = 0
         for path, exists in entries:
-            hay = str(path).casefold()
-            tags = tags_by_path.get(str(path)) or []
+            shown_path = native_fs_path(path) or str(path)
+            hay = shown_path.casefold()
+            tags = tags_by_path.get(str(path)) or tags_by_path.get(shown_path) or []
             tag_hay = " ".join(tags).casefold()
             if needle and needle not in hay and needle not in tag_hay:
                 continue
-            label = str(path) if exists else f"{path} (fehlt)"
+            label = shown_path if exists else f"{shown_path} (fehlt)"
             if tags:
                 label = f"{label}  ·  {', '.join(tags[:6])}"
             item = QListWidgetItem(label)
-            item.setData(Qt.UserRole, str(path))
+            item.setData(Qt.UserRole, shown_path)
             item.setData(Qt.UserRole + 1, bool(exists))
             item.setData(Qt.UserRole + 2, list(tags))
             if tags:
@@ -825,7 +827,7 @@ class WelcomePage(QWidget):
         """Recent-Pfad in Zwischenablage (Ctrl+Shift+C) — 2.5.14."""
         from PySide6.QtWidgets import QApplication, QMessageBox
 
-        text = str(path or "").strip()
+        text = native_fs_path(path)
         win = self.window()
         if not text:
             msg = "Pfad zum Kopieren fehlt"
@@ -1120,7 +1122,7 @@ class WelcomePage(QWidget):
         for url in mime.urls():
             if not url.isLocalFile():
                 continue
-            path = url.toLocalFile()
+            path = native_fs_path(url.toLocalFile())
             if path:
                 paths.append(path)
         return paths

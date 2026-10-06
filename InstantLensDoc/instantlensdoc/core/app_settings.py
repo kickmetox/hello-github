@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 from instantlensdoc.config import config_dir
+from instantlensdoc.core.fs_path import native_fs_path
 
 SETTINGS_NAME = "ui_settings.json"
 
@@ -2999,7 +3000,7 @@ def remember_recent_dir(path: str | Path | None, max_items: int = RECENT_DIRS_MA
         p = p.parent
     else:
         return get_recent_dirs(max_items=max_items)
-    key = str(p)
+    key = native_fs_path(p) or str(p)
     prev = [str(x) for x in get_recent_dirs(max_items=max_items * 2)]
     cleaned = [key] + [x for x in prev if x != key]
     cleaned = cleaned[:max_items]
@@ -3069,13 +3070,19 @@ def clear_active_project_workspace() -> None:
 
 
 def dialog_start_dir(*fallbacks: str | Path | None) -> str:
-    """Startpfad für QFileDialog: aktiver Workspace, zuletzt verwendeter Ordner, sonst Fallbacks."""
+    """Startpfad für QFileDialog: aktiver Workspace, zuletzt verwendeter Ordner, sonst Fallbacks.
+
+    Rückgabe mit nativen Trennern; Qt akzeptiert ``/`` und ``\\``.
+    """
+    def _out(p: str | Path) -> str:
+        return native_fs_path(p) or str(p)
+
     active = get_active_project_workspace()
     if active is not None and active.is_dir():
-        return str(active)
+        return _out(active)
     for d in get_recent_dirs():
         if d.is_dir():
-            return str(d)
+            return _out(d)
     for fb in fallbacks:
         if fb is None:
             continue
@@ -3083,14 +3090,14 @@ def dialog_start_dir(*fallbacks: str | Path | None) -> str:
         if p.is_file():
             p = p.parent
         if p.is_dir():
-            return str(p)
+            return _out(p)
         # default_open / last_export als String ohne Existenzcheck schon in get_*
     d = get_default_open_dir()
     if d:
-        return str(d)
+        return _out(d)
     d = get_last_export_dir()
     if d:
-        return str(d)
+        return _out(d)
     return ""
 
 
@@ -5241,7 +5248,7 @@ def export_profile_path_preview(profile: dict[str, object] | None) -> str:
     target = str(profile.get("target") or "").strip()
     if not target:
         return "(kein Zielordner)"
-    return target
+    return native_fs_path(target) or target
 
 
 def apply_export_profile(name: str) -> dict[str, object] | None:
