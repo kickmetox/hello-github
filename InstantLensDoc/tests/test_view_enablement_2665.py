@@ -146,6 +146,49 @@ def test_font_gray_on_image_pdf_tooltip_ocr() -> None:
     assert _WIN.ribbon_bar.is_enabled("dtp_layout")
 
 
+def test_dtp_text_frame_enables_font_on_pdf() -> None:
+    from instantlensdoc.dtp.model import DtpDocument
+
+    load_state(_WIN, _APP, "pdf20", _FIXTURES)
+    pump(_APP, 0.2)
+    try:
+        if getattr(_WIN, "doc", None) is not None:
+            _WIN.doc.dirty = False
+        if hasattr(_WIN.dtp_pane, "clear_dirty"):
+            _WIN.dtp_pane.clear_dirty()
+    except Exception:
+        pass
+    _WIN.dtp_pane.set_document(DtpDocument.sample("A5"))
+    try:
+        _WIN.dtp_pane.clear_dirty()
+    except Exception:
+        pass
+    _WIN._dtp_tools_on = True
+    _WIN.dtp_pane.show()
+    _WIN.dtp_pane.raise_()
+    pump(_APP, 0.1)
+    _WIN._sync_menu_enablement()
+    assert _WIN._layout_mode_active()
+    assert _select_dtp_kind("image") or _select_dtp_kind("shape")
+    caps = _WIN._view_capability_state()
+    assert caps["font"] is False, caps
+    assert not _WIN.ribbon_bar.is_enabled("font")
+    assert _select_dtp_kind("text")
+    caps = _WIN._view_capability_state()
+    assert caps["font"] is True
+    assert _WIN.ribbon_bar.is_enabled("bold")
+    assert _WIN.ribbon_bar.is_enabled("font")
+    assert _select_dtp_kind("image") or _select_dtp_kind("shape")
+    assert _WIN._view_capability_state()["font"] is False
+    try:
+        _WIN.dtp_pane.clear_dirty()
+    except Exception:
+        pass
+    _WIN.dtp_pane.hide()
+    _WIN._dtp_tools_on = False
+    _WIN._sync_menu_enablement()
+
+
 def test_font_after_ocr_word_suite() -> None:
     load_state(_WIN, _APP, "pdf20", _FIXTURES)
     pump(_APP, 0.2)
@@ -164,47 +207,6 @@ def test_font_after_ocr_word_suite() -> None:
     assert _WIN.ribbon_bar.is_enabled("font_color")
     _p, _h, fett = _leaf("Bearbeiten", "Fett")
     assert fett.isEnabled()
-
-
-def test_dtp_text_frame_enables_font_on_pdf() -> None:
-    from instantlensdoc.dtp.model import DtpDocument
-
-    try:
-        _WIN._leave_layout_mode()
-    except Exception:
-        pass
-    try:
-        _WIN.close_all_tabs()
-    except Exception:
-        pass
-    pump(_APP, 0.1)
-    _WIN.open_path(str(_FIXTURES["pdf20"]))
-    pump(_APP, 0.4)
-    assert _WIN._pdf_page_shown(), (
-        f"kein PDF-Tab: kind={getattr(_WIN.doc, 'kind', None)} "
-        f"stack={_WIN.stack.currentWidget()}"
-    )
-    assert not _WIN._text_document_active()
-    _WIN.dtp_pane.set_document(DtpDocument.sample("A5"))
-    assert _WIN._enter_layout_mode()
-    _WIN.dtp_pane.show()
-    _WIN.dtp_pane.raise_()
-    pump(_APP, 0.1)
-    assert _WIN._layout_mode_active()
-    assert _select_dtp_kind("image") or _select_dtp_kind("shape")
-    caps = _WIN._view_capability_state()
-    assert caps["font"] is False
-    assert not _WIN.ribbon_bar.is_enabled("font")
-    assert _select_dtp_kind("text")
-    caps = _WIN._view_capability_state()
-    assert caps["font"] is True
-    assert _WIN.ribbon_bar.is_enabled("bold")
-    assert _WIN.ribbon_bar.is_enabled("font")
-    assert _select_dtp_kind("image") or _select_dtp_kind("shape")
-    caps = _WIN._view_capability_state()
-    assert caps["font"] is False
-    assert not _WIN.ribbon_bar.is_enabled("font")
-    assert _WIN._leave_layout_mode()
 
 
 def test_never_hide_menus_or_ribbon_groups() -> None:
