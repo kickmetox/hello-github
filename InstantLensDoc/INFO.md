@@ -1,5 +1,9 @@
 # InstantLens Doc — Kurzinfo
 
+### 2.6.55 — Release
+
+PDF-Objekte auswählbar, Werkzeug auf Auswahl; Bearbeiten echte Formate; OCR = Word-Suite; DTP-Spec + Scribus-Chrome; Menütest PASS nur bei Dialog/Effekt. Pack `InstantLensDoc-2.6.55-pack.zip`. VERSION **2.6.55**.
+
 ### 2.6.54 — Release
 
 PDF-Export statt DOCX-Kopie, `pdf_doctor`, Minimap aus; Scan-Übertragung ins Dokument; Tab/Nav/Recents/Editor-Guard; Annotationen persistieren; DTP-Layout-Modus (`dtp/` + `features/dtp_spec.py`, Scribus-Chrome: Menü Datei…Hilfe, Icon-Leiste, mm-Lineale, Anschnitt rot / Satzspiegel blau) + Extras ohne „(geplant)“; Menü-Audit (701 Einträge, Telemetrie ohne Stub-Dialog). Ansicht → **Layout-Modus** (Ctrl+Alt+L, Ribbon DTP). Werkzeuge gelten auf dem gewählten Rahmen, ohne Auswahl auf der Story/allem Text, Caret auf Auswahl/Absatz. Pack `InstantLensDoc-2.6.54-pack.zip`. VERSION **2.6.54**.
@@ -19,7 +23,7 @@ Menü **Geräte** (Scanner / Scannen…, Drucker, Erkennen), PDF → Scannen, To
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **2.6.54** |
+| Version | **2.6.55** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |

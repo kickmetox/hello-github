@@ -1,3 +1,13 @@
+## 2.6.55 - Release: Select-then-tool, Bearbeiten-Formate, OCR-Word-Suite, DTP/Scribus, Menü-Audit
+
+Pack `InstantLensDoc-2.6.55-pack.zip`; VERSION **2.6.55**. Arbeitspakete nach 2.6.54 (HEAD inkl. Menü-Audit `246a9e8`).
+
+- **PDF-Objekte:** auswählbar; Werkzeug gilt auf der Auswahl (select-then-tool).
+- **Bearbeiten:** echte Formate (nativ verdrahtet; Schriftart ohne blockierendes QFontDialog; ohne Auswahl auf das ganze Dokument).
+- **OCR = Word-Suite:** OCR-/PDF-Text im gleichen Editor als rich `QTextDocument`; Auswahl oder gesamter Text.
+- **DTP:** Spec Layout/Typo/Prepress/IO plus Scribus-Chrome (Menü, Icon-Leiste, mm-Lineale, Anschnitt rot / Satzspiegel blau).
+- **Menütest:** PASS nur bei echtem Dialog oder sichtbarem Effekt (`docs/instantlensdoc-menu-test-2655.md`); `QAction.trigger()` allein zählt nicht.
+
 ## 2.6.54 - Release: PDF-Export/Minimap, Scan, Tabs, Annotationen, DTP, Menü-Audit
 
 Sechs auf dem Branch gelandete Arbeitspakete. Pack `InstantLensDoc-2.6.54-pack.zip`; VERSION **2.6.54**.

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.6.54.
+"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.6.55.
 
 Leichtgewichtig. Exit-Codes:
   0  OK  (ok=true)
@@ -14,12 +14,12 @@ Aufruf:
   python scripts/smoke_ild.py -h
 
 JSON-Schema (--json), Erfolg:
-  {"ok": true, "version": "2.6.54", "duration_ms": 1234,
+  {"ok": true, "version": "2.6.55", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 
 JSON bei Fail: checks[] enthält Objekt mit error-Text (max 200 Zeichen, Truncate …);
 Exitcode spiegelt ok (0↔true, 1↔false) — 2.2.0:
-  {"ok": false, "version": "2.6.54", "duration_ms": 12,
+  {"ok": false, "version": "2.6.55", "duration_ms": 12,
    "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 """
 
@@ -41,7 +41,7 @@ if str(ROOT) not in sys.path:
 # Headless/CI: Qt ohne Display
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-EXPECTED_VERSION = "2.6.54"
+EXPECTED_VERSION = "2.6.55"
 FAIL_ERROR_MAX_LEN = 200
 
 EXIT_OK = 0
@@ -631,6 +631,26 @@ def check_version() -> None:
     if not (ROOT / "tests" / "fixtures" / "ocr_sample.ildocr.txt").is_file():
         _fail("tests/fixtures/ocr_sample.ildocr.txt fehlt")
     _ok("2.6.54 ocr-editable Word-Suite QTextDocument: OK")
+    # 2.6.55: select-then-tool, Bearbeiten-Formate, DTP/Scribus, Menü-Audit Dialog/Effekt
+    if "hit_test_annotation_at_view" not in pv:
+        _fail("pdf_view fehlt hit_test_annotation_at_view (2.6.55 select-then-tool)")
+    if "selection_or_document_cursor" not in (ROOT / "instantlensdoc" / "ui" / "editor.py").read_text(
+        encoding="utf-8"
+    ):
+        _fail("editor.py fehlt selection_or_document_cursor (2.6.55)")
+    chrome = ROOT / "instantlensdoc" / "dtp" / "chrome.py"
+    if not chrome.is_file():
+        _fail("dtp/chrome.py fehlt (2.6.55 Scribus-Chrome)")
+    chrome_t = chrome.read_text(encoding="utf-8")
+    if "MENU_TITLES" not in chrome_t or "BLEED_RED" not in chrome_t:
+        _fail("dtp/chrome.py fehlt MENU_TITLES/BLEED_RED (2.6.55)")
+    if not (ROOT / "instantlensdoc" / "features" / "dtp_spec.py").is_file():
+        _fail("features/dtp_spec.py fehlt (2.6.55 DTP-Spec)")
+    if not (ROOT / "tests" / "test_menu_audit_2655.py").is_file():
+        _fail("tests/test_menu_audit_2655.py fehlt (2.6.55)")
+    if not (ROOT / "tests" / "menu_effect_lib.py").is_file():
+        _fail("tests/menu_effect_lib.py fehlt (2.6.55 Dialog/Effekt)")
+    _ok("2.6.55 select-then-tool/edit-formats/ocr-word-suite/dtp-scribus/menu-effect: OK")
 
 
 def check_imports(*, with_qt: bool) -> None:
@@ -1530,6 +1550,8 @@ def check_changelog() -> None:
         _fail("CHANGELOG fehlt ## 2.6.49")
     if "## 2.6.51" not in cl:
         _fail("CHANGELOG fehlt ## 2.6.51")
+    if "## 2.6.55" not in cl:
+        _fail("CHANGELOG fehlt ## 2.6.55")
     if "## 2.6.54" not in cl:
         _fail("CHANGELOG fehlt ## 2.6.54")
     if "## 2.6.53" not in cl:
@@ -2999,11 +3021,11 @@ Exit-Codes:
 Laufzeit: am Ende als „Laufzeit: N ms“ (oder duration_ms im JSON).
 
 Beispiel --json (Erfolg):
-  {"ok": true, "version": "2.6.54", "duration_ms": 1234,
+  {"ok": true, "version": "2.6.55", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 
 Beispiel --json (Fail):
-  {"ok": false, "version": "2.6.54", "duration_ms": 12,
+  {"ok": false, "version": "2.6.55", "duration_ms": 12,
    "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 """.rstrip()
     )

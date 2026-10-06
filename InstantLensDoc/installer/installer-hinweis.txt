@@ -1,4 +1,12 @@
-InstantLens Doc 2.6.54 - Installation
+InstantLens Doc 2.6.55 - Installation
+
+Neu in 2.6.55:
+- PDF-Objekte auswaehlbar; Werkzeug gilt auf der Auswahl (select-then-tool)
+- Bearbeiten: echte Formate (nativ; ohne Auswahl auf das ganze Dokument)
+- OCR = Word-Suite (rich QTextDocument, Auswahl oder gesamter Text)
+- DTP-Spec + Scribus-Chrome (Menue, Icon-Leiste, mm-Lineale, Anschnitt/Satzspiegel)
+- Menue-Test: PASS nur bei Dialog oder sichtbarem Effekt
+- Pack InstantLensDoc-2.6.55-pack.zip
 
 Neu in 2.6.54:
 - Speichern unter .pdf schreibt echte PDFs (kein DOCX unter PDF-Namen)
