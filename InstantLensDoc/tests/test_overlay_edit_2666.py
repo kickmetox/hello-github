@@ -106,24 +106,24 @@ def test_fillable_shapes_select_and_handles(qapp, tmp_path: Path):
         AnnotationType.STAMP,
         AnnotationType.TEXT_OVERLAY,
     )
-    x = 60.0
+    y = 50.0
     for kind in kinds:
         ann = _add(
             v,
             type=kind,
-            x=x,
-            y=80.0,
-            width=70.0,
-            height=40.0,
+            x=80.0,
+            y=y,
+            width=110.0,
+            height=48.0,
             text="OK" if kind in (AnnotationType.STAMP, AnnotationType.TEXT_OVERLAY) else "",
             color="#2980B9",
         )
-        wx, wy = _center_widget(v, ann)
+        wx, wy = _center_widget(v, v.store.get(ann.id) or ann)
         _qclick(v.canvas, wx, wy)
-        _pump(app, 0.1)
-        assert ann.id in v.canvas._selected_ids, kind
+        _pump(app, 0.12)
+        assert ann.id in v.canvas._selected_ids, (kind, v.canvas._selected_ids)
         assert len(v.canvas.selected_handle_rects()) == 8, kind
-        x += 90.0
+        y += 70.0
     v.close()
 
 
@@ -168,7 +168,7 @@ def test_schreibschutz_blocks_overlay_move(qapp, tmp_path: Path):
 def test_dtp_stamp_shape_move_resize_undo_lock(qapp):
     from instantlensdoc.dtp.canvas import DtpPane, ResizeHandle
     from instantlensdoc.dtp.model import DtpDocument
-    from PySide6.QtWidgets import QGraphicsView
+    from PySide6.QtWidgets import QGraphicsItem, QGraphicsView
 
     doc = DtpDocument()
     doc.grid_snap = False
@@ -227,7 +227,7 @@ def test_dtp_stamp_shape_move_resize_undo_lock(qapp):
     assert pane.view.dragMode() == QGraphicsView.NoDrag
     item = pane.scene._items[stamp.id]
     assert item.is_locked()
-    assert not bool(item.flags() & item.ItemIsMovable)
+    assert not bool(item.flags() & QGraphicsItem.ItemIsMovable)
     w_lock = float(item.frame.width)
     item.resize_from("br", 40.0, 20.0, (item.frame.x, item.frame.y, item.frame.width, item.frame.height))
     assert abs(item.frame.width - w_lock) < 0.01
