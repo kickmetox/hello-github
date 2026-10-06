@@ -136,26 +136,33 @@ def wrap_hscroll(
 
 
 def install_chrome_shrink_layout(window) -> None:
-    """Menüleiste in horizontale Scrollbar legen — keine verlorenen Titel."""
+    """Eigene Menüleiste im Central-Layout, horizontal scrollbar.
+
+    ``QMainWindow.menuBar()`` (C++) darf die Leiste nicht ersetzen.
+    """
     if getattr(window, "_ild_menubar_host", None) is not None:
         return
-    if not hasattr(window, "menuBar"):
+    from PySide6.QtWidgets import QMainWindow, QMenuBar
+
+    central = window.centralWidget() if hasattr(window, "centralWidget") else None
+    lay = central.layout() if central is not None else None
+    if lay is None or not hasattr(lay, "insertWidget"):
         return
-    mb = window.menuBar()
-    if mb is None:
-        return
-    try:
-        mb.setNativeMenuBar(False)
-    except Exception:
-        pass
+    mb = QMenuBar()
+    mb.setObjectName("ildScrollMenuBar")
+    mb.setNativeMenuBar(False)
     host = wrap_hscroll(mb, object_name="ildMenuBarScroll")
     window._ild_chrome_menubar = mb
     window._ild_menubar_host = host
+    lay.insertWidget(0, host)
     try:
-        window.setMenuWidget(host)
+        native = QMainWindow.menuBar(window)
+        if native is not None and native is not mb:
+            native.setNativeMenuBar(False)
+            native.setVisible(False)
+            native.setMaximumHeight(0)
     except Exception:
-        window._ild_menubar_host = None
-        window._ild_chrome_menubar = None
+        pass
 
 
 def apply_chrome(window, mode: str | None = None) -> ChromeMode:
@@ -171,6 +178,15 @@ def apply_chrome(window, mode: str | None = None) -> ChromeMode:
         host.setVisible(bool(show_menu))
     if menubar is not None:
         menubar.setVisible(bool(show_menu))
+    try:
+        from PySide6.QtWidgets import QMainWindow as _QMW
+
+        native = _QMW.menuBar(window)
+        if native is not None and native is not menubar:
+            native.setVisible(False)
+            native.setMaximumHeight(0)
+    except Exception:
+        pass
     if ribbon is not None:
         ribbon.setVisible(bool(show_ribbon))
     act = getattr(window, "_ribbon_action", None)

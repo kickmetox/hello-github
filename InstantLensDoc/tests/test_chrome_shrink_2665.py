@@ -137,6 +137,7 @@ def test_overflow_menu_is_one_column_and_triggers_qaction() -> None:
 
     act = rb.qaction("bold")
     assert act is not None
+    act.setEnabled(True)
     act.triggered.connect(_hit)
     try:
         menu = show_scrollable_menu(

@@ -291,6 +291,12 @@ class MainWindow(QMainWindow):
             self.setWindowIcon(icon)
 
         self._build_ui()
+        try:
+            from instantlensdoc.ui.chrome import install_chrome_shrink_layout
+
+            install_chrome_shrink_layout(self)
+        except Exception:
+            pass
         self._build_menus()
         # Geräte/Scan-Menü nach Build absichern + Menüleiste sichtbar — 2.6.51
         try:
@@ -4147,12 +4153,12 @@ class MainWindow(QMainWindow):
         apply_clickable_popup_menus(self)
         self._bind_ribbon_qactions()
         self._install_ink_input()
-        try:
-            from instantlensdoc.ui.chrome import install_chrome_shrink_layout
-
-            install_chrome_shrink_layout(self)
-        except Exception:
-            pass
+        host = getattr(self, "_ild_menubar_host", None)
+        if host is not None and hasattr(host, "_fit"):
+            try:
+                host._fit()
+            except Exception:
+                pass
 
     _FORMAT_MENU_TEXTS = frozenset(
         {
