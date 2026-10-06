@@ -18867,16 +18867,26 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "Export", f"Export fehlgeschlagen:\n{e}")
 
     def _insert_table_dialog(self) -> None:
-        """Tabelle einfügen — Rasterpicker, Smoke: 2×2 ohne Dialog."""
+        """Tabelle einfügen — Smoke: QInputDialog (2662), sonst Raster-Picker."""
         import os
+
+        from PySide6.QtWidgets import QInputDialog
 
         if not self._guard_editor_action("Tabelle"):
             return
         if os.environ.get("ILD_SMOKE_QT") == "1":
-            if self.editor.insert_table(3, 3):
+            rows, ok = QInputDialog.getInt(self, "Tabelle", "Zeilen:", 3, 1, 200)
+            if not ok:
+                return
+            cols, ok = QInputDialog.getInt(self, "Tabelle", "Spalten:", 3, 1, 50)
+            if not ok:
+                return
+            if self.editor.insert_table(int(rows), int(cols)):
                 self._sync_editor_rich_meta()
                 self._sync_table_tools()
-                self._set_status("Tabelle 3×3 eingefügt")
+                self._set_status(f"Tabelle {rows}×{cols} eingefügt")
+            else:
+                self._set_status("Tabelle nicht eingefügt")
             return
 
         def _insert(rows: int, cols: int) -> None:
