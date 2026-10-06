@@ -680,6 +680,51 @@ def list_layers() -> list[dict[str, Any]]:
     return [layer.to_dict() for layer in default_layers()]
 
 
+def list_optional_content_groups(path: PathLike) -> list[dict[str, Any]]:
+    """PDF-Optional-Content-Groups (OCG / Dokument-Ebenen) via pikepdf."""
+    import pikepdf
+
+    src = Path(path)
+    out: list[dict[str, Any]] = []
+    if not src.is_file():
+        return out
+    with pikepdf.open(src) as pdf:
+        ocprops = pdf.Root.get("/OCProperties")
+        if ocprops is None:
+            return out
+        ocgs = ocprops.get("/OCGs") or []
+        on_names: set[str] = set()
+        dflt = ocprops.get("/D")
+        if dflt is not None:
+            on_arr = dflt.get("/ON") or []
+            for item in on_arr:
+                try:
+                    on_names.add(str(item.get("/Name", "")))
+                except Exception:
+                    pass
+        for i, g in enumerate(ocgs):
+            try:
+                name = str(g.get("/Name", f"Ebene {i + 1}"))
+            except Exception:
+                name = f"Ebene {i + 1}"
+            intent = ""
+            try:
+                raw_intent = g.get("/Intent")
+                if raw_intent is not None:
+                    intent = str(raw_intent)
+            except Exception:
+                intent = ""
+            out.append(
+                {
+                    "index": i,
+                    "name": name,
+                    "visible": name in on_names if on_names else True,
+                    "intent": intent,
+                }
+            )
+    return out
+
+
 def normalize_layer(name: str | None) -> LayerName:
     key = (name or "text").strip().lower()
     aliases = {

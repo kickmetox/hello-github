@@ -3130,24 +3130,26 @@ class MainWindow(QMainWindow):
         self._ensure_devices_menu(mb)
 
         m_pdf = mb.addMenu("&PDF")
+        m_pdf.setToolTipsVisible(True)
+        self._pdf_menu = m_pdf
         act_merge = QAction("PDFs zusammenführen / teilen…", self)
-        act_merge.triggered.connect(self._pdf_tools)
+        self._bind_pdf_action(act_merge, self._pdf_tools)
         m_pdf.addAction(act_merge)
         act_extract = QAction("Seitenbereich extrahieren…", self)
         act_extract.setToolTip(
             "Seitenbereiche z. B. 1-3,5,8-10; DE-Validierung + Seitenanzahl-Vorschau — 1.2.1"
         )
-        act_extract.triggered.connect(self._extract_page_range)
+        self._bind_pdf_action(act_extract, self._extract_page_range)
         m_pdf.addAction(act_extract)
         act_split_pages = QAction("Seiten als Einzel-PDFs…", self)
         act_split_pages.setToolTip("Jede Seite als eigene PDF-Datei in einen Ordner")
-        act_split_pages.triggered.connect(self._split_into_single_page_pdfs)
+        self._bind_pdf_action(act_split_pages, self._split_into_single_page_pdfs)
         m_pdf.addAction(act_split_pages)
         act_wm = QAction("Wasserzeichen / Seitennummern / Kopfzeile…", self)
         act_wm.setToolTip(
             "Opacity/Größe/Winkel Settings; Seitenbereich; zuletzt Text/Bild; Bake — 1.6.1"
         )
-        act_wm.triggered.connect(self._watermark_tools)
+        self._bind_pdf_action(act_wm, self._watermark_tools)
         m_pdf.addAction(act_wm)
         act_cmp = QAction("Zwei PDFs vergleichen…", self)
         act_cmp.setShortcut(QKeySequence("Ctrl+Alt+Shift+V"))
@@ -3156,14 +3158,14 @@ class MainWindow(QMainWindow):
             "Dokumentvergleich: Side-by-Side, Drag-and-Drop, Sync-Scroll, "
             "Diff-Highlight — 2.6.19"
         )
-        act_cmp.triggered.connect(self._compare_pdfs)
+        self._bind_pdf_action(act_cmp, self._compare_pdfs)
         m_pdf.addAction(act_cmp)
         act_ann_search = QAction("Annotation-Suche (offene Docs)…", self)
         act_ann_search.setShortcut(QKeySequence("Ctrl+Shift+F3"))
         act_ann_search.setToolTip(
             "Volltext Sidecar; Treffer klickbar (Doc+Seite); Case/Regex — 1.4.1"
         )
-        act_ann_search.triggered.connect(self._annotation_search_open_docs)
+        self._bind_pdf_action(act_ann_search, self._annotation_search_open_docs)
         m_pdf.addAction(act_ann_search)
         act_sec = QAction("Verschlüsselung & Rechte…", self)
         act_sec.setShortcut(QKeySequence("Ctrl+Alt+Shift+P"))
@@ -3171,7 +3173,7 @@ class MainWindow(QMainWindow):
             "Passwortschutz AES-256, Rechte (Druck/Kopieren/…), "
             "setzen/entfernen — 2.6.7"
         )
-        act_sec.triggered.connect(self._pdf_security_dialog)
+        self._bind_pdf_action(act_sec, self._pdf_security_dialog)
         m_pdf.addAction(act_sec)
         act_esign = QAction("Digitale Signatur (eIDAS)…", self)
         act_esign.setObjectName("actionPdfESign")
@@ -3179,15 +3181,15 @@ class MainWindow(QMainWindow):
         act_esign.setToolTip(
             "Offizielle/digitale Signatur — Zertifikat AES/QES-Pfad, SES-Stempel — 2.6.22"
         )
-        act_esign.triggered.connect(self._run_esign_dialog)
+        self._bind_pdf_action(act_esign, self._run_esign_dialog)
         m_pdf.addAction(act_esign)
         act_para = QAction("Absatz hervorheben", self)
         act_para.setShortcut(QKeySequence("Ctrl+Alt+Shift+H"))
         act_para.setToolTip(
             "Highlight ganzer Textabsätze (nicht nur freie Rechtecke) — 2.6.10"
         )
-        act_para.triggered.connect(
-            lambda: self.pdf_view._toggle_paragraph_highlight(True)
+        self._bind_pdf_action(
+            act_para, lambda: self.pdf_view._toggle_paragraph_highlight(True)
         )
         m_pdf.addAction(act_para)
         act_pw = QAction("PDF verschlüsseln…", self)
@@ -3195,115 +3197,115 @@ class MainWindow(QMainWindow):
             "Stärke-Hinweis; AES-256; Rechte; leeres PW abgelehnt; "
             "nach Erfolg neu laden — 2.6.7 / 1.6.1"
         )
-        act_pw.triggered.connect(self._set_pdf_password)
+        self._bind_pdf_action(act_pw, self._set_pdf_password)
         m_pdf.addAction(act_pw)
         act_pw_rm = QAction("PDF entschlüsseln…", self)
         act_pw_rm.setToolTip("Passwort entfernen; leeres PW abgelehnt; nach Erfolg neu laden — 1.6.1")
-        act_pw_rm.triggered.connect(self._remove_pdf_password)
+        self._bind_pdf_action(act_pw_rm, self._remove_pdf_password)
         m_pdf.addAction(act_pw_rm)
         act_stats = QAction("Dokument-Statistik…", self)
         act_stats.setToolTip(
             "Refresh; Auto-Update Doc-Wechsel; Wörter nur Textschicht sonst „—“ — 1.6.1"
         )
-        act_stats.triggered.connect(self._show_doc_stats)
+        self._bind_pdf_action(act_stats, self._show_doc_stats)
         m_pdf.addAction(act_stats)
         act_compress = QAction("PDF komprimieren / Downsample…", self)
         act_compress.setToolTip(
             "Seiten rastern (pypdfium2), optional Downsample, JPEG → neues File (pikepdf) — 2.3.0"
         )
-        act_compress.triggered.connect(self._compress_pdf_images)
+        self._bind_pdf_action(act_compress, self._compress_pdf_images)
         m_pdf.addAction(act_compress)
         act_preflight = QAction("Preflight (Druckprüfung)…", self)
         act_preflight.setObjectName("actPreflight")
         act_preflight.setToolTip(
             "Fehlende Schriften, niedrige Bildauflösung, Bleed — 2.6.18"
         )
-        act_preflight.triggered.connect(self._run_preflight)
+        self._bind_pdf_action(act_preflight, self._run_preflight)
         m_pdf.addAction(act_preflight)
         act_bleed = QAction("Anschnitt / Bleed setzen…", self)
         act_bleed.setObjectName("actBleed")
         act_bleed.setToolTip("BleedBox/TrimBox für Druck — 2.6.18")
-        act_bleed.triggered.connect(self._apply_bleed_dialog)
+        self._bind_pdf_action(act_bleed, self._apply_bleed_dialog)
         m_pdf.addAction(act_bleed)
         act_layers = QAction("Dokument-Ebenen…", self)
         act_layers.setObjectName("actDocLayers")
         act_layers.setToolTip(
             "Hintergrund / Bilder / Text — Rahmen-Ebenen — 2.6.18"
         )
-        act_layers.triggered.connect(self._show_doc_layers)
+        self._bind_pdf_action(act_layers, self._show_doc_layers)
         m_pdf.addAction(act_layers)
         act_bake_links = QAction("Link-Annotationen in PDF backen…", self)
         act_bake_links.setToolTip(
             "Sidecar-URL-Links als native PDF Link-Annotationen speichern — 2.3.0"
         )
-        act_bake_links.triggered.connect(self._bake_uri_links)
+        self._bind_pdf_action(act_bake_links, self._bake_uri_links)
         m_pdf.addAction(act_bake_links)
         act_meta = QAction("Metadaten bearbeiten…", self)
-        act_meta.triggered.connect(self._edit_pdf_metadata)
+        self._bind_pdf_action(act_meta, self._edit_pdf_metadata)
         m_pdf.addAction(act_meta)
         act_doc_tags = QAction("Dokument-Tags…", self)
         act_doc_tags.setToolTip(
             "Globale Dokument-Tags (ildtags-v1) für Welcome/Recent-Filter — 2.5.0"
         )
-        act_doc_tags.triggered.connect(self._edit_doc_tags)
+        self._bind_pdf_action(act_doc_tags, self._edit_doc_tags)
         m_pdf.addAction(act_doc_tags)
         act_sanitize = QAction("PDF bereinigen…", self)
         act_sanitize.setToolTip("PDF neu speichern; optional Metadaten entfernen")
-        act_sanitize.triggered.connect(self._sanitize_pdf)
+        self._bind_pdf_action(act_sanitize, self._sanitize_pdf)
         m_pdf.addAction(act_sanitize)
         act_forms = QAction("Formularfelder ausfüllen…", self)
         act_forms.setToolTip("Bestehende AcroForm-Felder lesen und schreiben")
-        act_forms.triggered.connect(self._edit_pdf_form_fields)
+        self._bind_pdf_action(act_forms, self._edit_pdf_form_fields)
         m_pdf.addAction(act_forms)
         act_attach = QAction("Anhänge…", self)
         act_attach.setToolTip(
             "Eingebettete PDF-Anhänge listen, extrahieren und hinzufügen (pikepdf) — 1.9.0"
         )
-        act_attach.triggered.connect(self._pdf_attachments)
+        self._bind_pdf_action(act_attach, self._pdf_attachments)
         m_pdf.addAction(act_attach)
         act_portfolio = QAction("PDF-Portfolio…", self)
         act_portfolio.setToolTip(
             "Portfolio erstellen/öffnen (pikepdf Attachments + Collection) — 2.0.0"
         )
-        act_portfolio.triggered.connect(self._pdf_portfolio)
+        self._bind_pdf_action(act_portfolio, self._pdf_portfolio)
         m_pdf.addAction(act_portfolio)
         act_stamp_lib = QAction("Stempel-Bibliothek (Bilder)…", self)
         act_stamp_lib.setToolTip(
             "Eigene Stempel-Bilder verwalten und als Sidecar-Stempel setzen — 1.9.0"
         )
-        act_stamp_lib.triggered.connect(self._stamp_image_library)
+        self._bind_pdf_action(act_stamp_lib, self._stamp_image_library)
         m_pdf.addAction(act_stamp_lib)
         act_ann_tmpl = QAction("Annotation-Vorlagen…", self)
         act_ann_tmpl.setToolTip(
             "Stempel/Highlight-Styles speichern/laden (ildtmpl-v1) — 2.4.0"
         )
-        act_ann_tmpl.triggered.connect(self._open_ann_templates)
+        self._bind_pdf_action(act_ann_tmpl, self._open_ann_templates)
         m_pdf.addAction(act_ann_tmpl)
         act_psize = QAction("Seitengröße / Zuschneiden…", self)
-        act_psize.triggered.connect(self._pdf_page_size)
+        self._bind_pdf_action(act_psize, self._pdf_page_size)
         m_pdf.addAction(act_psize)
         act_goto_page = QAction("Gehe zu Seite…", self)
         act_goto_page.setShortcut(QKeySequence("Ctrl+Shift+G"))
         act_goto_page.setToolTip("Seitennummer eingeben und springen (auch Ctrl+G im PDF)")
-        act_goto_page.triggered.connect(self._goto_page)
+        self._bind_pdf_action(act_goto_page, self._goto_page)
         m_pdf.addAction(act_goto_page)
         act_page_labels = QAction("Seitenbeschriftungen…", self)
         act_page_labels.setToolTip(
             "Benutzerdefinierte Labels — Range-Editor · Import PDF · Reset arabisch 1… — 2.2.1"
         )
-        act_page_labels.triggered.connect(lambda: self.pdf_view.edit_page_labels())
+        self._bind_pdf_action(act_page_labels, lambda: self.pdf_view.edit_page_labels())
         m_pdf.addAction(act_page_labels)
         act_doc_hist = QAction("Dokument-Historie…", self)
         act_doc_hist.setToolTip(
             "Dokument-Historie-Panel: letzte 50 · Filter Aktionstyp · Export JSON — 2.2.1"
         )
-        act_doc_hist.triggered.connect(lambda: self.pdf_view.show_doc_history())
+        self._bind_pdf_action(act_doc_hist, lambda: self.pdf_view.show_doc_history())
         m_pdf.addAction(act_doc_hist)
         m_pdf.addSeparator()
         for title, slot in [
             ("Annotationen speichern (Sidecar)", lambda: self.pdf_view.save_annotations()),
             ("Annotationen speichern unter…", lambda: self.pdf_view.save_annotations_as()),
-            ("Annotationen laden", lambda: self.pdf_view.reload_annotations()),
+            ("Annotationen laden", self._pdf_reload_annotations_menu),
             ("Annotationen als JSON exportieren…", lambda: self.pdf_view.export_annotations_json()),
             (
                 "Annotationen exportieren (JSON / Flatten)…",
@@ -3334,17 +3336,17 @@ class MainWindow(QMainWindow):
             ),
         ]:
             a = QAction(title, self)
-            a.triggered.connect(lambda checked=False, t=title, s=slot: self._pdf_menu_call(t, s))
+            self._bind_pdf_action(a, slot)
             m_pdf.addAction(a)
         act_cycle_color = QAction("Annotation-Farbe Palette-Zyklus", self)
         act_cycle_color.setShortcut(QKeySequence("Ctrl+Shift+C"))
         act_cycle_color.setToolTip("Nächste Highlight-Farbe aus der festen Palette")
-        act_cycle_color.triggered.connect(lambda: self.pdf_view.cycle_annotation_color())
+        self._bind_pdf_action(act_cycle_color, self._pdf_cycle_ann_color_menu)
         m_pdf.addAction(act_cycle_color)
         act_rand_color = QAction("Annotation-Farbe randomisieren", self)
         act_rand_color.setShortcut(QKeySequence("Ctrl+Alt+Shift+C"))
         act_rand_color.setToolTip("Zufällige Highlight-Farbe aus der Palette")
-        act_rand_color.triggered.connect(lambda: self.pdf_view.randomize_annotation_color())
+        self._bind_pdf_action(act_rand_color, self._pdf_randomize_ann_color_menu)
         m_pdf.addAction(act_rand_color)
         m_pdf.addSeparator()
         for title, slot in [
@@ -3372,10 +3374,10 @@ class MainWindow(QMainWindow):
                 "Auswahl → Text bearbeiten",
                 lambda: self.pdf_view.edit_inline_text_selection(),
             ),
-            ("Objekt bearbeiten…", lambda: self.pdf_view.object_edit_dialog()),
+            ("Objekt bearbeiten…", self._pdf_object_edit_menu),
             (
                 "Objekt-Dialog…",
-                lambda: self.pdf_view.object_transform_dialog(),
+                self._pdf_object_transform_menu,
             ),
             ("Formularfelder…", lambda: self.pdf_view.form_field_dialog()),
             (
@@ -3455,7 +3457,7 @@ class MainWindow(QMainWindow):
                     "setzen/entfernen — 2.6.7"
                 )
                 a.setShortcut(QKeySequence("Ctrl+Alt+Shift+P"))
-            a.triggered.connect(lambda checked=False, t=title, s=slot: self._pdf_menu_call(t, s))
+            self._bind_pdf_action(a, slot)
             m_pdf.addAction(a)
         # Batch Drehen/Spiegeln Shortcuts (Auswahl oder aktuelle Seite) — 1.8.1
         m_pdf.addSeparator()
@@ -3464,29 +3466,30 @@ class MainWindow(QMainWindow):
         act_batch_r90.setToolTip(
             "Thumbnail-Auswahl oder aktuelle Seite 90° rechts (Batch) — 1.8.1"
         )
-        act_batch_r90.triggered.connect(lambda: self._batch_rotate_selection(90))
+        self._bind_pdf_action(act_batch_r90, lambda: self._batch_rotate_selection(90))
         m_pdf.addAction(act_batch_r90)
         act_batch_l90 = QAction("Auswahl 90° links drehen", self)
         act_batch_l90.setShortcut(QKeySequence("Ctrl+Alt+Left"))
         act_batch_l90.setToolTip(
             "Thumbnail-Auswahl oder aktuelle Seite 90° links (Batch) — 1.8.1"
         )
-        act_batch_l90.triggered.connect(lambda: self._batch_rotate_selection(-90))
+        self._bind_pdf_action(act_batch_l90, lambda: self._batch_rotate_selection(-90))
         m_pdf.addAction(act_batch_l90)
         act_batch_180 = QAction("Auswahl 180° drehen", self)
         act_batch_180.setShortcut(QKeySequence("Ctrl+Alt+Up"))
         act_batch_180.setToolTip(
             "Thumbnail-Auswahl oder aktuelle Seite 180° (Batch) — 1.8.1"
         )
-        act_batch_180.triggered.connect(lambda: self._batch_rotate_selection(180))
+        self._bind_pdf_action(act_batch_180, lambda: self._batch_rotate_selection(180))
         m_pdf.addAction(act_batch_180)
         act_batch_fh = QAction("Auswahl horizontal spiegeln", self)
         act_batch_fh.setShortcut(QKeySequence("Ctrl+Alt+H"))
         act_batch_fh.setToolTip(
             "Thumbnail-Auswahl oder aktuelle Seite horizontal spiegeln — 1.8.1"
         )
-        act_batch_fh.triggered.connect(
-            lambda: self._batch_flip_selection(horizontal=True, vertical=False)
+        self._bind_pdf_action(
+            act_batch_fh,
+            lambda: self._batch_flip_selection(horizontal=True, vertical=False),
         )
         m_pdf.addAction(act_batch_fh)
         act_batch_fv = QAction("Auswahl vertikal spiegeln", self)
@@ -3494,65 +3497,66 @@ class MainWindow(QMainWindow):
         act_batch_fv.setToolTip(
             "Thumbnail-Auswahl oder aktuelle Seite vertikal spiegeln — 1.8.1"
         )
-        act_batch_fv.triggered.connect(
-            lambda: self._batch_flip_selection(horizontal=False, vertical=True)
+        self._bind_pdf_action(
+            act_batch_fv,
+            lambda: self._batch_flip_selection(horizontal=False, vertical=True),
         )
         m_pdf.addAction(act_batch_fv)
         act_page_hist = QAction("Seiten-Historie (Undo)…", self)
         act_page_hist.setShortcut(QKeySequence("Ctrl+Shift+H"))
         act_page_hist.setToolTip("Gelöschte/gedrehte Seiten aus dem Undo-Stack wiederherstellen")
-        act_page_hist.triggered.connect(lambda: self.pdf_view.show_page_ops_history())
+        self._bind_pdf_action(act_page_hist, lambda: self.pdf_view.show_page_ops_history())
         m_pdf.addAction(act_page_hist)
         act_page_fav = QAction("Seite als Favorit umschalten", self)
         act_page_fav.setShortcut(QKeySequence("Ctrl+Shift+F"))
         act_page_fav.setToolTip("Aktuelle PDF-Seite als Favorit markieren/entfernen")
-        act_page_fav.triggered.connect(lambda: self.pdf_view.toggle_page_favorite())
+        self._bind_pdf_action(act_page_fav, lambda: self.pdf_view.toggle_page_favorite())
         m_pdf.addAction(act_page_fav)
         act_page_fav_jump = QAction("Seiten-Favoriten…", self)
         act_page_fav_jump.setShortcut(QKeySequence("Ctrl+Alt+F"))
         act_page_fav_jump.setToolTip("Zu markierten Favoriten-Seiten springen")
-        act_page_fav_jump.triggered.connect(lambda: self.pdf_view.show_page_favorites())
+        self._bind_pdf_action(act_page_fav_jump, lambda: self.pdf_view.show_page_favorites())
         m_pdf.addAction(act_page_fav_jump)
         act_fav_export = QAction("Seiten-Favoriten als JSON exportieren…", self)
         act_fav_export.setToolTip("Favoritenliste als ildfav-v1 JSON speichern")
-        act_fav_export.triggered.connect(lambda: self.pdf_view.export_page_favorites_json())
+        self._bind_pdf_action(act_fav_export, lambda: self.pdf_view.export_page_favorites_json())
         m_pdf.addAction(act_fav_export)
         act_fav_import = QAction("Seiten-Favoriten aus JSON importieren…", self)
         act_fav_import.setToolTip("Favoritenliste aus JSON laden (ersetzen oder zusammenführen)")
-        act_fav_import.triggered.connect(lambda: self.pdf_view.import_page_favorites_json())
+        self._bind_pdf_action(act_fav_import, lambda: self.pdf_view.import_page_favorites_json())
         m_pdf.addAction(act_fav_import)
         act_global_fav = QAction("Zur Lesezeichen-Leiste hinzufügen", self)
         act_global_fav.setShortcut(QKeySequence("Ctrl+Alt+Shift+B"))
         act_global_fav.setToolTip(
             "Aktuelle Seite in globale Favoriten (ildfav-v1) — Schnelljump — 1.7.0"
         )
-        act_global_fav.triggered.connect(self._add_current_to_global_favorites)
+        self._bind_pdf_action(act_global_fav, self._add_current_to_global_favorites)
         m_pdf.addAction(act_global_fav)
         act_gf_export = QAction("Lesezeichen-Leiste als JSON exportieren…", self)
         act_gf_export.setToolTip("Globale Favoriten als ildfav-v1 JSON speichern — 1.7.1")
-        act_gf_export.triggered.connect(self._export_global_favorites_json)
+        self._bind_pdf_action(act_gf_export, self._export_global_favorites_json)
         m_pdf.addAction(act_gf_export)
         act_gf_import = QAction("Lesezeichen-Leiste aus JSON importieren…", self)
         act_gf_import.setToolTip(
             "Globale Favoriten aus ildfav-v1 JSON laden (ersetzen oder zusammenführen) — 1.7.1"
         )
-        act_gf_import.triggered.connect(self._import_global_favorites_json)
+        self._bind_pdf_action(act_gf_import, self._import_global_favorites_json)
         m_pdf.addAction(act_gf_import)
         act_ol_import = QAction("Bookmarks aus PDF-Outlines importieren…", self)
         act_ol_import.setToolTip(
             "PDF-Outline → Seiten-Favoriten (Bookmarks) importieren — 1.3.0"
         )
-        act_ol_import.triggered.connect(self._import_bookmarks_from_outline)
+        self._bind_pdf_action(act_ol_import, self._import_bookmarks_from_outline)
         m_pdf.addAction(act_ol_import)
         act_ol_export = QAction("Bookmarks als PDF-Outlines exportieren…", self)
         act_ol_export.setToolTip(
             "Seiten-Favoriten (Bookmarks) als PDF-Outline schreiben — 1.3.0"
         )
-        act_ol_export.triggered.connect(self._export_bookmarks_to_outline)
+        self._bind_pdf_action(act_ol_export, self._export_bookmarks_to_outline)
         m_pdf.addAction(act_ol_export)
         m_pdf.addSeparator()
         for title, slot in [
-            ("PDF-Text → Overlay…", lambda: self.pdf_view.import_text_overlays()),
+            ("PDF-Text → Overlay…", self._pdf_import_text_overlays_menu),
             ("Text-Overlays einbrennen…", lambda: self.pdf_view.bake_overlays()),
             ("Text dieser Seite → Editor", self._extract_page_text_to_editor),
             ("Gesamten PDF-Text → Editor", self._extract_all_text_to_editor),
@@ -3587,7 +3591,7 @@ class MainWindow(QMainWindow):
                 a.setToolTip(
                     "Textauswahl als Schwärzungs-Rechtecke markieren (Sidecar) — 2.6.5"
                 )
-            a.triggered.connect(lambda checked=False, t=title, s=slot: self._pdf_menu_call(t, s))
+            self._bind_pdf_action(a, slot)
             m_pdf.addAction(a)
 
         # Geräte-Menü idempotent nachziehen — 2.6.51
@@ -4075,11 +4079,164 @@ class MainWindow(QMainWindow):
                 ids.add(v)
         return {x for x in ids if x}
 
-    def _pdf_menu_call(self, title: str, fn) -> None:
-        """PDF-Menüslot: leere Voraussetzung → FeatureDialog, sonst echte Funktion."""
-        t = (title or "").replace("&", "").strip()
-        if not getattr(self.pdf_view, "pdf_path", None):
+    def _bind_pdf_action(self, act, slot):
+        """PDF-Menü: jeder Klick geht durch _pdf_menu_call (Dialog oder Dateiänderung)."""
+        from ild_pdf.menu_policy import pdf_menu_need
+
+        title = (act.text() or "").replace("&", "").strip()
+        try:
+            act.setProperty("ildPdfNeed", pdf_menu_need(title))
+        except Exception:
+            pass
+        act.triggered.connect(
+            lambda checked=False, t=title, s=slot: self._pdf_menu_call(t, s)
+        )
+        return act
+
+    def _open_pdf_paths(self) -> list:
+        """Alle geöffneten PDF-Tabs plus aktueller Viewer-Pfad."""
+        seen: set[str] = set()
+        out: list = []
+
+        def _add(raw) -> None:
+            if not raw:
+                return
+            try:
+                p = Path(str(raw))
+            except Exception:
+                return
+            if not p.is_file() or p.suffix.lower() != ".pdf":
+                return
+            key = str(p.resolve()) if p.exists() else str(p)
+            if key in seen:
+                return
+            seen.add(key)
+            out.append(p)
+
+        _add(getattr(self.pdf_view, "pdf_path", None))
+        try:
+            for item in list(self.sidebar.document_paths() or []):
+                _add(item)
+        except Exception:
+            pass
+        doc = getattr(self, "doc", None)
+        if doc is not None:
+            _add(getattr(doc, "path", None))
+        return out
+
+    def _activate_pdf_path(self, path) -> bool:
+        """PDF-Tab aktivieren (Stack + pdf_view), ohne stilles No-Op."""
+        p = Path(str(path))
+        if not p.is_file():
+            self._feature_dialog("PDF", f"Datei nicht gefunden:\n{p}")
+            return False
+        cur = getattr(self.pdf_view, "pdf_path", None)
+        try:
+            same = cur is not None and Path(cur).resolve() == p.resolve()
+        except Exception:
+            same = cur is not None and Path(cur) == p
+        if same:
+            try:
+                self.stack.setCurrentWidget(self.pdf_view)
+            except Exception:
+                pass
+            try:
+                self._sync_menu_enablement()
+            except Exception:
+                pass
+            return True
+        try:
+            self.open_path(str(p))
+        except Exception as e:
+            self._feature_dialog("PDF öffnen", str(e))
+            return False
+        ok = bool(getattr(self.pdf_view, "pdf_path", None))
+        if not ok:
+            self._feature_dialog("PDF öffnen", f"Konnte PDF nicht laden:\n{p}")
+        return ok
+
+    def _ensure_pdf_target(self, title: str) -> bool:
+        """Aktives PDF oder Zielwahl unter offenen PDF-Tabs. Nie stilles No-Op."""
+        t = (title or "").replace("&", "").strip() or "PDF"
+        try:
+            if bool(self._pdf_tab_active()) and bool(
+                getattr(self.pdf_view, "pdf_path", None)
+            ):
+                return True
+        except Exception:
+            pass
+        paths = self._open_pdf_paths()
+        if not paths:
             self._feature_dialog(t, "Bitte zuerst ein PDF öffnen.")
+            return False
+        chosen = paths[0]
+        if len(paths) == 1:
+            labels = [paths[0].name]
+            prompt = (
+                "Aktiver Tab ist kein PDF.\nWelches geöffnete PDF verwenden?"
+            )
+        else:
+            labels = [p.name for p in paths]
+            prompt = "Welches geöffnete PDF verwenden?"
+        from PySide6.QtWidgets import QInputDialog
+
+        item, ok = QInputDialog.getItem(self, t, prompt, labels, 0, False)
+        if not ok:
+            return False
+        if item in labels:
+            chosen = paths[labels.index(item)]
+        return self._activate_pdf_path(chosen)
+
+    def _pdf_menu_selection_ok(self, title: str) -> bool:
+        t = (title or "").replace("&", "").strip().lower()
+        pv = getattr(self, "pdf_view", None)
+        store = getattr(pv, "store", None) if pv is not None else None
+        if "stempel 90" in t:
+            aid = getattr(pv, "_selected_ann_id", None) if pv is not None else None
+            if not aid or store is None:
+                return False
+            try:
+                from ild_pdf.annotate import AnnotationType
+
+                ann = store.get(aid)
+                return bool(ann and ann.type == AnnotationType.STAMP)
+            except Exception:
+                return False
+        if "lesezeichen löschen" in t:
+            try:
+                return self.sidebar.selected_outline_path() is not None
+            except Exception:
+                return False
+        if "messwerte" in t:
+            try:
+                return bool(store and store.list_measure_annotations())
+            except Exception:
+                return False
+        if "auswahl → text" in t or ("auswahl" in t and "schwärz" in t):
+            rects = list(getattr(pv, "_text_selection_rects", None) or []) if pv else []
+            return bool(rects)
+        if t.startswith("auswahl ") and (
+            "drehen" in t or "spiegeln" in t
+        ):
+            return bool(self._pages_for_batch_transform())
+        return True
+
+    def _pdf_menu_call(self, title: str, fn) -> None:
+        """PDF-Menüslot: Zielwahl / FeatureDialog, sonst echte Funktion — kein No-Op."""
+        from ild_pdf.menu_policy import pdf_menu_need
+
+        t = (title or "").replace("&", "").strip()
+        need = pdf_menu_need(t)
+        if need != "always":
+            if not self._ensure_pdf_target(t):
+                return
+        if need == "selection" and not self._pdf_menu_selection_ok(t):
+            from ild_pdf.menu_policy import pdf_menu_disable_reason
+
+            reason = pdf_menu_disable_reason(
+                t, has_open_pdf=True, is_pdf_tab=bool(self._pdf_tab_active())
+            )
+            self._feature_dialog(t, reason or "Voraussetzung nicht erfüllt.")
             return
         store = getattr(self.pdf_view, "store", None)
         low = t.lower()
@@ -4147,26 +4304,82 @@ class MainWindow(QMainWindow):
         try:
             fn()
         except Exception as e:
-            self._feature_dialog(t, str(e))
+            self._feature_dialog(t, str(e) or "Aktion fehlgeschlagen.")
+
+    def _pdf_reload_annotations_menu(self) -> None:
+        ok = bool(self.pdf_view.reload_annotations())
+        if ok:
+            n = 0
+            try:
+                n = len(self.pdf_view.store.annotations)
+            except Exception:
+                n = 0
+            self._feature_dialog(
+                "Annotationen laden",
+                f"{n} Annotation(en) aus Sidecar geladen.",
+                object_name="ildAnnReloadDialog",
+            )
+
+    def _pdf_cycle_ann_color_menu(self) -> None:
+        color = self.pdf_view.cycle_annotation_color()
+        self._feature_dialog(
+            "Annotation-Farbe",
+            f"Nächste Highlight-Farbe: {color}",
+            object_name="ildAnnColorDialog",
+        )
+
+    def _pdf_randomize_ann_color_menu(self) -> None:
+        color = self.pdf_view.randomize_annotation_color()
+        self._feature_dialog(
+            "Annotation-Farbe",
+            f"Zufällige Highlight-Farbe: {color}",
+            object_name="ildAnnColorDialog",
+        )
+
+    def _pdf_object_edit_menu(self) -> None:
+        if not self.pdf_view.object_edit_dialog():
+            self._feature_dialog("Objekt bearbeiten", "Kein PDF geöffnet.")
+            return
+        self._feature_dialog(
+            "Objekt bearbeiten",
+            "Objekt-Werkzeug aktiv. Klick wählt ein Objekt; "
+            "Doppelklick öffnet den Transform-Dialog.",
+            object_name="ildObjectEditDialog",
+        )
+
+    def _pdf_object_transform_menu(self) -> None:
+        if self.pdf_view.object_transform_dialog():
+            return
+        self._feature_dialog(
+            "Objekt-Dialog",
+            "Kein Objekt gewählt. Zuerst ein Objekt auf der Seite anklicken.",
+            object_name="ildObjectTransformHint",
+        )
+
+    def _pdf_import_text_overlays_menu(self) -> None:
+        store = getattr(self.pdf_view, "store", None)
+        n0 = 0
+        try:
+            n0 = len(store.text_overlays()) if store is not None else 0
+        except Exception:
+            n0 = 0
+        self.pdf_view.import_text_overlays()
+        n1 = n0
+        try:
+            n1 = len(store.text_overlays()) if store is not None else 0
+        except Exception:
+            n1 = n0
+        added = max(0, n1 - n0)
+        if added:
+            self._feature_dialog(
+                "PDF-Text → Overlay",
+                f"{added} Overlay(s) aus der Textschicht angelegt.",
+                object_name="ildTextOverlayDialog",
+            )
 
     def _require_pdf(self, title: str) -> bool:
-        """True wenn ein PDF aktiv ist, sonst Status (keine Info-Box)."""
-        try:
-            if bool(self._pdf_tab_active()) and bool(
-                getattr(self.pdf_view, "pdf_path", None)
-            ):
-                return True
-        except Exception:
-            try:
-                if (
-                    self.stack.currentWidget() is self.pdf_view
-                    and bool(getattr(self.pdf_view, "pdf_path", None))
-                ):
-                    return True
-            except Exception:
-                pass
-        self._set_status(f"{title}: bitte zuerst ein PDF öffnen")
-        return False
+        """True wenn ein PDF bereit ist; sonst Zielwahl oder FeatureDialog — nie nur Status."""
+        return self._ensure_pdf_target(title)
 
     def _set_action_available(self, act, available: bool, reason: str) -> None:
         """Enable/Disable mit Tooltip-Grund, ohne Tooltip zu stapeln — 2.6.54."""
@@ -4345,6 +4558,10 @@ class MainWindow(QMainWindow):
                 is_editor = self.stack.currentWidget() is self.editor_pane
             except Exception:
                 is_editor = False
+        try:
+            pdf_paths = self._open_pdf_paths()
+        except Exception:
+            pdf_paths = []
 
         def _walk(menu, mode: str, parent: str = "") -> None:
             if menu is None:
@@ -4359,12 +4576,51 @@ class MainWindow(QMainWindow):
                     continue
                 t = (a.text() or "").replace("&", "").lower()
                 if mode == "pdf":
-                    if any(x in t for x in ("scan", "drucker", "gerät")):
-                        a.setEnabled(True)
-                        continue
-                    self._set_action_available(
-                        a, is_pdf, "Nur bei geöffnetem PDF verfügbar"
+                    from ild_pdf.menu_policy import (
+                        pdf_menu_disable_reason,
+                        pdf_menu_need,
                     )
+
+                    src = ""
+                    try:
+                        src = str(a.property("ild_i18n_src") or "")
+                    except Exception:
+                        src = ""
+                    label = (src or t).replace("&", "")
+                    need = ""
+                    try:
+                        need = str(a.property("ildPdfNeed") or "")
+                    except Exception:
+                        need = ""
+                    if not need:
+                        need = pdf_menu_need(label)
+                    has_open = bool(pdf_paths)
+                    if need == "always":
+                        self._set_action_available(a, True, "")
+                        continue
+                    if need == "selection":
+                        ok = bool(is_pdf) and self._pdf_menu_selection_ok(label)
+                        reason = pdf_menu_disable_reason(
+                            label, has_open_pdf=has_open, is_pdf_tab=bool(is_pdf)
+                        )
+                        self._set_action_available(a, ok, reason)
+                        continue
+                    if is_pdf:
+                        self._set_action_available(a, True, "")
+                    elif has_open:
+                        self._set_action_available(
+                            a, True, "Fragt nach dem geöffneten PDF-Tab"
+                        )
+                    else:
+                        self._set_action_available(
+                            a,
+                            False,
+                            pdf_menu_disable_reason(
+                                label,
+                                has_open_pdf=False,
+                                is_pdf_tab=False,
+                            ),
+                        )
                 elif mode == "insert":
                     if "musterseite" in t:
                         self._set_action_available(
@@ -5678,9 +5934,7 @@ class MainWindow(QMainWindow):
             self._enter_presentation()
 
     def _enter_presentation(self):
-        if not self.pdf_view.pdf_path:
-            self._set_status("Präsentationsmodus: bitte zuerst ein PDF öffnen")
-            self._require_pdf("Präsentationsmodus")
+        if not self._require_pdf("Präsentationsmodus"):
             return
         try:
             ann_was = bool(self.pdf_view.annotations_visible())
@@ -6350,8 +6604,7 @@ class MainWindow(QMainWindow):
         self.pdf_view.edit_selected_annotation_tags()
 
     def _edit_annotation_group(self, page: int | None = None):
-        if self.stack.currentWidget() is not self.pdf_view or not self.pdf_view.pdf_path:
-            self._set_status("Annotationsgruppe nur im PDF-Modus")
+        if not self._require_pdf("Annotationsgruppe"):
             return
         idx = None if page is None or isinstance(page, bool) else int(page)
         self.pdf_view.edit_page_annotation_group(idx)
@@ -8576,23 +8829,31 @@ class MainWindow(QMainWindow):
 
     def _batch_rotate_selection(self, degrees: int) -> None:
         """Batch-Drehen per Shortcut — 1.8.1."""
+        if not self._require_pdf("Drehen"):
+            return
         if self.stack.currentWidget() is not self.pdf_view:
             self.stack.setCurrentWidget(self.pdf_view)
-        if not self.pdf_view.pdf_path:
-            return
         pages = self._pages_for_batch_transform()
         if not pages:
+            self._feature_dialog(
+                "Drehen",
+                "Keine Seite gewählt. Thumbnail-Auswahl oder aktuelles PDF nötig.",
+            )
             return
         self._on_thumbs_batch_rotate(pages, int(degrees))
 
     def _batch_flip_selection(self, *, horizontal: bool, vertical: bool) -> None:
         """Batch-Spiegeln per Shortcut — 1.8.1."""
+        if not self._require_pdf("Spiegeln"):
+            return
         if self.stack.currentWidget() is not self.pdf_view:
             self.stack.setCurrentWidget(self.pdf_view)
-        if not self.pdf_view.pdf_path:
-            return
         pages = self._pages_for_batch_transform()
         if not pages:
+            self._feature_dialog(
+                "Spiegeln",
+                "Keine Seite gewählt. Thumbnail-Auswahl oder aktuelles PDF nötig.",
+            )
             return
         self._on_thumbs_batch_flip(pages, bool(horizontal), bool(vertical))
 
@@ -10773,8 +11034,10 @@ class MainWindow(QMainWindow):
         GotoLineDialog(self.editor, self).exec()
 
     def _goto_page(self):
-        if not self.pdf_view.pdf_path or self.pdf_view.page_count < 1:
-            self._require_pdf("Gehe zu Seite")
+        if not self._require_pdf("Gehe zu Seite"):
+            return
+        if int(getattr(self.pdf_view, "page_count", 0) or 0) < 1:
+            self._feature_dialog("Gehe zu Seite", "PDF hat keine Seiten.")
             return
         self.stack.setCurrentWidget(self.pdf_view)
         from instantlensdoc.ui.goto_page_dialog import GotoPageDialog
@@ -11935,8 +12198,7 @@ class MainWindow(QMainWindow):
         self._set_status(f"Lesezeichen → Seite {idx + 1}")
 
     def _outline_add(self):
-        if self.stack.currentWidget() is not self.pdf_view or not self.pdf_view.pdf_path:
-            self._set_status("Lesezeichen hinzufügen: PDF öffnen")
+        if not self._require_pdf("Lesezeichen hinzufügen"):
             return
         from PySide6.QtWidgets import QInputDialog
         from ild_pdf.outline import add_outline_item
@@ -11958,12 +12220,14 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Lesezeichen", str(e))
 
     def _outline_delete(self):
-        if self.stack.currentWidget() is not self.pdf_view or not self.pdf_view.pdf_path:
-            self._set_status("Lesezeichen löschen: PDF öffnen")
+        if not self._require_pdf("Lesezeichen löschen"):
             return
         path = self.sidebar.selected_outline_path()
         if path is None:
-            self._set_status("Kein Lesezeichen ausgewählt")
+            self._feature_dialog(
+                "Lesezeichen löschen",
+                "Kein Lesezeichen ausgewählt. Zuerst ein Lesezeichen in der Dokumentstruktur markieren.",
+            )
             return
         from ild_pdf.outline import delete_outline_item
 
@@ -12811,8 +13075,7 @@ class MainWindow(QMainWindow):
 
     def _import_bookmarks_from_outline(self) -> None:
         """PDF-Outlines → Seiten-Favoriten (Bookmarks) — 1.3.0/1.3.1."""
-        if not self.pdf_view.pdf_path or self.pdf_view.store is None:
-            self._require_pdf("Bookmarks importieren")
+        if not self._require_pdf("Bookmarks importieren"):
             return
         try:
             from ild_pdf.outline import extract_outline, flatten_outline_pages
@@ -12874,8 +13137,7 @@ class MainWindow(QMainWindow):
 
     def _export_bookmarks_to_outline(self) -> None:
         """Outlines-Export: Retry max. 3 wie Backup, dann Abbruch-Hinweis — 1.3.5."""
-        if not self.pdf_view.pdf_path or self.pdf_view.store is None:
-            self._require_pdf("Bookmarks exportieren")
+        if not self._require_pdf("Bookmarks exportieren"):
             return
         # Leere Outlines/Favoriten Hinweis — 1.3.2
         try:
@@ -13474,8 +13736,7 @@ class MainWindow(QMainWindow):
 
     def _pdf_security_dialog(self):
         """Verschlüsselung & Rechte — zentraler Dialog — 2.6.7."""
-        if not self.pdf_view.pdf_path:
-            self._require_pdf("Verschlüsselung")
+        if not self._require_pdf("Verschlüsselung"):
             return
         dlg = PdfSecurityDialog(
             self,
@@ -13595,8 +13856,7 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Rechte", str(e))
 
     def _set_pdf_password(self):
-        if not self.pdf_view.pdf_path:
-            self._require_pdf("Passwort")
+        if not self._require_pdf("Passwort"):
             return
         dlg = SetPasswordDialog(self, pdf_name=self.pdf_view.pdf_path.name)
         if not dlg.exec():
@@ -13607,8 +13867,7 @@ class MainWindow(QMainWindow):
 
     def _remove_pdf_password(self):
         """PDF entschlüsseln / Passwort entfernen — 1.6.0/1.6.2."""
-        if not self.pdf_view.pdf_path:
-            self._require_pdf("Passwort")
+        if not self._require_pdf("Passwort"):
             return
         dlg = RemovePasswordDialog(self, pdf_name=self.pdf_view.pdf_path.name)
         if not dlg.exec():
@@ -13638,8 +13897,7 @@ class MainWindow(QMainWindow):
 
     def _show_doc_stats(self):
         """Dokument-Statistik-Panel (Seiten/Wörter/Ann./Größe) — 1.6.0/1.6.1."""
-        if not self.pdf_view.pdf_path:
-            self._require_pdf("Dokument-Statistik")
+        if not self._require_pdf("Dokument-Statistik"):
             return
         ann_n = (
             len(self.pdf_view.store.annotations)
@@ -14059,8 +14317,7 @@ class MainWindow(QMainWindow):
             self._set_status(f"Layout nicht gelöscht: {name}")
 
     def _compress_pdf_images(self):
-        if not self.pdf_view.pdf_path:
-            self._require_pdf("Kompression")
+        if not self._require_pdf("Kompression"):
             return
         src = Path(self.pdf_view.pdf_path)
         dlg = CompressPdfDialog(self, source_path=src)
@@ -14567,8 +14824,7 @@ class MainWindow(QMainWindow):
             )
 
     def _edit_pdf_metadata(self):
-        if not self.pdf_view.pdf_path:
-            self._require_pdf("Metadaten")
+        if not self._require_pdf("Metadaten"):
             return
         # Dialog schon offen → Fokus/raise statt zweites Fenster — 1.5.5
         existing = getattr(self, "_meta_dialog", None)
@@ -14608,8 +14864,7 @@ class MainWindow(QMainWindow):
             QTimer.singleShot(ms + 50, _clear_meta_toast_flag)
 
     def _edit_pdf_form_fields(self):
-        if not self.pdf_view.pdf_path:
-            self._require_pdf("Formularfelder")
+        if not self._require_pdf("Formularfelder"):
             return
         # 2.6.6: Dialog auch ohne bestehende Felder (anlegen/erkennen)
         page = int(getattr(self.pdf_view, "page_index", 0) or 0)
@@ -14631,8 +14886,7 @@ class MainWindow(QMainWindow):
             self._refresh_form_fields()
 
     def _pdf_attachments(self):
-        if not self.pdf_view.pdf_path:
-            self._require_pdf("Anhänge")
+        if not self._require_pdf("Anhänge"):
             return
         dlg = AttachmentsDialog(self.pdf_view.pdf_path, self)
         dlg.exec()
@@ -15178,8 +15432,7 @@ class MainWindow(QMainWindow):
         self._set_status("Alle Tabs geschlossen")
 
     def _pdf_page_size(self):
-        if not self.pdf_view.pdf_path:
-            self._require_pdf("Seitengröße")
+        if not self._require_pdf("Seitengröße"):
             return
         if PageSizeDialog(self.pdf_view.pdf_path, self.pdf_view.page_index, self).exec():
             from ild_pdf.render import clear_render_cache
@@ -15532,8 +15785,7 @@ class MainWindow(QMainWindow):
     def _add_current_to_global_favorites(self) -> None:
         from instantlensdoc.core.global_favorites import add_global_favorite
 
-        if not self.pdf_view.pdf_path:
-            self._require_pdf("Lesezeichen-Leiste")
+        if not self._require_pdf("Lesezeichen-Leiste"):
             return
         path = str(Path(self.pdf_view.pdf_path))
         page = int(self.pdf_view.page_index or 0)
@@ -15550,6 +15802,11 @@ class MainWindow(QMainWindow):
                 self._favorites_bar_action.blockSignals(False)
         self._refresh_favorites_bar()
         self._set_status(f"Favorit: {Path(path).name} · S{page + 1}")
+        self._feature_dialog(
+            "Lesezeichen-Leiste",
+            f"Hinzugefügt: {Path(path).name} · Seite {page + 1}",
+            object_name="ildGlobalFavAddedDialog",
+        )
 
     def _jump_global_favorite(
         self, path: str, page: int, *, force_open: bool = False
@@ -15722,9 +15979,7 @@ class MainWindow(QMainWindow):
 
     def _extract_page_range(self):
         """Schnelldialog: Seitenbereiche z. B. 1-3,5,8-10; DE-Validierung + Vorschau — 1.2.1."""
-        if not self.pdf_view.pdf_path:
-            self._require_pdf("Seitenbereich")
-            self._pdf_tools()
+        if not self._require_pdf("Seitenbereich"):
             return
         from PySide6.QtWidgets import QInputDialog
         from ild_pdf.pages import extract_by_page_spec
@@ -15803,9 +16058,7 @@ class MainWindow(QMainWindow):
 
     def _split_into_single_page_pdfs(self):
         """Jede Seite des aktuellen PDFs als eigene Datei exportieren."""
-        if not self.pdf_view.pdf_path:
-            self._require_pdf("Einzel-PDFs")
-            self._pdf_tools()
+        if not self._require_pdf("Einzel-PDFs"):
             return
         from ild_pdf.pages import split_into_single_page_pdfs
 
@@ -18028,8 +18281,7 @@ class MainWindow(QMainWindow):
         from PySide6.QtWidgets import QInputDialog
         from ild_pdf.page_layout import apply_master_page, list_master_presets
 
-        if not self.pdf_view.pdf_path:
-            self._require_pdf("Musterseite")
+        if not self._require_pdf("Musterseite"):
             return
         presets = list_master_presets()
         names = [str(p.get("name") or p.get("id")) for p in presets]
@@ -18560,9 +18812,15 @@ class MainWindow(QMainWindow):
         self._run_ocr_with_dialog(dlg)
 
     def _current_pdf_path(self) -> Path | None:
-        """Aktuelles PDF für Druck/Preflight — 2.6.18."""
+        """Aktuelles PDF für Druck/Preflight — Viewer oder aktiver Doc-Tab."""
         if self.doc and self.doc.path and self.doc.kind == DocKind.PDF:
             p = Path(self.doc.path)
+            if p.is_file():
+                return p
+        pv = getattr(self, "pdf_view", None)
+        raw = getattr(pv, "pdf_path", None) if pv is not None else None
+        if raw:
+            p = Path(raw)
             if p.is_file():
                 return p
         return None
@@ -18571,9 +18829,10 @@ class MainWindow(QMainWindow):
         """Preflight-Druckprüfung — 2.6.18."""
         from ild_pdf.print_prep import preflight_to_text, run_preflight
 
+        if not self._require_pdf("Preflight"):
+            return
         pdf = self._current_pdf_path()
         if pdf is None:
-            self._require_pdf("Preflight")
             return
         report = run_preflight(pdf, require_bleed=False, color_mode="cmyk")
         text = preflight_to_text(report)
@@ -18600,9 +18859,10 @@ class MainWindow(QMainWindow):
         from PySide6.QtWidgets import QInputDialog
         from ild_pdf.print_prep import BleedSettings, apply_bleed_boxes
 
+        if not self._require_pdf("Anschnitt"):
+            return
         pdf = self._current_pdf_path()
         if pdf is None:
-            self._require_pdf("Anschnitt")
             return
         mm, ok = QInputDialog.getDouble(
             self,
@@ -18632,14 +18892,40 @@ class MainWindow(QMainWindow):
         )
 
     def _show_doc_layers(self) -> None:
-        """Dokument-Ebenen anzeigen / Rahmen zuordnen — 2.6.18."""
-        from ild_pdf.print_prep import LAYER_LABELS, list_layers
+        """PDF-OCG-Ebenen (pikepdf) plus DTP-Rahmen-Ebenen — 2.6.59."""
+        from ild_pdf.print_prep import (
+            LAYER_LABELS,
+            list_layers,
+            list_optional_content_groups,
+        )
 
+        if not self._require_pdf("Dokument-Ebenen"):
+            return
+        pdf = self._current_pdf_path()
+        lines = ["Dokument-Ebenen", ""]
+        ocgs = []
+        if pdf is not None:
+            try:
+                ocgs = list_optional_content_groups(pdf)
+            except Exception as e:
+                ocgs = []
+                lines.append(f"OCG-Lesen fehlgeschlagen: {e}")
+                lines.append("")
+        if ocgs:
+            lines.append(f"PDF Optional Content ({pdf.name}):")
+            for g in ocgs:
+                vis = "sichtbar" if g.get("visible") else "ausgeblendet"
+                extra = f" · {g.get('intent')}" if g.get("intent") else ""
+                lines.append(f"• {g.get('name') or 'Ebene'} — {vis}{extra}")
+            lines.append("")
+        else:
+            lines.append("Keine PDF-Optional-Content-Groups (OCG) in diesem Dokument.")
+            lines.append("")
         layers = list_layers()
         by = {}
         if hasattr(self, "layout_doc") and self.layout_doc is not None:
             by = self.layout_doc.frames_by_layer()
-        lines = ["Dokument-Ebenen (Hintergrund / Bilder / Text)", ""]
+        lines.append("DTP-Rahmen-Ebenen (Hintergrund / Bilder / Text):")
         for layer in layers:
             lid = layer["id"]
             frames = by.get(lid) or []
@@ -19656,8 +19942,7 @@ class MainWindow(QMainWindow):
         """OCR-Region: Rechteck → Defaults DPI/Sprache → Text-Tab — 2.5.1."""
         from instantlensdoc.core.app_settings import get_ocr_dpi, get_ocr_lang
 
-        if not self.doc or self.doc.kind != DocKind.PDF or not self.doc.path:
-            self._require_pdf("OCR Region")
+        if not self._require_pdf("OCR Region"):
             return
         ok, msg = ocr_mod.tesseract_available()
         if not ok:
@@ -19990,8 +20275,7 @@ class MainWindow(QMainWindow):
             QVBoxLayout,
         )
 
-        if not self.pdf_view.pdf_path:
-            self._require_pdf("PDF bereinigen")
+        if not self._require_pdf("PDF bereinigen"):
             return
         src = Path(self.pdf_view.pdf_path)
 

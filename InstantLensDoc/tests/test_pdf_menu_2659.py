@@ -1,0 +1,244 @@
+"""PDF-Menü 2659: kein No-Op — Dialog (QTimer close) oder Dateiänderung."""
+
+from __future__ import annotations
+
+import os
+import sys
+import tempfile
+from pathlib import Path
+
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+os.environ["ILD_SMOKE_QT"] = "1"
+os.environ.setdefault("ILD_SKIP_DEPS_CHECK", "1")
+os.environ.setdefault("ILD_NO_SESSION", "1")
+os.environ.setdefault("ILD_NO_SPLASH", "1")
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / "tests"))
+
+from menu_effect_lib import DialogRecorder, pump  # noqa: E402
+from menu_smoke_lib import (  # noqa: E402
+    create_main_window,
+    install_headless_env,
+    make_docx,
+    make_n_page_pdf,
+)
+from ild_pdf.menu_policy import pdf_menu_need  # noqa: E402
+from instantlensdoc.ui.menu_click import find_menubar_menu, iter_leaf_actions  # noqa: E402
+
+
+_APP = None
+_WIN = None
+_TD = None
+_REC = None
+_PDF = None
+_DOCX = None
+_ORIG = None
+
+
+def setup_module() -> None:
+    global _APP, _WIN, _TD, _REC, _PDF, _DOCX, _ORIG
+    install_headless_env()
+    _TD = tempfile.TemporaryDirectory(prefix="ild-pdf-menu-2659-")
+    td = Path(_TD.name)
+    _PDF = td / "three.pdf"
+    _DOCX = td / "doc.docx"
+    make_n_page_pdf(_PDF, 3)
+    make_docx(_DOCX)
+    _ORIG = _PDF.read_bytes()
+    _REC = DialogRecorder(shot_dir=None)
+    _REC.install()
+    _APP, _WIN = create_main_window()
+
+
+def teardown_module() -> None:
+    global _WIN, _TD, _REC
+    try:
+        if _WIN is not None:
+            _WIN.close()
+    except Exception:
+        pass
+    if _REC is not None:
+        _REC.restore()
+    if _TD is not None:
+        _TD.cleanup()
+
+
+def _pdf_menu():
+    menu = find_menubar_menu(_WIN, "PDF")
+    assert menu is not None, "PDF-Menü fehlt"
+    return menu
+
+
+def _leaf_actions():
+    return list(iter_leaf_actions(_pdf_menu()))
+
+
+def _reload_pdf() -> None:
+    _PDF.write_bytes(_ORIG)
+    _WIN.open_path(str(_PDF))
+    pump(_APP, 0.2)
+    try:
+        _WIN._sync_menu_enablement()
+    except Exception:
+        pass
+
+
+def _close_all() -> None:
+    try:
+        if hasattr(_WIN, "close_all_tabs"):
+            _WIN.close_all_tabs()
+    except Exception:
+        pass
+    pump(_APP, 0.1)
+
+
+def _snap() -> dict:
+    pv = _WIN.pdf_view
+    path = getattr(pv, "pdf_path", None)
+    mtime = 0
+    sidec = 0
+    try:
+        if path and Path(path).is_file():
+            mtime = int(Path(path).stat().st_mtime_ns)
+    except Exception:
+        mtime = 0
+    try:
+        store = getattr(pv, "store", None)
+        sp = getattr(store, "sidecar_path", None) if store is not None else None
+        if sp and Path(sp).is_file():
+            sidec = int(Path(sp).stat().st_mtime_ns)
+    except Exception:
+        sidec = 0
+    gray = False
+    night = False
+    try:
+        gray = bool(pv.grayscale_enabled())
+    except Exception:
+        pass
+    try:
+        night = bool(pv.night_mode_enabled())
+    except Exception:
+        pass
+    color = str(getattr(pv, "_highlight_color", "") or "")
+    tool = str(getattr(pv, "tool", None) or getattr(pv, "_tool", "") or "")
+    page = int(getattr(pv, "page_index", -1) or -1)
+    count = int(getattr(pv, "page_count", 0) or 0)
+    stack_pdf = False
+    try:
+        stack_pdf = _WIN.stack.currentWidget() is pv
+    except Exception:
+        stack_pdf = False
+    return {
+        "mtime": mtime,
+        "sidec": sidec,
+        "gray": gray,
+        "night": night,
+        "color": color,
+        "tool": tool,
+        "page": page,
+        "count": count,
+        "stack_pdf": stack_pdf,
+    }
+
+
+def test_pdf_menu_policy_labels() -> None:
+    assert pdf_menu_need("PDFs zusammenführen / teilen…") == "always"
+    assert pdf_menu_need("Zwei PDFs vergleichen…") == "always"
+    assert pdf_menu_need("Scannen / Import…") == "always"
+    assert pdf_menu_need("Seitenbereich extrahieren…") == "pdf"
+    assert pdf_menu_need("Stempel 90° drehen ↻") == "selection"
+    assert pdf_menu_need("Lesezeichen löschen") == "selection"
+
+
+def test_ocg_layers_empty_on_plain_pdf() -> None:
+    from ild_pdf.print_prep import list_optional_content_groups
+
+    assert list_optional_content_groups(_PDF) == []
+
+
+def test_docx_only_pdf_items_disabled() -> None:
+    _close_all()
+    _WIN.open_path(str(_DOCX))
+    pump(_APP, 0.25)
+    _WIN._sync_menu_enablement()
+    failed = []
+    always = []
+    for path, _menu, act in _leaf_actions():
+        text = (act.text() or "").replace("&", "").strip()
+        need = pdf_menu_need(text)
+        if need == "always":
+            always.append(path)
+            continue
+        if act.isEnabled():
+            failed.append(path)
+    assert always, "always-on PDF-Einträge fehlen"
+    assert not failed, "PDF-only bei DOCX ohne PDF-Tab noch enabled:\n" + "\n".join(
+        failed[:20]
+    )
+
+
+def test_docx_with_sibling_pdf_asks_which() -> None:
+    _close_all()
+    _WIN.open_path(str(_PDF))
+    pump(_APP, 0.2)
+    _WIN.open_path(str(_DOCX))
+    pump(_APP, 0.25)
+    _WIN._sync_menu_enablement()
+    stats = None
+    for path, _menu, act in _leaf_actions():
+        if "Dokument-Statistik" in (act.text() or ""):
+            stats = act
+            break
+    assert stats is not None
+    assert stats.isEnabled(), "Statistik sollte bei offenem PDF-Tab wählbar sein"
+    _REC.events.clear()
+    stats.trigger()
+    pump(_APP, 0.2)
+    titles = [str(e.get("title") or "") for e in _REC.events]
+    assert _REC.events, "Kein Dialog bei DOCX+PDF-Sibling"
+    joined = " ".join(titles).lower()
+    assert "pdf" in joined or "statistik" in joined or "welches" in joined or any(
+        e.get("cls") for e in _REC.events
+    )
+
+
+def test_each_enabled_pdf_action_dialog_or_file() -> None:
+    _reload_pdf()
+    fails: list[str] = []
+    n_enabled = 0
+    for path, _menu, act in _leaf_actions():
+        if not act.isEnabled():
+            continue
+        n_enabled += 1
+        before = _snap()
+        _REC.events.clear()
+        try:
+            act.trigger()
+        except Exception as e:
+            fails.append(f"{path}: exception {e}")
+            _reload_pdf()
+            continue
+        pump(_APP, 0.15)
+        after = _snap()
+        dlg = bool(_REC.events)
+        changed = after != before
+        if not dlg and not changed:
+            fails.append(f"{path}: kein Dialog und keine Datei-/Ansichtsänderung")
+        try:
+            _PDF.write_bytes(_ORIG)
+            if getattr(_WIN.pdf_view, "pdf_path", None):
+                cur = Path(_WIN.pdf_view.pdf_path)
+                if cur.resolve() == _PDF.resolve():
+                    _WIN.pdf_view.load(_PDF)
+        except Exception:
+            _reload_pdf()
+        try:
+            _WIN._sync_menu_enablement()
+        except Exception:
+            pass
+        pump(_APP, 0.05)
+    assert n_enabled >= 40, f"zu wenige enabled PDF-Aktionen: {n_enabled}"
+    assert not fails, "No-Ops:\n" + "\n".join(fails[:30])
