@@ -2796,6 +2796,10 @@ class MainWindow(QMainWindow):
         act_ungroup.triggered.connect(self._ungroup_selected_annotations)
         self._act_ann_ungroup = act_ungroup
         m_align.addAction(act_ungroup)
+        try:
+            self._sync_group_actions()
+        except Exception:
+            pass
         act_group_lock = QAction("Gruppen-Sperre umschalten", self)
         act_group_lock.setShortcut(QKeySequence("Ctrl+Alt+Shift+L"))
         act_group_lock.setToolTip(
@@ -5527,6 +5531,16 @@ class MainWindow(QMainWindow):
                     except Exception:
                         src = ""
                     label = (src or t).replace("&", "").lower()
+                    oid = ""
+                    try:
+                        oid = str(a.objectName() or "")
+                    except Exception:
+                        oid = ""
+                    if oid in ("actAnnGroup", "actAnnUngroup") or label in (
+                        "gruppieren",
+                        "gruppierung aufheben",
+                    ):
+                        continue
                     if self._label_is_pdf_annotation(label, parent) or "treffer als highlight" in label:
                         ids = self._pdf_selected_annotation_ids()
                         need_sel = (
@@ -5766,6 +5780,7 @@ class MainWindow(QMainWindow):
             self._sync_layout_arrange()
             self._sync_table_tools()
             self._sync_spellcheck_ribbon()
+            self._sync_group_actions()
         except Exception:
             pass
         try:
@@ -7653,8 +7668,14 @@ class MainWindow(QMainWindow):
             return
         if self._layout_mode_active():
             pane = getattr(self, "dtp_pane", None)
+            if pane is not None:
+                try:
+                    pane.set_tool("select", apply=False)
+                except Exception:
+                    pass
             n = pane.group_selected() if pane is not None else 0
             if n:
+                self._sync_group_actions()
                 return
             self._set_status("Mindestens zwei Objekte markieren (Strg+Klick)")
             QMessageBox.information(
@@ -7665,9 +7686,14 @@ class MainWindow(QMainWindow):
             return
         pdf = getattr(self, "pdf_view", None)
         if pdf is not None and getattr(pdf, "pdf_path", None) and getattr(pdf, "store", None):
+            try:
+                pdf.set_tool(None)
+            except Exception:
+                pass
             n = pdf.group_selected_annotations()
             if n:
                 self._refresh_pdf_marks()
+                self._sync_group_actions()
             return
         self._set_status("Mindestens zwei Objekte markieren (Strg+Klick)")
         QMessageBox.information(
@@ -7687,6 +7713,7 @@ class MainWindow(QMainWindow):
             pane = getattr(self, "dtp_pane", None)
             n = pane.ungroup_selected() if pane is not None else 0
             if n:
+                self._sync_group_actions()
                 return
             self._set_status("Zuerst eine Gruppe auswählen")
             QMessageBox.information(
@@ -7700,6 +7727,7 @@ class MainWindow(QMainWindow):
             n = pdf.ungroup_selected_annotations()
             if n:
                 self._refresh_pdf_marks()
+                self._sync_group_actions()
             return
         self._set_status("Zuerst eine Gruppe auswählen")
         QMessageBox.information(
@@ -7709,65 +7737,80 @@ class MainWindow(QMainWindow):
         )
 
     def _sync_group_actions(self) -> None:
+        from instantlensdoc.ui.ink_input import is_schreibschutz
+
         n_pdf = 0
         n_dtp = 0
         has_group = False
+        locked = False
+        try:
+            locked = bool(is_schreibschutz(self))
+        except Exception:
+            locked = False
         pdf = getattr(self, "pdf_view", None)
-        if pdf is not None:
-            try:
-                n_pdf = len(pdf._selected_annotation_ids())
-            except Exception:
-                n_pdf = 0
+        layout = False
+        try:
+            layout = bool(self._layout_mode_active())
+        except Exception:
+            layout = False
+        if pdf is not None and not layout:
             try:
                 ids = list(pdf._selected_annotation_ids())
+                n_pdf = len(ids)
                 store = getattr(pdf, "store", None)
                 if store is not None:
                     has_group = any(
                         str(getattr(store.get(i), "group_id", "") or "").strip() for i in ids
                     )
             except Exception:
-                pass
+                n_pdf = 0
         pane = getattr(self, "dtp_pane", None)
-        if pane is not None and pane.isVisible():
+        if pane is not None and (layout or (pane.isVisible() and n_pdf == 0)):
             try:
                 frames = list(pane.scene.selected_frames())
                 n_dtp = len(frames)
-                has_group = has_group or any(str(getattr(f, "group_id", "") or "").strip() for f in frames)
+                has_group = has_group or any(
+                    str(getattr(f, "group_id", "") or "").strip() for f in frames
+                )
             except Exception:
                 n_dtp = 0
-        n = max(n_pdf, n_dtp)
+        n = n_dtp if layout else n_pdf
+        can_group = (n >= 2) and not locked
+        can_ungroup = bool(has_group) and not locked
         tip_g = (
             "Auswahl gruppieren (Strg+Klick / Gummiband)"
-            if n >= 2
+            if can_group
             else "Mindestens zwei Objekte markieren (Strg+Klick)"
         )
         tip_u = (
             "Gruppierung aufheben"
-            if has_group
+            if can_ungroup
             else "Zuerst eine Gruppe auswählen"
         )
-        for act, tip in (
-            (getattr(self, "_act_ann_group", None), tip_g),
-            (getattr(self, "actAnnGroup", None), tip_g),
-            (getattr(self, "_act_ann_ungroup", None), tip_u),
-            (getattr(self, "actAnnUngroup", None), tip_u),
+        for act, tip, on in (
+            (getattr(self, "_act_ann_group", None), tip_g, can_group),
+            (getattr(self, "actAnnGroup", None), tip_g, can_group),
+            (getattr(self, "_act_ann_ungroup", None), tip_u, can_ungroup),
+            (getattr(self, "actAnnUngroup", None), tip_u, can_ungroup),
         ):
             if act is None:
                 continue
             try:
+                act.setEnabled(on)
                 act.setToolTip(tip)
             except Exception:
                 pass
-        btn = getattr(pdf, "btn_ann_group", None) if pdf is not None else None
-        if btn is not None:
+        for btn, tip, on in (
+            (getattr(pdf, "btn_ann_group", None) if pdf is not None else None, tip_g, can_group),
+            (getattr(pdf, "btn_ann_ungroup", None) if pdf is not None else None, tip_u, can_ungroup),
+            (getattr(pane, "btn_grp", None) if pane is not None else None, tip_g, can_group),
+            (getattr(pane, "btn_ungroup", None) if pane is not None else None, tip_u, can_ungroup),
+        ):
+            if btn is None:
+                continue
             try:
-                btn.setToolTip(tip_g)
-            except Exception:
-                pass
-        ubtn = getattr(pdf, "btn_ann_ungroup", None) if pdf is not None else None
-        if ubtn is not None:
-            try:
-                ubtn.setToolTip(tip_u)
+                btn.setEnabled(on)
+                btn.setToolTip(tip)
             except Exception:
                 pass
 
