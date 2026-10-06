@@ -27,7 +27,7 @@ from menu_smoke_lib import (  # noqa: E402
     make_docx,
     make_n_page_pdf,
 )
-from ild_pdf.menu_policy import pdf_menu_need  # noqa: E402
+from ild_pdf.menu_policy import pdf_menu_disable_reason, pdf_menu_need  # noqa: E402
 from instantlensdoc.ui.menu_click import (  # noqa: E402
     find_menubar_menu,
     iter_leaf_actions,
@@ -158,6 +158,15 @@ def test_pdf_menu_policy_labels() -> None:
     assert pdf_menu_need("Seitenbereich extrahieren…") == "pdf"
     assert pdf_menu_need("Stempel 90° drehen ↻") == "selection"
     assert pdf_menu_need("Lesezeichen löschen") == "selection"
+    assert (
+        pdf_menu_disable_reason(
+            "Dokument-Statistik…", has_open_pdf=True, is_pdf_tab=False
+        )
+        == ""
+    )
+    assert pdf_menu_disable_reason(
+        "Dokument-Statistik…", has_open_pdf=False, is_pdf_tab=False
+    ) == "Nur bei geöffnetem PDF verfügbar"
 
 
 def test_ocg_layers_empty_on_plain_pdf() -> None:
@@ -207,14 +216,14 @@ def test_pdf_menu_object_name_and_one_column() -> None:
     )
 
 
-def test_docx_with_sibling_pdf_pdf_only_disabled() -> None:
+def test_docx_with_sibling_pdf_pdf_only_enabled() -> None:
     _close_all()
     _WIN.open_path(str(_PDF))
     pump(_APP, 0.2)
     _WIN.open_path(str(_DOCX))
     pump(_APP, 0.25)
     _WIN._sync_menu_enablement()
-    failed = []
+    disabled_pdf = []
     always = []
     stats = None
     for path, _menu, act in _leaf_actions():
@@ -226,14 +235,50 @@ def test_docx_with_sibling_pdf_pdf_only_disabled() -> None:
             always.append(path)
             assert act.isEnabled(), f"always-on disabled bei DOCX: {path}"
             continue
-        if act.isEnabled():
-            failed.append(path)
+        if need == "pdf" and not act.isEnabled():
+            disabled_pdf.append(path)
     assert stats is not None
-    assert not stats.isEnabled(), "Statistik muss ohne aktuellen PDF-Tab disabled sein"
+    assert stats.isEnabled(), "Statistik muss bei offenem Geschwister-PDF enabled sein"
     assert always, "always-on PDF-Einträge fehlen"
-    assert not failed, "PDF-only bei DOCX (PDF-Geschwister offen) noch enabled:\n" + "\n".join(
-        failed[:20]
+    assert not disabled_pdf, (
+        "PDF-only bei DOCX (PDF-Geschwister offen) disabled:\n"
+        + "\n".join(disabled_pdf[:20])
     )
+
+
+def test_qtest_mouseclick_pdf_only_with_sibling_pdf() -> None:
+    _close_all()
+    _WIN.open_path(str(_PDF))
+    pump(_APP, 0.2)
+    _WIN.open_path(str(_DOCX))
+    pump(_APP, 0.25)
+    _WIN._sync_menu_enablement()
+    hits = {"n": 0}
+    act = None
+    host = None
+    for _path, host, act in _leaf_actions():
+        text = (act.text() or "").replace("&", "").strip()
+        if "Dokument-Statistik" in text:
+            break
+    else:
+        raise AssertionError("Dokument-Statistik fehlt")
+    assert act.isEnabled(), "PDF-only bei Geschwister-PDF disabled"
+
+    def _hit(*_a, **_k):
+        hits["n"] += 1
+
+    act.triggered.connect(_hit)
+    _REC.events.clear()
+    try:
+        assert mouse_click_menu_action(_APP, host, act)
+        pump(_APP, 0.2)
+    finally:
+        try:
+            act.triggered.disconnect(_hit)
+        except Exception:
+            pass
+    assert hits["n"] >= 1, f"Mausklick PDF-only mit Geschwister-PDF: triggered={hits['n']}"
+    assert _REC.events, "PDF-only Mausklick ohne Dialog (Zielwahl oder Statistik)"
 
 
 def test_qtest_mouseclick_pdf_always_on_without_pdf_tab() -> None:

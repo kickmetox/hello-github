@@ -1,7 +1,9 @@
 """PDF-Menü: Enablement-Klassen — kein No-Op, Dialog oder Dateiänderung.
 
 always  — Dateidialoge, unabhängig vom aktuellen Tab (Merge, Vergleich, Scan, …)
-pdf     — braucht aktuellen PDF-Tab (sonst disabled, auch bei offenem Geschwister-PDF)
+pdf     — braucht irgendein offenes PDF (aktueller Tab oder Geschwister).
+          Slot fragt über `_ensure_pdf_target` „Welches PDF?“. Disabled nur
+          wenn gar kein PDF offen ist.
 selection — braucht aktiven PDF-Tab plus Auswahl (Stempel, Bookmark, Textauswahl, …)
 """
 
@@ -66,6 +68,4 @@ def pdf_menu_disable_reason(label: str, *, has_open_pdf: bool, is_pdf_tab: bool)
         return "Keine Auswahl"
     if not has_open_pdf:
         return "Nur bei geöffnetem PDF verfügbar"
-    if not is_pdf_tab:
-        return "Aktiver Tab ist kein PDF"
-    return "Nur bei geöffnetem PDF verfügbar"
+    return ""

@@ -4887,7 +4887,7 @@ class MainWindow(QMainWindow):
                         )
                         self._set_action_available(a, ok, reason)
                         continue
-                    if is_pdf:
+                    if has_open:
                         self._set_action_available(a, True, "")
                     else:
                         self._set_action_available(
@@ -4895,7 +4895,7 @@ class MainWindow(QMainWindow):
                             False,
                             pdf_menu_disable_reason(
                                 label,
-                                has_open_pdf=has_open,
+                                has_open_pdf=False,
                                 is_pdf_tab=False,
                             ),
                         )
