@@ -1700,8 +1700,33 @@ class PdfCanvas(QLabel):
             "l": (x0 - hs * 0.5, my - hs * 0.5, hs, hs),
         }
 
+    @staticmethod
+    def _cursor_for_ann_handle(handle: str):
+        if handle in ("t", "b"):
+            return Qt.SizeVerCursor
+        if handle in ("l", "r"):
+            return Qt.SizeHorCursor
+        if handle in ("tr", "bl"):
+            return Qt.SizeBDiagCursor
+        return Qt.SizeFDiagCursor
+
+    def _begin_ann_resize(self, ann: Annotation, handle: str, x: float, y: float) -> None:
+        self._resize_id = ann.id
+        self._resize_handle = handle
+        self._resize_origin = (x, y)
+        bx0, by0, bx1, by1 = self._ann_bounds(ann)
+        self._resize_start = (bx0, by0, bx1 - bx0, by1 - by0)
+        self._resize_preview = self._resize_start
+        self.setCursor(QCursor(self._cursor_for_ann_handle(handle)))
+
+    def _begin_ann_move(self, ids: set[str], x: float, y: float) -> None:
+        self._move_ids = set(ids)
+        self._move_origin = (x, y)
+        self._move_delta = (0.0, 0.0)
+        self.setCursor(QCursor(Qt.ClosedHandCursor))
+
     def _hit_ann_handle(self, x: float, y: float) -> tuple[str, Annotation] | None:
-        if not self._select_mode or self._annotations_locked:
+        if self._annotations_locked:
             return None
         selected = self._selected_ids or ({self._selected_id} if self._selected_id else set())
         if not selected:
@@ -2124,25 +2149,28 @@ class PdfCanvas(QLabel):
                     if self._resize_preview and ann.id == self._resize_id:
                         rx, ry, rw, rh = self._resize_preview
                         x0, y0, x1, y1 = rx, ry, rx + rw, ry + rh
+                        handle_rects = {
+                            "tl": (x0 - 4.0, y0 - 4.0, 8.0, 8.0),
+                            "t": ((x0 + x1) / 2.0 - 4.0, y0 - 4.0, 8.0, 8.0),
+                            "tr": (x1 - 4.0, y0 - 4.0, 8.0, 8.0),
+                            "r": (x1 - 4.0, (y0 + y1) / 2.0 - 4.0, 8.0, 8.0),
+                            "br": (x1 - 4.0, y1 - 4.0, 8.0, 8.0),
+                            "b": ((x0 + x1) / 2.0 - 4.0, y1 - 4.0, 8.0, 8.0),
+                            "bl": (x0 - 4.0, y1 - 4.0, 8.0, 8.0),
+                            "l": (x0 - 4.0, (y0 + y1) / 2.0 - 4.0, 8.0, 8.0),
+                        }
                     else:
                         x0, y0, x1, y1 = self._ann_bounds(ann)
                         x0, y0, x1, y1 = x0 + dx, y0 + dy, x1 + dx, y1 + dy
+                        handle_rects = self._ann_handle_rects(ann, dx=dx, dy=dy)
                     sel = QPen(QColor(30, 144, 255), 2, Qt.DashLine)
                     painter.setPen(sel)
                     painter.setBrush(Qt.NoBrush)
                     painter.drawRect(int(x0) - 2, int(y0) - 2, int(x1 - x0) + 4, int(y1 - y0) + 4)
-                    if self._select_mode and not self._annotations_locked:
+                    if (self._select_mode or self._drag_tool is None) and not self._annotations_locked:
                         painter.setBrush(QColor(30, 144, 255))
                         painter.setPen(QPen(QColor(255, 255, 255), 1))
-                        dummy = Annotation(
-                            page=ann.page,
-                            type=ann.type,
-                            x=x0,
-                            y=y0,
-                            width=max(x1 - x0, 1),
-                            height=max(y1 - y0, 1),
-                        )
-                        for hx, hy, hw, hh in self._ann_handle_rects(dummy).values():
+                        for hx, hy, hw, hh in handle_rects.values():
                             painter.fillRect(int(hx), int(hy), int(hw), int(hh), QColor(30, 144, 255))
                             painter.setPen(QPen(QColor(255, 255, 255), 1))
                             painter.setBrush(Qt.NoBrush)
@@ -2383,13 +2411,7 @@ class PdfCanvas(QLabel):
             handle_hit = self._hit_ann_handle(x, y)
             if handle_hit is not None:
                 hname, hann = handle_hit
-                self._resize_id = hann.id
-                self._resize_handle = hname
-                self._resize_origin = (x, y)
-                bx0, by0, bx1, by1 = self._ann_bounds(hann)
-                self._resize_start = (bx0, by0, bx1 - bx0, by1 - by0)
-                self._resize_preview = self._resize_start
-                self.setCursor(QCursor(Qt.SizeFDiagCursor))
+                self._begin_ann_resize(hann, hname, x, y)
                 event.accept()
                 try:
                     self.grabMouse()
@@ -2407,74 +2429,16 @@ class PdfCanvas(QLabel):
                     self.uri_link_clicked.emit(uri)
                     event.accept()
                     return
-            auswahl = (
-                bool(self._select_mode)
-                and not self._place_on_empty
-                and self._drag_tool is None
-                and not self._text_mark_mode
-            )
-            hit_strict = self._hit_annotation_strict(x, y) if auswahl else hit_any
-            selected = set(self._selected_ids) if self._selected_ids else (
-                {self._selected_id} if self._selected_id else set()
-            )
-            # Schon ausgewähltes Objekt: ziehen = verschieben
-            if (
-                auswahl
-                and hit_strict is not None
-                and hit_strict.id in selected
-                and not self._annotations_locked
-                and not bool(getattr(hit_strict, "locked", False))
-            ):
-                shift = bool(event.modifiers() & Qt.ShiftModifier)
-                if shift:
-                    self.annotation_selected.emit(hit_strict.id)
-                    event.accept()
-                    return
-                self.annotation_selected.emit(hit_strict.id)
-                by_id = {a.id: a for a in self._annotations}
-                movable = {
-                    i
-                    for i in selected
-                    if not bool(getattr(by_id.get(i), "locked", False))
-                }
-                if movable:
-                    self._move_ids = movable
-                    self._move_origin = (x, y)
-                    self._move_delta = (0.0, 0.0)
-                    self.setCursor(QCursor(Qt.ClosedHandCursor))
-                self._repaint_overlay()
-                event.accept()
-                try:
-                    self.grabMouse()
-                except Exception:
-                    pass
-                return
-            # Auswahl-Tool: Leerklick/Ziehen = Gummiband; kleiner Release = Klick-Select
-            if auswahl:
-                self._band_start = (x, y)
-                self._band_current = (x, y)
-                self._band_click_hit = hit_any.id if hit_any else None
-                self._band_click_shift = bool(event.modifiers() & Qt.ShiftModifier)
-                self._move_ids = set()
-                self._move_origin = None
-                self._move_delta = (0.0, 0.0)
-                event.accept()
-                try:
-                    self.grabMouse()
-                except Exception:
-                    pass
-                self._repaint_overlay()
-                return
-            if hit_any:
-                shift = bool(event.modifiers() & Qt.ShiftModifier)
+            shift = bool(event.modifiers() & Qt.ShiftModifier)
+            # Overlay/Form getroffen: sofort auswählen und ziehen = verschieben.
+            # Gummiband nur auf leerer Fläche.
+            if hit_any is not None:
                 if shift:
                     self.annotation_selected.emit(hit_any.id)
                     event.accept()
                     return
                 if hit_any.id not in self._selected_ids:
-                    # Outline + 8 Griffe sofort (vor dem Viewer-Slot)
                     self.set_selected_ids({hit_any.id})
-                # Immer emittieren: Viewer-IDs dürfen nicht hinter dem Canvas zurückbleiben
                 self.annotation_selected.emit(hit_any.id)
                 ids = set(self._selected_ids) if self._selected_ids else {hit_any.id}
                 if not self._annotations_locked:
@@ -2485,12 +2449,13 @@ class PdfCanvas(QLabel):
                         if not bool(getattr(by_id.get(i), "locked", False))
                     }
                     if movable:
-                        self._move_ids = movable
-                        self._move_origin = (x, y)
-                        self._move_delta = (0.0, 0.0)
-                        self.setCursor(QCursor(Qt.ClosedHandCursor))
+                        self._begin_ann_move(movable, x, y)
                 self._repaint_overlay()
                 event.accept()
+                try:
+                    self.grabMouse()
+                except Exception:
+                    pass
                 return
             # Leere Fläche: Create-Tool → deselektieren und zeichnen/platzieren
             if not (event.modifiers() & Qt.ShiftModifier):
@@ -2658,14 +2623,18 @@ class PdfCanvas(QLabel):
                 )
             elif (
                 pt
-                and self._select_mode
+                and (self._select_mode or self._drag_tool is None)
                 and not self._annotations_locked
             ):
-                hit = self._hit_annotation(*pt)
-                if hit and not bool(getattr(hit, "locked", False)):
-                    self.setCursor(QCursor(Qt.OpenHandCursor))
+                handle_hit = self._hit_ann_handle(*pt)
+                if handle_hit is not None:
+                    self.setCursor(QCursor(self._cursor_for_ann_handle(handle_hit[0])))
                 else:
-                    self.unsetCursor()
+                    hit = self._hit_annotation(*pt)
+                    if hit and not bool(getattr(hit, "locked", False)):
+                        self.setCursor(QCursor(Qt.OpenHandCursor))
+                    else:
+                        self.unsetCursor()
             else:
                 self.unsetCursor()
         super().mouseMoveEvent(event)
@@ -2924,7 +2893,17 @@ class PdfCanvas(QLabel):
         if pt:
             hit = self._hit_overlay(*pt)
             if hit:
+                if hit.id not in self._selected_ids:
+                    self.set_selected_ids({hit.id})
+                self.annotation_selected.emit(hit.id)
                 self.overlay_edit_requested.emit(hit.id)
+                return
+            hit_any = self._hit_annotation(*pt)
+            if hit_any is not None:
+                # Form/Overlay: Auswahl halten, nicht in nativen PDF-Text fallen.
+                if hit_any.id not in self._selected_ids:
+                    self.set_selected_ids({hit_any.id})
+                self.annotation_selected.emit(hit_any.id)
                 return
             if self._object_edit_mode:
                 self.object_edit_requested.emit(pt[0], pt[1])
