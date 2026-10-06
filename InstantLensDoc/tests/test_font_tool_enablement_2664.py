@@ -113,6 +113,13 @@ def _open_pdf() -> None:
 def _open_empty() -> None:
     _WIN.new_doc("empty")
     pump(_APP, 0.12)
+    doc = getattr(_WIN, "doc", None)
+    if doc is not None:
+        try:
+            doc.text = _WIN.editor.toPlainText()
+        except Exception:
+            pass
+        doc.dirty = False
     _WIN._sync_menu_enablement()
 
 
@@ -182,7 +189,13 @@ def test_font_tools_enabled_on_txt_and_after_ocr() -> None:
 
 def test_font_tools_enabled_in_dtp() -> None:
     _open_empty()
-    _WIN._enter_layout_mode()
+    pane = getattr(_WIN, "dtp_pane", None)
+    if pane is not None:
+        try:
+            pane.clear_dirty()
+        except Exception:
+            pass
+    assert _WIN._enter_layout_mode()
     pump(_APP, 0.1)
     _WIN._sync_menu_enablement()
     assert _WIN._layout_mode_active()
