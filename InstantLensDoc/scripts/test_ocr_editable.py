@@ -396,6 +396,7 @@ _HOCR_SAMPLE = """
 def test_core_sanitize_and_hocr_layout() -> None:
     from instantlensdoc.core.ocr_word_suite import (
         blocks_to_word_suite_html,
+        build_word_suite_document,
         classify_ocr_list_line,
         expand_blocks_with_tables,
         normalize_field_tokens,
@@ -549,18 +550,19 @@ def test_core_sanitize_and_hocr_layout() -> None:
             _fail(f"Tabellen-OCR enthält Steuerzeichen {g!r}")
     if "<table" not in th.lower():
         _fail(f"Pipe-OCR ohne HTML-Tabelle: {th[:500]}")
-    if "Alpha" not in th or "Betrag" not in th:
+    if "Alpha" not in th or "Betrag" not in th or "Beta" not in th:
         _fail(f"Tabellenzellen fehlen: {th[:400]}")
     if "<!-- ild-table" in th or "| --- |" in th:
         _fail("OCR-Tabelle als Markdown-Dump statt HTML")
     if "EINLEITUNG" not in tt or "Fliesstext" not in tt:
         _fail("Fließtext neben Tabelle verloren")
-    if not any(getattr(b, "table_cells", None) for b in tab_doc.blocks):
+    ws_tab = build_word_suite_document(text=pipe, auto_format=False, title="t")
+    if not any(getattr(b, "table_cells", None) for b in ws_tab.blocks):
         _fail("table_cells fehlen nach Pipe-OCR")
     cells = split_ocr_table_row("| A | B |")
     if cells != ["A", "B"]:
         _fail(f"split_ocr_table_row: {cells!r}")
-    expanded = expand_blocks_with_tables(tab_doc.blocks)
+    expanded = expand_blocks_with_tables(ws_tab.blocks)
     if not any(getattr(b, "table_cells", None) for b in expanded):
         _fail("expand_blocks_with_tables verlor Tabelle")
     _ok("core: Steuerzeichen weg, hOCR Font/Fett/Kursiv/Align")

@@ -362,15 +362,27 @@ def sanitize_ocr_visible_text(text: str) -> str:
     """Form-Feed, Bidi-Marken, Ersatzzeichen aus OCR/PDF-Text entfernen — kein ¶/Kasten."""
     if not text:
         return ""
+    lines = str(text).replace("\r\n", "\n").replace("\r", "\n").split("\n")
+    cleaned_lines: List[str] = []
+    for line in lines:
+        stripped = line.lstrip(" \t")
+        # Pipe/TSV-Zeilen: Steuerzeichen sind Zellenmüll, kein Absatz-/Seitenumbruch.
+        if stripped.startswith("|") or stripped.count("|") >= 2 or "\t" in line:
+            line = (
+                line.replace("\x0c", " ")
+                .replace("\u00b6", " ")
+                .replace("\u2028", " ")
+                .replace("\u2029", " ")
+            )
+        cleaned_lines.append(line)
+    s = "\n".join(cleaned_lines)
     s = (
-        str(text)
-        .replace("\x0c", "\n\n")
+        s.replace("\x0c", "\n\n")
         .replace("\u00b6", "\n\n")  # Pilcrow = Absatzende, kein Listenzeichen
         .replace("\u2028", "\n")
         .replace("\u2029", "\n\n")
     )
     s = _OCR_CONTROL_RE.sub("", s)
-    s = s.replace("\r\n", "\n").replace("\r", "\n")
     return normalize_field_tokens(s)
 
 
