@@ -751,6 +751,17 @@ def check_version() -> None:
         _fail("tests/test_chrome_shared_actions_2662.py fehlt (2.6.59 Chrome-Klick)")
     if not (ROOT / "tests" / "test_dtp_2660.py").is_file():
         _fail("tests/test_dtp_2660.py fehlt (2.6.59 DTP-Lineale)")
+    ca_path = ROOT / "instantlensdoc" / "ui" / "chrome_actions.py"
+    if not ca_path.is_file():
+        _fail("ui/chrome_actions.py fehlt (2.6.59 chrome_actions bind 633e1d8)")
+    ca = ca_path.read_text(encoding="utf-8")
+    if "CHROME_ACTION_ATTRS" not in ca or "pick_tab_qactions" not in ca:
+        _fail("chrome_actions.py fehlt CHROME_ACTION_ATTRS/pick_tab_qactions (2.6.59 bind)")
+    if "from instantlensdoc.ui.chrome_actions import" not in mw:
+        _fail("main_window.py fehlt chrome_actions-Import (2.6.59 bind)")
+    rb_t = (ROOT / "instantlensdoc" / "ui" / "ribbon_bar.py").read_text(encoding="utf-8")
+    if "def bind_qactions(" not in rb_t:
+        _fail("ribbon_bar.py fehlt bind_qactions (2.6.59 chrome_actions bind)")
     _ok("2.6.59 word-suite/pdf-menu/ocr/dtp/chrome/ribbon: OK")
 
 
