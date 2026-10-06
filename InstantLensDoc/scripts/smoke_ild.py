@@ -611,6 +611,10 @@ def check_version() -> None:
         _fail("ocr_word_suite fehlt open_ocr_result/blocks_to_word_suite_html (OCR→DOCX)")
     if "sanitize_ocr_visible_text" not in ocr_ws or "parse_hocr_to_blocks" not in ocr_ws:
         _fail("ocr_word_suite fehlt sanitize_ocr_visible_text/parse_hocr_to_blocks")
+    if "classify_ocr_list_line" not in ocr_ws or "expand_blocks_with_lists" not in ocr_ws:
+        _fail("ocr_word_suite fehlt Listen/Absatz-Klassifikation (kein ¶/Form-Feed als Marker)")
+    if 'align="' not in ocr_ws or "margin-bottom" not in ocr_ws:
+        _fail("ocr_word_suite HTML ohne align/margin (Absatz/Ausrichtung)")
     if "source_comment" not in ocr_ws:
         _fail("ocr_word_suite fehlt Quell-Kommentar")
     if "def open_ocr_result" not in mw or "_present_word_suite_document" not in mw:

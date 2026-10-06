@@ -202,6 +202,8 @@ def test_editor_ocr_bold_find_save() -> None:
 
     test_editor_no_control_glyphs_highlight_font_docx(win)
 
+    test_editor_ocr_paragraph_layout_align_list(win)
+
     assert app is not None
 
 
@@ -388,18 +390,29 @@ _HOCR_SAMPLE = """
 def test_core_sanitize_and_hocr_layout() -> None:
     from instantlensdoc.core.ocr_word_suite import (
         blocks_to_word_suite_html,
+        classify_ocr_list_line,
         open_ocr_result,
         parse_hocr_to_blocks,
         sanitize_ocr_visible_text,
     )
 
-    dirty = "Hallo\x0cWelt\u2028Zeile\ufffd\u200e"
+    dirty = "Hallo\x0cWelt\u2028Zeile\ufffd\u200e\u00b6"
     clean = sanitize_ocr_visible_text(dirty)
     for g in _CONTROL_GLYPHS:
         if g in clean:
             _fail(f"sanitize liess Steuerzeichen {g!r}")
     if "Hallo" not in clean or "Welt" not in clean:
         _fail("sanitize hat Fließtext entfernt")
+
+    kind, rest = classify_ocr_list_line("\u00b6 erster Punkt")
+    if kind != "ul" or rest != "erster Punkt":
+        _fail(f"¶-Zeile nicht als ul: {kind!r} {rest!r}")
+    kind, rest = classify_ocr_list_line("\x0c zweiter Punkt")
+    if kind != "ul" or "zweiter" not in rest:
+        _fail(f"Form-Feed-Zeile nicht als ul: {kind!r} {rest!r}")
+    kind, rest = classify_ocr_list_line("1. nummeriert")
+    if kind != "ol" or rest != "nummeriert":
+        _fail(f"Nummerierung nicht erkannt: {kind!r} {rest!r}")
 
     blocks = parse_hocr_to_blocks(_HOCR_SAMPLE)
     if len(blocks) < 2:
@@ -417,6 +430,8 @@ def test_core_sanitize_and_hocr_layout() -> None:
     low = html.lower()
     if "font-family" not in low or "font-size" not in low or "text-align" not in low:
         _fail(f"hOCR-HTML ohne Layout: {html[:400]}")
+    if 'align="' not in low or "margin-bottom" not in low:
+        _fail(f"hOCR-HTML ohne Absatz-align/margin: {html[:400]}")
     if "<b>" not in low and "<h1" not in low:
         _fail("hOCR-HTML ohne Fett/Überschrift-Tag")
     if "<i>" not in low:
@@ -436,6 +451,24 @@ def test_core_sanitize_and_hocr_layout() -> None:
             _fail(f"open_ocr_result dumpte Steuerzeichen {g!r}")
     if "Dump" not in dumped.text:
         _fail("Dirty-OCR-Text verloren")
+
+    listed = open_ocr_result(
+        text="Titel\n\n\u00b6 Alpha\n\x0c Beta\n- Gamma\n1. Delta",
+        auto_format=False,
+        title="Word-Suite — Listen",
+    )
+    lhtml = str((listed.meta or {}).get("html") or "")
+    ltext = listed.text or ""
+    for g in ("\x0c", "\u00b6"):
+        if g in lhtml or g in ltext:
+            _fail(f"Listen-OCR enthält Marker {g!r}")
+    if "\u2022" not in lhtml and "&bull;" not in lhtml:
+        _fail(f"Listen-HTML ohne Aufzählungszeichen: {lhtml[:400]}")
+    if "1." not in lhtml and "Delta" not in lhtml:
+        _fail("Listen-HTML ohne Nummerierung/Delta")
+    n_blocks = int((listed.meta or {}).get("block_count") or 0)
+    if n_blocks < 4:
+        _fail(f"Listen nicht in Absätze gesplittet: {n_blocks}")
     _ok("core: Steuerzeichen weg, hOCR Font/Fett/Kursiv/Align")
 
 
@@ -517,6 +550,81 @@ def test_editor_no_control_glyphs_highlight_font_docx(win) -> None:
         if not highs:
             _fail(f"DOCX ohne persistentes Highlight: names={names}")
     _ok("qt: keine Steuerzeichen; Highlight+Arial überleben DOCX")
+
+
+def test_editor_ocr_paragraph_layout_align_list(win) -> None:
+    """Absatz, Seitenlayout, Ausrichtung, Aufzählung greifen auf OCR-Richtext."""
+    from PySide6.QtGui import QTextCursor
+
+    from instantlensdoc.core.editor_page_layout import EditorPageLayout
+
+    ok = win.open_ocr_result(
+        text=(
+            "EINLEITUNG\n\n"
+            "Fliesstext Absatz zum Ausrichten.\n\n"
+            "\u00b6 erster Listenpunkt\n"
+            "\x0c zweiter Listenpunkt\n"
+            "- dritter Listenpunkt"
+        ),
+        title="Word-Suite — Absatz/Liste",
+        auto_format=False,
+    )
+    if not ok:
+        _fail("open_ocr_result für Absatz/Layout-Test fehlgeschlagen")
+    ed = win.editor
+    if not ed.rich_mode():
+        _fail("OCR nicht im Rich-Modus (Seitenlayout/Absatz brauchen QTextDocument)")
+    if ed.document().blockCount() < 3:
+        _fail(f"OCR ohne Absätze (blockCount={ed.document().blockCount()})")
+    plain = ed.toPlainText()
+    for g in ("\x0c", "\u00b6"):
+        if g in plain:
+            _fail(f"OCR-Liste zeigt Marker {g!r}")
+    if "erster Listenpunkt" not in plain:
+        _fail("Listenpunkt-Text fehlt")
+
+    idx = plain.index("Fliesstext")
+    cur = ed.textCursor()
+    cur.setPosition(idx)
+    cur.setPosition(idx + len("Fliesstext"), QTextCursor.KeepAnchor)
+    ed.setTextCursor(cur)
+    if not ed.set_paragraph_alignment("center"):
+        _fail("set_paragraph_alignment auf OCR-Absatz fehlgeschlagen")
+    if ed.current_block_alignment() != "center":
+        _fail(f"Ausrichtung nicht center: {ed.current_block_alignment()!r}")
+    if not ed.set_paragraph_spacing(line_spacing=1.5, space_before_pt=6, space_after_pt=12):
+        _fail("set_paragraph_spacing auf OCR-Absatz fehlgeschlagen")
+    fmt = ed.textCursor().blockFormat()
+    if float(fmt.bottomMargin() or 0) < 11.5:
+        _fail(f"Absatzabstand danach fehlt: {fmt.bottomMargin()}")
+
+    idx = plain.index("erster Listenpunkt")
+    cur = ed.textCursor()
+    cur.setPosition(idx)
+    ed.setTextCursor(cur)
+    line = cur.block().text()
+    if "\u2022" not in line and not line.lstrip().startswith("-"):
+        # Tool muss Listenzeichen setzen können (Auswahl = aktueller Absatz)
+        if not ed.toggle_list(ordered=False):
+            _fail("toggle_list auf OCR-Absatz fehlgeschlagen")
+        line = ed.textCursor().block().text()
+    if "\u2022" not in line and "•" not in line:
+        _fail(f"Aufzählung ohne Bullet: {line!r}")
+    if "\x0c" in line or "\u00b6" in line:
+        _fail(f"Aufzählung nutzt ¶/Form-Feed: {line!r}")
+
+    lay = EditorPageLayout.from_settings()
+    lay.enabled = True
+    lay.scope = "rich"
+    lay.with_preset("A4")
+    ed.set_page_layout(lay)
+    if not ed.page_layout_active():
+        _fail("Seitenlayout nach OCR nicht aktiv (scope rich)")
+    pw = float(ed.document().pageSize().width())
+    if pw < 100:
+        _fail(f"Seitenlayout pageSize nicht gesetzt: {pw}")
+    win._sync_editor_rich_meta()
+    _ok("qt: OCR Absatz/Ausrichtung/Liste/Seitenlayout")
 
 
 def main() -> int:

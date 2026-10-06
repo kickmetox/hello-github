@@ -18567,6 +18567,10 @@ class MainWindow(QMainWindow):
                         doc.text = self.editor.toPlainText()
                     except Exception:
                         doc.text = body
+                    try:
+                        self.editor._apply_page_layout()
+                    except Exception:
+                        pass
                 except Exception:
                     self.editor.setPlainText(body)
             else:

@@ -1999,6 +1999,13 @@ class TextEditor(QPlainTextEdit):
             self.setCurrentCharFormat(QTextCharFormat())
         except Exception:
             pass
+        try:
+            if getattr(self, "_page_layout", None) is None:
+                from instantlensdoc.core.editor_page_layout import EditorPageLayout
+
+                self._page_layout = EditorPageLayout.from_settings()
+        except Exception:
+            pass
         self._apply_page_layout()
         self._sync_char_background_extras()
 

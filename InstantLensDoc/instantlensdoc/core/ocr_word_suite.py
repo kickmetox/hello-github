@@ -36,6 +36,13 @@ PAGE_BREAK_HTML = (
     '<p style="margin-top:22pt;margin-bottom:0pt;-qt-paragraph-type:empty;">'
     "<br/></p>"
 )
+# Sichtbares Listenzeichen für QPlainTextEdit (kein ¶ / Form-Feed).
+LIST_UL_PREFIX = "\u2022 "
+_OCR_UL_RE = re.compile(
+    r"^(?:[\x0c\u00b6\u00b7\u2022\u2023\u2043\u2219\u25aa\u25ab\u25cf\u25e6"
+    r"\u25a0\u25a1●○▪▫–—]|[-*+])\s+"
+)
+_OCR_OL_RE = re.compile(r"^(\d{1,3})[.)]\s+")
 
 # Steuer-/Bidi-/Formatsteuerzeichen, die in QTextDocument als ¶ · Kästchen landen.
 _OCR_CONTROL_RE = re.compile(
@@ -95,6 +102,7 @@ class WordSuiteBlock:
     page: int = 0
     is_heading: bool = False
     align: str = ""
+    list_kind: str = ""  # "" | "ul" | "ol"
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -242,6 +250,7 @@ def _ws_blocks_from_ocr(
                 page=int(getattr(b, "page", 0) or 0),
                 is_heading=bool(getattr(b, "is_heading", False)),
                 align=str(getattr(b, "align", "") or ""),
+                list_kind=str(getattr(b, "list_kind", "") or ""),
             )
         )
     out.sort(key=lambda x: (x.reading_order, x.top, x.left))
@@ -335,6 +344,7 @@ def sanitize_ocr_visible_text(text: str) -> str:
     s = (
         str(text)
         .replace("\x0c", "\n\n")
+        .replace("\u00b6", "\n\n")  # Pilcrow = Absatzende, kein Listenzeichen
         .replace("\u2028", "\n")
         .replace("\u2029", "\n\n")
     )
@@ -347,7 +357,13 @@ def sanitize_ocr_html(html: str) -> str:
     """Steuerzeichen aus generiertem Word-Suite-HTML strippen (Tags bleiben)."""
     if not html:
         return ""
-    s = str(html).replace("\x0c", "").replace("\u2028", " ").replace("\u2029", " ")
+    s = (
+        str(html)
+        .replace("\x0c", "")
+        .replace("\u00b6", "")
+        .replace("\u2028", " ")
+        .replace("\u2029", " ")
+    )
     return _OCR_CONTROL_RE.sub("", s)
 
 
@@ -355,6 +371,89 @@ def _html_escape(text: str) -> str:
     return html_lib.escape(sanitize_ocr_visible_text(text), quote=False).replace(
         "\n", "<br/>"
     )
+
+
+def classify_ocr_list_line(line: str) -> tuple[str, str]:
+    """OCR-Zeile → (list_kind, Text ohne Marker). ``¶``/``\\x0c`` zählen als ul, nicht als Glyph."""
+    s = (line or "").strip(" \t\r\n")
+    if not s:
+        return "", ""
+    s = re.sub(r"^[\x0c\u00b6]+", LIST_UL_PREFIX, s).strip(" \t\r\n")
+    if s in ("\u2022", LIST_UL_PREFIX.strip()):
+        return "", ""
+    ol = _OCR_OL_RE.match(s)
+    if ol:
+        rest = s[ol.end() :].strip()
+        if rest:
+            return "ol", rest
+    ul = _OCR_UL_RE.match(s)
+    if ul:
+        rest = s[ul.end() :].strip()
+        if rest:
+            return "ul", rest
+    return "", s
+
+
+def _clone_ws_block(src: WordSuiteBlock, text: str, list_kind: str, order: int) -> WordSuiteBlock:
+    return WordSuiteBlock(
+        reading_order=order,
+        text=text,
+        block_num=int(src.block_num or 0),
+        left=int(src.left or 0),
+        top=int(src.top or 0),
+        width=int(src.width or 0),
+        height=int(src.height or 0),
+        conf=float(src.conf if src.conf is not None else -1.0),
+        lines=text.splitlines() or [text],
+        font_name=src.font_name,
+        font_size_pt=float(src.font_size_pt or 0.0),
+        bold=bool(src.bold),
+        italic=bool(src.italic),
+        page=int(src.page or 0),
+        is_heading=bool(src.is_heading) and not list_kind,
+        align=src.align or "",
+        list_kind=list_kind,
+    )
+
+
+def expand_blocks_with_lists(blocks: Sequence[WordSuiteBlock] | None) -> List[WordSuiteBlock]:
+    """Mehrzeilige Blöcke mit Aufzählung/Nummerierung in eigene Absätze splitten."""
+    out: List[WordSuiteBlock] = []
+    order = 0
+    for src in blocks or []:
+        raw_lines = list(src.lines or [])
+        blob = src.text or ""
+        if not raw_lines:
+            raw_lines = blob.splitlines() or ([blob] if blob.strip() else [])
+        classified: List[tuple[str, str]] = []
+        for ln in raw_lines:
+            kind, text = classify_ocr_list_line(ln)
+            if text:
+                classified.append((kind, text))
+        if not classified and blob.strip():
+            kind, text = classify_ocr_list_line(blob)
+            if text:
+                classified.append((kind, text))
+        if not classified:
+            continue
+        any_list = any(k for k, _t in classified)
+        if not any_list and len(classified) == 1:
+            out.append(
+                _clone_ws_block(
+                    src, classified[0][1], src.list_kind or classified[0][0], order
+                )
+            )
+            order += 1
+            continue
+        if not any_list:
+            joined = "\n".join(t for _k, t in classified)
+            out.append(_clone_ws_block(src, joined, src.list_kind or "", order))
+            order += 1
+            continue
+        for kind, text in classified:
+            out.append(_clone_ws_block(src, text, kind or (src.list_kind or ""), order))
+            order += 1
+    return out
 
 
 def infer_align(left: float, width: float, page_width: float) -> str:
@@ -593,6 +692,17 @@ def infer_block_styles(blocks: Sequence[WordSuiteBlock]) -> None:
                 b.font_size_pt = DEFAULT_HEADING_PT
         elif not b.font_size_pt:
             b.font_size_pt = DEFAULT_BODY_PT
+        if not (b.list_kind or "").strip():
+            kind, rest = classify_ocr_list_line(b.text)
+            if kind:
+                b.list_kind = kind
+                b.text = rest
+                b.lines = rest.splitlines() or [rest]
+                b.is_heading = False
+        if b.list_kind:
+            b.is_heading = False
+            if not (b.align or "").strip():
+                b.align = "left"
         if not (b.align or "").strip():
             b.align = infer_align(b.left, b.width, page_w)
 
@@ -650,6 +760,7 @@ def blocks_to_word_suite_html(
     parts: List[str] = [head]
     last_page: int | None = None
     wrote = False
+    ol_index = 0
     for b in items:
         body = (b.text or "").strip()
         if not body:
@@ -657,27 +768,43 @@ def blocks_to_word_suite_html(
         page = int(b.page or 0)
         if last_page is not None and page and page != last_page:
             parts.append(PAGE_BREAK_HTML)
+            ol_index = 0
         if page:
             last_page = page
         fam = html_lib.escape(b.font_name or font_family)
         size = float(b.font_size_pt or font_size_pt or DEFAULT_BODY_PT)
         inner = _html_escape(body)
-        if b.italic:
-            inner = f"<i>{inner}</i>"
-        if b.bold or b.is_heading:
-            inner = f"<b>{inner}</b>"
-        tag = "h1" if b.is_heading else "p"
+        kind = (b.list_kind or "").strip().lower()
+        if kind == "ol":
+            ol_index += 1
+            inner = f"{ol_index}. {inner}"
+        elif kind == "ul":
+            ol_index = 0
+            inner = LIST_UL_PREFIX + inner
+        else:
+            ol_index = 0
+            if b.italic:
+                inner = f"<i>{inner}</i>"
+            if b.bold or b.is_heading:
+                inner = f"<b>{inner}</b>"
+        tag = "h1" if b.is_heading and kind not in ("ul", "ol") else "p"
         align = (b.align or "left").lower().strip()
         if align not in ("left", "center", "right", "justify"):
             align = "left"
+        if kind in ("ul", "ol"):
+            align = "left"
+        margin_left = "24px" if kind in ("ul", "ol") else "0"
+        margin_top = "0" if kind in ("ul", "ol") else ("6pt" if tag == "h1" else "0")
+        margin_bottom = "4pt" if kind in ("ul", "ol") else ("10pt" if tag == "h1" else "8pt")
         parts.append(
-            f'<{tag} style="font-family:{fam};font-size:{size:g}pt;'
-            f'text-align:{align};">{inner}</{tag}>'
+            f'<{tag} align="{align}" style="font-family:{fam};font-size:{size:g}pt;'
+            f'text-align:{align};margin-left:{margin_left};margin-top:{margin_top};'
+            f'margin-bottom:{margin_bottom};line-height:115%;">{inner}</{tag}>'
         )
         wrote = True
     if not wrote and (text or "").strip():
         for para in _paragraphs_as_blocks(text):
-            parts.append(f"<p>{_html_escape(para.text)}</p>")
+            parts.append(f'<p align="left">{_html_escape(para.text)}</p>')
     parts.append("</body></html>")
     return sanitize_ocr_html("".join(parts))
 
@@ -695,7 +822,12 @@ def _int_meta(meta: dict[str, Any], key: str) -> int | None:
 
 def _finalize_word_suite_document(doc: WordSuiteDocument) -> WordSuiteDocument:
     """HTML, Überschriften und Quell-Link an ein Word-Suite-Dokument anhängen."""
+    doc.blocks = expand_blocks_with_lists(doc.blocks)
     infer_block_styles(doc.blocks)
+    if doc.blocks and not doc.auto_formatted:
+        rebuilt = blocks_to_word_suite_text(doc.blocks)
+        if rebuilt:
+            doc.text = rebuilt
     if not doc.source_path:
         src = (doc.source or "").strip()
         if src and src not in ("OCR", "OCR-Text"):
@@ -788,6 +920,7 @@ def build_word_suite_document(
                         page=int(b.get("page") or 0),
                         is_heading=bool(b.get("is_heading")),
                         align=str(b.get("align") or ""),
+                        list_kind=str(b.get("list_kind") or ""),
                     )
                 )
     body = ""
