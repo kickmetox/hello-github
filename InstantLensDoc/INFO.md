@@ -1,13 +1,13 @@
 # InstantLens Doc — Kurzinfo
 
-### 2.6.59 — Release
+### 2.6.60 — Release
 
-Word-Suite (Absatz/Seitenlayout/Kopf/Fuß/Ersatzzeichen, Formatvorlagen, Tabellen, Serienbrief), PDF-Menü live, OCR-Layout/Felder, DTP-Lineale/Rahmen im selben Dokumentfenster (Word-Menüs und Start/Einfügen/Layout bleiben; Eigenschaften in der rechten Werkzeugspalte; DTP-Hilfe schließbar; Speichern/Nicht speichern/Abbrechen bei Layout-Änderung; Schriftfarbe QColorDialog auf Textrahmen; Druckermarken geteilt mit PDF, Satzspiegel als Geometrie). Overlays/Formen/Stempel wählbar, verschiebbar, in der Größe anpassbar, doppelklick-editierbar; Gummiband; Undo/Redo; Schreibschutz sperrt. Textstempel mit/ohne Rahmen, nur Schrift, Schatten, Outline. Gruppieren/Aufheben auf DTP-Rahmen und PDF-Overlays (Strg+Klick/Gummiband, ≥2). Word-Chrome Klassisch/Ribbon/Kombiniert. Pack `InstantLensDoc-2.6.59-pack.zip`. VERSION **2.6.59**. HEAD `8f01af3` (Ersatzzeichen) auf Chrome/Klick `d1e74c6`.
+PDF-Menü live, OCR-Layout/Felder/Handschrift, DTP-Gruppieren/Overlays/Stempel, Word-Ribbon Start–Ansicht, vereinigte Ansicht (Text/PDF/DTP), Ribbon-Scrollbar, Schriftwerkzeuge grau ohne OCR, Schreibschutz und Textersteller, Tinte/Maus/rechte Werkzeugspalte, Markdown/CSV/Excel (md/csv/xls/xlsx), Layout-Marken, DTP-Hilfe und Speichern-Abfrage. Pack `InstantLensDoc-2.6.60-pack.zip`. VERSION **2.6.60**. HEAD `f51542a`. Nach 2.6.59-Pack (`659cf45`).
 
-**Windows-Rebuild (Andreas Meyer)** — gleicher Ablauf wie 2.6.58, Ziel `D:\AI_Temp\InstantLensDoc-2659`:
+**Windows-Rebuild (Andreas Meyer)** — gleicher Ablauf wie 2.6.59, Ziel `D:\AI_Temp\InstantLensDoc-2660`:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File "D:\AI_Temp\sync-ild.ps1" -LocalPack D:\AI_Temp\InstantLensDoc-2.6.59-pack.zip -Dest D:\AI_Temp\InstantLensDoc-2659 -Swap -SkipStart
+powershell -ExecutionPolicy Bypass -File "D:\AI_Temp\sync-ild.ps1" -LocalPack D:\AI_Temp\InstantLensDoc-2.6.60-pack.zip -Dest D:\AI_Temp\InstantLensDoc-2660 -Swap -SkipStart
 cd D:\AI_Temp\InstantLensDoc
 python -m pip install -r requirements.txt
 powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
@@ -16,7 +16,11 @@ powershell -ExecutionPolicy Bypass -File .\scripts\install-ild.ps1
 powershell -ExecutionPolicy Bypass -File .\scripts\build-windows-installer.ps1
 ```
 
-Oder Pack direkt nach `D:\AI_Temp\InstantLensDoc-2659` entpacken (nested: innerer Ordner `InstantLensDoc\`), dann `build-windows.ps1` wie bei 2.6.58.
+Oder Pack direkt nach `D:\AI_Temp\InstantLensDoc-2660` entpacken (nested: innerer Ordner `InstantLensDoc\`), dann `build-windows.ps1` wie bei 2.6.59.
+
+### 2.6.59 — Release
+
+Word-Suite (Absatz/Seitenlayout/Kopf/Fuß/Ersatzzeichen, Formatvorlagen, Tabellen, Serienbrief), PDF-Menü live, OCR-Layout/Felder, DTP-Lineale/Rahmen im selben Dokumentfenster (Word-Menüs und Start/Einfügen/Layout bleiben; Eigenschaften in der rechten Werkzeugspalte; DTP-Hilfe schließbar; Speichern/Nicht speichern/Abbrechen bei Layout-Änderung; Schriftfarbe QColorDialog auf Textrahmen; Druckermarken geteilt mit PDF, Satzspiegel als Geometrie). Overlays/Formen/Stempel wählbar, verschiebbar, in der Größe anpassbar, doppelklick-editierbar; Gummiband; Undo/Redo; Schreibschutz sperrt. Textstempel mit/ohne Rahmen, nur Schrift, Schatten, Outline. Gruppieren/Aufheben auf DTP-Rahmen und PDF-Overlays (Strg+Klick/Gummiband, ≥2). Word-Chrome Klassisch/Ribbon/Kombiniert. Pack `InstantLensDoc-2.6.59-pack.zip`. VERSION **2.6.59**. HEAD `8f01af3` (Ersatzzeichen) auf Chrome/Klick `d1e74c6`.
 
 ### 2.6.58 — Release
 
@@ -53,7 +57,7 @@ Menü **Geräte** (Scanner / Scannen…, Drucker, Erkennen), PDF → Scannen, To
 | | |
 |---|---|
 | Produkt | InstantLens Doc |
-| Version | **2.6.59** |
+| Version | **2.6.60** |
 | Hersteller | Andreas Meyer |
 | Kontakt | ame@sellerbach.de |
 | PDF | pypdfium2 / PDFium |

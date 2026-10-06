@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.6.59.
+"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.6.60.
 
 Leichtgewichtig. Exit-Codes:
   0  OK  (ok=true)
@@ -14,12 +14,12 @@ Aufruf:
   python scripts/smoke_ild.py -h
 
 JSON-Schema (--json), Erfolg:
-  {"ok": true, "version": "2.6.59", "duration_ms": 1234,
+  {"ok": true, "version": "2.6.60", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 
 JSON bei Fail: checks[] enthält Objekt mit error-Text (max 200 Zeichen, Truncate …);
 Exitcode spiegelt ok (0↔true, 1↔false) — 2.2.0:
-  {"ok": false, "version": "2.6.59", "duration_ms": 12,
+  {"ok": false, "version": "2.6.60", "duration_ms": 12,
    "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 """
 
@@ -41,7 +41,7 @@ if str(ROOT) not in sys.path:
 # Headless/CI: Qt ohne Display
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-EXPECTED_VERSION = "2.6.59"
+EXPECTED_VERSION = "2.6.60"
 FAIL_ERROR_MAX_LEN = 200
 
 EXIT_OK = 0
@@ -714,8 +714,12 @@ def check_version() -> None:
         _fail("pdf_view.py fehlt _band_click_hit (2.6.58 Klick vs. Drag)")
     if "rubber_band_finished.emit" not in pv:
         _fail("pdf_view.py fehlt rubber_band_finished.emit (2.6.58 Drag-Select)")
-    if "Leerklick/Ziehen = Gummiband" not in pv:
-        _fail("pdf_view.py fehlt Gummiband-Auswahl-Tool (2.6.58)")
+    if (
+        "Leerklick/Ziehen = Gummiband" not in pv
+        and "Klick / Gummiband" not in pv
+        and "Klick/Gummiband" not in pv
+    ):
+        _fail("pdf_view.py fehlt Gummiband-Auswahl-Tool (2.6.58/2.6.60)")
     audit_2654 = (ROOT / "scripts" / "test_ui_audit_2654.py").read_text(encoding="utf-8")
     if "Gummiband-Drag:" not in audit_2654:
         _fail("test_ui_audit_2654.py fehlt Gummiband-Drag (2.6.58, 7c ohne Fallback)")
@@ -780,6 +784,50 @@ def check_version() -> None:
     if not (ROOT / "tests" / "test_native_fs_path.py").is_file():
         _fail("tests/test_native_fs_path.py fehlt")
     _ok("2.6.59 word-suite/pdf-menu/ocr/dtp/chrome/ribbon: OK")
+    # 2.6.60: vereinigte Ansicht, Ribbon-Scrollbar, Schreibschutz, Formate, Layout-Marken
+    if "class HScrollHost" not in chrome_ui_t:
+        _fail("ui/chrome.py fehlt HScrollHost (2.6.60 Ribbon-Scrollbar)")
+    wr_t = (ROOT / "instantlensdoc" / "ui" / "word_ribbon.py").read_text(encoding="utf-8")
+    if '"Start"' not in wr_t or '"Ansicht"' not in wr_t:
+        _fail("word_ribbon.py fehlt Start/Ansicht (2.6.60 Word-Ribbon)")
+    if "FONT_TOOL_DISABLE_REASON" not in ca or "def font_tools_allowed(" not in ca:
+        _fail("chrome_actions.py fehlt Schrift-Enablement (2.6.60)")
+    if not (ROOT / "instantlensdoc" / "core" / "write_protect.py").is_file():
+        _fail("core/write_protect.py fehlt (2.6.60 Schreibschutz)")
+    if not (ROOT / "instantlensdoc" / "core" / "document_author.py").is_file():
+        _fail("core/document_author.py fehlt (2.6.60 Textersteller)")
+    if "def _toggle_write_protect(" not in mw:
+        _fail("main_window.py fehlt _toggle_write_protect (2.6.60)")
+    if "def _unsaved_prompt_box(" not in mw:
+        _fail("main_window.py fehlt _unsaved_prompt_box (2.6.60 Speichern-Abfrage)")
+    if not (ROOT / "instantlensdoc" / "ui" / "ink_input.py").is_file():
+        _fail("ui/ink_input.py fehlt (2.6.60 Tinte/Maus)")
+    if not (ROOT / "instantlensdoc" / "ui" / "ink_tools_pane.py").is_file():
+        _fail("ui/ink_tools_pane.py fehlt (2.6.60 rechte Spalte)")
+    if not (ROOT / "instantlensdoc" / "ui" / "editor_layout_marks.py").is_file():
+        _fail("ui/editor_layout_marks.py fehlt (2.6.60 Layout-Marken)")
+    if not (ROOT / "instantlensdoc" / "dtp" / "help_dialog.py").is_file():
+        _fail("dtp/help_dialog.py fehlt (2.6.60 DTP-Hilfe)")
+    if not (ROOT / "tests" / "test_office_formats_open.py").is_file():
+        _fail("tests/test_office_formats_open.py fehlt (2.6.60 md/csv/xls/xlsx)")
+    if not (ROOT / "tests" / "test_word_ribbon_full_2664.py").is_file():
+        _fail("tests/test_word_ribbon_full_2664.py fehlt (2.6.60)")
+    if not (ROOT / "tests" / "test_chrome_shrink_2665.py").is_file():
+        _fail("tests/test_chrome_shrink_2665.py fehlt (2.6.60 Ribbon-Scrollbar)")
+    if not (ROOT / "tests" / "test_write_protect_author_2666.py").is_file():
+        _fail("tests/test_write_protect_author_2666.py fehlt (2.6.60 Schreibschutz)")
+    if not (ROOT / "tests" / "test_overlay_edit_2666.py").is_file():
+        _fail("tests/test_overlay_edit_2666.py fehlt (2.6.60 Overlays)")
+    if not (ROOT / "tests" / "test_dtp_help_2662.py").is_file():
+        _fail("tests/test_dtp_help_2662.py fehlt (2.6.60 DTP-Hilfe)")
+    if not (ROOT / "tests" / "test_font_tool_enablement_2664.py").is_file():
+        _fail("tests/test_font_tool_enablement_2664.py fehlt (2.6.60 Schrift-Grau)")
+    dtp_model = (ROOT / "instantlensdoc" / "dtp" / "model.py").read_text(encoding="utf-8")
+    if "def group_frames(" not in dtp_model:
+        _fail("dtp/model.py fehlt group_frames (2.6.60 DTP-Gruppe)")
+    if "def group_selected_annotations(" not in pv:
+        _fail("pdf_view.py fehlt group_selected_annotations (2.6.60 Overlay-Gruppe)")
+    _ok("2.6.60 unified-view/ribbon-scroll/protect/formats/layout-marks: OK")
 
 
 def check_imports(*, with_qt: bool) -> None:
@@ -1679,6 +1727,8 @@ def check_changelog() -> None:
         _fail("CHANGELOG fehlt ## 2.6.49")
     if "## 2.6.51" not in cl:
         _fail("CHANGELOG fehlt ## 2.6.51")
+    if "## 2.6.60" not in cl:
+        _fail("CHANGELOG fehlt ## 2.6.60")
     if "## 2.6.59" not in cl:
         _fail("CHANGELOG fehlt ## 2.6.59")
     if "## 2.6.58" not in cl:
@@ -3158,11 +3208,11 @@ Exit-Codes:
 Laufzeit: am Ende als „Laufzeit: N ms“ (oder duration_ms im JSON).
 
 Beispiel --json (Erfolg):
-  {"ok": true, "version": "2.6.59", "duration_ms": 1234,
+  {"ok": true, "version": "2.6.60", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 
 Beispiel --json (Fail):
-  {"ok": false, "version": "2.6.59", "duration_ms": 12,
+  {"ok": false, "version": "2.6.60", "duration_ms": 12,
    "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 """.rstrip()
     )

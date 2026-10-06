@@ -1,3 +1,30 @@
+## 2.6.60 - Release: PDF-Menü, OCR, DTP, Word-Ribbon, vereinigte Ansicht
+
+Pack `InstantLensDoc-2.6.60-pack.zip`; VERSION **2.6.60**. HEAD `f51542a` (Shrink-Tests sichtbare Tab-Instanz). Nach 2.6.59-Pack (`659cf45`).
+
+- **PDF-Menü live:** Klick eine Spalte; Einträge enabled bei offenem PDF-Tab oder Geschwister-PDF; jeder Slot Dialog oder Dateiänderung (`_bind_pdf_action` / `_pdf_menu_call`).
+- **OCR:** Layout, Felder, Kopf/Fuß, Formatvorlagen, Tabellen ohne Steuerzeichen; Handschrift-OCR über Stroke-Word-Suite-APIs.
+- **DTP Gruppieren / Overlays:** Rahmen und PDF-Overlays wählen, ziehen, 8 Griffe, Doppelklick-Edit; Gummiband; Undo/Redo; **Grp** nur bei ≥2 (sonst Tooltip „Mindestens zwei Objekte markieren (Strg+Klick)“); **Aufh.** bei Gruppe; gilt in derselben Ansicht.
+- **Word-Ribbon Start–Ansicht:** lokale Befehle auf den Tabs Start bis Ansicht; Cloud-Befehle bleiben sichtbar mit Tooltip (nicht lokal).
+- **Vereinigte Ansicht:** Text, PDF und DTP in einem Dokumentfenster (keine zweite DTP-Bühne); Word-Menüs und Start/Einfügen/Layout bleiben.
+- **Ribbon-Scrollbar:** Menü/Ribbon schrumpfen mit dem Fenster; zu schmal horizontale Scrollbar (`HScrollHost`), keine versteckten Tools.
+- **Schrift ausgegraut ohne OCR:** Schriftwerkzeuge grauen mit Tooltip, Menüs bleiben sichtbar; enabled nach OCR sowie in txt/doc/docx/odt/md/csv/xls/xlsx/DTP.
+- **Schreibschutz / Textersteller:** wie Word Datei/Überprüfen ▸ Schützen / Info (`write_protect` / `document_author`); Stifteingabe bleibt an, nur Schreibschutz graut aus.
+- **Tinte / Maus / rechte Spalte / Stempel:** Maus-Linksziehen zeichnet dieselben Tintenwerkzeuge; Stifte/Pinsel in der rechten Werkzeugspalte (gleiche QActions wie das Menü); Stempel dort editierbar (Rahmen/nur Schrift/Schatten/Outline).
+- **Markdown / CSV / Excel:** `.md` / `.csv` / `.xls` / `.xlsx` in der Word-Suite öffnen und speichern; Schriftwerkzeuge aktiv.
+- **Layout-Marken:** Druckermarken/Satzspiegel in der gemeinsamen Dokumentansicht (geteilt mit PDF, Satzspiegel als Geometrie).
+- **DTP-Hilfe / Speichern-Abfrage:** schließbare DTP-Hilfe (Hilfe-Menü, F1, rechte Spalte); bei Layout-Änderung **Speichern / Nicht speichern / Abbrechen**.
+
+Windows-Rebuild (Andreas Meyer), wie 2.6.59:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File "D:\AI_Temp\sync-ild.ps1" -LocalPack D:\AI_Temp\InstantLensDoc-2.6.60-pack.zip -Dest D:\AI_Temp\InstantLensDoc-2660 -Swap -SkipStart
+cd D:\AI_Temp\InstantLensDoc
+python -m pip install -r requirements.txt
+powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
+powershell -ExecutionPolicy Bypass -File .\scripts\install-ild.ps1
+```
+
 ## 2.6.59 - Release: Word-Suite, PDF-Menü, OCR, DTP, Ribbon
 
 Pack `InstantLensDoc-2.6.59-pack.zip`; VERSION **2.6.59**. HEAD `8f01af3` (Ersatzzeichen) auf Chrome/Klick `d1e74c6`. Nach 2.6.58-Pack (`db9ef25`).

@@ -163,7 +163,7 @@ HELP_HTML = f"""
     (auch bei offenem PDF). Bei ungespeicherten Änderungen:
     Speichern / Nicht speichern / Abbrechen.
     Im Layout-Modus öffnen Hilfe-Menü, <b>F1</b> und der <b>?</b>-Button die schließbare
-    DTP-Hilfe (Werkzeuge, Rahmen, Speichern, Tastatur) — kein Stub. — <b>2.6.54</b> / <b>2.6.59</b></li>
+    DTP-Hilfe (Werkzeuge, Rahmen, Speichern, Tastatur) — kein Stub. — <b>2.6.54</b> / <b>2.6.60</b></li>
 <li><b>Extras → KI-Assistent</b>: Zusammenfassen, umformulieren, übersetzen, Inhaltsverzeichnis vorschlagen.
     OpenAI-kompatibler Endpoint + Schlüssel in Einstellungen; ohne Schlüssel Offline-Modus. — <b>2.6.54</b></li>
 <li><b>Extras → Intelligente Formerkennung / Variable Fonts / Envelope Distort / 3D-Extrusion / E-Signatur PAdES /

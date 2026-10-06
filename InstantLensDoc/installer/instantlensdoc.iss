@@ -1,4 +1,4 @@
-; Inno Setup - InstantLens Doc 2.6.59
+; Inno Setup - InstantLens Doc 2.6.60
 ; Voraussetzung: Inno Setup 6 (iscc.exe im PATH oder ISCC_PATH / -IsccPath)
 ;
 ; Build-Varianten:
@@ -24,7 +24,7 @@
 
 #define MyAppName "InstantLens Doc"
 #ifndef MyAppVersion
-  #define MyAppVersion "2.6.59"
+  #define MyAppVersion "2.6.60"
 #endif
 #define MyAppPublisher "Andreas Meyer"
 #define MyAppURL "mailto:ame@sellerbach.de"
