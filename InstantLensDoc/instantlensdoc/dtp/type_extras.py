@@ -33,6 +33,20 @@ def format_number(n: int, system: str = "latin") -> str:
     return ("-" if n < 0 else "") + out
 
 
+def list_system_fonts() -> list[str]:
+    """Installierte Schriften (Windows: QFontDatabase, sonst Qt-Families)."""
+    try:
+        from PySide6.QtGui import QFontDatabase
+        from PySide6.QtWidgets import QApplication
+
+        if QApplication.instance() is None:
+            return ["serif", "sans-serif", "monospace"]
+        fams = [str(f) for f in QFontDatabase.families() if str(f).strip()]
+        return fams or ["serif", "sans-serif", "monospace"]
+    except Exception:
+        return ["serif", "sans-serif", "monospace"]
+
+
 def list_script_fonts(script: str = "cjk") -> list[str]:
     names = list(FONT_FALLBACKS.get((script or "").lower(), FONT_FALLBACKS["cjk"]))
     try:

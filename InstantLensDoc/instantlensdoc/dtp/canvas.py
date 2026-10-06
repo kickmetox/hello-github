@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
     QColorDialog,
     QComboBox,
     QFileDialog,
+    QFontComboBox,
     QFontDialog,
     QFrame,
     QGraphicsItem,
@@ -52,7 +53,7 @@ from instantlensdoc.dtp.chrome import (
     MmRuler,
 )
 
-from instantlensdoc.dtp.geometry import snap_point, snap_value
+from instantlensdoc.dtp.geometry import format_unit, normalize_unit, snap_point, snap_to_unit, snap_value
 from instantlensdoc.dtp.model import DtpDocument, DtpFrame, DtpGuide
 from instantlensdoc.dtp.presets import list_book_presets
 from instantlensdoc.dtp.targeting import ToolHit, is_text_tool, story_or_all_text
@@ -449,11 +450,17 @@ class GuideItem(QGraphicsPathItem):
         self.setPath(path)
 
     def itemChange(self, change, value):  # type: ignore[override]
+        unit = "mm"
+        sc = self.scene()
+        if sc is not None and getattr(sc, "doc", None) is not None:
+            unit = getattr(sc.doc, "ruler_unit", "mm") or "mm"
         if change == QGraphicsItem.ItemPositionChange:
             p: QPointF = value
             if self.orientation in ("v", "vertical"):
-                return QPointF(p.x(), 0)
-            return QPointF(0, p.y())
+                x = snap_to_unit(p.x() - PAGE_OFFSET, unit) + PAGE_OFFSET
+                return QPointF(x, 0)
+            y = snap_to_unit(p.y() - PAGE_OFFSET, unit) + PAGE_OFFSET
+            return QPointF(0, y)
         if change == QGraphicsItem.ItemPositionHasChanged:
             if self.orientation in ("v", "vertical"):
                 self.guide.position_pt = self.pos().x() - PAGE_OFFSET
@@ -609,6 +616,13 @@ class DtpView(QGraphicsView):
         self._stroke: list[list[float]] = []
         self._base_width = 2.2
         self.setMouseTracking(True)
+        self._create_origin: tuple[float, float] | None = None
+
+    def _dtp_pane(self):
+        w = self.parent()
+        while w is not None and not hasattr(w, "set_tool"):
+            w = w.parent()
+        return w
 
     def _page_pos(self, view_pos) -> tuple[float, float]:
         sp = self.mapToScene(view_pos)
@@ -646,12 +660,29 @@ class DtpView(QGraphicsView):
             self._stroke = [[x, y, 0.5]]
             event.accept()
             return
+        pane = self._dtp_pane()
+        tool = getattr(pane, "_tool", "select") if pane is not None else "select"
+        if pane is not None and tool in ("text", "image", "shape") and event.button() == Qt.LeftButton:
+            x, y = self._page_pos(event.pos())
+            converted = pane.begin_create_or_apply(tool, x, y)
+            self._create_origin = None if converted else (x, y)
+            event.accept()
+            return
         super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event):  # type: ignore[override]
+        pane = self._dtp_pane()
+        if pane is not None:
+            x, y = self._page_pos(event.pos())
+            pane.show_cursor_pt(x, y)
         if self.ink_mode and self._stroke:
             x, y = self._page_pos(event.pos())
             self._stroke.append([x, y, 0.5])
+            event.accept()
+            return
+        if self._create_origin is not None and pane is not None:
+            x, y = self._page_pos(event.pos())
+            pane.preview_create_rect(self._create_origin, (x, y))
             event.accept()
             return
         super().mouseMoveEvent(event)
@@ -662,6 +693,14 @@ class DtpView(QGraphicsView):
             self._stroke.append([x, y, 0.5])
             self.strokeFinished.emit(list(self._stroke))
             self._stroke = []
+            event.accept()
+            return
+        if self._create_origin is not None:
+            pane = self._dtp_pane()
+            x, y = self._page_pos(event.pos())
+            if pane is not None:
+                pane.finish_create_frame(self._create_origin, (x, y))
+            self._create_origin = None
             event.accept()
             return
         super().mouseReleaseEvent(event)
@@ -698,6 +737,10 @@ class DtpPane(QWidget):
         self._block_style = False
         self._block_layer = False
         self._block_wrap = False
+        self._block_font = True
+        self._tool = "select"
+        self._create_rect = None
+        self._ghost = None
         self.scene = DtpScene(self.doc)
         self.view = DtpView(self.scene)
         self.view.strokeFinished.connect(self._on_stroke)
@@ -743,6 +786,10 @@ class DtpPane(QWidget):
         self.master_combo.setToolTip("Musterseite auf aktuelle Seite anwenden")
         self._reload_masters()
         self.master_combo.currentIndexChanged.connect(self._on_master)
+        self.font_combo = QFontComboBox()
+        self.font_combo.setObjectName("dtpFontCombo")
+        self.font_combo.setToolTip("Systemschriften (QFontDatabase / Windows-Fonts)")
+        self.font_combo.currentFontChanged.connect(self._on_font_combo)
 
         self.menu_bar = build_menu_bar(self)
         root.addWidget(self.menu_bar)
@@ -757,10 +804,18 @@ class DtpPane(QWidget):
         self.v_ruler = _Ruler("v", thickness=20)
         self.h_ruler.guideRequested.connect(self._add_guide)
         self.v_ruler.guideRequested.connect(self._add_guide)
-        corner = QWidget()
+        self.h_ruler.guidePreview.connect(self._preview_guide)
+        self.v_ruler.guidePreview.connect(self._preview_guide)
+        self.h_ruler.unitChanged.connect(self._on_ruler_unit)
+        self.v_ruler.unitChanged.connect(self._on_ruler_unit)
+        corner = QToolButton()
         corner.setObjectName("dtpRulerCorner")
         corner.setFixedSize(20, 20)
-        corner.setStyleSheet(f"background:{RULER_BG};")
+        corner.setText("mm")
+        corner.setToolTip("Linealeinheit: mm → pt → in")
+        corner.setStyleSheet(f"background:{RULER_BG}; border:1px solid #C8C8C8; font-size:8px;")
+        corner.clicked.connect(self.cycle_ruler_unit)
+        self._unit_corner = corner
         top = QHBoxLayout()
         top.setContentsMargins(0, 0, 0, 0)
         top.setSpacing(0)
@@ -804,9 +859,13 @@ class DtpPane(QWidget):
         root.addWidget(self.status_bar)
         self.view.horizontalScrollBar().valueChanged.connect(self._sync_rulers)
         self.view.verticalScrollBar().valueChanged.connect(self._sync_rulers)
+        self.scene.selectionChanged.connect(self._on_selection_chrome)
         self._refresh_info()
         self._reload_layers()
         self._sync_rulers()
+        self.set_ruler_unit(getattr(self.doc, "ruler_unit", "mm") or "mm")
+        self.set_tool("select", apply=False)
+        self._block_font = False
 
     def set_document(self, doc: DtpDocument) -> None:
         self.doc = doc
@@ -822,6 +881,201 @@ class DtpPane(QWidget):
         self._block_preset = False
 
     def editing_item(self) -> FrameItem | None:
+        for it in self.scene._items.values():
+            if it._editing:
+                return it
+        return None
+
+    def set_tool(self, name: str, *, apply: bool = True) -> str:
+        """Select / Textrahmen / Bild / Form — Select-then-apply auf die Auswahl."""
+        n = (name or "select").lower()
+        if n not in ("select", "text", "image", "shape"):
+            n = "select"
+        self._tool = n
+        btn = getattr(self, "_tool_buttons", {}).get(n)
+        if btn is not None and not btn.isChecked():
+            btn.blockSignals(True)
+            btn.setChecked(True)
+            btn.blockSignals(False)
+        if n == "select":
+            self.view.setDragMode(QGraphicsView.RubberBandDrag)
+        else:
+            self.view.setDragMode(QGraphicsView.NoDrag)
+        if apply and n != "select" and self.scene.selected_frames():
+            self.apply_frame_tool(n)
+            return self.set_tool("select", apply=False)
+        self.statusMessage.emit(f"Werkzeug: {n}")
+        return n
+
+    def apply_frame_tool(self, kind: str, *, shape: str = "rectangle") -> ToolHit:
+        k = (kind or "text").lower()
+        if k not in ("text", "image", "shape"):
+            k = "text"
+        selected = list(self.scene.selected_frames())
+        if selected:
+            hit = ToolHit(scope="frames", frames=selected, role=k)
+            for fr in selected:
+                self.doc.convert_frame(fr.id, k, shape=shape if k == "shape" else None)
+            self._refresh_after_tool(hit, rebuild=True)
+            self._on_selection_chrome()
+            self.statusMessage.emit(f"Werkzeug {k} auf Auswahl ({len(selected)})")
+            return hit
+        if k == "text":
+            fr = self.add_text_frame()
+        elif k == "image":
+            fr = self.add_image_frame()
+        else:
+            fr = self.add_shape(shape)
+        it = self.scene._items.get(fr.id)
+        if it is not None:
+            it.setSelected(True)
+        return ToolHit(scope="created", frames=[fr], role=k)
+
+    def begin_create_or_apply(self, kind: str, x: float, y: float) -> bool:
+        """Klick auf Rahmen wandelt um; Klick ins Leere startet Aufziehen."""
+        item = self.scene.itemAt(QPointF(x + PAGE_OFFSET, y + PAGE_OFFSET), self.view.transform())
+        frame_item = None
+        if isinstance(item, FrameItem):
+            frame_item = item
+        elif item is not None and isinstance(item.parentItem(), FrameItem):
+            frame_item = item.parentItem()
+        if frame_item is not None:
+            self.scene.clearSelection()
+            frame_item.setSelected(True)
+            self.apply_frame_tool(kind)
+            self.set_tool("select", apply=False)
+            return True
+        self._create_rect = (x, y, x, y)
+        return False
+
+    def preview_create_rect(self, origin: tuple[float, float], pos: tuple[float, float]) -> None:
+        x0, y0 = origin
+        x1, y1 = pos
+        self._create_rect = (x0, y0, x1, y1)
+        x, y = min(x0, x1), min(y0, y1)
+        w, h = abs(x1 - x0), abs(y1 - y0)
+        if self._ghost is None:
+            ghost = QGraphicsRectItem()
+            ghost.setPen(QPen(QColor("#1A4DB3"), 0.8, Qt.DashLine))
+            ghost.setBrush(Qt.NoBrush)
+            ghost.setZValue(60)
+            self.scene.addItem(ghost)
+            self._ghost = ghost
+        self._ghost.setRect(x + PAGE_OFFSET, y + PAGE_OFFSET, max(1.0, w), max(1.0, h))
+
+    def finish_create_frame(self, origin: tuple[float, float], pos: tuple[float, float]) -> DtpFrame | None:
+        if self._ghost is not None:
+            self.scene.removeItem(self._ghost)
+            self._ghost = None
+        kind = self._tool if self._tool in ("text", "image", "shape") else "text"
+        x0, y0 = origin
+        x1, y1 = pos
+        x, y = min(x0, x1), min(y0, y1)
+        w, h = abs(x1 - x0), abs(y1 - y0)
+        self._create_rect = None
+        if w < 8 or h < 8:
+            self.set_tool("select", apply=False)
+            return None
+        if kind == "text":
+            fr = self.doc.add_text_frame("Neuer Text", x=x, y=y, width=w, height=h, page=self.doc.current_page)
+        elif kind == "image":
+            fr = self.doc.add_image_frame("", x=x, y=y, width=w, height=h, page=self.doc.current_page)
+        else:
+            fr = self.doc.add_shape("rectangle", x=x, y=y, width=w, height=h, page=self.doc.current_page)
+        self.scene.rebuild()
+        it = self.scene._items.get(fr.id)
+        if it is not None:
+            it.setSelected(True)
+        self.set_tool("select", apply=False)
+        self.statusMessage.emit(f"{kind} {w:.0f}×{h:.0f} pt")
+        return fr
+
+    def set_ruler_unit(self, unit: str) -> str:
+        u = normalize_unit(unit)
+        self.doc.ruler_unit = u
+        for r in (getattr(self, "h_ruler", None), getattr(self, "v_ruler", None)):
+            if r is not None and r.unit() != u:
+                r.blockSignals(True)
+                r.set_unit(u)
+                r.blockSignals(False)
+        if hasattr(self, "_unit_corner"):
+            self._unit_corner.setText(u)
+        self._sync_rulers()
+        self.show_cursor_pt(0.0, 0.0)
+        self.statusMessage.emit(f"Lineal: {u}")
+        return u
+
+    def cycle_ruler_unit(self) -> str:
+        order = ("mm", "pt", "in")
+        cur = normalize_unit(getattr(self.doc, "ruler_unit", "mm"))
+        return self.set_ruler_unit(order[(order.index(cur) + 1) % 3])
+
+    def _on_ruler_unit(self, unit: str) -> None:
+        self.set_ruler_unit(unit)
+
+    def show_cursor_pt(self, x: float, y: float) -> None:
+        if not hasattr(self, "_coord_label"):
+            return
+        u = normalize_unit(getattr(self.doc, "ruler_unit", "mm"))
+        self._coord_label.setText(f"{format_unit(x, u)}  {format_unit(y, u)}")
+
+    def _preview_guide(self, orientation: str, pos: float) -> None:
+        unit = normalize_unit(getattr(self.doc, "ruler_unit", "mm"))
+        pos = snap_to_unit(pos, unit)
+        g = self.doc.geometry
+        if self._ghost is not None and getattr(self._ghost, "_guide_preview", False):
+            ghost = self._ghost
+        else:
+            if self._ghost is not None:
+                self.scene.removeItem(self._ghost)
+            ghost = QGraphicsRectItem()
+            ghost.setPen(QPen(QColor("#C0392B"), 0.9, Qt.DashLine))
+            ghost.setBrush(Qt.NoBrush)
+            ghost.setZValue(55)
+            ghost._guide_preview = True  # type: ignore[attr-defined]
+            self.scene.addItem(ghost)
+            self._ghost = ghost
+        if orientation in ("v", "vertical"):
+            ghost.setRect(pos + PAGE_OFFSET, PAGE_OFFSET - 12, 0.8, g.height_pt + 24)
+        else:
+            ghost.setRect(PAGE_OFFSET - 12, pos + PAGE_OFFSET, g.width_pt + 24, 0.8)
+        self.show_cursor_pt(pos if orientation in ("v", "vertical") else 0.0, 0.0 if orientation in ("v", "vertical") else pos)
+
+    def _on_font_combo(self, font: QFont) -> None:
+        if self._block_font:
+            return
+        fam = font.family() if font is not None else ""
+        if not fam:
+            return
+        self.apply_font(family=fam)
+
+    def _on_selection_chrome(self) -> None:
+        try:
+            scene = self.scene
+        except RuntimeError:
+            return
+        if scene is None:
+            return
+        try:
+            frames = scene.selected_frames()
+        except RuntimeError:
+            return
+        fill, stroke = "#D0E8FF", "#1A5276"
+        family = ""
+        if frames:
+            fill = frames[0].fill or fill
+            stroke = frames[0].stroke or stroke
+            texts = [f for f in frames if f.kind == "text"]
+            if texts:
+                family = texts[0].font_family or ""
+        if hasattr(self, "_fill_chip"):
+            self._fill_chip.setStyleSheet(f"background:{fill}; border:1px solid #333;")
+        if hasattr(self, "_stroke_chip"):
+            self._stroke_chip.setStyleSheet(f"background:{stroke}; border:1px solid #333;")
+        if family and hasattr(self, "font_combo"):
+            self._block_font = True
+            self.font_combo.setCurrentFont(QFont(family))
+            self._block_font = False
         for it in self.scene._items.values():
             if it._editing:
                 return it
@@ -898,6 +1152,7 @@ class DtpPane(QWidget):
         for fr in hit.frames:
             self.doc.apply_fill_color(fr.id, color, kind=kind)
         self._refresh_after_tool(hit, rebuild=True)
+        self._on_selection_chrome()
         self.statusMessage.emit(f"Füllung {hit.scope}: {color} ({len(hit.frames)})")
         return hit
 
@@ -918,6 +1173,7 @@ class DtpPane(QWidget):
         for fr in hit.frames:
             self.doc.apply_stroke_color(fr.id, color, width=width)
         self._refresh_after_tool(hit, rebuild=True)
+        self._on_selection_chrome()
         self.statusMessage.emit(f"Kontur {hit.scope}: {color} ({len(hit.frames)})")
         return hit
 
@@ -934,7 +1190,6 @@ class DtpPane(QWidget):
         dialog: bool = False,
     ) -> ToolHit:
         if dialog:
-            ok, font = False, QFont()
             font, ok = QFontDialog.getFont(QFont(family or "serif"), self, "Schrift")
             if not ok:
                 return ToolHit(scope="cancelled", frames=[], role="font")
@@ -968,6 +1223,7 @@ class DtpPane(QWidget):
                 fr.id, family=family, size=size, weight=weight, italic=italic, color=color
             )
         self._refresh_after_tool(hit, rebuild=False)
+        self._on_selection_chrome()
         self.statusMessage.emit(f"Schrift {hit.scope} ({len(hit.frames)})")
         return hit
 
@@ -1490,8 +1746,14 @@ class DtpPane(QWidget):
         self.statusMessage.emit(f"Erkannt: {result.kind} ({result.confidence:.0%})")
 
     def _add_guide(self, orientation: str, pos: float) -> None:
+        if self._ghost is not None:
+            self.scene.removeItem(self._ghost)
+            self._ghost = None
+        unit = normalize_unit(getattr(self.doc, "ruler_unit", "mm"))
+        pos = snap_to_unit(float(pos), unit)
         self.doc.add_guide(orientation, pos)
         self.scene.rebuild()
+        self.statusMessage.emit(f"Hilfslinie {orientation} {format_unit(pos, unit)}")
 
     def _emit_export(self) -> None:
         self.export_pdf_dialog()
@@ -1628,5 +1890,5 @@ class DtpPane(QWidget):
 
     def _chrome_help(self) -> None:
         self.statusMessage.emit(
-            "Layout-Modus: Menü Datei…Hilfe, mm-Lineale, Anschnitt rot, Satzspiegel blau"
+            "Layout-Modus: Lineale mm/pt/in (ziehen = Hilfslinie), Werkzeuge auf Auswahl, Füllung/Kontur, QFontDialog"
         )

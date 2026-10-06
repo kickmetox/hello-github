@@ -142,12 +142,64 @@ def column_rects(
     return out
 
 
+RULER_UNITS = ("mm", "pt", "in")
+
+
 def mm_to_pt(mm: float) -> float:
     return float(mm) * 72.0 / 25.4
 
 
 def pt_to_mm(pt: float) -> float:
     return float(pt) * 25.4 / 72.0
+
+
+def normalize_unit(unit: str) -> str:
+    u = (unit or "mm").lower().strip()
+    if u in ("in", "inch", "inches", '"', "″"):
+        return "in"
+    if u in ("pt", "pts", "point", "points"):
+        return "pt"
+    return "mm"
+
+
+def pt_from_unit(value: float, unit: str = "mm") -> float:
+    u = normalize_unit(unit)
+    v = float(value)
+    if u == "in":
+        return v * 72.0
+    if u == "pt":
+        return v
+    return mm_to_pt(v)
+
+
+def unit_from_pt(pt: float, unit: str = "mm") -> float:
+    u = normalize_unit(unit)
+    v = float(pt)
+    if u == "in":
+        return v / 72.0
+    if u == "pt":
+        return v
+    return pt_to_mm(v)
+
+
+def format_unit(pt: float, unit: str = "mm") -> str:
+    u = normalize_unit(unit)
+    val = unit_from_pt(pt, u)
+    if u == "in":
+        return f"{val:.2f} in"
+    if u == "pt":
+        return f"{val:.1f} pt"
+    return f"{val:.1f} mm"
+
+
+def snap_to_unit(pt: float, unit: str = "mm") -> float:
+    """Hilfslinie/Position auf die aktuelle Lineal-Einheit rasten."""
+    u = normalize_unit(unit)
+    if u == "in":
+        return snap_value(float(pt), 72.0 / 8.0, 72.0 / 16.0)
+    if u == "pt":
+        return snap_value(float(pt), 1.0, 1.0)
+    return snap_mm(float(pt), 1.0, 1.0)
 
 
 def snap_mm(value_pt: float, spacing_mm: float, threshold_mm: float = 1.0) -> float:

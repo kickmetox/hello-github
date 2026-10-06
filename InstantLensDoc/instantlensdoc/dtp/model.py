@@ -302,6 +302,7 @@ class DtpDocument:
     cross_refs: list = field(default_factory=list)
     widgets: list = field(default_factory=list)
     number_system: str = "latin"
+    ruler_unit: str = "mm"
 
     def __post_init__(self) -> None:
         if not self.layers:
@@ -357,6 +358,41 @@ class DtpDocument:
         g = DtpGuide(orientation=orientation, position_pt=float(position_pt))
         self.guides.append(g)
         return g
+
+    def convert_frame(
+        self, frame_id: str, kind: str, *, shape: str | None = None
+    ) -> DtpFrame:
+        """Select-then-tool: Rahmenart auf die Auswahl anwenden; Geometrie bleibt."""
+        fr = self.frame_by_id(frame_id)
+        if fr is None:
+            raise KeyError(frame_id)
+        k = (kind or fr.kind or "text").lower()
+        if k not in ("text", "image", "render", "shape"):
+            raise ValueError(f"unbekannte Rahmenart: {kind}")
+        if fr.kind == "text" and k != "text":
+            for other in self.frames:
+                if other.next_id == fr.id:
+                    other.next_id = fr.next_id
+                    break
+            fr.next_id = None
+        fr.kind = k
+        if k == "shape":
+            sk = (shape or fr.shape or "rectangle").lower()
+            if sk not in ("rectangle", "ellipse", "line", "arrow", "triangle"):
+                sk = "rectangle"
+            fr.shape = sk
+            if not (fr.fill or "").strip():
+                fr.fill = "#D0E8FF"
+            if not fr.layer_id:
+                fr.layer_id = "images"
+        elif k == "text":
+            fr.layer_id = "text"
+            if fr.style_id not in self.styles:
+                fr.style_id = "body"
+        elif k in ("image", "render"):
+            if not fr.layer_id:
+                fr.layer_id = "images"
+        return fr
 
     def add_text_frame(
         self,
@@ -1072,6 +1108,7 @@ class DtpDocument:
             "grid_snap": self.grid_snap,
             "guides_snap": self.guides_snap,
             "number_system": self.number_system,
+            "ruler_unit": self.ruler_unit,
             "variables": dict(self.variables),
             "library": self.library.to_dict() if self.library is not None else {},
             "footnotes": [n.to_dict() if hasattr(n, "to_dict") else n for n in self.footnotes],
@@ -1109,6 +1146,9 @@ class DtpDocument:
             doc.masters = [DtpMaster(**m) for m in data["masters"] if isinstance(m, dict)]
         doc.page_master = list(data.get("page_master") or [])
         doc.number_system = str(data.get("number_system") or "latin")
+        from .geometry import normalize_unit
+
+        doc.ruler_unit = normalize_unit(str(data.get("ruler_unit") or "mm"))
         doc.variables = dict(data.get("variables") or {})
         if data.get("library"):
             from .assets import AssetLibrary

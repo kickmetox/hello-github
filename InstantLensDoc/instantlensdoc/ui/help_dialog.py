@@ -151,7 +151,9 @@ HELP_HTML = f"""
     Caret im Textrahmen auf der Textauswahl oder dem aktuellen Absatz.
     Grafikimport AI/IDML/EPS/SVG/PSD/TIFF/Krita; natives XML <code>.sla</code> (Scribus-Teilmenge).
     Chrome analog Scribus: Menü Datei/Bearbeiten/Objekt/Einfügen/Seite/Tabelle/Ansicht/Extras/Fenster/Script/Hilfe,
-    kompakte Icon-Leiste, mm-Lineale, grauer Pasteboard, Anschnitt rot, Satzspiegel blau, Status Zoom/Seite/Hintergrund.
+    kompakte Icon-Leiste (Auswählen/Text/Bild/Form gelten auf der Auswahl; Füllung/Kontur-Farbwähler;
+    Schrift <code>QFontDialog</code>/<code>QFontDatabase</code>), Lineale mm/pt/in (ziehen setzt Hilfslinien),
+    grauer Pasteboard, Anschnitt rot, Satzspiegel blau, Status Zoom/Seite/Koordinaten/Hintergrund.
     Menü Typografie/Drop-Cap/Silbentrennung/Zeilenabstand ebenso. Ribbon-Tab <b>DTP</b> (Alt+8). — <b>2.6.54</b></li>
 <li><b>Extras → KI-Assistent</b>: Zusammenfassen, umformulieren, übersetzen, Inhaltsverzeichnis vorschlagen.
     OpenAI-kompatibler Endpoint + Schlüssel in Einstellungen; ohne Schlüssel Offline-Modus. — <b>2.6.54</b></li>

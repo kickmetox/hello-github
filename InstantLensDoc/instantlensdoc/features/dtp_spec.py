@@ -46,6 +46,7 @@ from instantlensdoc.dtp.type_extras import (
     format_number,
     keep_orphans_widows,
     list_script_fonts,
+    list_system_fonts,
     resolve_cross_ref,
 )
 
@@ -81,6 +82,7 @@ __all__ = [
     "import_sla",
     "keep_orphans_widows",
     "list_script_fonts",
+    "list_system_fonts",
     "place_symbol",
     "register_symbol",
     "resolve_cross_ref",

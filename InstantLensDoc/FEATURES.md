@@ -2,7 +2,7 @@
 
 ### 2.6.58 — Release: Auswahl-Gummiband per Mausziehen
 
-Leere Fläche ziehen selektiert alle sich schneidenden Annotationen (`rubber_band_finished` / `_on_rubber_band`); bereits ausgewähltes Objekt ziehen verschiebt. Klick bleibt Hit-Test. Pack `InstantLensDoc-2.6.58-pack.zip`. VERSION **2.6.58**.
+Leere Fläche ziehen selektiert alle sich schneidenden Annotationen (`rubber_band_finished` / `_on_rubber_band`); bereits ausgewähltes Objekt ziehen verschiebt. Klick bleibt Hit-Test. DTP-Layout: Lineale mm/pt/in, Werkzeuge/Farbe/Schrift auf Auswahl. Pack `InstantLensDoc-2.6.58-pack.zip`. VERSION **2.6.58**.
 
 ### 2.6.57 — Release: Scan-Timeout/eSCL-first, Bearbeiten-Klick, Strich auf aktuelles Objekt
 
@@ -18,7 +18,7 @@ PDF-Objekte auswählbar; Werkzeug gilt auf der Auswahl. Bearbeiten echte Formate
 
 ### 2.6.54 — Release: PDF-Export/Minimap, Scan, Tabs, Annotationen, DTP, Menü-Audit
 
-Save-As `.pdf` schreibt echte PDFs (`QPdfWriter`/`text_to_pdf`), `pdf_doctor`, Minimap aus. Scan-Übertragung (`scan_transfer.py`). Tab-Close nicht-blockierend, per-Tab-Nav, Recents, Editor-Guard. Annotationen in PDF-Punkten + native `/Annots` + `QUndoStack`. **Layout-Modus** (`instantlensdoc/dtp/`, Fassade `features/dtp_spec.py`): getrennte Text-/Bild-/Render-Rahmen, Musterseiten, Asset-Bibliothek/Symbole, Snap mm, Ebenen-Blend, Schweißen, Stile/Kerning/Grundlinie, Noten/Variablen/Querverweise, CJK/Indische/Thai-Ziffern, CMYK/Lab/Spot, Preflight, PDF/X-3, `.sla`, Grafikimport (AI/IDML/EPS/SVG/PSD/TIFF/Krita). Select-then-tool. Tests `tests/test_dtp_2654.py`–`test_dtp_2658.py`. Pack `InstantLensDoc-2.6.54-pack.zip`. VERSION **2.6.54**.
+Save-As `.pdf` schreibt echte PDFs (`QPdfWriter`/`text_to_pdf`), `pdf_doctor`, Minimap aus. Scan-Übertragung (`scan_transfer.py`). Tab-Close nicht-blockierend, per-Tab-Nav, Recents, Editor-Guard. Annotationen in PDF-Punkten + native `/Annots` + `QUndoStack`. **Layout-Modus** (`instantlensdoc/dtp/`, Fassade `features/dtp_spec.py`): getrennte Text-/Bild-/Render-Rahmen, Musterseiten, Asset-Bibliothek/Symbole, Snap mm, Ebenen-Blend, Schweißen, Stile/Kerning/Grundlinie, Noten/Variablen/Querverweise, CJK/Indische/Thai-Ziffern, CMYK/Lab/Spot, Preflight, PDF/X-3, `.sla`, Grafikimport (AI/IDML/EPS/SVG/PSD/TIFF/Krita). Nutzbare Lineale (mm/pt/in, Hilfslinien ziehen), Werkzeuge auf Auswahl, Füllung/Kontur, `QFontDialog`/`QFontDatabase`. Select-then-tool. Tests `tests/test_dtp_2654.py`–`test_dtp_2660.py`. Pack `InstantLensDoc-2.6.54-pack.zip`. VERSION **2.6.54**.
 
 ### 2.6.53 — PDFium „Data format error“, DOCX-Umbruch/-Schrift, Seitenlayout
 
@@ -261,7 +261,7 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | OCR Ausgabe: Tabelle als CSV | fertig | Heuristik → CSV; Trennzeichen `;`/`,`/Tab · UTF-8-BOM · Zielordner · Vorschau 5 Zeilen · Abbruch · Zeilen/Spalten-Zähler · Trennzeichen live · Persistenz erst Speichern · Vorschau-Reset Abbruch · Combobox synchron zurück · A11y Speichern · `*_table.csv` **1.9.5** (Basis **1.9.4**/**1.9.3**/**1.9.2**/**1.9.1**/**1.9.0**) |
 | Plugin-Hooks | fertig | User-/Script-Hooks + Event-Bus; Events: `app.started`, `document.opened`, `document.saved`, `document.exported`, `ocr.finished`, `annotation.changed`; Hooks-Ordner + ild/PS — **2.6.28** (Basis Bus **1.9.x**) |
 | Formulargenerator → HTML/PDF | fertig | Mehr Feldtypen; Definition speichern/laden |
-| Layout: Textrahmen + Verkettung | fertig | DTP-Canvas Scribus-Chrome (Menü/Icons/mm-Lineale); Caret, Resize, Overflow, Select-then-tool; Text/Bild/Render getrennt, Weld/Symbol, PDF/X-3, `.sla` — **2.6.54** |
+| Layout: Textrahmen + Verkettung | fertig | DTP-Canvas Scribus-Chrome (Menü/Icons/Lineale mm/pt/in, Hilfslinien ziehen); Caret, Resize, Overflow, Select-then-tool (Text/Bild/Form/Füllung/Kontur/Schrift auf Auswahl); Text/Bild/Render getrennt, Weld/Symbol, PDF/X-3, `.sla` — **2.6.54** |
 | Layout: einfacher Umbruch | fertig | Wortgrenzen |
 | Lizenz Trial 28d / Keys 32d | fertig | Statusleiste farbig + Tooltip; **<7 Tage prominent** 0.2.6; Dialog Resttage/Ablauf 0.3.3; **Resttage Status+About konsistent** (`resttage_phrase`) **1.0.2**; **Ablauf TT.MM.JJJJ** About+Status (`format_ablaufdatum`) **1.0.3**; **Warnung ≤3 Tage 1×/Tag nicht modal** **1.0.4**; **Banner Klick→About, Dismiss bis morgen** **1.0.5**; **Banner i18n + Farbe Warnung/abgelaufen** **1.0.6**; **Icon + Dismiss + Schließen-X, Persistenz `dismiss_date`** **1.0.7**; **Esc schließt + AccessibleName** **1.0.8** + **Fokus-Ring + Enter→Aktivierung** **1.0.9** |
 | Keygenerator (CLI/GUI) | fertig | `run-keygen.bat`/`.ps1` + PYTHONPATH Parent/Vendor **2.6.34**; HMAC `ILD1.…` · **Klartext ohne QR + Kopieren-Button** **1.1.0** + **Gültigkeitstage neben Key** **1.1.1** + **Speichern als .txt + CLI `--days`** **1.1.2** + **History letzte 10 Keys + Clear History** **1.1.3** + **Maskierung (letzte 4) / Hover·Reveal / Doppelklick kopiert** **1.1.4** + **Reveal Auto-Hide 10s / Esc** **1.1.5** + **Auto-Hide 5/10/30 s + Countdown** **1.1.6** + **Countdown Pause bei Fokusverlust** **1.1.7** + **Label „pausiert“ am Countdown** **1.1.8** + **Tooltip „Countdown pausiert (Fenster ohne Fokus)“** **1.1.9** · Store-/Pack-Doku DE **2.6.8** |

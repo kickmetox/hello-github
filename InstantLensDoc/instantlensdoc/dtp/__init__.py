@@ -10,7 +10,10 @@ from .geometry import (
     snap_mm,
     snap_point,
     snap_to_guide_mm,
+    snap_to_unit,
     snap_value,
+    format_unit,
+    normalize_unit,
 )
 from .model import (
     DtpDocument,
@@ -43,8 +46,11 @@ __all__ = [
     "distribute_frames",
     "snap_point",
     "snap_to_guide_mm",
+    "snap_to_unit",
     "snap_mm",
     "snap_value",
+    "format_unit",
+    "normalize_unit",
 ]
 
 

@@ -2,7 +2,7 @@
 
 ### 2.6.58 — Release
 
-Auswahl-Gummiband per Mausziehen: leere Fläche ziehen selektiert sich schneidende Annotationen; bereits ausgewähltes Objekt ziehen verschiebt; Klick bleibt Hit-Test. Pack `InstantLensDoc-2.6.58-pack.zip`. VERSION **2.6.58**. HEAD `56d90a4`.
+Auswahl-Gummiband per Mausziehen: leere Fläche ziehen selektiert sich schneidende Annotationen; bereits ausgewähltes Objekt ziehen verschiebt; Klick bleibt Hit-Test. DTP-Layout: nutzbare Lineale (mm/pt/in, Hilfslinien ziehen), Werkzeuge/Füllung/Kontur/Schrift auf Auswahl (`QFontDatabase`). Pack `InstantLensDoc-2.6.58-pack.zip`. VERSION **2.6.58**. HEAD `56d90a4`.
 
 ### 2.6.57 — Release
 
@@ -18,7 +18,7 @@ PDF-Objekte auswählbar, Werkzeug auf Auswahl; Bearbeiten echte Formate; OCR = W
 
 ### 2.6.54 — Release
 
-PDF-Export statt DOCX-Kopie, `pdf_doctor`, Minimap aus; Scan-Übertragung ins Dokument; Tab/Nav/Recents/Editor-Guard; Annotationen persistieren; DTP-Layout-Modus (`dtp/` + `features/dtp_spec.py`, Scribus-Chrome: Menü Datei…Hilfe, Icon-Leiste, mm-Lineale, Anschnitt rot / Satzspiegel blau) + Extras ohne „(geplant)“; Menü-Audit (701 Einträge, Telemetrie ohne Stub-Dialog). Ansicht → **Layout-Modus** (Ctrl+Alt+L, Ribbon DTP). Werkzeuge gelten auf dem gewählten Rahmen, ohne Auswahl auf der Story/allem Text, Caret auf Auswahl/Absatz. Pack `InstantLensDoc-2.6.54-pack.zip`. VERSION **2.6.54**.
+PDF-Export statt DOCX-Kopie, `pdf_doctor`, Minimap aus; Scan-Übertragung ins Dokument; Tab/Nav/Recents/Editor-Guard; Annotationen persistieren; DTP-Layout-Modus (`dtp/` + `features/dtp_spec.py`, Scribus-Chrome: Menü Datei…Hilfe, Icon-Leiste, Lineale mm/pt/in mit Hilfslinien, Anschnitt rot / Satzspiegel blau; Werkzeuge/Farbe/Schrift auf Auswahl) + Extras ohne „(geplant)“; Menü-Audit (701 Einträge, Telemetrie ohne Stub-Dialog). Ansicht → **Layout-Modus** (Ctrl+Alt+L, Ribbon DTP). Werkzeuge gelten auf dem gewählten Rahmen, ohne Auswahl auf der Story/allem Text, Caret auf Auswahl/Absatz. Pack `InstantLensDoc-2.6.54-pack.zip`. VERSION **2.6.54**.
 
 ### 2.6.53 — PDFium „Data format error“, DOCX-Umbruch/-Schrift, Seitenlayout
 

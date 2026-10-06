@@ -5,6 +5,7 @@ from __future__ import annotations
 from PySide6.QtCore import QPointF, QSize, Qt, Signal
 from PySide6.QtGui import QAction, QColor, QFont, QIcon, QPainter, QPen, QPixmap, QPolygonF
 from PySide6.QtWidgets import (
+    QButtonGroup,
     QHBoxLayout,
     QLabel,
     QMenuBar,
@@ -13,7 +14,10 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from instantlensdoc.dtp.geometry import mm_to_pt, pt_to_mm
+from instantlensdoc.dtp.geometry import (
+    mm_to_pt,
+    normalize_unit,
+)
 
 PASTEBOARD = "#E8E8E8"
 RULER_BG = "#F3F3F3"
@@ -116,6 +120,18 @@ def scribus_icon(kind: str, size: int = 18) -> QIcon:
             p.drawLine(x, 3, x, 15)
         for y in (4, 9, 14):
             p.drawLine(3, y, 15, y)
+    elif k == "fill":
+        p.setBrush(QColor("#E74C3C"))
+        p.drawRect(3, 8, 12, 8)
+        p.setBrush(QColor("#F4D03F"))
+        p.drawEllipse(6, 2, 6, 7)
+    elif k == "stroke":
+        p.setBrush(Qt.NoBrush)
+        p.setPen(QPen(QColor("#1A5276"), 2.0))
+        p.drawRect(3, 4, 12, 10)
+    elif k == "font":
+        p.setFont(QFont("Serif", 11, QFont.Bold))
+        p.drawText(pm.rect(), Qt.AlignCenter, "A")
     else:
         p.setBrush(QColor("#bbb"))
         p.drawRect(3, 3, 12, 12)
@@ -124,9 +140,11 @@ def scribus_icon(kind: str, size: int = 18) -> QIcon:
 
 
 class MmRuler(QWidget):
-    """Scribus-Lineal in Millimetern, 0 am Seitenursprung, negative Pasteboard-Werte."""
+    """Nutzbares Lineal: mm/pt/in, Ziehen setzt Hilfslinie, 0 am Seitenursprung."""
 
     guideRequested = Signal(str, float)
+    guidePreview = Signal(str, float)
+    unitChanged = Signal(str)
 
     def __init__(self, orientation: str, *, thickness: int = 20):
         super().__init__()
@@ -135,7 +153,10 @@ class MmRuler(QWidget):
         self._scale = 1.0
         self._origin_px = 40.0
         self._length_pt = 595.0
-        self.setToolTip("Lineal (mm) — Klick setzt Hilfslinie")
+        self._unit = "mm"
+        self._dragging = False
+        self.setMouseTracking(True)
+        self._refresh_tip()
         if orientation == "h":
             self.setFixedHeight(thickness)
             self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
@@ -143,11 +164,45 @@ class MmRuler(QWidget):
             self.setFixedWidth(thickness)
             self.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
 
+    def _refresh_tip(self) -> None:
+        self.setToolTip(
+            f"Lineal ({self._unit}) — Ziehen setzt Hilfslinie, Rechtsklick wechselt mm/pt/in"
+        )
+
+    def unit(self) -> str:
+        return self._unit
+
+    def set_unit(self, unit: str) -> None:
+        u = normalize_unit(unit)
+        if u == self._unit:
+            return
+        self._unit = u
+        self._refresh_tip()
+        self.update()
+        self.unitChanged.emit(u)
+
+    def cycle_unit(self) -> str:
+        order = ("mm", "pt", "in")
+        nxt = order[(order.index(self._unit) + 1) % len(order)]
+        self.set_unit(nxt)
+        return nxt
+
     def set_metrics(self, scale: float, origin_px: float, length_pt: float) -> None:
         self._scale = max(0.05, float(scale))
         self._origin_px = float(origin_px)
         self._length_pt = float(length_pt)
         self.update()
+
+    def _px_to_pt(self, px: float) -> float:
+        return (float(px) - self._origin_px) / max(self._scale, 0.01)
+
+    def _event_pt(self, event) -> float:
+        if self.orientation == "h":
+            return self._px_to_pt(event.position().x())
+        return self._px_to_pt(event.position().y())
+
+    def _orientation_name(self) -> str:
+        return "vertical" if self.orientation == "h" else "horizontal"
 
     def paintEvent(self, event) -> None:  # type: ignore[override]
         p = QPainter(self)
@@ -158,47 +213,103 @@ class MmRuler(QWidget):
         else:
             p.drawLine(self.width() - 1, 0, self.width() - 1, self.height())
         p.setPen(QColor("#222"))
-        font = QFont("Sans Serif", 7)
-        p.setFont(font)
-        px_per_mm = mm_to_pt(1.0) * self._scale
-        if px_per_mm < 0.4:
-            p.end()
-            return
+        p.setFont(QFont("Sans Serif", 7))
         span = self.width() if self.orientation == "h" else self.height()
-        mm_lo = int((0 - self._origin_px) / px_per_mm) - 2
-        mm_hi = int((span - self._origin_px) / px_per_mm) + 2
-        for mm in range(mm_lo, mm_hi + 1):
-            pos = int(round(self._origin_px + mm * px_per_mm))
-            if self.orientation == "h":
-                if mm % 10 == 0:
-                    p.drawLine(pos, self.height() - 12, pos, self.height())
-                    p.drawText(pos + 2, 10, str(mm))
-                elif mm % 5 == 0:
-                    p.drawLine(pos, self.height() - 8, pos, self.height())
+        unit = self._unit
+        if unit == "in":
+            step_pt = 72.0 / 16.0
+            px_per = step_pt * self._scale
+            if px_per < 0.4:
+                p.end()
+                return
+            lo = int((0 - self._origin_px) / px_per) - 2
+            hi = int((span - self._origin_px) / px_per) + 2
+            for n in range(lo, hi + 1):
+                pos = int(round(self._origin_px + n * px_per))
+                if n % 16 == 0:
+                    self._tick(p, pos, 12, str(n // 16))
+                elif n % 8 == 0:
+                    self._tick(p, pos, 9)
+                elif n % 4 == 0:
+                    self._tick(p, pos, 6)
                 else:
-                    p.drawLine(pos, self.height() - 4, pos, self.height())
-            else:
-                if mm % 10 == 0:
-                    p.drawLine(self.width() - 12, pos, self.width(), pos)
-                    p.save()
-                    p.translate(9, pos + 11)
-                    p.rotate(-90)
-                    p.drawText(0, 0, str(mm))
-                    p.restore()
-                elif mm % 5 == 0:
-                    p.drawLine(self.width() - 8, pos, self.width(), pos)
+                    self._tick(p, pos, 4)
+        elif unit == "pt":
+            px_per = self._scale
+            if px_per < 0.25:
+                p.end()
+                return
+            minor = 10 if px_per < 1.2 else 1
+            lo = int((0 - self._origin_px) / px_per) - 2
+            hi = int((span - self._origin_px) / px_per) + 2
+            for n in range(lo, hi + 1):
+                if n % minor:
+                    continue
+                pos = int(round(self._origin_px + n * px_per))
+                if n % 50 == 0:
+                    self._tick(p, pos, 12, str(n))
+                elif n % 10 == 0:
+                    self._tick(p, pos, 8)
                 else:
-                    p.drawLine(self.width() - 4, pos, self.width(), pos)
+                    self._tick(p, pos, 4)
+        else:
+            px_per = mm_to_pt(1.0) * self._scale
+            if px_per < 0.4:
+                p.end()
+                return
+            lo = int((0 - self._origin_px) / px_per) - 2
+            hi = int((span - self._origin_px) / px_per) + 2
+            for n in range(lo, hi + 1):
+                pos = int(round(self._origin_px + n * px_per))
+                if n % 10 == 0:
+                    self._tick(p, pos, 12, str(n))
+                elif n % 5 == 0:
+                    self._tick(p, pos, 8)
+                else:
+                    self._tick(p, pos, 4)
         p.end()
 
-    def mousePressEvent(self, event) -> None:  # type: ignore[override]
-        px_per_mm = mm_to_pt(1.0) * self._scale
+    def _tick(self, p: QPainter, pos: int, length: int, label: str = "") -> None:
         if self.orientation == "h":
-            mm = (event.position().x() - self._origin_px) / max(px_per_mm, 0.01)
-            self.guideRequested.emit("vertical", float(mm_to_pt(mm)))
+            p.drawLine(pos, self.height() - length, pos, self.height())
+            if label:
+                p.drawText(pos + 2, 10, label)
         else:
-            mm = (event.position().y() - self._origin_px) / max(px_per_mm, 0.01)
-            self.guideRequested.emit("horizontal", float(mm_to_pt(mm)))
+            p.drawLine(self.width() - length, pos, self.width(), pos)
+            if label:
+                p.save()
+                p.translate(9, pos + 11)
+                p.rotate(-90)
+                p.drawText(0, 0, label)
+                p.restore()
+
+    def mousePressEvent(self, event) -> None:  # type: ignore[override]
+        if event.button() == Qt.RightButton:
+            self.cycle_unit()
+            event.accept()
+            return
+        if event.button() != Qt.LeftButton:
+            return
+        self._dragging = True
+        self.guidePreview.emit(self._orientation_name(), self._event_pt(event))
+        event.accept()
+
+    def mouseMoveEvent(self, event) -> None:  # type: ignore[override]
+        if not self._dragging:
+            return
+        self.guidePreview.emit(self._orientation_name(), self._event_pt(event))
+        event.accept()
+
+    def mouseReleaseEvent(self, event) -> None:  # type: ignore[override]
+        if not self._dragging or event.button() != Qt.LeftButton:
+            return
+        self._dragging = False
+        self.guideRequested.emit(self._orientation_name(), self._event_pt(event))
+        event.accept()
+
+    def mouseDoubleClickEvent(self, event) -> None:  # type: ignore[override]
+        self.cycle_unit()
+        event.accept()
 
 
 def build_menu_bar(pane: QWidget) -> QMenuBar:
@@ -247,6 +358,10 @@ def build_menu_bar(pane: QWidget) -> QMenuBar:
     m_ans.addAction("Ebenen", pane.toggle_layers)
     m_ans.addAction("Zoom 100 %", lambda: pane.set_zoom(100.0))
     m_ans.addAction("Seite einpassen", pane.zoom_fit)
+    m_units = m_ans.addMenu("Linealeinheit")
+    m_units.addAction("Millimeter", lambda: pane.set_ruler_unit("mm"))
+    m_units.addAction("Punkt (pt)", lambda: pane.set_ruler_unit("pt"))
+    m_units.addAction("Zoll (in)", lambda: pane.set_ruler_unit("in"))
     m_ex = bar.addMenu("&Extras")
     m_ex.addAction("Preflight…", pane.run_preflight)
     m_ex.addAction("Live-Füllung", pane.apply_live_fill)
@@ -267,13 +382,14 @@ def build_icon_bar(pane: QWidget) -> QWidget:
     lay.setContentsMargins(4, 2, 4, 2)
     lay.setSpacing(1)
 
-    def add_btn(kind: str, slot, tip: str) -> QToolButton:
+    def add_btn(kind: str, slot, tip: str, *, checkable: bool = False) -> QToolButton:
         btn = QToolButton()
         btn.setIcon(scribus_icon(kind))
         btn.setAutoRaise(True)
         btn.setIconSize(QSize(18, 18))
         btn.setFixedSize(24, 24)
         btn.setToolTip(tip)
+        btn.setCheckable(checkable)
         btn.clicked.connect(slot)
         lay.addWidget(btn)
         return btn
@@ -284,14 +400,48 @@ def build_icon_bar(pane: QWidget) -> QWidget:
     sep = QWidget()
     sep.setFixedWidth(6)
     lay.addWidget(sep)
-    add_btn("select", lambda: None, "Auswählen")
-    add_btn("text", pane.add_text_frame, "Textrahmen")
-    add_btn("image", pane.add_image_frame, "Bildrahmen")
-    add_btn("shape", pane.add_shape, "Form")
+    pane._tool_buttons = {}
+    pane._tool_group = QButtonGroup(bar)
+    pane._tool_group.setExclusive(True)
+
+    def add_tool(kind: str, name: str, tip: str) -> QToolButton:
+        btn = add_btn(kind, lambda _=False, n=name: pane.set_tool(n), tip, checkable=True)
+        btn.setObjectName(f"dtpTool_{name}")
+        pane._tool_group.addButton(btn)
+        pane._tool_buttons[name] = btn
+        return btn
+
+    add_tool("select", "select", "Auswählen")
+    add_tool("text", "text", "Textrahmen — gilt auf Auswahl")
+    add_tool("image", "image", "Bildrahmen — gilt auf Auswahl")
+    add_tool("shape", "shape", "Form — gilt auf Auswahl")
+    pane._tool_buttons["select"].setChecked(True)
     add_btn("link", pane.link_selected, "Verketten")
     sep2 = QWidget()
     sep2.setFixedWidth(6)
     lay.addWidget(sep2)
+    add_btn("fill", lambda: pane.apply_fill(dialog=True), "Füllfarbe auf Auswahl")
+    pane._fill_chip = QLabel()
+    pane._fill_chip.setObjectName("dtpFillChip")
+    pane._fill_chip.setFixedSize(14, 12)
+    pane._fill_chip.setToolTip("Aktuelle Füllfarbe")
+    pane._fill_chip.setStyleSheet("background:#D0E8FF; border:1px solid #333;")
+    pane._fill_chip.mousePressEvent = lambda e: pane.apply_fill(dialog=True)  # type: ignore[method-assign]
+    lay.addWidget(pane._fill_chip)
+    add_btn("stroke", lambda: pane.apply_stroke(dialog=True), "Kontur auf Auswahl")
+    pane._stroke_chip = QLabel()
+    pane._stroke_chip.setObjectName("dtpStrokeChip")
+    pane._stroke_chip.setFixedSize(14, 12)
+    pane._stroke_chip.setToolTip("Aktuelle Konturfarbe")
+    pane._stroke_chip.setStyleSheet("background:#1A5276; border:1px solid #333;")
+    pane._stroke_chip.mousePressEvent = lambda e: pane.apply_stroke(dialog=True)  # type: ignore[method-assign]
+    lay.addWidget(pane._stroke_chip)
+    add_btn("font", lambda: pane.apply_font(dialog=True), "Schrift (QFontDialog) auf Auswahl/Caret")
+    pane.font_combo.setMaximumHeight(22)
+    pane.font_combo.setMaximumWidth(140)
+    pane.font_combo.setObjectName("dtpFontCombo")
+    pane.font_combo.setToolTip("Systemschriften (Windows: QFontDatabase)")
+    lay.addWidget(pane.font_combo)
     add_btn("align", lambda: pane.align("left"), "Ausrichten")
     add_btn("weld", pane.weld_selected, "Schweißen")
     add_btn("grid", pane.toggle_grid, "Raster")
@@ -331,6 +481,10 @@ def build_status_bar(pane: QWidget) -> QWidget:
     pane._info = QLabel("")
     pane._info.setObjectName("dtpInfo")
     lay.addWidget(pane._info, 1)
+    pane._coord_label = QLabel("0,0 mm")
+    pane._coord_label.setObjectName("dtpCoordLabel")
+    pane._coord_label.setFixedWidth(120)
+    lay.addWidget(pane._coord_label)
     pane._zoom_label = QLabel("100.00 %")
     pane._zoom_label.setObjectName("dtpZoomLabel")
     pane._zoom_label.setFixedWidth(64)
