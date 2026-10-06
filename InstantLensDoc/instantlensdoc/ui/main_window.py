@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
     QDialogButtonBox,
     QFileDialog,
     QFrame,
+    QGridLayout,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -1341,11 +1342,26 @@ class MainWindow(QMainWindow):
         self.welcome_page.continue_session_requested.connect(self._continue_last_session)
         self.dtp_pane = DtpPane(self, doc=getattr(self, "dtp_doc", None))
         self.dtp_pane.statusMessage.connect(self._set_status)
+        self._dtp_tools_on = False
         self.stack.addWidget(self.editor_pane)  # 0
         self.stack.addWidget(self.pdf_view)  # 1
         self.stack.addWidget(self.image_label)  # 2
         self.stack.addWidget(self.welcome_page)  # 3 — Startseite ohne Tabs (1.0.0)
-        self.stack.addWidget(self.dtp_pane)  # 4 — DTP-Layout-Modus 2.6.54
+        # DTP liegt als Overlay auf dem Dokument, nicht als eigener Stack-Modus.
+        self._doc_host = QWidget()
+        self._doc_host.setObjectName("ildDocHost")
+        host_lay = QGridLayout(self._doc_host)
+        host_lay.setContentsMargins(0, 0, 0, 0)
+        host_lay.setSpacing(0)
+        host_lay.addWidget(self.stack, 0, 0)
+        host_lay.addWidget(self.dtp_pane, 0, 0)
+        self.dtp_pane.hide()
+        try:
+            mb = getattr(self.dtp_pane, "menu_bar", None)
+            if mb is not None:
+                mb.hide()
+        except Exception:
+            pass
         self.stack.currentChanged.connect(lambda *_: self._apply_doc_split_sync_scroll())
         self.stack.currentChanged.connect(lambda *_: self._update_doc_status())
         self.stack.currentChanged.connect(lambda *_: self._sync_editor_toolbar_for_stack())
@@ -1360,7 +1376,7 @@ class MainWindow(QMainWindow):
             Qt.Vertical if get_editor_doc_split_vertical() else Qt.Horizontal
         )
         self.doc_splitter = QSplitter(split_orient)
-        self.doc_splitter.addWidget(self.stack)
+        self.doc_splitter.addWidget(self._doc_host)
         self.secondary_wrap = QWidget()
         sec_lay = QVBoxLayout(self.secondary_wrap)
         sec_lay.setContentsMargins(4, 4, 4, 4)
@@ -2785,12 +2801,12 @@ class MainWindow(QMainWindow):
         )
         self._satzspiegel_action.toggled.connect(self._toggle_satzspiegel)
         m_view.addAction(self._satzspiegel_action)
-        self._layout_mode_action = QAction("Layout-Modus", self)
+        self._layout_mode_action = QAction("DTP-Werkzeuge", self)
         self._layout_mode_action.setObjectName("actLayoutMode")
         self._layout_mode_action.setCheckable(True)
         self._layout_mode_action.setShortcut(QKeySequence("Ctrl+Alt+L"))
         self._layout_mode_action.setToolTip(
-            "DTP-Canvas: Rahmen, Lineal, Raster, Musterseiten — 2.6.54"
+            "DTP-Rahmen, Lineale und Raster in derselben Dokumentansicht — kein zweites Fenster"
         )
         self._layout_mode_action.triggered.connect(self._on_layout_mode_triggered)
         m_view.addAction(self._layout_mode_action)
@@ -4345,13 +4361,13 @@ class MainWindow(QMainWindow):
         m_dtp = QMenu("&DTP", self)
         m_dtp.setObjectName("menuDtp")
         m_dtp.setToolTip(
-            "DTP-Layout: Menütitel öffnet den Canvas; Einträge teilen bestehende Slots"
+            "DTP-Werkzeuge in derselben Ansicht wie Text und PDF"
         )
-        self._dtp_view_action = QAction("DTP-Ansicht", self)
+        self._dtp_view_action = QAction("DTP-Werkzeuge", self)
         self._dtp_view_action.setObjectName("actDtpView")
         self._dtp_view_action.setCheckable(True)
         self._dtp_view_action.setToolTip(
-            "Sofort in den DTP-Layout-Modus wechseln (aktuelles Dokument, inkl. PDF)"
+            "Rahmen/Lineale auf der aktuellen Seite — Word-Leiste bleibt sichtbar"
         )
         self._dtp_view_action.triggered.connect(self._on_layout_mode_triggered)
         m_dtp.addAction(self._dtp_view_action)
@@ -4410,7 +4426,7 @@ class MainWindow(QMainWindow):
             pass
 
     def _on_dtp_menu_about_to_show(self) -> None:
-        """Menütitel DTP: eine Spalte, sofort Layout-Modus (PDF inklusive)."""
+        """Menütitel DTP: eine Spalte; Werkzeuge in derselben Ansicht."""
         if getattr(self, "_dtp_switching", False):
             return
         self._dtp_menu_showing = True
@@ -11731,9 +11747,9 @@ class MainWindow(QMainWindow):
         return True
 
     def _layout_mode_active(self) -> bool:
+        """DTP-Werkzeuge in derselben Dokumentansicht (kein Stack-Tausch)."""
         pane = getattr(self, "dtp_pane", None)
-        stack = getattr(self, "stack", None)
-        return pane is not None and stack is not None and stack.currentWidget() is pane
+        return bool(getattr(self, "_dtp_tools_on", False)) and pane is not None and pane.isVisible()
 
     def _guard_editor_action(self, what: str) -> bool:
         """Editor-only Aktion: bei PDF/anderem Tab no-op, kein Stack-Wechsel — 2.6.54."""
@@ -14056,7 +14072,7 @@ class MainWindow(QMainWindow):
         """Drucksensitiver Stift: DTP-Canvas oder PDF-Freihand — 2.6.54."""
         try:
             if getattr(self, "dtp_pane", None) is not None and (
-                self.stack.currentWidget() is self.dtp_pane
+                self._layout_mode_active()
                 or not getattr(self.pdf_view, "pdf_path", None)
             ):
                 if not self._enter_layout_mode():
@@ -14291,15 +14307,12 @@ class MainWindow(QMainWindow):
             pass
 
     def _on_ribbon_category(self, title: str) -> None:
-        """Ribbon-Tab DTP öffnet sofort die DTP-Ansicht, nicht erst ein Unterwerkzeug."""
+        """Ribbon-Tab DTP schaltet Werkzeuge ein, ohne die Dokumentansicht zu tauschen."""
         if str(title or "").strip() != "DTP":
             return
         if getattr(self, "_dtp_switching", False):
             return
-        if not self._enter_layout_mode():
-            rb = getattr(self, "ribbon_bar", None)
-            if rb is not None and hasattr(rb, "restore_previous_category"):
-                rb.restore_previous_category()
+        self._enter_layout_mode()
 
     def _on_layout_mode_triggered(self, checked: bool = True) -> None:
         if not checked:
@@ -14329,9 +14342,14 @@ class MainWindow(QMainWindow):
                 rb.set_checked("dtp_layout", want)
             except Exception:
                 pass
+            if hasattr(rb, "set_dtp_tools_visible"):
+                try:
+                    rb.set_dtp_tools_visible(want)
+                except Exception:
+                    pass
 
     def _enter_layout_mode(self, checked: bool = True) -> bool:
-        """Ribbon/Menü DTP oder Ansicht → Layout-Modus: DTP-Canvas für das aktuelle Dokument."""
+        """DTP-Werkzeuge in derselben Ansicht wie Text/PDF — kein Fensterwechsel."""
         if checked is False:
             return self._leave_layout_mode()
         if self._layout_mode_active():
@@ -14344,12 +14362,6 @@ class MainWindow(QMainWindow):
             return True
         self._dtp_switching = True
         try:
-            if not self._confirm_document_unsaved(title="Layout-Modus"):
-                self._sync_layout_mode_checked(False)
-                return False
-            cur = self.stack.currentWidget()
-            if cur is not pane:
-                self._dtp_return_widget = cur
             try:
                 from instantlensdoc.dtp.model import DtpDocument
 
@@ -14359,17 +14371,19 @@ class MainWindow(QMainWindow):
                     pane.set_document(DtpDocument.sample("A5"))
             except Exception:
                 pass
-            self.stack.setCurrentWidget(pane)
+            try:
+                mb = getattr(pane, "menu_bar", None)
+                if mb is not None:
+                    mb.hide()
+            except Exception:
+                pass
+            pane.show()
+            pane.raise_()
+            self._dtp_tools_on = True
             if hasattr(pane, "apply_shared_print_overlays"):
                 pane.apply_shared_print_overlays()
             self._sync_layout_mode_checked(True)
-            rb = getattr(self, "ribbon_bar", None)
-            if rb is not None and not getattr(self, "_dtp_menu_showing", False):
-                try:
-                    rb.select_tab("DTP")
-                except Exception:
-                    pass
-            self._set_status("Layout-Modus (DTP)")
+            self._set_status("DTP-Werkzeuge (gleiche Ansicht)")
             try:
                 self._sync_editor_only_actions()
                 self._sync_menu_enablement()
@@ -14381,7 +14395,7 @@ class MainWindow(QMainWindow):
             self._dtp_switching = False
 
     def _leave_layout_mode(self) -> bool:
-        """DTP verlassen; bei dirty Layout Speichern / Nicht speichern / Abbrechen."""
+        """DTP-Overlay ausblenden; Dokument-Stack bleibt Text/PDF."""
         if not self._layout_mode_active():
             self._sync_layout_mode_checked(False)
             return True
@@ -14393,25 +14407,11 @@ class MainWindow(QMainWindow):
                 self._sync_layout_mode_checked(True)
                 return False
             pane = getattr(self, "dtp_pane", None)
-            target = getattr(self, "_dtp_return_widget", None)
-            if target is None or target is pane:
-                doc = getattr(self, "doc", None)
-                kind = getattr(doc, "kind", None) if doc is not None else None
-                if kind == DocKind.PDF or getattr(self.pdf_view, "pdf_path", None):
-                    target = self.pdf_view
-                elif kind in (
-                    DocKind.TEXT,
-                    DocKind.MARKDOWN,
-                    DocKind.HTML,
-                    DocKind.DOCX,
-                    DocKind.RTF,
-                ):
-                    target = self.editor_pane
-                else:
-                    target = self.welcome_page
-            self.stack.setCurrentWidget(target)
+            if pane is not None:
+                pane.hide()
+            self._dtp_tools_on = False
             self._sync_layout_mode_checked(False)
-            self._set_status("DTP beendet")
+            self._set_status("DTP-Werkzeuge aus")
             try:
                 self._sync_editor_only_actions()
                 self._sync_menu_enablement()

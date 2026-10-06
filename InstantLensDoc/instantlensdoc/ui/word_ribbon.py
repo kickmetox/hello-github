@@ -151,6 +151,14 @@ WORD_TAB_GROUPS: dict[str, tuple[tuple[str, tuple], ...]] = {
             (("doc_comments", "Kommentar"),),
         ),
         (
+            "Rahmen",
+            (
+                ("dtp_text_frame", "Textrahmen"),
+                ("dtp_image", "Bild…"),
+                ("dtp_graphic", "Grafik"),
+            ),
+        ),
+        (
             "Kopf-/Fußzeile",
             (
                 ("insert_header", "Kopfzeile"),
@@ -309,6 +317,8 @@ WORD_TAB_GROUPS: dict[str, tuple[tuple[str, tuple], ...]] = {
                 ("toggle_navigation", "Navigation"),
                 ("toggle_minimap", "Minimap"),
                 ("show_special_chars", "¶"),
+                ("dtp_layout", "DTP-Werkzeuge"),
+                ("dtp_grid", "Raster"),
             ),
         ),
         (

@@ -206,3 +206,23 @@ def test_disabled_ribbon_click_sets_status() -> None:
         assert aid in _WIN.ribbon_bar._actions, aid
         assert _WIN.ribbon_bar._actions[aid].isEnabled(), aid
 
+
+def test_single_view_dtp_keeps_word_tabs() -> None:
+    load_state(_WIN, _APP, "empty", _FIXTURES)
+    pump(_APP, 0.1)
+    assert _WIN.stack.currentWidget() is _WIN.editor_pane
+    assert _WIN._enter_layout_mode()
+    assert _WIN._layout_mode_active()
+    assert _WIN.stack.currentWidget() is _WIN.editor_pane
+    assert _WIN.dtp_pane.isVisible()
+    rb = _WIN.ribbon_bar
+    for tab in ("Start", "Einfügen", "Layout", "Ansicht"):
+        rb.select_tab(tab)
+        pump(_APP, 0.02)
+        assert rb._stack.currentWidget() is not None
+    assert "dtp_layout" in rb._actions
+    assert "dtp_text_frame" in rb._actions
+    assert _WIN._leave_layout_mode()
+    assert not _WIN.dtp_pane.isVisible()
+    assert _WIN.stack.currentWidget() is _WIN.editor_pane
+

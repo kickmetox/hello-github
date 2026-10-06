@@ -116,8 +116,9 @@ def test_ribbon_dtp_tab_opens_pane_for_pdf() -> None:
     assert _WIN.stack.currentWidget() is _WIN.pdf_view
     _WIN.ribbon_bar.select_tab("DTP")
     pump(_APP, 0.05)
-    assert _WIN.stack.currentWidget() is _WIN.dtp_pane
+    assert _WIN.stack.currentWidget() is _WIN.pdf_view
     assert _WIN._layout_mode_active()
+    assert _WIN.dtp_pane.isVisible()
     assert _WIN._layout_mode_action.isChecked()
     assert _WIN._dtp_view_action.isChecked()
 
@@ -128,11 +129,12 @@ def test_menubar_dtp_about_to_show_opens_pane() -> None:
     menu = find_menubar_menu(_WIN, "DTP")
     assert menu is not None
     texts = [a.text() for a in menu.actions() if not a.isSeparator()]
-    assert texts[0] == "DTP-Ansicht"
+    assert texts[0] == "DTP-Werkzeuge"
     menu.aboutToShow.emit()
     pump(_APP, 0.05)
     assert _WIN._layout_mode_active()
-    assert _WIN.stack.currentWidget() is _WIN.dtp_pane
+    assert _WIN.stack.currentWidget() is _WIN.pdf_view
+    assert _WIN.dtp_pane.isVisible()
 
 
 def test_unsaved_prompt_german_buttons() -> None:
@@ -142,37 +144,25 @@ def test_unsaved_prompt_german_buttons() -> None:
     assert box.button(QMessageBox.Cancel).text() == "Abbrechen"
 
 
-def test_dirty_document_cancel_aborts_enter(monkeypatch) -> None:
+def test_dirty_document_still_keeps_pdf_surface(monkeypatch) -> None:
     _reload_pdf()
     monkeypatch.setattr(_WIN, "_document_is_dirty", lambda: True)
-    seen: dict[str, str] = {}
-
-    def fake_exec(self, *a, **k):
-        seen["title"] = self.windowTitle()
-        save_btn = self.button(QMessageBox.Save)
-        seen["save"] = save_btn.text() if save_btn is not None else ""
-        return QMessageBox.Cancel
-
-    monkeypatch.setattr(QMessageBox, "exec", fake_exec)
-    monkeypatch.setattr(QDialog, "exec", fake_exec)
-    assert _WIN._enter_layout_mode() is False
-    assert not _WIN._layout_mode_active()
+    assert _WIN._enter_layout_mode() is True
+    assert _WIN._layout_mode_active()
     assert _WIN.stack.currentWidget() is _WIN.pdf_view
-    assert seen.get("save") == "Speichern"
-    assert seen.get("title") == "Layout-Modus"
+    assert _WIN.dtp_pane.isVisible()
 
 
-def test_ribbon_dtp_cancel_restores_previous_tab(monkeypatch) -> None:
+def test_ribbon_dtp_keeps_word_chrome_on_dirty_document(monkeypatch) -> None:
     _reload_pdf()
     _WIN.ribbon_bar.select_tab("Start")
     pump(_APP, 0.05)
     monkeypatch.setattr(_WIN, "_document_is_dirty", lambda: True)
-    monkeypatch.setattr(QMessageBox, "exec", lambda self, *a, **k: QMessageBox.Cancel)
-    monkeypatch.setattr(QDialog, "exec", lambda self, *a, **k: QMessageBox.Cancel)
     _WIN.ribbon_bar.select_tab("DTP")
     pump(_APP, 0.05)
-    assert not _WIN._layout_mode_active()
-    assert _checked_ribbon_title() == "Start"
+    assert _WIN._layout_mode_active()
+    assert _WIN.stack.currentWidget() is _WIN.pdf_view
+    assert "Start" in _WIN.ribbon_bar._tab_index
 
 
 def test_dirty_layout_cancel_stays_in_dtp(monkeypatch) -> None:

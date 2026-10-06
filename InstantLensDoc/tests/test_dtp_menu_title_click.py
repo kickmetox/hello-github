@@ -107,7 +107,7 @@ def test_dtp_menu_exists_one_column() -> None:
         (act.text() or "").replace("&", "").strip()
         for _p, _h, act in iter_leaf_actions(menu, "DTP")
     ]
-    assert "Layout-Modus" in labels
+    assert "DTP-Werkzeuge" in labels
 
 
 def test_qtest_mouseclick_dtp_menubar_title_enters_layout() -> None:
@@ -130,8 +130,9 @@ def test_qtest_mouseclick_dtp_menubar_title_enters_layout() -> None:
     if not _WIN._layout_mode_active():
         menu.popup(mb.mapToGlobal(geo.bottomLeft()))
         pump(_APP, 0.1)
-    assert _WIN._layout_mode_active(), "DTP-Menütitel ohne Layout-Modus"
-    assert _WIN.stack.currentWidget() is _WIN.dtp_pane
+    assert _WIN._layout_mode_active(), "DTP-Menütitel ohne DTP-Werkzeuge"
+    assert _WIN.stack.currentWidget() is not _WIN.dtp_pane
+    assert _WIN.dtp_pane.isVisible()
 
 
 def test_qtest_mouseclick_ribbon_dtp_tab_enters_layout() -> None:
@@ -148,5 +149,6 @@ def test_qtest_mouseclick_ribbon_dtp_tab_enters_layout() -> None:
     assert btn is not None, "Ribbon-Tab DTP fehlt"
     QTest.mouseClick(btn, Qt.MouseButton.LeftButton)
     pump(_APP, 0.15)
-    assert _WIN._layout_mode_active(), "Ribbon-Tab DTP ohne Layout-Modus"
-    assert _WIN.stack.currentWidget() is _WIN.dtp_pane
+    assert _WIN._layout_mode_active(), "Ribbon-Tab DTP ohne DTP-Werkzeuge"
+    assert _WIN.stack.currentWidget() is not _WIN.dtp_pane
+    assert _WIN.dtp_pane.isVisible()

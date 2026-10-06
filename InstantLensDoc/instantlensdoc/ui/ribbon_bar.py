@@ -434,6 +434,17 @@ class RibbonBar(QWidget):
             _add_button(g_arr.panel, "send_backward", "Rückwärts")
             row.addWidget(g_arr)
             self._arrange_group = g_arr
+
+            g_dtp = _RibbonGroup("DTP-Werkzeuge", wrap)
+            g_dtp.setObjectName("ribbonDtpToolsGroup")
+            g_dtp.panel.overflow_picked.connect(self.action_triggered.emit)
+            _add_button(g_dtp.panel, "dtp_layout", "DTP-Werkzeuge")
+            _add_button(g_dtp.panel, "dtp_text_frame", "Textrahmen")
+            _add_button(g_dtp.panel, "dtp_link", "Verketten")
+            _add_button(g_dtp.panel, "dtp_grid", "Raster")
+            _add_button(g_dtp.panel, "dtp_wrap", "Umfluss")
+            row.addWidget(g_dtp)
+            self._dtp_tools_group = g_dtp
             row.addStretch(1)
             return wrap
 
@@ -558,7 +569,7 @@ class RibbonBar(QWidget):
             (
                 "DTP",
                 (
-                    ("dtp_layout", "Layout-Modus"),
+                    ("dtp_layout", "DTP-Werkzeuge"),
                     ("dtp_text_frame", "Textrahmen"),
                     ("dtp_link", "Verketten"),
                     ("dtp_grid", "Raster"),
@@ -661,6 +672,7 @@ class RibbonBar(QWidget):
         self._install_alt_shortcuts()
         self.set_table_tools_visible(False)
         self.set_arrange_visible(False)
+        self.set_dtp_tools_visible(True)
 
     def _install_alt_shortcuts(self) -> None:
         """Alt+1…8 → Ribbon-Kategorie (praktische Alt-Parity)."""
@@ -721,6 +733,12 @@ class RibbonBar(QWidget):
         g = getattr(self, "_arrange_group", None)
         if g is not None:
             g.setVisible(bool(visible))
+
+    def set_dtp_tools_visible(self, visible: bool) -> None:
+        """DTP-Gruppen bleiben in der Word-Leiste sichtbar (keine zweite Ansicht)."""
+        g = getattr(self, "_dtp_tools_group", None)
+        if g is not None:
+            g.setVisible(True)
 
     def set_checked(self, action_id: str, checked: bool) -> None:
         for btn in self._action_buttons.get(action_id, ()) or ():
