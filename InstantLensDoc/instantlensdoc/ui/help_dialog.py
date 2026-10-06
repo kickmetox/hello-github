@@ -153,7 +153,10 @@ HELP_HTML = f"""
     Chrome analog Scribus: Menü Datei/Bearbeiten/Objekt/Einfügen/Seite/Tabelle/Ansicht/Extras/Fenster/Script/Hilfe,
     kompakte Icon-Leiste (Auswählen/Text/Bild/Form gelten auf der Auswahl; Füllung/Kontur-Farbwähler;
     Schrift <code>QFontDialog</code>/<code>QFontDatabase</code>), Lineale mm/pt/in (ziehen setzt Hilfslinien),
-    grauer Pasteboard, Anschnitt rot, Satzspiegel blau, Status Zoom/Seite/Koordinaten/Hintergrund.
+    grauer Pasteboard, Anschnitt rot, Satzspiegel blau (Seitengeometrie),
+    Druckermarken (Crop/Registration) über dieselbe Einstellung wie PDF
+    (<code>show_printer_marks</code>) — keine Word-Breiten- oder Kopf-/Fuß-Marken.
+    Status Zoom/Seite/Koordinaten/Hintergrund.
     Menü Typografie/Drop-Cap/Silbentrennung/Zeilenabstand ebenso.
     Menü/Ribbon-Tab <b>DTP</b> (nicht erst ein Unterpunkt) wechselt sofort in die DTP-Ansicht
     (auch bei offenem PDF). Bei ungespeicherten Änderungen:

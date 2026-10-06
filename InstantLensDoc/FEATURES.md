@@ -2,7 +2,7 @@
 
 ### 2.6.59 — Release: Word-Suite, PDF-Menü, OCR, DTP, Ribbon
 
-PDF-Menü live (Dialog/Dateiänderung, Geschwister-PDF). OCR: Layout, Felder, Kopf/Fuß, Formatvorlagen, Tabellen ohne Steuerzeichen. DTP-Lineale; Ribbon/Menü **DTP** öffnet die Ansicht sofort, Speichern-Abfrage bei Änderungen; Hilfe/F1 im DTP ist ein schließbares Fenster. Word-Chrome Klassisch/Ribbon/Kombiniert. Absatz/Seitenlayout/Kopf/Fuß/Ersatzzeichen; Formatvorlagen, Tabellen, Serienbrief teilen Ribbon-QActions. Windows Copy-Path/Status/Recent mit `\\` (Öffnen/Speichern `/` und `\\`). Pack `InstantLensDoc-2.6.59-pack.zip`. VERSION **2.6.59**. HEAD `8f01af3` / `d1e74c6`.
+PDF-Menü live (Dialog/Dateiänderung, Geschwister-PDF). OCR: Layout, Felder, Kopf/Fuß, Formatvorlagen, Tabellen ohne Steuerzeichen. DTP-Lineale; Ribbon/Menü **DTP** öffnet die Ansicht sofort, Speichern-Abfrage bei Änderungen; Hilfe/F1 im DTP ist ein schließbares Fenster; Druckermarken geteilt mit PDF (`show_printer_marks`), Satzspiegel als Geometrie (keine Word-Overlays). Word-Chrome Klassisch/Ribbon/Kombiniert. Absatz/Seitenlayout/Kopf/Fuß/Ersatzzeichen; Formatvorlagen, Tabellen, Serienbrief teilen Ribbon-QActions. Windows Copy-Path/Status/Recent mit `\\` (Öffnen/Speichern `/` und `\\`). Pack `InstantLensDoc-2.6.59-pack.zip`. VERSION **2.6.59**. HEAD `8f01af3` / `d1e74c6`.
 
 ### 2.6.58 — Release: Auswahl-Gummiband per Mausziehen
 
@@ -165,7 +165,7 @@ Statuslegende: **fertig** · **teilweise** · **geplant** · **Stub**
 | Drucker- & Scannererkennung | fertig | **ScanTuxio**-Module vendored (`core/scantuxio`): NAPS2/eSCL/mDNS + Qt/CUPS; plus Winspool/Get-Printer/WIA/PnP; Menü Geräte; leere Liste mit DE-Status · Palette `devices` — **2.6.41** (Basis **2.6.38**) |
 | PDF drehen / Seite löschen | fertig | Toolbar ⟲/⟳ (−90°/+90°) speichert; **Seite löschen Undo (Ctrl+Z)** 0.5.4; **Historie-Liste Wiederherstellen** 0.5.5; Annotation-Remap; gebündelt in Seitenmanagement — **2.6.2** |
 | PDF spiegeln (H/V) | fertig | Toolbar ↔/↕ + Menü; `ild_pdf.flip_page` 0.2.7 |
-| PDF Druckermarken | fertig | Seitenrand Crop/Registration-Overlay optional; Toolbar „Marken“; Ctrl+Alt+M 0.4.4 |
+| PDF Druckermarken | fertig | Seitenrand Crop/Registration-Overlay optional; Toolbar „Marken“; Ctrl+Alt+M 0.4.4; DTP teilt `show_printer_marks` (keine Word-Overlays) |
 | PDF Seitennummer-Overlay | fertig | Aktuelle Seitennummer als Overlay; Toggle Einstellungen / Ansicht / Toolbar „Nr.“ **0.8.3**; **Deckkraft Setting/Toolbar** **0.8.4**; **Schriftgröße Settings** **0.8.5**; **Position unten-mitte / oben-mitte** **0.8.6**; **Format-String `{page}`/`{pages}`** **0.8.7**; **Start-Offset** **0.8.8**; **Ausschluss erste/letzte Seite** **0.8.9** |
 | PDF Graustufen | fertig | Toggle Ansicht/Export; `render_page(..., grayscale=True)` 0.2.8 |
 | PDF Nachtmodus | fertig | Invert-Ansicht nur Darstellung; `invert=True` — nicht speichern/exportieren 0.3.0 |

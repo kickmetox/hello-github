@@ -44,7 +44,10 @@ ohne Auswahl entsteht ein neuer Rahmen.</li>
 <li><b>Bildrahmen / Form</b>: Bild ersetzen, Grafik importieren, schweißen.</li>
 <li><b>Lineale</b> mm / pt / in (Ecke oder Menü Ansicht). Ziehen setzt
 Hilfslinien mit Snap.</li>
-<li>Anschnitt rot, Satzspiegel blau, grauer Pasteboard.</li>
+<li>Anschnitt rot, Satzspiegel blau (Seitengeometrie, kein Word-Overlay).</li>
+<li><b>Druckermarken</b> (Ansicht): Crop-/Registration, geteilt mit PDF
+(<code>show_printer_marks</code>). Keine Breiten- oder Kopf-/Fuß-Marken
+des Texteditors.</li>
 </ul>
 
 <h3>Tastatur</h3>

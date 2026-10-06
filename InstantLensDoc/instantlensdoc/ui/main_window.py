@@ -10281,6 +10281,9 @@ class MainWindow(QMainWindow):
     def _toggle_printer_marks(self, checked: bool):
         self.pdf_view.set_show_printer_marks(bool(checked))
         self._sync_printer_marks_action(bool(checked))
+        pane = getattr(self, "dtp_pane", None)
+        if pane is not None and hasattr(pane, "apply_shared_print_overlays"):
+            pane.apply_shared_print_overlays()
 
     def _sync_grayscale_action(self, enabled: bool):
         if hasattr(self, "_grayscale_action") and self._grayscale_action is not None:
@@ -12552,6 +12555,9 @@ class MainWindow(QMainWindow):
             self._satzspiegel_action.blockSignals(True)
             self._satzspiegel_action.setChecked(on)
             self._satzspiegel_action.blockSignals(False)
+        pane = getattr(self, "dtp_pane", None)
+        if pane is not None and hasattr(pane, "apply_shared_print_overlays"):
+            pane.apply_shared_print_overlays()
 
     def _auto_format_document(self) -> None:
         """Automatische Formatierung Editor oder PDF — 2.6.10."""
@@ -14354,6 +14360,8 @@ class MainWindow(QMainWindow):
             except Exception:
                 pass
             self.stack.setCurrentWidget(pane)
+            if hasattr(pane, "apply_shared_print_overlays"):
+                pane.apply_shared_print_overlays()
             self._sync_layout_mode_checked(True)
             rb = getattr(self, "ribbon_bar", None)
             if rb is not None and not getattr(self, "_dtp_menu_showing", False):

@@ -354,7 +354,35 @@ def build_menu_bar(pane: QWidget) -> QMenuBar:
     m_tab = bar.addMenu("&Tabelle")
     m_tab.addAction("Textrahmen-Tabelle 2×3", pane.insert_text_table)
     m_ans = bar.addMenu("&Ansicht")
+    m_ans.setObjectName("dtpViewMenu")
     m_ans.addAction("Raster", pane.toggle_grid)
+    from instantlensdoc.core.app_settings import (
+        get_show_printer_marks,
+        get_show_satzspiegel,
+    )
+
+    act_marks = QAction("Druckermarken", pane)
+    act_marks.setObjectName("dtpPrinterMarksAction")
+    act_marks.setCheckable(True)
+    act_marks.setChecked(get_show_printer_marks())
+    act_marks.setToolTip(
+        "Crop-/Registration-Marken (geteilt mit PDF). "
+        "Keine Word-Breiten- oder Kopf-/Fuß-Marken."
+    )
+    act_marks.toggled.connect(pane._chrome_printer_marks)
+    m_ans.addAction(act_marks)
+    pane._printer_marks_action = act_marks
+    act_ss = QAction("Satzspiegel", pane)
+    act_ss.setObjectName("dtpSatzspiegelAction")
+    act_ss.setCheckable(True)
+    act_ss.setChecked(get_show_satzspiegel())
+    act_ss.setToolTip(
+        "Geteilte Einstellung für PDF/Editor. Im Layout bleibt der Satzspiegel "
+        "als blaue Seitengeometrie (kein Word-Overlay)."
+    )
+    act_ss.toggled.connect(pane._chrome_satzspiegel)
+    m_ans.addAction(act_ss)
+    pane._satzspiegel_action = act_ss
     m_ans.addAction("Ebenen", pane.toggle_layers)
     m_ans.addAction("Zoom 100 %", lambda: pane.set_zoom(100.0))
     m_ans.addAction("Seite einpassen", pane.zoom_fit)

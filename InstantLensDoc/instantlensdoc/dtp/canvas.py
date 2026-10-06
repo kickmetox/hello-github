@@ -25,7 +25,9 @@ from PySide6.QtWidgets import (
     QFontComboBox,
     QFontDialog,
     QFrame,
+    QGraphicsEllipseItem,
     QGraphicsItem,
+    QGraphicsLineItem,
     QGraphicsPathItem,
     QGraphicsRectItem,
     QGraphicsScene,
@@ -522,6 +524,7 @@ class DtpScene(QGraphicsScene):
         margin.setData(0, "margin")
         self.addItem(margin)
         self.margin_item = margin
+        self.sync_printer_marks()
         if self.doc.grid_visible:
             step = self.doc.grid_pt()
             x = 0.0
@@ -560,6 +563,42 @@ class DtpScene(QGraphicsScene):
                 it.setZValue(fr.z)
                 self.addItem(it)
                 self._items[fr.id] = it
+
+    def printer_mark_items(self) -> list:
+        return [it for it in self.items() if it.data(0) == "printer_marks"]
+
+    def sync_printer_marks(self) -> None:
+        """Crop/Registration aus geteiltem show_printer_marks; kein Word-Overlay."""
+        from instantlensdoc.core.app_settings import get_show_printer_marks
+        from instantlensdoc.dtp.print_marks import crop_and_registration_marks
+
+        for it in self.printer_mark_items():
+            self.removeItem(it)
+        if not get_show_printer_marks():
+            return
+        g = self.doc.geometry
+        lines, circle = crop_and_registration_marks(
+            PAGE_OFFSET, PAGE_OFFSET, g.width_pt, g.height_pt
+        )
+        pen = QPen(QColor(20, 20, 20, 220), 1.5)
+        for seg in lines:
+            item = QGraphicsLineItem(seg.x1, seg.y1, seg.x2, seg.y2)
+            item.setPen(pen)
+            item.setZValue(-17)
+            item.setData(0, "printer_marks")
+            item.setFlag(QGraphicsItem.ItemIsSelectable, False)
+            item.setFlag(QGraphicsItem.ItemIsMovable, False)
+            self.addItem(item)
+        if circle is not None:
+            r = circle.r
+            ell = QGraphicsEllipseItem(circle.x - r, circle.y - r, 2 * r, 2 * r)
+            ell.setPen(pen)
+            ell.setBrush(Qt.NoBrush)
+            ell.setZValue(-17)
+            ell.setData(0, "printer_marks")
+            ell.setFlag(QGraphicsItem.ItemIsSelectable, False)
+            ell.setFlag(QGraphicsItem.ItemIsMovable, False)
+            self.addItem(ell)
 
     def sync_text_items(self) -> None:
         for fid, it in self._items.items():
@@ -875,6 +914,7 @@ class DtpPane(QWidget):
         self.set_ruler_unit(getattr(self.doc, "ruler_unit", "mm") or "mm")
         self.set_tool("select", apply=False)
         self._block_font = False
+        self.apply_shared_print_overlays()
 
     def set_document(self, doc: DtpDocument) -> None:
         self.doc = doc
@@ -889,6 +929,7 @@ class DtpPane(QWidget):
             self.preset_combo.setCurrentIndex(idx)
         self._block_preset = False
         self.clear_dirty()
+        self.apply_shared_print_overlays()
 
     def is_dirty(self) -> bool:
         return bool(self._dirty)
@@ -898,6 +939,51 @@ class DtpPane(QWidget):
 
     def clear_dirty(self) -> None:
         self._dirty = False
+
+    def apply_shared_print_overlays(self) -> None:
+        """Crop/Registration aus app_settings; Satzspiegel bleibt DTP-Geometrie."""
+        self.scene.sync_printer_marks()
+        self._sync_print_overlay_actions()
+
+    def _sync_print_overlay_actions(self) -> None:
+        from instantlensdoc.core.app_settings import (
+            get_show_printer_marks,
+            get_show_satzspiegel,
+        )
+
+        marks = getattr(self, "_printer_marks_action", None)
+        if marks is not None:
+            marks.blockSignals(True)
+            marks.setChecked(get_show_printer_marks())
+            marks.blockSignals(False)
+        ss = getattr(self, "_satzspiegel_action", None)
+        if ss is not None:
+            ss.blockSignals(True)
+            ss.setChecked(get_show_satzspiegel())
+            ss.blockSignals(False)
+
+    def _chrome_printer_marks(self, checked: bool) -> None:
+        win = self.window()
+        toggle = getattr(win, "_toggle_printer_marks", None)
+        if callable(toggle) and win is not self:
+            toggle(bool(checked))
+            return
+        from instantlensdoc.core.app_settings import set_show_printer_marks
+
+        set_show_printer_marks(bool(checked))
+        self.apply_shared_print_overlays()
+
+    def _chrome_satzspiegel(self, checked: bool) -> None:
+        """Geteilte Einstellung; DTP-Satzspiegel bleibt blaue Seitengeometrie."""
+        win = self.window()
+        toggle = getattr(win, "_toggle_satzspiegel", None)
+        if callable(toggle) and win is not self:
+            toggle(bool(checked))
+            return
+        from instantlensdoc.core.app_settings import set_show_satzspiegel
+
+        set_show_satzspiegel(bool(checked))
+        self.apply_shared_print_overlays()
 
     def editing_item(self) -> FrameItem | None:
         for it in self.scene._items.values():

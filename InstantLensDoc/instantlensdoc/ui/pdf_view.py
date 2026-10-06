@@ -1179,38 +1179,17 @@ class PdfCanvas(QLabel):
         self, painter: QPainter, rect: tuple[float, float, float, float]
     ):
         """Crop-/Registration-Marken an den Ecken des Rechtecks."""
+        from instantlensdoc.dtp.print_marks import crop_and_registration_marks
+
         x, y, w, h = rect
-        mark = max(8.0, min(18.0, min(w, h) * 0.04))
-        gap = 2.0
+        lines, circle = crop_and_registration_marks(x, y, w, h)
         pen = QPen(QColor(20, 20, 20, 220), 1.5, Qt.SolidLine)
         painter.setPen(pen)
         painter.setBrush(Qt.NoBrush)
-        # Vier Ecken: L-förmige Crop-Marks etwas außerhalb
-        corners = [
-            (x, y, -1, -1),  # TL
-            (x + w, y, 1, -1),  # TR
-            (x, y + h, -1, 1),  # BL
-            (x + w, y + h, 1, 1),  # BR
-        ]
-        for cx, cy, sx, sy in corners:
-            # horizontal
-            hx0 = cx + sx * gap
-            hx1 = cx + sx * (gap + mark)
-            hy = cy + sy * gap
-            painter.drawLine(QPointF(hx0, hy), QPointF(hx1, hy))
-            # vertikal
-            vx = cx + sx * gap
-            vy0 = cy + sy * gap
-            vy1 = cy + sy * (gap + mark)
-            painter.drawLine(QPointF(vx, vy0), QPointF(vx, vy1))
-        # Registrierkreuz in der Mitte der oberen Kante
-        mx = x + w / 2.0
-        my = y - gap - mark * 0.6
-        if my > 2:
-            r = mark * 0.35
-            painter.drawLine(QPointF(mx - r, my), QPointF(mx + r, my))
-            painter.drawLine(QPointF(mx, my - r), QPointF(mx, my + r))
-            painter.drawEllipse(QPointF(mx, my), r * 0.45, r * 0.45)
+        for seg in lines:
+            painter.drawLine(QPointF(seg.x1, seg.y1), QPointF(seg.x2, seg.y2))
+        if circle is not None:
+            painter.drawEllipse(QPointF(circle.x, circle.y), circle.r, circle.r)
 
     def _draw_alignment_grid(
         self, painter: QPainter, rect: tuple[float, float, float, float]
