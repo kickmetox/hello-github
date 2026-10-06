@@ -3354,7 +3354,7 @@ class MainWindow(QMainWindow):
             ("Lesezeichen löschen", self._outline_delete),
             ("Seite drehen 90° ⟳", lambda: self.pdf_view.rotate_current(90)),
             ("Seite drehen −90° ⟲", lambda: self.pdf_view.rotate_current(-90)),
-            ("Stempel 90° drehen ↻", lambda: self.pdf_view.rotate_selected_stamp(90)),
+            ("Stempel 90° drehen ↻", self._pdf_rotate_stamp_menu),
             ("Seite horizontal spiegeln ↔", lambda: self.pdf_view.flip_current(horizontal=True)),
             ("Seite vertikal spiegeln ↕", lambda: self.pdf_view.flip_current(vertical=True)),
             ("Graustufen umschalten", lambda: self._toggle_grayscale(not self.pdf_view.grayscale_enabled())),
@@ -4376,6 +4376,33 @@ class MainWindow(QMainWindow):
                 f"{added} Overlay(s) aus der Textschicht angelegt.",
                 object_name="ildTextOverlayDialog",
             )
+
+    def _pdf_rotate_stamp_menu(self) -> None:
+        ok = bool(self.pdf_view.rotate_selected_stamp(90))
+        if not ok:
+            self._feature_dialog(
+                "Stempel drehen",
+                "Kein Stempel ausgewählt. Zuerst einen Stempel auf der Seite markieren.",
+                object_name="ildStampRotateDialog",
+            )
+            return
+        try:
+            self.pdf_view.schedule_sidecar_save(force=True)
+        except Exception:
+            pass
+        rot = ""
+        try:
+            aid = getattr(self.pdf_view, "_selected_ann_id", None)
+            ann = self.pdf_view.store.get(aid) if aid else None
+            if ann is not None:
+                rot = f" ({int(getattr(ann, 'rotation', 0) or 0)}°)"
+        except Exception:
+            rot = ""
+        self._feature_dialog(
+            "Stempel drehen",
+            f"Stempel gedreht{rot}.",
+            object_name="ildStampRotateDialog",
+        )
 
     def _require_pdf(self, title: str) -> bool:
         """True wenn ein PDF bereit ist; sonst Zielwahl oder FeatureDialog — nie nur Status."""
@@ -14492,7 +14519,13 @@ class MainWindow(QMainWindow):
                 "Keine gültigen URL-Link-Annotationen (http/https) im Sidecar.",
             )
             return
-        self.pdf_view.bake_uri_links()
+        out = self.pdf_view.bake_uri_links()
+        if out:
+            self._feature_dialog(
+                "Links backen",
+                f"Native Link-Annotationen geschrieben:\n{out}",
+                object_name="ildBakeLinksDialog",
+            )
 
     def _place_signature_field_menu(self) -> None:
         if not getattr(self.pdf_view, "pdf_path", None):

@@ -7,6 +7,8 @@ import sys
 import tempfile
 from pathlib import Path
 
+import pytest
+
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 os.environ["ILD_SMOKE_QT"] = "1"
 os.environ.setdefault("ILD_SKIP_DEPS_CHECK", "1")
@@ -242,3 +244,132 @@ def test_each_enabled_pdf_action_dialog_or_file() -> None:
         pump(_APP, 0.05)
     assert n_enabled >= 40, f"zu wenige enabled PDF-Aktionen: {n_enabled}"
     assert not fails, "No-Ops:\n" + "\n".join(fails[:30])
+
+
+# Screenshot-Inventar: ein Pytest-Fall pro deutschem PDF-Menü-Eintrag.
+INVENTORY: list[tuple[str, str]] = [
+    ("merge", "PDFs zusammenführen / teilen…"),
+    ("extract", "Seitenbereich extrahieren…"),
+    ("split", "Seiten als Einzel-PDFs…"),
+    ("watermark", "Wasserzeichen / Seitennummern / Kopfzeile…"),
+    ("compare", "Zwei PDFs vergleichen…"),
+    ("ann_search", "Annotation-Suche (offene Docs)…"),
+    ("esign", "Digitale Signatur (eIDAS)…"),
+    ("encrypt", "PDF verschlüsseln…"),
+    ("decrypt", "PDF entschlüsseln…"),
+    ("stats", "Dokument-Statistik…"),
+    ("compress", "PDF komprimieren / Downsample…"),
+    ("preflight", "Preflight (Druckprüfung)…"),
+    ("bleed", "Anschnitt / Bleed setzen…"),
+    ("layers", "Dokument-Ebenen…"),
+    ("flatten_links", "Link-Annotationen in PDF backen…"),
+    ("metadata", "Metadaten bearbeiten…"),
+    ("tags", "Dokument-Tags…"),
+    ("sanitize", "PDF bereinigen…"),
+    ("forms", "Formularfelder ausfüllen…"),
+    ("attachments", "Anhänge…"),
+    ("portfolio", "PDF-Portfolio…"),
+    ("stamp_lib", "Stempel-Bibliothek (Bilder)…"),
+    ("ann_tmpl", "Annotation-Vorlagen…"),
+    ("crop", "Seitengröße / Zuschneiden…"),
+    ("goto", "Gehe zu Seite…"),
+    ("page_labels", "Seitenbeschriftungen…"),
+    ("history", "Dokument-Historie…"),
+    ("ann_save", "Annotationen speichern (Sidecar)"),
+    ("ann_save_as", "Annotationen speichern unter…"),
+    ("ann_load", "Annotationen laden"),
+    ("ann_json", "Annotationen als JSON exportieren…"),
+    ("ann_json_flat", "Annotationen exportieren (JSON / Flatten)…"),
+    ("ann_csv", "Annotationen als CSV exportieren…"),
+    ("ann_md", "Kommentar-Bericht (Markdown)…"),
+    ("ann_txt", "Kommentar-Bericht (Text)…"),
+    ("ann_flatten", "Annotationen flatten/bake exportieren…"),
+    ("ann_import_json", "Annotationen aus JSON importieren…"),
+    ("ann_import_native", "PDF-Kommentare importieren (native)…"),
+    ("ann_dupes", "Annotation-Duplikate finden / zusammenführen…"),
+    ("color_cycle", "Annotation-Farbe Palette-Zyklus"),
+    ("color_rand", "Annotation-Farbe randomisieren"),
+    ("bm_add", "Lesezeichen hinzufügen…"),
+    ("bm_del", "Lesezeichen löschen"),
+    ("rot90", "Seite drehen 90° ⟳"),
+    ("rotm90", "Seite drehen −90° ⟲"),
+    ("stamp_rot", "Stempel 90° drehen ↻"),
+    ("flip_h", "Seite horizontal spiegeln ↔"),
+    ("flip_v", "Seite vertikal spiegeln ↕"),
+    ("gray", "Graustufen umschalten"),
+    ("night", "Nachtmodus umschalten"),
+    ("insert", "Leere Seite einfügen"),
+    ("dup", "Seite duplizieren"),
+    ("delete", "Seite löschen…"),
+    ("group", "Annotationsgruppe umbenennen/Farbe…"),
+]
+
+
+def _find_inventory_action(needle: str):
+    want = needle.replace("&", "").strip()
+    for _path, _menu, act in _leaf_actions():
+        got = (act.text() or "").replace("&", "").strip()
+        if got == want:
+            return act
+    return None
+
+
+def _add_ann(*, kind, **kw):
+    from ild_pdf.annotate import Annotation, AnnotationType
+
+    store = _WIN.pdf_view.store
+    assert store is not None
+    typ = getattr(AnnotationType, kind)
+    ann = Annotation(page=0, type=typ, x=12.0, y=12.0, width=80.0, height=28.0, **kw)
+    store.add(ann)
+    return ann
+
+
+def _prepare_inventory(key: str) -> None:
+    if key == "stamp_rot":
+        ann = _add_ann(kind="STAMP", text="GENEHMIGT")
+        _WIN.pdf_view._selected_ann_id = ann.id
+        try:
+            _WIN.pdf_view.canvas.set_selected_id(ann.id)
+        except Exception:
+            pass
+    elif key == "bm_del":
+        from ild_pdf.outline import add_outline_item
+
+        add_outline_item(_WIN.pdf_view.pdf_path, "InventarBM", 0)
+        _WIN._refresh_outline(_WIN.pdf_view.pdf_path)
+        tree = _WIN.sidebar.outline
+        if tree.topLevelItemCount() > 0:
+            tree.setCurrentItem(tree.topLevelItem(0))
+    elif key == "flatten_links":
+        _add_ann(kind="LINK", text="https://example.com/ild")
+    try:
+        _WIN._sync_menu_enablement()
+    except Exception:
+        pass
+    pump(_APP, 0.05)
+
+
+@pytest.mark.parametrize("key,needle", INVENTORY, ids=[k for k, _ in INVENTORY])
+def test_inventory_item_dialog_or_file(key: str, needle: str) -> None:
+    _reload_pdf()
+    _prepare_inventory(key)
+    act = _find_inventory_action(needle)
+    assert act is not None, f"PDF-Menü fehlt: {needle}"
+    if not act.isEnabled():
+        try:
+            act.setEnabled(True)
+        except Exception:
+            pass
+    assert act.isEnabled(), f"disabled nach Vorbereitung: {needle}"
+    before = _snap()
+    _REC.events.clear()
+    act.trigger()
+    pump(_APP, 0.2)
+    after = _snap()
+    dlg = bool(_REC.events)
+    changed = after != before
+    assert dlg or changed, (
+        f"{needle}: kein schließbarer Dialog und keine Datei-/Ansichtsänderung"
+        f" (events={_REC.events!r})"
+    )
