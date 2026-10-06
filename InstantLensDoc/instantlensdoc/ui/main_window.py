@@ -1770,6 +1770,7 @@ class MainWindow(QMainWindow):
 
         act_open = QAction("Öffnen…", self)
         act_open.setShortcut(QKeySequence.Open)
+        act_open.setObjectName("actFileOpen")
         act_open.triggered.connect(self.open_dialog)
         m_file.addAction(act_open)
         act_open_enc = QAction("Öffnen mit Encoding…", self)
@@ -1783,6 +1784,7 @@ class MainWindow(QMainWindow):
 
         act_save = QAction("Speichern", self)
         act_save.setShortcut(QKeySequence.Save)
+        act_save.setObjectName("actFileSave")
         act_save.triggered.connect(self.save_doc)
         m_file.addAction(act_save)
         act_save_enc = QAction("Speichern mit Encoding…", self)
@@ -1796,6 +1798,7 @@ class MainWindow(QMainWindow):
         m_file.addAction(act_save_all)
 
         act_save_as = QAction("Speichern unter…", self)
+        act_save_as.setObjectName("actFileSaveAs")
         # Word-Parity: F12 = Speichern unter; Alt-Chord bleibt — 2.6.28
         act_save_as.setShortcuts(
             [
@@ -2025,6 +2028,7 @@ class MainWindow(QMainWindow):
         act_find_prev.triggered.connect(self._on_search_prev)
         m_edit.addAction(act_find_prev)
         act_find_repl = QAction("Suchen und Ersetzen…", self)
+        act_find_repl.setObjectName("actEditFindReplace")
         # Word-like Ctrl+H; Ctrl+R = Absatz rechts (2.6.11)
         act_find_repl.setShortcut(QKeySequence("Ctrl+H"))
         act_find_repl.setToolTip(
@@ -2034,16 +2038,19 @@ class MainWindow(QMainWindow):
         m_edit.addAction(self._track_editor_action(act_find_repl))
         act_bold = QAction("Fett", self)
         act_bold.setShortcut(QKeySequence("Ctrl+B"))
+        act_bold.setObjectName("actEditBold")
         act_bold.setToolTip("Fett (QTextCharFormat) — Word/InDesign — 2.6.49")
         act_bold.triggered.connect(self._toggle_bold)
         m_edit.addAction(self._track_editor_action(act_bold))
         act_italic = QAction("Kursiv", self)
         act_italic.setShortcut(QKeySequence("Ctrl+I"))
+        act_italic.setObjectName("actEditItalic")
         act_italic.setToolTip("Kursiv (QTextCharFormat) — 2.6.49")
         act_italic.triggered.connect(self._toggle_italic)
         m_edit.addAction(self._track_editor_action(act_italic))
         act_underline = QAction("Unterstrichen", self)
         act_underline.setShortcut(QKeySequence("Ctrl+U"))
+        act_underline.setObjectName("actEditUnderline")
         act_underline.setToolTip("Unterstrichen (QTextCharFormat, Buchstaben inkl.) — 2.6.49")
         act_underline.triggered.connect(self._toggle_underline)
         m_edit.addAction(self._track_editor_action(act_underline))
@@ -2146,6 +2153,7 @@ class MainWindow(QMainWindow):
         act_auto_fmt.triggered.connect(self._auto_format_document)
         m_edit.addAction(act_auto_fmt)
         act_auto_toc = QAction("Inhaltsverzeichnis aktualisieren", self)
+        act_auto_toc.setObjectName("actEditAutoToc")
         act_auto_toc.setToolTip(
             "TOC aus Überschriften: Editor→Markdown · PDF→Outline/Sidebar — 2.6.10 "
             "(ohne Ctrl+Alt+Shift+T: das Kürzel bleibt Tab duplizieren)"
@@ -2153,6 +2161,7 @@ class MainWindow(QMainWindow):
         act_auto_toc.triggered.connect(self._update_auto_toc)
         m_edit.addAction(act_auto_toc)
         act_lof = QAction("Abbildungsverzeichnis aktualisieren", self)
+        act_lof.setObjectName("actEditAutoLof")
         act_lof.setShortcut(QKeySequence("Ctrl+Alt+Shift+A"))
         act_lof.setToolTip(
             "Abbildungsverzeichnis aus Captions/Markdown-Bildern — 2.6.28"
@@ -2160,6 +2169,7 @@ class MainWindow(QMainWindow):
         act_lof.triggered.connect(self._update_figure_list)
         m_edit.addAction(act_lof)
         act_idx = QAction("Stichwortverzeichnis aktualisieren", self)
+        act_idx.setObjectName("actEditAutoIndex")
         act_idx.setShortcut(QKeySequence("Ctrl+Alt+Shift+X"))
         act_idx.setToolTip(
             "Stichwortverzeichnis aus Häufigkeitsanalyse — 2.6.28"
@@ -2169,16 +2179,19 @@ class MainWindow(QMainWindow):
         m_edit.addSeparator()
         act_align_l = QAction("Absatz links", self)
         act_align_l.setShortcut(QKeySequence("Ctrl+L"))
+        act_align_l.setObjectName("actEditAlignLeft")
         act_align_l.setToolTip("Absatzausrichtung links — 2.6.11")
         act_align_l.triggered.connect(lambda: self._set_paragraph_alignment("left"))
         m_edit.addAction(self._track_editor_action(act_align_l))
         act_align_c = QAction("Absatz zentriert", self)
         act_align_c.setShortcut(QKeySequence("Ctrl+E"))
+        act_align_c.setObjectName("actEditAlignCenter")
         act_align_c.setToolTip("Absatzausrichtung zentriert — 2.6.11")
         act_align_c.triggered.connect(lambda: self._set_paragraph_alignment("center"))
         m_edit.addAction(self._track_editor_action(act_align_c))
         act_align_r = QAction("Absatz rechts", self)
         act_align_r.setShortcut(QKeySequence("Ctrl+R"))
+        act_align_r.setObjectName("actEditAlignRight")
         act_align_r.setToolTip(
             "Absatzausrichtung rechts (Ctrl+R; Ersetzen: Ctrl+H) — 2.6.11"
         )
@@ -2428,6 +2441,7 @@ class MainWindow(QMainWindow):
         m_specialchars.addAction(act_nbsp)
         act_spell = QAction("Rechtschreibung prüfen…", self)
         act_spell.setShortcut(QKeySequence("F7"))
+        act_spell.setObjectName("actEditSpellcheck")
         act_spell.setToolTip(
             "Wortliste + Builtin der UI-Sprache; Vorschläge im Tooltip; "
             "leichte Grammatik-Hinweise — 2.6.20"
@@ -2887,6 +2901,7 @@ class MainWindow(QMainWindow):
         self._continuous_action = QAction("Fortlaufend scrollen", self)
         self._continuous_action.setCheckable(True)
         self._continuous_action.setChecked(get_pdf_continuous_scroll())
+        self._continuous_action.setObjectName("actContinuousScroll")
         self._continuous_action.setToolTip(
             "Seiten untereinander scrollen statt Einzelseite (Ctrl+3); schließt Doppelseite aus"
         )
@@ -3875,6 +3890,7 @@ class MainWindow(QMainWindow):
         from instantlensdoc.ui.menu_click import apply_clickable_popup_menus
 
         apply_clickable_popup_menus(self)
+        self._bind_ribbon_qactions()
 
     _FORMAT_MENU_TEXTS = frozenset(
         {
@@ -8376,8 +8392,103 @@ class MainWindow(QMainWindow):
         if getattr(self, "ribbon_bar", None) is not None:
             self.ribbon_bar.setVisible(bool(checked))
 
+    _RIBBON_ACTION_OBJECT_NAMES: dict[str, str] = {
+        "open": "actFileOpen",
+        "save": "actFileSave",
+        "save_as": "actFileSaveAs",
+        "bold": "actEditBold",
+        "italic": "actEditItalic",
+        "underline": "actEditUnderline",
+        "strike": "actEditStrike",
+        "font": "actEditFont",
+        "font_color": "actEditFontColor",
+        "highlight_color": "actEditBackgroundColor",
+        "clear_formatting": "actEditClearFormatting",
+        "align_left": "actEditAlignLeft",
+        "align_center": "actEditAlignCenter",
+        "align_right": "actEditAlignRight",
+        "bullet_list": "actEditBulletList",
+        "numbered_list": "actEditNumberedList",
+        "find_replace": "actEditFindReplace",
+        "spellcheck": "actEditSpellcheck",
+        "insert_hyperlink": "actEditHyperlink",
+        "insert_table": "actEditInsertTable",
+        "insert_break": "actEditInsertPageBreak",
+        "page_layout": "actPageLayout",
+        "compare_pdfs": "actComparePdfs",
+        "preflight": "actPreflight",
+        "apply_bleed": "actBleed",
+        "export_pdfx": "actExportPdfX",
+        "insert_shape": "actInsertShape",
+        "scan_import": "actScanImport",
+        "devices_discover": "actDevicesDiscover",
+        "devices_printers": "actDevicesPrinters",
+        "devices_refresh": "actDevicesRefresh",
+        "book_layout": "actBookLayout",
+        "page_by_page": "actPageByPage",
+        "continuous_scroll": "actContinuousScroll",
+        "toggle_doc_tabs": "actDocTabs",
+        "toggle_ribbon": "actRibbon",
+        "auto_toc": "actEditAutoToc",
+        "auto_lof": "actEditAutoLof",
+        "auto_index": "actEditAutoIndex",
+        "shared_review": "actSharedReview",
+        "dtp_layout": "actLayoutMode",
+        "ki_assistant": "actKiAssistant",
+        "varfonts": "actVariableFonts",
+        "pades_sign": "actPadesSign",
+        "dtp_text_path": "actTextOnPath",
+        "dtp_glyphs": "actGlyphPalette",
+        "detach_window": "actDetachDocumentWindow",
+    }
+
+    def _bind_ribbon_qactions(self) -> None:
+        """Pulldown und Ribbon klicken dieselbe QAction (Classic bleibt eine Spalte)."""
+        by_name: dict[str, object] = {}
+        try:
+            from PySide6.QtGui import QAction
+
+            for act in self.findChildren(QAction):
+                n = (act.objectName() or "").strip()
+                if n:
+                    by_name[n] = act
+        except Exception:
+            by_name = {}
+        mapping: dict[str, object] = {}
+        for aid, objn in self._RIBBON_ACTION_OBJECT_NAMES.items():
+            act = by_name.get(objn)
+            if act is not None:
+                mapping[aid] = act
+        for aid, attr in (
+            ("undo", "_undo_action"),
+            ("redo", "_redo_action"),
+            ("page_layout", "_page_layout_action"),
+            ("book_layout", "_book_layout_action"),
+            ("page_by_page", "_page_by_page_action"),
+            ("continuous_scroll", "_continuous_action"),
+            ("toggle_doc_tabs", "_doc_tabs_action"),
+            ("toggle_ribbon", "_ribbon_action"),
+            ("dtp_layout", "_layout_mode_action"),
+        ):
+            if aid not in mapping:
+                act = getattr(self, attr, None)
+                if act is not None:
+                    mapping[aid] = act
+        self._ribbon_qactions = mapping
+        rb = getattr(self, "ribbon_bar", None)
+        if rb is not None and hasattr(rb, "bind_qactions"):
+            rb.bind_qactions(mapping)
+
     def _on_ribbon_action(self, action_id: str) -> None:
         """Ribbon-Chrome-Aktionen — 2.6.28 (Save-as / Alt-Parity)."""
+        act = (getattr(self, "_ribbon_qactions", None) or {}).get(action_id)
+        if act is not None:
+            try:
+                if act.isEnabled():
+                    act.trigger()
+            except Exception:
+                pass
+            return
         handlers = {
             "open": self.open_dialog,
             "save": self.save_doc,
