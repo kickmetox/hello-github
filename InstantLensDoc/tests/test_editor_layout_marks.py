@@ -64,7 +64,6 @@ def main_win():
         pass
     try:
         app.processEvents()
-        app.quit()
     except Exception:
         pass
     td.cleanup()
