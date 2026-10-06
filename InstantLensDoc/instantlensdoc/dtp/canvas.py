@@ -98,6 +98,9 @@ class ResizeHandle(QGraphicsRectItem):
         if isinstance(parent, FrameItem) and parent.is_locked():
             event.ignore()
             return
+        pane = parent._pane() if isinstance(parent, FrameItem) else None
+        if pane is not None:
+            pane.begin_gesture("Größe")
         self._origin = event.scenePos()
         fr = parent.frame  # type: ignore[union-attr]
         self._geom = (fr.x, fr.y, fr.width, fr.height)
@@ -118,6 +121,9 @@ class ResizeHandle(QGraphicsRectItem):
         parent = self.parentItem()
         if isinstance(parent, FrameItem) and parent.frame.kind == "text":
             parent.reflow_after_edit()
+        pane = parent._pane() if isinstance(parent, FrameItem) else None
+        if pane is not None:
+            pane.end_gesture()
         self._origin = None
         self._geom = None
         event.accept()
@@ -166,13 +172,28 @@ class FrameItem(QGraphicsRectItem):
     def is_locked(self) -> bool:
         if self.frame.locked:
             return True
+        pane = self._pane()
+        if pane is not None and getattr(pane, "_schreibschutz", False):
+            return True
         for ly in self.doc.layers:
             if ly.id == self.frame.layer_id:
                 return bool(ly.locked)
         return False
 
+    def _pane(self):
+        sc = self.scene()
+        if sc is None:
+            return None
+        for v in sc.views():
+            w = v
+            while w is not None:
+                if hasattr(w, "mark_dirty"):
+                    return w
+                w = w.parent()
+        return None
+
     def _install_text(self) -> None:
-        if self.frame.kind != "text" or self.frame.path_kind or self.frame.as_outlines:
+        if self.frame.kind not in ("text", "stamp") or self.frame.path_kind or self.frame.as_outlines:
             return
         item = FrameTextItem(self)
         item.setPos(3, 2)
@@ -193,6 +214,17 @@ class FrameItem(QGraphicsRectItem):
         if self.frame.kind == "text":
             self.setBrush(QBrush(QColor(255, 255, 255, 30)))
             self.setPen(QPen(QColor("#3B6DB5"), 0.8, Qt.DashLine))
+        elif self.frame.kind == "stamp":
+            sw = float(self.frame.stroke_width or 0)
+            if getattr(self.frame, "stamp_text_only", False) or sw < 0.5:
+                self.setBrush(Qt.NoBrush)
+                self.setPen(Qt.NoPen)
+            else:
+                if self.frame.fill:
+                    self.setBrush(QBrush(QColor(self.frame.fill)))
+                else:
+                    self.setBrush(Qt.NoBrush)
+                self.setPen(QPen(QColor(self.frame.stroke or "#1E8449"), max(0.6, sw)))
         elif self.frame.kind == "shape":
             self.setBrush(Qt.NoBrush)
             self.setPen(QPen(QColor(self.frame.stroke or "#1A5276"), max(0.6, self.frame.stroke_width)))
@@ -231,9 +263,9 @@ class FrameItem(QGraphicsRectItem):
             painter.setPen(QPen(QColor("#0B3D91"), 1.15, Qt.DashLine))
         else:
             painter.setPen(self.pen())
-        painter.setBrush(self.brush() if self.frame.kind == "text" else Qt.NoBrush)
+        painter.setBrush(self.brush() if self.frame.kind in ("text", "stamp") else Qt.NoBrush)
         painter.drawRect(self.rect())
-        if self.frame.kind == "text" and self.text_item is not None and not self.frame.path_kind:
+        if self.frame.kind in ("text", "stamp") and self.text_item is not None and not self.frame.path_kind:
             # Live-Text zeichnet QGraphicsTextItem; nur Overflow-Hint
             if self.frame.next_id:
                 painter.setPen(QPen(QColor("#1A5276"), 1.0))
@@ -363,6 +395,11 @@ class FrameItem(QGraphicsRectItem):
         self.text_item.setFont(_qfont_for_frame(self.doc, self.frame))
 
     def resize_from(self, role: str, dx: float, dy: float, orig: tuple[float, float, float, float]) -> None:
+        if self.is_locked():
+            return
+        pane = self._pane()
+        if pane is not None:
+            pane.begin_gesture("Größe")
         x, y, w, h = orig
         if "r" in role:
             w = max(24.0, w + dx)
@@ -388,16 +425,24 @@ class FrameItem(QGraphicsRectItem):
         if self.text_item is not None:
             self.text_item.setTextWidth(max(12.0, w - 6))
         self._place_handles()
+        if pane is not None:
+            pane.mark_dirty()
 
     def mouseDoubleClickEvent(self, event) -> None:  # type: ignore[override]
-        if self.frame.kind == "text":
+        if self.frame.kind in ("text", "stamp"):
             self.begin_edit()
             event.accept()
             return
-        if self.frame.kind == "image":
-            scene = self.scene()
-            pane = scene.parent() if scene is not None else None
-            # DtpPane ruft replace_image
+        if self.frame.kind in ("image", "render"):
+            pane = self._pane()
+            if pane is not None and hasattr(pane, "replace_image"):
+                pane.replace_image()
+            event.accept()
+            return
+        if self.frame.kind == "shape":
+            pane = self._pane()
+            if pane is not None and hasattr(pane, "apply_fill"):
+                pane.apply_fill(dialog=True)
             event.accept()
             return
         super().mouseDoubleClickEvent(event)
@@ -416,9 +461,31 @@ class FrameItem(QGraphicsRectItem):
             sx, sy = snap_point(x, y, grid_pt=grid, guides=guides)
             return QPointF(sx + PAGE_OFFSET, sy + PAGE_OFFSET)
         if change == QGraphicsItem.ItemPositionHasChanged and not self._editing:
-            self.frame.x = self.pos().x() - PAGE_OFFSET
-            self.frame.y = self.pos().y() - PAGE_OFFSET
+            nx = self.pos().x() - PAGE_OFFSET
+            ny = self.pos().y() - PAGE_OFFSET
+            pane = self._pane()
+            if pane is not None and (
+                abs(nx - self.frame.x) > 0.05 or abs(ny - self.frame.y) > 0.05
+            ):
+                pane.begin_gesture("Verschieben")
+            self.frame.x = nx
+            self.frame.y = ny
+            if pane is not None:
+                pane.mark_dirty()
         return super().itemChange(change, value)
+
+    def mousePressEvent(self, event) -> None:  # type: ignore[override]
+        if self.is_locked():
+            super().mousePressEvent(event)
+            self.setFlag(QGraphicsItem.ItemIsMovable, False)
+            return
+        super().mousePressEvent(event)
+
+    def mouseReleaseEvent(self, event) -> None:  # type: ignore[override]
+        pane = self._pane()
+        if pane is not None:
+            pane.end_gesture()
+        super().mouseReleaseEvent(event)
 
     def focusOutEvent(self, event) -> None:  # type: ignore[override]
         if self._editing:
@@ -790,6 +857,10 @@ class DtpPane(QWidget):
         self._create_rect = None
         self._ghost = None
         self._dirty = False
+        self._schreibschutz = False
+        self._undo_stack: list[dict] = []
+        self._redo_stack: list[dict] = []
+        self._gesture_open = False
         self._word_embedded = False
         self._save_path: str | None = None
         self.scene = DtpScene(self.doc)
@@ -1008,6 +1079,87 @@ class DtpPane(QWidget):
 
     def clear_dirty(self) -> None:
         self._dirty = False
+        self._undo_stack.clear()
+        self._redo_stack.clear()
+        self._gesture_open = False
+
+    def begin_gesture(self, label: str = "Layout") -> None:
+        if getattr(self, "_schreibschutz", False):
+            return
+        if getattr(self, "_gesture_open", False):
+            return
+        self.push_undo(label)
+        self._gesture_open = True
+
+    def end_gesture(self) -> None:
+        self._gesture_open = False
+
+    def push_undo(self, label: str = "Layout") -> None:
+        try:
+            data = self.doc.to_dict()
+        except Exception:
+            return
+        self._undo_stack.append({"label": str(label or "Layout"), "data": data})
+        self._redo_stack.clear()
+        if len(self._undo_stack) > 80:
+            self._undo_stack.pop(0)
+
+    def can_undo(self) -> bool:
+        return bool(self._undo_stack)
+
+    def can_redo(self) -> bool:
+        return bool(self._redo_stack)
+
+    def undo_label(self) -> str:
+        if not self._undo_stack:
+            return ""
+        return str(self._undo_stack[-1].get("label") or "Layout")
+
+    def redo_label(self) -> str:
+        if not self._redo_stack:
+            return ""
+        return str(self._redo_stack[-1].get("label") or "Layout")
+
+    def undo(self) -> bool:
+        if not self._undo_stack:
+            return False
+        item = self._undo_stack.pop()
+        try:
+            current = self.doc.to_dict()
+        except Exception:
+            current = {}
+        self._redo_stack.append({"label": item.get("label") or "Layout", "data": current})
+        self._restore_doc(item.get("data") or {})
+        self._gesture_open = False
+        self.statusMessage.emit(f"Rückgängig: {item.get('label') or 'Layout'}")
+        return True
+
+    def redo(self) -> bool:
+        if not self._redo_stack:
+            return False
+        item = self._redo_stack.pop()
+        try:
+            current = self.doc.to_dict()
+        except Exception:
+            current = {}
+        self._undo_stack.append({"label": item.get("label") or "Layout", "data": current})
+        self._restore_doc(item.get("data") or {})
+        self._gesture_open = False
+        self.statusMessage.emit(f"Wiederholen: {item.get('label') or 'Layout'}")
+        return True
+
+    def _restore_doc(self, data: dict) -> None:
+        from instantlensdoc.dtp.model import DtpDocument
+
+        self.doc = DtpDocument.from_dict(data)
+        self.scene.doc = self.doc
+        self.scene.rebuild()
+        self._dirty = True
+        self._refresh_info()
+        try:
+            self._reload_layers()
+        except Exception:
+            pass
 
     def apply_shared_print_overlays(self) -> None:
         """Crop/Registration aus app_settings; Satzspiegel bleibt DTP-Geometrie."""
@@ -1076,7 +1228,7 @@ class DtpPane(QWidget):
             pbtn.blockSignals(True)
             pbtn.setChecked(True)
             pbtn.blockSignals(False)
-        if n == "select":
+        if n == "select" and not getattr(self, "_schreibschutz", False):
             self.view.setDragMode(QGraphicsView.RubberBandDrag)
         else:
             self.view.setDragMode(QGraphicsView.NoDrag)
@@ -1112,6 +1264,9 @@ class DtpPane(QWidget):
 
     def begin_create_or_apply(self, kind: str, x: float, y: float) -> bool:
         """Klick auf Rahmen wandelt um; Klick ins Leere startet Aufziehen."""
+        if getattr(self, "_schreibschutz", False):
+            self.statusMessage.emit("Schreibschutz: Rahmen gesperrt")
+            return True
         item = self.scene.itemAt(QPointF(x + PAGE_OFFSET, y + PAGE_OFFSET), self.view.transform())
         frame_item = None
         if isinstance(item, FrameItem):
@@ -1326,7 +1481,11 @@ class DtpPane(QWidget):
             if not c.isValid():
                 return ToolHit(scope="cancelled", frames=[], role="fill")
             color = c.name()
+        if getattr(self, "_schreibschutz", False):
+            self.statusMessage.emit("Schreibschutz: Rahmen gesperrt")
+            return ToolHit(scope="locked", frames=[], role="fill")
         color = color or "#4A90D9"
+        self.push_undo("Füllung")
         hit = self.resolve_targets("fill")
         if hit.is_caret and hit.item is not None:
             hit.item.apply_char_format(color=color)
@@ -1351,7 +1510,11 @@ class DtpPane(QWidget):
             if not c.isValid():
                 return ToolHit(scope="cancelled", frames=[], role="stroke")
             color = c.name()
+        if getattr(self, "_schreibschutz", False):
+            self.statusMessage.emit("Schreibschutz: Rahmen gesperrt")
+            return ToolHit(scope="locked", frames=[], role="stroke")
         color = color or "#1A5276"
+        self.push_undo("Kontur")
         hit = self.resolve_targets("stroke")
         for fr in hit.frames:
             self.doc.apply_stroke_color(fr.id, color, width=width)
@@ -1688,6 +1851,7 @@ class DtpPane(QWidget):
         self._sync_rulers()
 
     def add_text_frame(self) -> DtpFrame:
+        self.push_undo("Textrahmen")
         fr = self.doc.add_text_frame("Neuer Text", page=self.doc.current_page)
         self.scene.rebuild()
         self.mark_dirty()
@@ -1695,6 +1859,7 @@ class DtpPane(QWidget):
         return fr
 
     def add_image_frame(self) -> DtpFrame:
+        self.push_undo("Bildrahmen")
         fr = self.doc.add_image_frame(page=self.doc.current_page)
         self.scene.rebuild()
         self.mark_dirty()
@@ -1702,11 +1867,94 @@ class DtpPane(QWidget):
         return fr
 
     def add_shape(self, kind: str = "rectangle") -> DtpFrame:
+        self.push_undo("Form")
         fr = self.doc.add_shape(kind or "rectangle", page=self.doc.current_page)
         self.scene.rebuild()
         self.mark_dirty()
         self.statusMessage.emit(f"Form {fr.shape}")
         return fr
+
+    def add_stamp(self, text: str = "GENEHMIGT", color: str = "#1E8449") -> DtpFrame:
+        self.push_undo("Stempel")
+        fr = self.doc.add_stamp(text, page=self.doc.current_page, color=color)
+        self.scene.rebuild()
+        self.mark_dirty()
+        self.statusMessage.emit(f"Stempel {fr.text}")
+        return fr
+
+    def apply_stamp_style(self, kind: str, *, color: str | None = None) -> bool:
+        """Rahmen / nur Schrift / Schatten / Kontur / Farbe auf DTP-Stempeln."""
+        if getattr(self, "_schreibschutz", False):
+            self.statusMessage.emit("Schreibschutz: Stempel gesperrt")
+            return False
+        frames = [f for f in self.scene.selected_frames() if f.kind == "stamp"]
+        if not frames:
+            self.statusMessage.emit("Kein Stempel ausgewählt")
+            return False
+        k = str(kind or "").strip()
+        self.push_undo("Stempelstil")
+        for fr in frames:
+            if k == "color" and color:
+                fr.stroke = color
+            elif k == "frame":
+                on = not (
+                    (not bool(getattr(fr, "stamp_text_only", False)))
+                    and float(fr.stroke_width or 0) > 0.5
+                )
+                if on:
+                    fr.stamp_text_only = False
+                    fr.stroke_width = max(2.0, float(fr.stroke_width or 0) or 3.0)
+                else:
+                    fr.stroke_width = 0.0
+            elif k == "text_only":
+                on = not bool(getattr(fr, "stamp_text_only", False))
+                fr.stamp_text_only = on
+                if on:
+                    fr.stroke_width = 0.0
+                    fr.fill = ""
+                else:
+                    fr.stroke_width = 3.0
+            elif k == "shadow":
+                fr.shadow = not bool(fr.shadow)
+            elif k == "outline":
+                on = not bool(getattr(fr, "stamp_outline", False))
+                fr.stamp_outline = on
+                if on:
+                    fr.stamp_text_only = False
+                    if float(fr.stroke_width or 0) < 0.5:
+                        fr.stroke_width = 2.0
+        self.scene.rebuild()
+        ids = {f.id for f in frames}
+        for fid, it in self.scene._items.items():
+            it.setSelected(fid in ids)
+        self.mark_dirty()
+        self.statusMessage.emit(f"Stempel: {k}")
+        return True
+
+    def set_schreibschutz(self, locked: bool) -> None:
+        self._schreibschutz = bool(locked)
+        for it in getattr(self.scene, "_items", {}).values():
+            if it._editing and self._schreibschutz:
+                it.end_edit()
+            movable = not it.is_locked()
+            it.setFlag(QGraphicsItem.ItemIsMovable, movable)
+            if it.is_locked():
+                it.set_handles_visible(False)
+        if self._schreibschutz:
+            self.view.setDragMode(QGraphicsView.NoDrag)
+        elif getattr(self, "_tool", "select") == "select":
+            self.view.setDragMode(QGraphicsView.RubberBandDrag)
+
+    def edit_selected_stamp(self) -> bool:
+        if getattr(self, "_schreibschutz", False):
+            self.statusMessage.emit("Schreibschutz: Stempel gesperrt")
+            return False
+        for it in getattr(self.scene, "_items", {}).values():
+            if it.isSelected() and it.frame.kind in ("text", "stamp"):
+                it.begin_edit()
+                return True
+        self.statusMessage.emit("Kein Stempel ausgewählt")
+        return False
 
     def prev_page(self) -> None:
         self.doc.current_page = max(0, self.doc.current_page - 1)

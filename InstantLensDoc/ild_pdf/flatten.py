@@ -139,6 +139,48 @@ def draw_annotations_on_image(
                         pass
             box_h = max(h, 48 if "\n" in (ann.text or "") else 36)
             bw = max(w, 120)
+            tags = [str(t).casefold() for t in (getattr(ann, "tags", None) or [])]
+            text_only = bool(getattr(ann, "stamp_text_only", False)) or "ild-stamp-text-only" in tags
+            frame = bool(getattr(ann, "stamp_frame", True)) and not text_only
+            if "ild-stamp-no-frame" in tags:
+                frame = False
+            if float(getattr(ann, "stroke_width", 0) or 0) < 0.5:
+                frame = False
+            shadow = bool(getattr(ann, "stamp_shadow", False)) or "ild-stamp-shadow" in tags
+            outline = (
+                bool(getattr(ann, "stamp_outline", False)) or "ild-stamp-outline" in tags
+            ) and not text_only
+            fill_src = "" if text_only else str(getattr(ann, "fill_color", "") or "").strip()
+            try:
+                sw_stamp = int(float(getattr(ann, "stroke_width", 3) or 0))
+            except (TypeError, ValueError):
+                sw_stamp = 3
+            if frame or outline:
+                sw_stamp = max(1, sw_stamp if sw_stamp >= 1 else (5 if outline else 3))
+
+            def _draw_stamp_box(d, ox, oy, bw_, bh_):
+                if shadow:
+                    d.rectangle(
+                        [ox + 3, oy + 3, ox + bw_ + 3, oy + bh_ + 3],
+                        fill=(0, 0, 0, 90),
+                    )
+                if fill_src:
+                    d.rectangle(
+                        [ox, oy, ox + bw_, oy + bh_],
+                        fill=_parse_color(fill_src, _opacity_alpha(ann, 80)),
+                    )
+                if frame or outline:
+                    d.rectangle(
+                        [ox, oy, ox + bw_, oy + bh_],
+                        outline=stroke,
+                        width=sw_stamp,
+                    )
+                font = _font(14)
+                ty = oy + 6
+                for line in (ann.text or "STEMPEL").splitlines()[:3]:
+                    d.text((ox + 8, ty), line[:28], fill=stroke, font=font)
+                    ty += 16
+
             if rot:
                 cx = int(x + bw / 2)
                 cy = int(y + box_h / 2)
@@ -146,22 +188,12 @@ def draw_annotations_on_image(
                 tile = Image.new("RGBA", (pad * 2, pad * 2), (0, 0, 0, 0))
                 td = ImageDraw.Draw(tile)
                 ox, oy = pad - int(bw / 2), pad - int(box_h / 2)
-                td.rectangle([ox, oy, ox + bw, oy + box_h], outline=stroke, width=3)
-                font = _font(14)
-                ty = oy + 6
-                for line in (ann.text or "STEMPEL").splitlines()[:3]:
-                    td.text((ox + 8, ty), line[:28], fill=stroke, font=font)
-                    ty += 16
+                _draw_stamp_box(td, ox, oy, bw, box_h)
                 tile = tile.rotate(-rot, expand=True, resample=Image.Resampling.BICUBIC)
                 tw, th = tile.size
                 overlay.paste(tile, (cx - tw // 2, cy - th // 2), tile)
                 continue
-            draw.rectangle([x, y, x + bw, y + box_h], outline=stroke, width=3)
-            font = _font(14)
-            ty = y + 6
-            for line in (ann.text or "STEMPEL").splitlines()[:3]:
-                draw.text((x + 8, ty), line[:28], fill=stroke, font=font)
-                ty += 16
+            _draw_stamp_box(draw, x, y, bw, box_h)
         elif ann.type == AnnotationType.SIGNATURE_FIELD:
             fh, fw = max(int(h), 48), max(int(w), 160)
             draw.rectangle([x, y, x + fw, y + fh], outline=stroke, width=2)

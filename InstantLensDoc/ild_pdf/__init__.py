@@ -96,6 +96,9 @@ from .annotate import (
     stamp_library_items,
     stamp_text_for_label,
     stamp_with_date,
+    stamp_is_image,
+    stamp_style_fields,
+    toggle_stamp_style,
 )
 from .pages import (
     PAGE_SIZE_PRESETS,
@@ -515,6 +518,9 @@ __all__ = [
     "stamp_with_date",
     "stamp_text_for_label",
     "stamp_library_items",
+    "stamp_is_image",
+    "stamp_style_fields",
+    "toggle_stamp_style",
     "PAGE_SIZE_PRESETS",
     "parse_page_ranges",
     "preview_page_range_count",

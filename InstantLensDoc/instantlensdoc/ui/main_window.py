@@ -13669,6 +13669,16 @@ class MainWindow(QMainWindow):
     def _sync_undo_redo_ui(self) -> None:
         if getattr(self, "stack", None) is None:
             return
+        if self._layout_mode_active():
+            pane = getattr(self, "dtp_pane", None)
+            if pane is not None and (pane.can_undo() or pane.can_redo()):
+                self._apply_undo_redo_ui(
+                    pane.can_undo(),
+                    pane.undo_label(),
+                    pane.can_redo(),
+                    pane.redo_label(),
+                )
+                return
         if self.stack.currentWidget() is self.pdf_view:
             try:
                 can_u, tu, can_r, tr = self.pdf_view.undo_ui_state()
@@ -13723,6 +13733,12 @@ class MainWindow(QMainWindow):
             rb.set_action_tooltip("redo", r_tip)
 
     def _undo(self):
+        if self._layout_mode_active():
+            pane = getattr(self, "dtp_pane", None)
+            if pane is not None and pane.can_undo():
+                pane.undo()
+                self._sync_undo_redo_ui()
+                return
         if self.stack.currentWidget() is self.pdf_view:
             # Sticky Clear bei Ann.-Undo (zusätzlich Seite/Dokument) — 1.1.9
             self.pdf_view.undo_annotation()
@@ -13730,6 +13746,12 @@ class MainWindow(QMainWindow):
             self.editor.undo()
 
     def _redo(self):
+        if self._layout_mode_active():
+            pane = getattr(self, "dtp_pane", None)
+            if pane is not None and pane.can_redo():
+                pane.redo()
+                self._sync_undo_redo_ui()
+                return
         if self.stack.currentWidget() is self.pdf_view:
             # Sticky Clear bei Ann.-Redo (zusätzlich Seite/Dokument) — 1.1.9
             self.pdf_view.redo_annotation()
@@ -14910,6 +14932,12 @@ class MainWindow(QMainWindow):
                     pane.sync_from_session(session)
             except Exception:
                 pass
+        dtp = getattr(self, "dtp_pane", None)
+        if dtp is not None and hasattr(dtp, "set_schreibschutz"):
+            try:
+                dtp.set_schreibschutz(locked)
+            except Exception:
+                pass
         for key, act in (getattr(self, "_ink_pen_actions", None) or {}).items():
             self._set_action_available(act, not locked, reason)
             if session is not None and act is not None:
@@ -15230,8 +15258,36 @@ class MainWindow(QMainWindow):
         if is_schreibschutz(self):
             self._sync_ink_input_actions()
             return
-        pdf = getattr(self, "pdf_view", None)
         key = str(kind or "")
+        if self._layout_mode_active():
+            pane = getattr(self, "dtp_pane", None)
+            if pane is None:
+                return
+            if key == "place":
+                from ild_pdf.annotate import STAMP_LIBRARY, stamp_with_date
+
+                label, color = STAMP_LIBRARY[0]
+                pane.add_stamp(stamp_with_date(label), color=color)
+                self._set_status("Stempel gesetzt")
+                return
+            if key == "edit":
+                pane.edit_selected_stamp()
+                return
+            color = None
+            if key == "color":
+                from PySide6.QtWidgets import QColorDialog
+
+                cur = QColor("#1E8449")
+                sel = [f for f in pane.scene.selected_frames() if f.kind == "stamp"]
+                if sel:
+                    cur = QColor(sel[0].stroke or "#1E8449")
+                picked = QColorDialog.getColor(cur, self, "Stempelfarbe")
+                if not picked.isValid():
+                    return
+                color = picked.name()
+            pane.apply_stamp_style(key, color=color)
+            return
+        pdf = getattr(self, "pdf_view", None)
         if key == "place" and pdf is not None and hasattr(pdf, "arm_quick_stamp"):
             pdf.arm_quick_stamp()
             self._set_status("Stempel: klicken zum Setzen")
@@ -15257,6 +15313,12 @@ class MainWindow(QMainWindow):
             except Exception:
                 pass
         pane = getattr(self, "dtp_pane", None)
+        if pane is not None and hasattr(pane, "edit_selected_stamp"):
+            try:
+                if pane.edit_selected_stamp():
+                    return True
+            except Exception:
+                pass
         if pane is not None and hasattr(pane, "scene"):
             frames = []
             try:
@@ -15275,8 +15337,14 @@ class MainWindow(QMainWindow):
         return False
 
     def _apply_stamp_style_dtp(self, kind: str, *, color: str | None = None) -> bool:
-        """Stempel-Werkzeuge auf Sibling-DtpFrame: fill/stroke/shadow/outlines."""
+        """Stempel-Werkzeuge auf DTP-Rahmen (Stempel/Text/Form)."""
         pane = getattr(self, "dtp_pane", None)
+        if pane is not None and hasattr(pane, "apply_stamp_style"):
+            try:
+                if pane.apply_stamp_style(kind, color=color):
+                    return True
+            except Exception:
+                pass
         if pane is None or getattr(pane, "doc", None) is None:
             return False
         frames = []

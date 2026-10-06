@@ -243,6 +243,89 @@ def stamp_library_items(*, include_date: bool = True) -> list[tuple[str, str, st
     return items
 
 
+def stamp_is_image(ann: Annotation) -> bool:
+    t = str(getattr(ann, "text", "") or "")
+    return t.startswith("img:") or t.startswith("file://")
+
+
+def toggle_stamp_style(ann: Annotation, kind: str, *, color: str | None = None) -> None:
+    """Rahmen / nur Schrift / Schatten / Kontur / Farbe auf einem Textstempel."""
+    k = str(kind or "").strip()
+    tags = list(getattr(ann, "tags", None) or [])
+
+    def _set_tag(name: str, on: bool) -> None:
+        nonlocal tags
+        tags = [t for t in tags if str(t).casefold() != name.casefold()]
+        if on:
+            tags.append(name)
+
+    if k == "color" and color:
+        ann.color = color
+        return
+    if k == "frame":
+        on = not (bool(getattr(ann, "stamp_frame", True)) and float(getattr(ann, "stroke_width", 0) or 0) > 0.5)
+        ann.stamp_frame = on
+        if on:
+            ann.stamp_text_only = False
+            ann.stroke_width = max(2.0, float(getattr(ann, "stroke_width", 0) or 0) or 3.0)
+            _set_tag("ild-stamp-no-frame", False)
+            _set_tag("ild-stamp-text-only", False)
+        else:
+            ann.stroke_width = 0.0
+            _set_tag("ild-stamp-no-frame", True)
+        ann.tags = tags
+        return
+    if k == "text_only":
+        on = not bool(getattr(ann, "stamp_text_only", False))
+        ann.stamp_text_only = on
+        if on:
+            ann.stamp_frame = False
+            ann.stroke_width = 0.0
+            ann.fill_color = ""
+            _set_tag("ild-stamp-text-only", True)
+            _set_tag("ild-stamp-no-frame", True)
+            _set_tag("ild-stamp-outline", False)
+        else:
+            ann.stamp_frame = True
+            ann.stroke_width = 3.0
+            _set_tag("ild-stamp-text-only", False)
+            _set_tag("ild-stamp-no-frame", False)
+        ann.tags = tags
+        return
+    if k == "shadow":
+        on = not bool(getattr(ann, "stamp_shadow", False))
+        ann.stamp_shadow = on
+        _set_tag("ild-stamp-shadow", on)
+        ann.tags = tags
+        return
+    if k == "outline":
+        on = not bool(getattr(ann, "stamp_outline", False))
+        ann.stamp_outline = on
+        if on:
+            ann.stroke_width = max(2.0, float(getattr(ann, "stroke_width", 0) or 0) or 2.0)
+            ann.stamp_text_only = False
+            _set_tag("ild-stamp-outline", True)
+            _set_tag("ild-stamp-text-only", False)
+            _set_tag("ild-stamp-no-frame", False)
+        else:
+            _set_tag("ild-stamp-outline", False)
+        ann.tags = tags
+
+
+def stamp_style_fields(ann: Annotation) -> dict:
+    """Persistierbare Stempel-Stilfelder für store.update."""
+    return {
+        "color": str(getattr(ann, "color", "") or ""),
+        "fill_color": str(getattr(ann, "fill_color", "") or ""),
+        "stroke_width": float(getattr(ann, "stroke_width", 0.0) or 0.0),
+        "tags": list(getattr(ann, "tags", None) or []),
+        "stamp_frame": bool(getattr(ann, "stamp_frame", True)),
+        "stamp_text_only": bool(getattr(ann, "stamp_text_only", False)),
+        "stamp_shadow": bool(getattr(ann, "stamp_shadow", False)),
+        "stamp_outline": bool(getattr(ann, "stamp_outline", False)),
+    }
+
+
 def _custom_stamps_path(path: Path | None = None) -> Path:
     if path is not None:
         return Path(path)
@@ -448,6 +531,10 @@ class Annotation:
     stroke_width: float = 2.0  # Strichstärke Shapes 1–12 px (0.9.2)
     fill_color: str = ""  # Füllfarbe Shapes (#RRGGBB); leer = aus color abgeleitet (0.9.3)
     rotation: float = 0.0  # Stempel-Drehung in Grad (0/90/180/270)
+    stamp_frame: bool = True  # Rahmen um Textstempel
+    stamp_text_only: bool = False  # nur Schrift, keine Füllung/kein Rahmen
+    stamp_shadow: bool = False
+    stamp_outline: bool = False  # extra Kontur
     tags: List[str] = field(default_factory=list)  # freie Labels, filterbar
     group_id: str = ""  # temporäre Gruppen-ID (Sidecar; leer = ungruppiert)
     locked: bool = False  # Gruppen-/Ann.-Sperre: nicht verschiebbar
@@ -629,7 +716,11 @@ class Annotation:
             sw = float(d.get("stroke_width", 2.0))
         except (TypeError, ValueError):
             sw = 2.0
-        d["stroke_width"] = round(max(1.0, min(12.0, sw)), 2)
+        d["stroke_width"] = round(max(0.0, min(12.0, sw)), 2)
+        d["stamp_frame"] = bool(d.get("stamp_frame", True))
+        d["stamp_text_only"] = bool(d.get("stamp_text_only", False))
+        d["stamp_shadow"] = bool(d.get("stamp_shadow", False))
+        d["stamp_outline"] = bool(d.get("stamp_outline", False))
         fc = str(d.get("fill_color") or "").strip()
         if fc and not fc.startswith("#"):
             fc = "#" + fc
@@ -768,10 +859,20 @@ class Annotation:
             op = 1.0
         data["opacity"] = max(0.05, min(1.0, op))
         try:
-            sw = float(data.get("stroke_width", 2.0) or 2.0)
+            sw = float(data.get("stroke_width", 2.0) if data.get("stroke_width") is not None else 2.0)
         except (TypeError, ValueError):
             sw = 2.0
-        data["stroke_width"] = max(1.0, min(12.0, sw))
+        data["stroke_width"] = max(0.0, min(12.0, sw))
+        data["stamp_frame"] = bool(data.get("stamp_frame", True))
+        data["stamp_text_only"] = bool(data.get("stamp_text_only", False))
+        data["stamp_shadow"] = bool(data.get("stamp_shadow", False))
+        data["stamp_outline"] = bool(data.get("stamp_outline", False))
+        if data["stamp_text_only"]:
+            data["stamp_frame"] = False
+            data["stroke_width"] = 0.0
+            data["fill_color"] = ""
+        if data.get("tags") and "ild-stamp-shadow" in normalize_tags(data.get("tags")):
+            data["stamp_shadow"] = True
         fc = str(data.get("fill_color") or "").strip()
         if fc and not fc.startswith("#"):
             fc = "#" + fc
@@ -1870,10 +1971,10 @@ class AnnotationStore:
             w = float(value)  # type: ignore[arg-type]
         except (TypeError, ValueError):
             w = 2.0
-        return round(max(1.0, min(12.0, w)), 2)
+        return round(max(0.0, min(12.0, w)), 2)
 
     def set_stroke_widths(self, ann_ids: Sequence[str], width: float) -> int:
-        """Batch-Strichstärke für Auswahl setzen (1–12 px) — 0.9.2."""
+        """Batch-Strichstärke für Auswahl setzen (0–12 px; 0 = ohne Kontur)."""
         w = self._normalize_stroke_width(width)
         return self.update_many(ann_ids, stroke_width=w)
 

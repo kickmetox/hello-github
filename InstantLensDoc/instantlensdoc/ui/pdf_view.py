@@ -1569,21 +1569,7 @@ class PdfCanvas(QLabel):
     def _hit_overlay(self, x: float, y: float) -> Annotation | None:
         if not self._annotations_visible:
             return None
-        editable = (
-            AnnotationType.TEXT_OVERLAY,
-            AnnotationType.TEXT,
-            AnnotationType.STICKY,
-            AnnotationType.CALLOUT,
-            AnnotationType.STAMP,
-            AnnotationType.SIGNATURE_FIELD,
-            AnnotationType.HIGHLIGHT,
-            AnnotationType.UNDERLINE,
-            AnnotationType.STRIKEOUT,
-        )
-        hit = self._hit_annotation(x, y)
-        if hit is not None and hit.type in editable:
-            return hit
-        return None
+        return self._hit_annotation(x, y)
 
     @staticmethod
     def _ann_bounds(ann: Annotation) -> tuple[float, float, float, float]:
@@ -1890,6 +1876,11 @@ class PdfCanvas(QLabel):
                 painter.setPen(Qt.NoPen)
                 painter.setBrush(QColor(0, 0, 0, _a(90)))
                 painter.drawRect(x + 4, y + 4, box_w, box_h)
+            fill = "" if flags["text_only"] else str(getattr(ann, "fill_color", "") or "").strip()
+            if fill:
+                fc = QColor(fill)
+                fc.setAlpha(_a(80))
+                painter.fillRect(int(x), int(y), int(box_w), int(box_h), fc)
             painter.setBrush(Qt.NoBrush)
             if flags["frame"] or flags["outline"]:
                 painter.setPen(QPen(stamp_color, float(flags["pen_width"])))
@@ -11945,11 +11936,47 @@ class PdfViewer(QWidget):
         """Notiz-/Kommentar-/Overlay-Text nachträglich bearbeiten."""
         if not self.store:
             return
+        if self.annotations_locked():
+            self.status.emit("Schreibschutz: Overlay gesperrt")
+            return
         ann = self.store.get(ann_id)
         if not ann:
             return
+        if bool(getattr(ann, "locked", False)):
+            self.status.emit("Overlay gesperrt")
+            return
         if ann.type == AnnotationType.LINK:
             self.edit_link_uri(ann.id)
+            return
+        if ann.type in FILLABLE_SHAPE_TYPES or ann.type in (
+            AnnotationType.LINE,
+            AnnotationType.ARROW,
+            AnnotationType.INK,
+            AnnotationType.REDACTION,
+            AnnotationType.MEASURE_AREA,
+        ):
+            from PySide6.QtWidgets import QColorDialog
+
+            src = str(getattr(ann, "fill_color", "") or "") or ann.color or "#2980B9"
+            if ann.type in (AnnotationType.LINE, AnnotationType.ARROW, AnnotationType.INK):
+                src = ann.color or "#2980B9"
+            color = QColorDialog.getColor(QColor(src), self, "Objektfarbe")
+            if not color.isValid():
+                return
+            kw = {"color": color.name()}
+            if ann.type in FILLABLE_SHAPE_TYPES or ann.type in (
+                AnnotationType.REDACTION,
+                AnnotationType.MEASURE_AREA,
+            ):
+                kw["fill_color"] = color.name()
+            self.store.update(ann_id, **kw)
+            try:
+                self.schedule_sidecar_save()
+            except Exception as e:
+                QMessageBox.warning(self, "Annotation", str(e))
+            self.refresh()
+            self.annotations_changed.emit()
+            self.status.emit(f"{ann.type.value} aktualisiert")
             return
         editable = {
             AnnotationType.TEXT_OVERLAY,
@@ -11958,6 +11985,7 @@ class PdfViewer(QWidget):
             AnnotationType.CALLOUT,
             AnnotationType.STAMP,
             AnnotationType.SIGNATURE_FIELD,
+            AnnotationType.SIGNATURE,
         }
         if ann.type not in editable:
             return

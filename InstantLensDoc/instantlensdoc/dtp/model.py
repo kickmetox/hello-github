@@ -155,7 +155,7 @@ class ExtrudeSpec:
 @dataclass
 class DtpFrame:
     id: str = field(default_factory=_nid)
-    kind: str = "text"  # text | image | render | shape | ink  — Layout-Box, Inhalt über content_id
+    kind: str = "text"  # text | image | render | shape | ink | stamp
     page: int = 0
     x: float = 40.0
     y: float = 40.0
@@ -196,6 +196,8 @@ class DtpFrame:
     shadow_dx: float = 3.0
     shadow_dy: float = 3.0
     shadow_color: str = "#00000066"
+    stamp_text_only: bool = False
+    stamp_outline: bool = False
     content_id: str = ""
     symbol_id: str = ""
     linked: bool = False
@@ -517,6 +519,37 @@ class DtpDocument:
             z=len(self.frames),
         )
         self.frames.append(fr)
+        return fr
+
+    def add_stamp(
+        self,
+        text: str = "GENEHMIGT",
+        *,
+        x: float = 80.0,
+        y: float = 80.0,
+        width: float = 140.0,
+        height: float = 44.0,
+        page: int = 0,
+        color: str = "#1E8449",
+    ) -> DtpFrame:
+        fr = DtpFrame(
+            kind="stamp",
+            page=max(0, int(page)),
+            x=x,
+            y=y,
+            width=width,
+            height=height,
+            text=text or "STEMPEL",
+            fill="",
+            stroke=color or "#1E8449",
+            stroke_width=3.0,
+            wrap="none",
+            layer_id="text",
+            style_id="object",
+            z=len(self.frames),
+        )
+        self.frames.append(fr)
+        self.page_count = max(self.page_count, fr.page + 1)
         return fr
 
     def add_ink_stroke(self, points: list[list[float]], *, page: int = 0) -> DtpFrame:
@@ -961,7 +994,7 @@ class DtpDocument:
             raise KeyError(frame_id)
         fr.stroke = str(color or "#333333")
         if width is not None:
-            fr.stroke_width = max(0.25, float(width))
+            fr.stroke_width = max(0.0, float(width))
         return fr
 
     def apply_font_attrs(

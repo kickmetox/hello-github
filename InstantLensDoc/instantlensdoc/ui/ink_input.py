@@ -1242,12 +1242,25 @@ def _stamp_set_tag(tags: Sequence[str], tag: str, on: bool) -> list[str]:
 
 
 def stamp_paint_flags(ann) -> dict:
-    """Rahmen/Farbe/Nur-Text/Schatten/Kontur aus Sibling-Annotation (Tags + color)."""
+    """Rahmen/Farbe/Nur-Text/Schatten/Kontur aus Tags, bool-Feldern und Strichstärke."""
     tags = _stamp_tag_list(ann)
-    text_only = _stamp_has_tag(tags, STAMP_TAG_TEXT_ONLY)
-    no_frame = _stamp_has_tag(tags, STAMP_TAG_NO_FRAME) or text_only
-    shadow = _stamp_has_tag(tags, STAMP_TAG_SHADOW)
-    outline = _stamp_has_tag(tags, STAMP_TAG_OUTLINE) and not text_only
+    text_only = _stamp_has_tag(tags, STAMP_TAG_TEXT_ONLY) or bool(
+        getattr(ann, "stamp_text_only", False)
+    )
+    no_frame = (
+        _stamp_has_tag(tags, STAMP_TAG_NO_FRAME)
+        or text_only
+        or (hasattr(ann, "stamp_frame") and not bool(getattr(ann, "stamp_frame", True)))
+    )
+    try:
+        if float(getattr(ann, "stroke_width", 1.0) or 0.0) < 0.5:
+            no_frame = True
+    except (TypeError, ValueError):
+        pass
+    shadow = _stamp_has_tag(tags, STAMP_TAG_SHADOW) or bool(getattr(ann, "stamp_shadow", False))
+    outline = (
+        _stamp_has_tag(tags, STAMP_TAG_OUTLINE) or bool(getattr(ann, "stamp_outline", False))
+    ) and not text_only
     frame = (not no_frame) or outline
     if text_only:
         frame = False
@@ -1255,13 +1268,19 @@ def stamp_paint_flags(ann) -> dict:
     color = str(getattr(ann, "color", "") or "").strip() or "#C0392B"
     if color.upper() == "#FFFF00":
         color = "#C0392B"
+    try:
+        sw = float(getattr(ann, "stroke_width", 0) or 0)
+    except (TypeError, ValueError):
+        sw = 0.0
+    if frame or outline:
+        sw = max(2.0, sw if sw >= 0.5 else (5.0 if outline else 3.0))
     return {
         "frame": bool(frame),
         "text_only": bool(text_only),
         "shadow": bool(shadow),
         "outline": bool(outline),
         "color": color,
-        "pen_width": 5.0 if outline else 3.0,
+        "pen_width": sw if (frame or outline) else 0.0,
     }
 
 
@@ -1296,12 +1315,26 @@ def apply_stamp_style_to_annotation(ann, kind: str, *, color: str | None = None)
         tags = _stamp_set_tag(tags, STAMP_TAG_NO_FRAME, not on)
         if on:
             tags = _stamp_set_tag(tags, STAMP_TAG_TEXT_ONLY, False)
+            if hasattr(ann, "stamp_text_only"):
+                ann.stamp_text_only = False
         else:
             tags = _stamp_set_tag(tags, STAMP_TAG_OUTLINE, False)
+            if hasattr(ann, "stamp_outline"):
+                ann.stamp_outline = False
+        if hasattr(ann, "stamp_frame"):
+            ann.stamp_frame = on
+        if hasattr(ann, "stroke_width"):
+            ann.stroke_width = 3.0 if on else 0.0
     elif key == "text_only":
         on = not flags["text_only"]
         tags = _stamp_set_tag(tags, STAMP_TAG_TEXT_ONLY, on)
         tags = _stamp_set_tag(tags, STAMP_TAG_NO_FRAME, on)
+        if hasattr(ann, "stamp_text_only"):
+            ann.stamp_text_only = on
+        if hasattr(ann, "stamp_frame"):
+            ann.stamp_frame = not on
+        if hasattr(ann, "stroke_width"):
+            ann.stroke_width = 0.0 if on else 3.0
         if on:
             tags = _stamp_set_tag(tags, STAMP_TAG_OUTLINE, False)
             try:
@@ -1309,19 +1342,42 @@ def apply_stamp_style_to_annotation(ann, kind: str, *, color: str | None = None)
             except Exception:
                 pass
     elif key == "shadow":
-        tags = _stamp_set_tag(tags, STAMP_TAG_SHADOW, not flags["shadow"])
+        on = not flags["shadow"]
+        tags = _stamp_set_tag(tags, STAMP_TAG_SHADOW, on)
+        if hasattr(ann, "stamp_shadow"):
+            ann.stamp_shadow = on
     elif key == "outline":
         on = not flags["outline"]
         tags = _stamp_set_tag(tags, STAMP_TAG_OUTLINE, on)
+        if hasattr(ann, "stamp_outline"):
+            ann.stamp_outline = on
         if on:
             tags = _stamp_set_tag(tags, STAMP_TAG_NO_FRAME, False)
             tags = _stamp_set_tag(tags, STAMP_TAG_TEXT_ONLY, False)
+            if hasattr(ann, "stamp_text_only"):
+                ann.stamp_text_only = False
+            if hasattr(ann, "stamp_frame"):
+                ann.stamp_frame = True
+            if hasattr(ann, "stroke_width"):
+                try:
+                    cur = float(getattr(ann, "stroke_width", 0) or 0)
+                except (TypeError, ValueError):
+                    cur = 0.0
+                ann.stroke_width = max(2.0, cur or 2.0)
     try:
         ann.tags = tags
     except Exception:
         pass
     flags = stamp_paint_flags(ann)
     _sync_optional_stamp_attrs(ann, flags)
+    sw = 0.0 if flags["text_only"] or not flags["frame"] else float(flags["pen_width"] or 3.0)
+    if flags["outline"] and sw < 2.0:
+        sw = 2.0
+    if hasattr(ann, "stroke_width"):
+        try:
+            ann.stroke_width = sw
+        except Exception:
+            pass
     if hasattr(ann, "touch"):
         try:
             ann.touch()
@@ -1331,4 +1387,9 @@ def apply_stamp_style_to_annotation(ann, kind: str, *, color: str | None = None)
         "color": getattr(ann, "color", None),
         "fill_color": getattr(ann, "fill_color", ""),
         "tags": list(getattr(ann, "tags", None) or []),
+        "stroke_width": sw,
+        "stamp_frame": bool(flags["frame"]),
+        "stamp_text_only": bool(flags["text_only"]),
+        "stamp_shadow": bool(flags["shadow"]),
+        "stamp_outline": bool(flags["outline"]),
     }

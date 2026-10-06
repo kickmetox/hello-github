@@ -256,6 +256,28 @@ def paint_frame_local(painter: QPainter, doc, fr) -> None:
                     Qt.TextWordWrap | Qt.AlignLeft | Qt.AlignTop,
                     fr.text or "",
                 )
+    elif fr.kind == "stamp":
+        text_only = bool(getattr(fr, "stamp_text_only", False))
+        try:
+            sw = float(fr.stroke_width or 0.0)
+        except (TypeError, ValueError):
+            sw = 0.0
+        outline = bool(getattr(fr, "stamp_outline", False)) and not text_only
+        if getattr(fr, "shadow", False):
+            painter.fillRect(QRectF(3, 3, fr.width, fr.height), QColor(0, 0, 0, 90))
+        if fr.fill and not text_only:
+            painter.fillRect(QRectF(0, 0, fr.width, fr.height), QColor(fr.fill))
+        if (sw >= 0.5 or outline) and not text_only:
+            painter.setPen(QPen(QColor(fr.stroke or "#1E8449"), max(0.6, sw if sw >= 0.5 else 2.0)))
+            painter.setBrush(Qt.NoBrush)
+            painter.drawRect(QRectF(0.5, 0.5, max(1.0, fr.width - 1), max(1.0, fr.height - 1)))
+        painter.setPen(QColor(fr.stroke or "#1E8449"))
+        painter.setFont(_qfont_for_frame(doc, fr))
+        painter.drawText(
+            QRectF(4, 4, max(4.0, fr.width - 8), max(4.0, fr.height - 8)),
+            Qt.TextWordWrap | Qt.AlignCenter,
+            fr.text or "STEMPEL",
+        )
     painter.restore()
 
 
