@@ -48,6 +48,12 @@ class MenuClickFilter(QObject):
                 if event.button() != Qt.MouseButton.LeftButton:
                     return False
                 act = _action_at(obj, event)
+                if act is None:
+                    act = obj.activeAction()
+                elif not obj.rect().contains(_event_pos(event)):
+                    highlighted = obj.activeAction()
+                    if highlighted is not None:
+                        act = highlighted
                 if act is None or not act.isEnabled() or act.isSeparator():
                     return False
                 if act.menu() is not None:
@@ -68,36 +74,23 @@ def _scroll_style() -> ScrollableMenuStyle:
     return _STYLE
 
 
-def _max_menu_height() -> int:
-    app = QApplication.instance()
-    h = 720
-    if app is not None:
-        screen = app.primaryScreen()
-        if screen is not None:
-            try:
-                h = int(screen.availableGeometry().height())
-            except Exception:
-                h = int(screen.geometry().height())
-    return max(240, h - 64)
-
-
 def prepare_menu_for_clicks(menu: QMenu) -> None:
-    """Eine Spalte, scrollbar, Höhe ≤ Bildschirm — Klickflächen bleiben im Widget."""
+    """Eine Spalte, scrollbar — keine abgeschnittene zweite Spalte."""
     if menu.property("ildScrollableMenu"):
-        menu.setMaximumHeight(_max_menu_height())
         return
     menu.setStyle(_scroll_style())
-    menu.setMaximumHeight(_max_menu_height())
     menu.setProperty("ildScrollableMenu", True)
 
 
-def _action_at(menu: QMenu, event: QMouseEvent) -> QAction | None:
+def _event_pos(event: QMouseEvent):
     if hasattr(event, "position"):
-        pt = event.position().toPoint()
-    else:
-        pt = event.pos()
+        return event.position().toPoint()
+    return event.pos()
+
+
+def _action_at(menu: QMenu, event: QMouseEvent) -> QAction | None:
     try:
-        return menu.actionAt(pt)
+        return menu.actionAt(_event_pos(event))
     except Exception:
         return None
 

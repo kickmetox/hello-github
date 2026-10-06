@@ -447,6 +447,7 @@ def test_qtest_mouseclick_all_enabled_bearbeiten_format_leaves() -> None:
     rec.install()
     fails: list[str] = []
     clicked = 0
+    seen_act: set[int] = set()
     try:
         for title in ("Bearbeiten", "Format"):
             menu = _menu_or_fail(title)
@@ -455,22 +456,48 @@ def test_qtest_mouseclick_all_enabled_bearbeiten_format_leaves() -> None:
                 if text in ("(leer)",) or text.lower() in ("beenden", "quit", "exit"):
                     continue
                 _reseed_for_click(_WIN)
+                if "einrückung verringern" in text.lower():
+                    try:
+                        _WIN.editor.adjust_block_indent(24)
+                    except Exception:
+                        pass
                 try:
                     if not act.isEnabled():
                         continue
                 except Exception:
                     continue
                 rec.reset()
+                hits = {"n": 0}
+
+                def _hit(*_a, **_k):
+                    hits["n"] += 1
+
+                act.triggered.connect(_hit)
                 before = snapshot_state(_WIN)
-                ok = mouse_click_menu_action(_APP, host, act)
-                pump(_APP, 0.05)
+                try:
+                    ok = mouse_click_menu_action(_APP, host, act)
+                    pump(_APP, 0.05)
+                finally:
+                    try:
+                        act.triggered.disconnect(_hit)
+                    except Exception:
+                        pass
                 after = snapshot_state(_WIN)
                 changes = state_changed(before, after)
                 verdict, detail = classify_events(rec.events, changes)
                 clicked += 1
-                if not ok or verdict not in ("open", "effect"):
+                alias = id(act) in seen_act
+                seen_act.add(id(act))
+                if not ok or hits["n"] < 1:
+                    fails.append(
+                        f"{path}: click={ok} triggered={hits['n']} {verdict}/{detail}"
+                    )
+                    continue
+                if alias:
+                    continue
+                if verdict not in ("open", "effect"):
                     fails.append(f"{path}: click={ok} {verdict}/{detail}")
         assert clicked > 0, "keine enabled Leaves geklickt"
-        assert fails == [], "Mausklick ohne Dialog/Effekt:\n" + "\n".join(fails[:24])
+        assert fails == [], "Mausklick ohne Slot/Dialog/Effekt:\n" + "\n".join(fails[:24])
     finally:
         rec.restore()
