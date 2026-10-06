@@ -71,6 +71,16 @@ def test_filters_include_md_csv_xls() -> None:
     for ext in (".md", ".csv", ".xls", ".xlsx"):
         assert ext in open_f, f"Öffnen-Filter fehlt {ext}"
         assert ext in save_f, f"Speichern-Filter fehlt {ext}"
+    from instantlensdoc.ui.file_dialogs import document_save_filters_are_safe
+
+    assert document_save_filters_are_safe()
+    import inspect
+    from instantlensdoc.ui.main_window import MainWindow
+
+    src = inspect.getsource(MainWindow.open_dialog) + inspect.getsource(
+        MainWindow.open_dialog_with_encoding
+    )
+    assert "document_open_name_filters" in src
 
 
 def test_open_document_md_csv_xlsx(tmp_path: Path) -> None:
@@ -159,6 +169,11 @@ def test_mainwindow_open_heading_and_table(tmp_path: Path, qapp) -> None:
     win.resize(1200, 800)
     try:
         win.open_path(str(samples["md"]))
+        win._sync_menu_enablement()
+        assert win._text_document_active()
+        assert win._view_capability_state()["font"] is True
+        assert win.ribbon_bar.is_enabled("font")
+        assert win.ribbon_bar.is_enabled("bold")
         plain = win.editor.toPlainText()
         assert "Bericht" in plain
         html = win.editor.to_rich_html()
@@ -175,6 +190,9 @@ def test_mainwindow_open_heading_and_table(tmp_path: Path, qapp) -> None:
         assert "¶" not in plain
 
         win.open_path(str(samples["csv"]))
+        win._sync_menu_enablement()
+        assert win._view_capability_state()["font"] is True
+        assert win.ribbon_bar.is_enabled("font_color")
         tables = iter_qtext_tables(win.editor.document())
         cells = first_qtext_table_cells(win.editor.document())
         assert tables or cells or "Alpha" in win.editor.toPlainText()
@@ -183,6 +201,11 @@ def test_mainwindow_open_heading_and_table(tmp_path: Path, qapp) -> None:
             assert "Alpha" in flat or "Name" in flat
 
         win.open_path(str(samples["xlsx"]))
+        win._sync_menu_enablement()
+        assert win._text_document_active()
+        assert win._view_capability_state()["font"] is True
+        assert win.ribbon_bar.is_enabled("font")
+        assert win.ribbon_bar.is_enabled("bold")
         cells = first_qtext_table_cells(win.editor.document())
         assert cells or "Alpha" in win.editor.toPlainText()
         bold = win.editor_pane._tool_buttons.get("bold")

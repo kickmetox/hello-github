@@ -379,15 +379,15 @@ def disabled_reason(action_id: str) -> str | None:
 
 # Eine Ansicht: nie ausblenden, nur ausgrauen — deutsche Gründe.
 REASON_FONT = (
-    "Schriftänderung erst nach OCR (Word-Suite) oder in txt/doc/docx/odt/DTP-Textrahmen verfügbar"
+    "Schriftänderung erst nach OCR (Word-Suite) oder in txt/doc/docx/odt/md/csv/xlsx/DTP-Textrahmen verfügbar"
 )
 REASON_FONT_PDF = "Schriftänderung erst nach OCR (Word-Suite) verfügbar"
 REASON_PAGE = "Seitenränder und Seitenlayout brauchen eine geöffnete Seite"
 REASON_PDF = "Nur bei angezeigter PDF-Seite verfügbar"
-REASON_MAIL = "Seriendruck nur bei Textdokument (txt, doc, docx, odt)"
+REASON_MAIL = "Seriendruck nur bei Textdokument (txt, doc, docx, odt, md, csv, xlsx)"
 REASON_TABLE = "Tabellenwerkzeuge nur in einer Tabelle"
 REASON_ARRANGE = "Anordnen nur bei ausgewähltem DTP-Rahmen"
-REASON_RICH = "Nur in txt, doc, docx, odt, DTP-Textrahmen oder nach OCR verfügbar"
+REASON_RICH = "Nur in txt, doc, docx, odt, md, csv, xlsx, DTP-Textrahmen oder nach OCR verfügbar"
 REASON_WRITE_PROTECT = "Dokument ist schreibgeschützt"
 
 FONT_ACTION_IDS = frozenset(

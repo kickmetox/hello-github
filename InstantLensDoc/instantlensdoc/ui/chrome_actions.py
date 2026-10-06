@@ -270,7 +270,7 @@ FONT_TOOL_LABEL_NEEDLES: tuple[str, ...] = (
 )
 
 FONT_TOOL_DISABLE_REASON = (
-    "Schriftwerkzeuge nach OCR oder in txt/doc/docx/odt/DTP"
+    "Schriftwerkzeuge nach OCR oder in txt/doc/docx/odt/md/csv/xlsx/DTP"
 )
 
 EDITOR_ACTION_DISABLE_REASON = "Nur im Text- oder DOCX-Editor verfügbar"
@@ -298,7 +298,7 @@ def font_tools_allowed(
 ) -> tuple[bool, str]:
     """Schriftwerkzeuge: grauen + Tooltip, nie Menü ausblenden.
 
-    Enabled: txt/doc/docx/odt-Editor, DTP, oder PDF nach OCR.
+    Enabled: txt/doc/docx/odt/md/csv/xlsx-Editor, DTP, oder PDF nach OCR.
     Disabled: PDF ohne OCR (und sonstige Nicht-Text-Tabs).
     """
     if is_dtp or is_editor:

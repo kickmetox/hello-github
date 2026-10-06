@@ -189,7 +189,7 @@ def document_save_filters_are_safe(filter_str: str | None = None) -> bool:
     """True wenn Dokument-Filter die Pflichtformate hat und *.py nicht primär ist."""
     text = filter_str if filter_str is not None else document_save_name_filters()
     low = text.lower()
-    required = (".ild", ".txt", ".docx", ".pdf", ".rtf", ".html")
+    required = (".ild", ".txt", ".docx", ".pdf", ".rtf", ".html", ".md", ".csv", ".xlsx", ".xls")
     if any(ext not in low for ext in required):
         return False
     # Dedizierter Python-Filter oder *.py als erstes Glob → unzulässig für Docs

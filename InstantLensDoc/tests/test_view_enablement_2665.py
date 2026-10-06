@@ -254,3 +254,34 @@ def test_welcome_page_no_font_no_page() -> None:
     assert REASON_PAGE in tip or "Seite" in tip
     tipf = _WIN.ribbon_bar._actions["font"].toolTip() or ""
     assert REASON_FONT in tipf or "OCR" in tipf or "txt" in tipf
+
+
+def test_font_enabled_on_md_csv_xlsx() -> None:
+    """Sibling-Formate: Schrift wie txt/docx, nicht wie Bild-PDF."""
+    from ild_pdf.tables import create_table, export_table_xlsx
+
+    td = Path(_TD.name)
+    md = td / "caps.md"
+    md.write_text("# Titel\n\nAbsatz mit **fett**.\n", encoding="utf-8")
+    csvp = td / "caps.csv"
+    csvp.write_text("Name,Wert\nA,1\n", encoding="utf-8")
+    xlsx = td / "caps.xlsx"
+    export_table_xlsx(
+        create_table(data=[["Name", "Wert"], ["A", "1"]], header=True),
+        xlsx,
+        sheet_name="Daten",
+    )
+    xls = td / "caps.xls"
+    xls.write_bytes(xlsx.read_bytes())
+    for path in (md, csvp, xlsx, xls):
+        _WIN.open_path(str(path))
+        pump(_APP, 0.15)
+        _WIN._sync_menu_enablement()
+        caps = _WIN._view_capability_state()
+        assert caps["font"] is True, path.name
+        assert caps["pdf"] is False
+        assert _WIN.ribbon_bar.is_enabled("font"), path.name
+        assert _WIN.ribbon_bar.is_enabled("bold"), path.name
+        assert _WIN.ribbon_bar.is_enabled("font_color"), path.name
+        _p, _h, fett = _leaf("Bearbeiten", "Fett")
+        assert fett.isEnabled(), path.name

@@ -12319,20 +12319,12 @@ class MainWindow(QMainWindow):
         return bool(getattr(pdf, "pdf_path", None))
 
     def _text_document_active(self) -> bool:
-        """txt/doc/docx/odt/RTF/HTML und Word-Suite nach OCR — nicht PDF/Bild/XLSX."""
+        """txt/doc/docx/odt/md/csv/xls/xlsx wie Editor — nicht Bild-PDF."""
         if not self._editor_document_active():
             return False
         doc = getattr(self, "doc", None)
         kind = getattr(doc, "kind", None) if doc is not None else None
-        if kind in (DocKind.PDF, DocKind.IMAGE, DocKind.XLSX):
-            return False
-        path = ""
-        try:
-            path = str(getattr(doc, "path", "") or "") if doc is not None else ""
-        except Exception:
-            path = ""
-        suffix = Path(path).suffix.lower() if path else ""
-        if suffix in {".xlsx", ".xls"}:
+        if kind in (DocKind.PDF, DocKind.IMAGE):
             return False
         return True
 
@@ -21160,12 +21152,14 @@ class MainWindow(QMainWindow):
         enc = self._pick_text_encoding("Öffnen mit Encoding")
         if not enc:
             return
+        from instantlensdoc.ui.file_dialogs import document_open_name_filters, get_open_file_name
+
         start = dialog_start_dir(get_default_open_dir())
-        path, _ = QFileDialog.getOpenFileName(
+        path, _ = get_open_file_name(
             self,
             f"Öffnen ({enc})",
             start,
-            "Textdokumente (*.txt *.md *.csv *.html *.htm *.log);;Alle (*.*)",
+            document_open_name_filters(),
         )
         path = native_fs_path(path)
         if path:
@@ -22296,7 +22290,7 @@ class MainWindow(QMainWindow):
         filters = {
             "html": ("HTML (*.html)", ".html"),
             "docx": ("DOCX (*.docx)", ".docx"),
-            "xlsx": ("Excel (*.xlsx)", ".xlsx"),
+            "xlsx": ("Excel (*.xlsx *.xls)", ".xlsx"),
             "pdf": ("PDF (*.pdf)", ".pdf"),
             "txt": ("Text (*.txt)", ".txt"),
             "rtf": ("RTF (*.rtf)", ".rtf"),
@@ -22475,7 +22469,7 @@ class MainWindow(QMainWindow):
             self,
             "Zahlen/Daten importieren",
             str(dialog_start_dir()),
-            "Tabellen (*.csv *.xlsx);;CSV (*.csv);;Excel (*.xlsx);;Alle (*.*)",
+            "Tabellen (*.csv *.xlsx *.xls);;CSV (*.csv);;Excel (*.xlsx *.xls);;Alle (*.*)",
         )
         if not path:
             return
