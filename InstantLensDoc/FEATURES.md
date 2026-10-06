@@ -2,7 +2,7 @@
 
 ### 2.6.59 — Release: Word-Suite, PDF-Menü, OCR, DTP, Ribbon
 
-PDF-Menü live (Dialog/Dateiänderung, Geschwister-PDF). OCR: Layout, Felder, Kopf/Fuß, Formatvorlagen, Tabellen ohne Steuerzeichen. DTP-Lineale. Word-Chrome Klassisch/Ribbon/Kombiniert. Absatz/Seitenlayout/Kopf/Fuß/Ersatzzeichen; Formatvorlagen, Tabellen, Serienbrief teilen Ribbon-QActions. Windows Copy-Path/Status/Recent mit `\\` (Öffnen/Speichern `/` und `\\`). Pack `InstantLensDoc-2.6.59-pack.zip`. VERSION **2.6.59**. HEAD `8f01af3` / `d1e74c6`.
+PDF-Menü live (Dialog/Dateiänderung, Geschwister-PDF). OCR: Layout, Felder, Kopf/Fuß, Formatvorlagen, Tabellen ohne Steuerzeichen. DTP-Lineale; Ribbon/Menü **DTP** öffnet die Ansicht sofort, Speichern-Abfrage bei Änderungen. Word-Chrome Klassisch/Ribbon/Kombiniert. Absatz/Seitenlayout/Kopf/Fuß/Ersatzzeichen; Formatvorlagen, Tabellen, Serienbrief teilen Ribbon-QActions. Windows Copy-Path/Status/Recent mit `\\` (Öffnen/Speichern `/` und `\\`). Pack `InstantLensDoc-2.6.59-pack.zip`. VERSION **2.6.59**. HEAD `8f01af3` / `d1e74c6`.
 
 ### 2.6.58 — Release: Auswahl-Gummiband per Mausziehen
 

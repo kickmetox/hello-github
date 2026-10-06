@@ -154,7 +154,10 @@ HELP_HTML = f"""
     kompakte Icon-Leiste (Auswählen/Text/Bild/Form gelten auf der Auswahl; Füllung/Kontur-Farbwähler;
     Schrift <code>QFontDialog</code>/<code>QFontDatabase</code>), Lineale mm/pt/in (ziehen setzt Hilfslinien),
     grauer Pasteboard, Anschnitt rot, Satzspiegel blau, Status Zoom/Seite/Koordinaten/Hintergrund.
-    Menü Typografie/Drop-Cap/Silbentrennung/Zeilenabstand ebenso. Ribbon-Tab <b>DTP</b> (Alt+8). — <b>2.6.54</b></li>
+    Menü Typografie/Drop-Cap/Silbentrennung/Zeilenabstand ebenso.
+    Menü/Ribbon-Tab <b>DTP</b> (nicht erst ein Unterpunkt) wechselt sofort in die DTP-Ansicht
+    (auch bei offenem PDF). Bei ungespeicherten Änderungen:
+    Speichern / Nicht speichern / Abbrechen. — <b>2.6.54</b> / <b>2.6.59</b></li>
 <li><b>Extras → KI-Assistent</b>: Zusammenfassen, umformulieren, übersetzen, Inhaltsverzeichnis vorschlagen.
     OpenAI-kompatibler Endpoint + Schlüssel in Einstellungen; ohne Schlüssel Offline-Modus. — <b>2.6.54</b></li>
 <li><b>Extras → Intelligente Formerkennung / Variable Fonts / Envelope Distort / 3D-Extrusion / E-Signatur PAdES /

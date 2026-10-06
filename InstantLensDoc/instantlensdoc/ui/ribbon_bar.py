@@ -142,6 +142,7 @@ class RibbonBar(QWidget):
     """
 
     action_triggered = Signal(str)
+    categorySelected = Signal(str)
 
     # Alt-Mnemonic → Kategorie-Index (Smoke/Alt-Ribbon) — Geräte bleibt erreichbar
     ALT_CATEGORY_KEYS = ("1", "2", "3", "4", "5", "6", "7", "8")
@@ -195,6 +196,7 @@ class RibbonBar(QWidget):
         self._tab_index: dict[str, int] = {}
         self._table_tab_index = -1
         self._arrange_group: QWidget | None = None
+        self._prev_index = 0
         self.style_gallery: StyleGallery | None = None
 
         checkable = {
@@ -212,6 +214,7 @@ class RibbonBar(QWidget):
             "table_header_row",
             "table_borders",
             "line_numbers",
+            "dtp_layout",
         }
 
         def _icon_for(aid: str) -> QIcon | None:
@@ -612,10 +615,6 @@ class RibbonBar(QWidget):
             btn.setToolTip(tip)
             btn.setProperty("altMnemonic", mnemonic)
             btn.clicked.connect(lambda _=False, idx=i: self._select_cat(idx))
-            if title == "DTP":
-                btn.clicked.connect(
-                    lambda _=False: self.action_triggered.emit("dtp_layout")
-                )
             cats.addWidget(btn)
             self._cat_buttons.append(btn)
             self._tab_index[title] = i
@@ -663,17 +662,27 @@ class RibbonBar(QWidget):
             sc.activated.connect(lambda idx=i: self.select_category(idx))
             self._alt_shortcuts.append(sc)
 
-    def _select_cat(self, index: int) -> None:
+    def _select_cat(self, index: int, *, notify: bool = True) -> None:
         if index < 0 or index >= self._stack.count():
             return
         btn = self._cat_buttons[index]
         if not btn.isVisible() and index == self._table_tab_index:
             return
+        current = self._stack.currentIndex()
+        if notify and current != index:
+            self._prev_index = current
         self._stack.setCurrentIndex(index)
         for i, b in enumerate(self._cat_buttons):
             b.blockSignals(True)
             b.setChecked(i == index)
             b.blockSignals(False)
+        if notify:
+            self.categorySelected.emit((btn.text() or "").strip())
+
+    def restore_previous_category(self) -> None:
+        """Nach Abbruch (Speichern-Dialog) den vorherigen Ribbon-Tab wiederherstellen."""
+        prev = int(getattr(self, "_prev_index", 0) or 0)
+        self._select_cat(prev, notify=False)
 
     def select_category(self, index: int) -> None:
         """Öffentliche Kategorie-Wahl (Smoke/Alt-Ribbon)."""

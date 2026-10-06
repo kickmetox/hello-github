@@ -1146,6 +1146,7 @@ class MainWindow(QMainWindow):
 
         self.ribbon_bar = RibbonBar(self)
         self.ribbon_bar.action_triggered.connect(self._on_ribbon_action)
+        self.ribbon_bar.categorySelected.connect(self._on_ribbon_category)
         outer.addWidget(self.ribbon_bar)
         self.doc_tab_bar = DocumentTabBar(self)
         self.doc_tab_bar.tab_activated.connect(self._on_doc_tab_activated)
@@ -2786,11 +2787,12 @@ class MainWindow(QMainWindow):
         m_view.addAction(self._satzspiegel_action)
         self._layout_mode_action = QAction("Layout-Modus", self)
         self._layout_mode_action.setObjectName("actLayoutMode")
+        self._layout_mode_action.setCheckable(True)
         self._layout_mode_action.setShortcut(QKeySequence("Ctrl+Alt+L"))
         self._layout_mode_action.setToolTip(
             "DTP-Canvas: Rahmen, Lineal, Raster, Musterseiten — 2.6.54"
         )
-        self._layout_mode_action.triggered.connect(self._enter_layout_mode)
+        self._layout_mode_action.triggered.connect(self._on_layout_mode_triggered)
         m_view.addAction(self._layout_mode_action)
         self._current_line_hl_action = QAction("Aktuelle Zeile hervorheben", self)
         self._current_line_hl_action.setCheckable(True)
@@ -4316,6 +4318,14 @@ class MainWindow(QMainWindow):
         m_dtp.setToolTip(
             "DTP-Layout: Menütitel öffnet den Canvas; Einträge teilen bestehende Slots"
         )
+        self._dtp_view_action = QAction("DTP-Ansicht", self)
+        self._dtp_view_action.setObjectName("actDtpView")
+        self._dtp_view_action.setCheckable(True)
+        self._dtp_view_action.setToolTip(
+            "Sofort in den DTP-Layout-Modus wechseln (aktuelles Dokument, inkl. PDF)"
+        )
+        self._dtp_view_action.triggered.connect(self._on_layout_mode_triggered)
+        m_dtp.addAction(self._dtp_view_action)
         if getattr(self, "_layout_mode_action", None) is not None:
             m_dtp.addAction(self._layout_mode_action)
         for objn in (
@@ -4365,7 +4375,9 @@ class MainWindow(QMainWindow):
             pass
 
     def _on_dtp_menu_about_to_show(self) -> None:
-        """Menütitel DTP: eine Spalte, Canvas öffnen. Slot bleibt sibling-owned."""
+        """Menütitel DTP: eine Spalte, sofort Layout-Modus (PDF inklusive)."""
+        if getattr(self, "_dtp_switching", False):
+            return
         try:
             from instantlensdoc.ui.menu_click import prepare_menu_for_clicks
 
@@ -4374,11 +4386,7 @@ class MainWindow(QMainWindow):
                 prepare_menu_for_clicks(menu)
         except Exception:
             pass
-        try:
-            if not self._layout_mode_active():
-                self._enter_layout_mode()
-        except Exception:
-            pass
+        self._enter_layout_mode()
 
     def _on_word_suite_menu_about_to_show(self) -> None:
         """Eine Spalte + Enablement bevor Absatz/Seitenlayout/Format layoutet."""
@@ -13473,7 +13481,8 @@ class MainWindow(QMainWindow):
     def _show_extrude3d_dialog(self) -> None:
         if getattr(self, "dtp_pane", None) is not None:
             try:
-                self._enter_layout_mode()
+                if not self._enter_layout_mode():
+                    return
                 self.dtp_pane.apply_extrude()
                 self._set_status("3D-Extrusion auf DTP-Auswahl")
                 return
@@ -13490,7 +13499,8 @@ class MainWindow(QMainWindow):
                 self.stack.currentWidget() is self.dtp_pane
                 or not getattr(self.pdf_view, "pdf_path", None)
             ):
-                self._enter_layout_mode()
+                if not self._enter_layout_mode():
+                    return
                 self.dtp_pane._ink_btn.setChecked(True)
                 self.dtp_pane.toggle_ink(True)
                 from instantlensdoc.core.stylus import stylus_info
@@ -13546,51 +13556,164 @@ class MainWindow(QMainWindow):
         except Exception:
             pass
 
-    def _enter_layout_mode(self) -> None:
-        """Ansicht → Layout-Modus: DTP-Canvas."""
+    def _on_ribbon_category(self, title: str) -> None:
+        """Ribbon-Tab DTP öffnet sofort die DTP-Ansicht, nicht erst ein Unterwerkzeug."""
+        if str(title or "").strip() != "DTP":
+            return
+        if getattr(self, "_dtp_switching", False):
+            return
+        if not self._enter_layout_mode():
+            rb = getattr(self, "ribbon_bar", None)
+            if rb is not None and hasattr(rb, "restore_previous_category"):
+                rb.restore_previous_category()
+
+    def _on_layout_mode_triggered(self, checked: bool = True) -> None:
+        if not checked:
+            if not self._leave_layout_mode():
+                self._sync_layout_mode_checked(True)
+            return
+        if not self._enter_layout_mode():
+            self._sync_layout_mode_checked(False)
+
+    def _sync_layout_mode_checked(self, on: bool) -> None:
+        want = bool(on)
+        for act in (
+            getattr(self, "_layout_mode_action", None),
+            getattr(self, "_dtp_view_action", None),
+        ):
+            if act is None:
+                continue
+            act.blockSignals(True)
+            try:
+                act.setChecked(want)
+            except Exception:
+                pass
+            act.blockSignals(False)
+        rb = getattr(self, "ribbon_bar", None)
+        if rb is not None:
+            try:
+                rb.set_checked("dtp_layout", want)
+            except Exception:
+                pass
+
+    def _enter_layout_mode(self, checked: bool = True) -> bool:
+        """Ribbon/Menü DTP oder Ansicht → Layout-Modus: DTP-Canvas für das aktuelle Dokument."""
+        if checked is False:
+            return self._leave_layout_mode()
+        if self._layout_mode_active():
+            self._sync_layout_mode_checked(True)
+            return True
         pane = getattr(self, "dtp_pane", None)
         if pane is None:
-            return
+            return False
+        if getattr(self, "_dtp_switching", False):
+            return True
+        self._dtp_switching = True
         try:
-            from instantlensdoc.dtp.model import DtpDocument
+            if not self._confirm_document_unsaved(title="Layout-Modus"):
+                self._sync_layout_mode_checked(False)
+                return False
+            cur = self.stack.currentWidget()
+            if cur is not pane:
+                self._dtp_return_widget = cur
+            try:
+                from instantlensdoc.dtp.model import DtpDocument
 
-            if getattr(self, "layout_doc", None) is not None and self.layout_doc.text_frames:
-                pane.set_document(DtpDocument.from_layout_document(self.layout_doc))
-            elif pane.doc is None:
-                pane.set_document(DtpDocument.sample("A5"))
-        except Exception:
-            pass
-        self.stack.setCurrentWidget(pane)
-        self._set_status("Layout-Modus (DTP)")
+                if getattr(self, "layout_doc", None) is not None and self.layout_doc.text_frames:
+                    pane.set_document(DtpDocument.from_layout_document(self.layout_doc))
+                elif pane.doc is None:
+                    pane.set_document(DtpDocument.sample("A5"))
+            except Exception:
+                pass
+            self.stack.setCurrentWidget(pane)
+            self._sync_layout_mode_checked(True)
+            rb = getattr(self, "ribbon_bar", None)
+            if rb is not None:
+                try:
+                    rb.select_tab("DTP")
+                except Exception:
+                    pass
+            self._set_status("Layout-Modus (DTP)")
+            try:
+                self._sync_editor_only_actions()
+                self._sync_menu_enablement()
+                self._sync_layout_arrange()
+            except Exception:
+                pass
+            return True
+        finally:
+            self._dtp_switching = False
+
+    def _leave_layout_mode(self) -> bool:
+        """DTP verlassen; bei dirty Layout Speichern / Nicht speichern / Abbrechen."""
+        if not self._layout_mode_active():
+            self._sync_layout_mode_checked(False)
+            return True
+        if getattr(self, "_dtp_switching", False):
+            return True
+        self._dtp_switching = True
         try:
-            self._sync_editor_only_actions()
-            self._sync_menu_enablement()
-            self._sync_layout_arrange()
-        except Exception:
-            pass
+            if not self._confirm_dtp_unsaved():
+                self._sync_layout_mode_checked(True)
+                return False
+            pane = getattr(self, "dtp_pane", None)
+            target = getattr(self, "_dtp_return_widget", None)
+            if target is None or target is pane:
+                doc = getattr(self, "doc", None)
+                kind = getattr(doc, "kind", None) if doc is not None else None
+                if kind == DocKind.PDF or getattr(self.pdf_view, "pdf_path", None):
+                    target = self.pdf_view
+                elif kind in (
+                    DocKind.TEXT,
+                    DocKind.MARKDOWN,
+                    DocKind.HTML,
+                    DocKind.DOCX,
+                    DocKind.RTF,
+                ):
+                    target = self.editor_pane
+                else:
+                    target = self.welcome_page
+            self.stack.setCurrentWidget(target)
+            self._sync_layout_mode_checked(False)
+            self._set_status("DTP beendet")
+            try:
+                self._sync_editor_only_actions()
+                self._sync_menu_enablement()
+                self._sync_layout_arrange()
+            except Exception:
+                pass
+            return True
+        finally:
+            self._dtp_switching = False
 
     def _dtp_apply_fill(self) -> None:
-        self._enter_layout_mode()
+        if not self._enter_layout_mode():
+            return
         self.dtp_pane.apply_fill(dialog=True)
 
     def _dtp_apply_stroke(self) -> None:
-        self._enter_layout_mode()
+        if not self._enter_layout_mode():
+            return
         self.dtp_pane.apply_stroke(dialog=True)
 
     def _dtp_apply_font(self) -> None:
-        self._enter_layout_mode()
+        if not self._enter_layout_mode():
+            return
         self.dtp_pane.apply_font(dialog=True)
 
     def _dtp_apply_wrap(self) -> None:
-        self._enter_layout_mode()
+        if not self._enter_layout_mode():
+            return
         self.dtp_pane.apply_wrap_mode(dialog=True)
 
     def _dtp_add_text_frame(self) -> None:
-        self._enter_layout_mode()
+        if not self._enter_layout_mode():
+            return
         self.dtp_pane.add_text_frame()
 
     def _dtp_link_frames(self) -> None:
-        self._enter_layout_mode()
+        if not self._enter_layout_mode():
+            return
         self.dtp_pane.link_selected()
 
     def _dtp_toggle_grid(self) -> None:
@@ -13611,7 +13734,8 @@ class MainWindow(QMainWindow):
         )
 
     def _dtp_export_pdf_dialog(self) -> None:
-        self._enter_layout_mode()
+        if not self._enter_layout_mode():
+            return
         path, _ = QFileDialog.getSaveFileName(
             self, "DTP als PDF", "", "PDF (*.pdf)"
         )
@@ -13621,51 +13745,63 @@ class MainWindow(QMainWindow):
         self._set_status(f"DTP-PDF: {out}")
 
     def _dtp_text_on_path(self) -> None:
-        self._enter_layout_mode()
+        if not self._enter_layout_mode():
+            return
         self.dtp_pane.apply_text_on_path("ellipse")
 
     def _dtp_text_to_outlines(self) -> None:
-        self._enter_layout_mode()
+        if not self._enter_layout_mode():
+            return
         self.dtp_pane.convert_to_outlines()
 
     def _dtp_clip_mask(self) -> None:
-        self._enter_layout_mode()
+        if not self._enter_layout_mode():
+            return
         self.dtp_pane.apply_clip_mask()
 
     def _dtp_live_fill(self) -> None:
-        self._enter_layout_mode()
+        if not self._enter_layout_mode():
+            return
         self.dtp_pane.apply_live_fill()
 
     def _dtp_glyph_palette(self) -> None:
-        self._enter_layout_mode()
+        if not self._enter_layout_mode():
+            return
         self.dtp_pane.show_glyph_palette()
 
     def _dtp_import_text(self) -> None:
-        self._enter_layout_mode()
+        if not self._enter_layout_mode():
+            return
         self.dtp_pane.import_text()
 
     def _dtp_replace_image(self) -> None:
-        self._enter_layout_mode()
+        if not self._enter_layout_mode():
+            return
         self.dtp_pane.replace_image()
 
     def _dtp_import_graphic(self) -> None:
-        self._enter_layout_mode()
+        if not self._enter_layout_mode():
+            return
         self.dtp_pane.import_graphic()
 
     def _dtp_weld(self) -> None:
-        self._enter_layout_mode()
+        if not self._enter_layout_mode():
+            return
         self.dtp_pane.weld_selected()
 
     def _dtp_symbol(self) -> None:
-        self._enter_layout_mode()
+        if not self._enter_layout_mode():
+            return
         self.dtp_pane.symbol_from_selection()
 
     def _dtp_preflight(self) -> None:
-        self._enter_layout_mode()
+        if not self._enter_layout_mode():
+            return
         self.dtp_pane.run_preflight()
 
     def _dtp_export_pdfx(self) -> None:
-        self._enter_layout_mode()
+        if not self._enter_layout_mode():
+            return
         self.dtp_pane.export_pdfx_dialog()
 
     def _show_ki_assistant(self) -> None:
@@ -13685,7 +13821,8 @@ class MainWindow(QMainWindow):
         KiAssistantDialog(self, selected_text=selected).exec()
 
     def _run_shape_recognition(self) -> None:
-        self._enter_layout_mode()
+        if not self._enter_layout_mode():
+            return
         self.dtp_pane.view.recognize_on_finish = True
         self.dtp_pane.recognize_selected_ink()
         self._set_status("Formerkennung (DTP-Tinte)")
@@ -13701,7 +13838,8 @@ class MainWindow(QMainWindow):
         pane = getattr(self, "dtp_pane", None)
         if pane is None:
             return
-        self._enter_layout_mode()
+        if not self._enter_layout_mode():
+            return
         targets = pane.scene.selected_frames()
         if not targets:
             targets = pane.doc.story_frames() or pane.doc.text_frames()
@@ -13714,7 +13852,8 @@ class MainWindow(QMainWindow):
         self._set_status(f"Variable Font: {fam}")
 
     def _apply_envelope_distort(self) -> None:
-        self._enter_layout_mode()
+        if not self._enter_layout_mode():
+            return
         self.dtp_pane.apply_envelope()
 
     def _show_pades_dialog(self) -> None:
@@ -16080,6 +16219,20 @@ class MainWindow(QMainWindow):
             self._set_status(f"Stempel-Bild gesetzt: {dlg.placed_path.name}")
 
     def _current_is_dirty(self) -> bool:
+        if self._dtp_is_dirty():
+            return True
+        return self._document_is_dirty()
+
+    def _dtp_is_dirty(self) -> bool:
+        pane = getattr(self, "dtp_pane", None)
+        if pane is None or not self._layout_mode_active():
+            return False
+        try:
+            return bool(pane.is_dirty())
+        except Exception:
+            return False
+
+    def _document_is_dirty(self) -> bool:
         if not self.doc:
             return False
         if self.doc.kind == DocKind.PDF:
@@ -16102,40 +16255,143 @@ class MainWindow(QMainWindow):
                 return True
         return bool(self.doc.dirty)
 
-    def _confirm_close_current(self, *, allow_discard: bool = True, quitting: bool = False) -> bool:
-        """Speichern-Dialog wenn dirty. True = fortfahren, False = abbrechen."""
-        if not self._current_is_dirty():
-            return True
-        name = self.doc.display_name if self.doc else "Dokument"
+    def _unsaved_prompt_box(
+        self, *, title: str, name: str, allow_discard: bool = True
+    ) -> QMessageBox:
         buttons = QMessageBox.Save | QMessageBox.Cancel
         if allow_discard:
             buttons |= QMessageBox.Discard
-        title = "Beenden" if quitting else "Schließen"
         box = QMessageBox(self)
+        box.setObjectName("ildUnsavedPrompt")
         box.setWindowTitle(title)
         box.setIcon(QMessageBox.Warning)
         box.setText(f"„{name}“ wurde geändert.")
         box.setInformativeText("Änderungen speichern?")
         box.setStandardButtons(buttons)
         box.setDefaultButton(QMessageBox.Save)
+        save_btn = box.button(QMessageBox.Save)
+        if save_btn is not None:
+            save_btn.setText("Speichern")
+        disc = box.button(QMessageBox.Discard)
+        if disc is not None:
+            disc.setText("Nicht speichern")
+        can = box.button(QMessageBox.Cancel)
+        if can is not None:
+            can.setText("Abbrechen")
+        return box
+
+    def _run_unsaved_prompt(
+        self,
+        *,
+        title: str,
+        name: str,
+        on_save,
+        on_discard,
+        allow_discard: bool = True,
+    ) -> bool:
+        """True = fortfahren, False = Abbrechen."""
+        box = self._unsaved_prompt_box(
+            title=title, name=name, allow_discard=allow_discard
+        )
         result = box.exec()
         if result == QMessageBox.Cancel:
             return False
         if result == QMessageBox.Discard:
-            if self.doc:
-                self.doc.dirty = False
-                if self.doc.path:
-                    self._mark_unsaved(self.doc.path, False)
-            if self.pdf_view.store:
-                self.pdf_view.store.dirty = False
-            self._update_unsaved_status()
+            try:
+                on_discard()
+            except Exception:
+                pass
             return True
         try:
-            self.save_doc()
+            ok = on_save()
         except Exception as e:
             QMessageBox.warning(self, title, f"Speichern fehlgeschlagen:\n{e}")
             return False
-        return not self._current_is_dirty()
+        return bool(ok)
+
+    def _discard_document_changes(self) -> None:
+        if self.doc:
+            self.doc.dirty = False
+            if self.doc.path:
+                self._mark_unsaved(self.doc.path, False)
+        if self.pdf_view.store:
+            self.pdf_view.store.dirty = False
+        try:
+            if hasattr(self.pdf_view, "_sidecar_save_pending"):
+                self.pdf_view._sidecar_save_pending = False
+        except Exception:
+            pass
+        self._update_unsaved_status()
+
+    def _confirm_document_unsaved(self, *, title: str = "Speichern") -> bool:
+        if not self._document_is_dirty():
+            return True
+        name = self.doc.display_name if self.doc else "Dokument"
+        return self._run_unsaved_prompt(
+            title=title,
+            name=name,
+            on_save=self.save_doc,
+            on_discard=self._discard_document_changes,
+        )
+
+    def _confirm_dtp_unsaved(self) -> bool:
+        pane = getattr(self, "dtp_pane", None)
+        if pane is None:
+            return True
+        try:
+            dirty = bool(pane.is_dirty())
+        except Exception:
+            dirty = False
+        if not dirty:
+            return True
+        name = "DTP-Layout"
+        try:
+            name = str(getattr(pane.doc, "title", "") or name)
+        except Exception:
+            pass
+        return self._run_unsaved_prompt(
+            title="Layout-Modus",
+            name=name,
+            on_save=self._save_dtp_document,
+            on_discard=pane.clear_dirty,
+        )
+
+    def _save_dtp_document(self) -> bool:
+        pane = getattr(self, "dtp_pane", None)
+        if pane is None:
+            return False
+        path = getattr(pane, "_save_path", None)
+        if not path:
+            path, _ = QFileDialog.getSaveFileName(
+                self,
+                "DTP-Layout speichern",
+                "",
+                "InstantLens Layout (*.ilddtp);;JSON (*.json)",
+            )
+            if not path:
+                return False
+        pane.doc.save(path)
+        pane._save_path = path
+        pane.clear_dirty()
+        self._set_status(f"DTP gespeichert: {path}")
+        return True
+
+    def _confirm_close_current(self, *, allow_discard: bool = True, quitting: bool = False) -> bool:
+        """Speichern-Dialog wenn dirty. True = fortfahren, False = abbrechen."""
+        if self._dtp_is_dirty():
+            if not self._confirm_dtp_unsaved():
+                return False
+        if not self._document_is_dirty():
+            return True
+        name = self.doc.display_name if self.doc else "Dokument"
+        title = "Beenden" if quitting else "Schließen"
+        return self._run_unsaved_prompt(
+            title=title,
+            name=name,
+            on_save=self.save_doc,
+            on_discard=self._discard_document_changes,
+            allow_discard=allow_discard,
+        )
 
     def close_current_tab(self):
         """Aktuelles Dokument schließen; Speichern-Dialog bei dirty."""

@@ -5,7 +5,7 @@ Pack `InstantLensDoc-2.6.59-pack.zip`; VERSION **2.6.59**. HEAD `8f01af3` (Ersat
 - **Windows-Pfade:** Copy Path / Status / Recent / Split-Log nutzen native `\\` (`D:\\AI_Temp\\file.pdf`); Öffnen/Speichern akzeptieren `/` und `\\`. Linux unverändert. Kein Versionsbump.
 - **PDF-Menü live:** Klick eine Spalte; Einträge enabled bei offenem PDF-Tab oder Geschwister-PDF; jeder Slot Dialog oder Dateiänderung (`_bind_pdf_action` / `_pdf_menu_call`).
 - **OCR Word-Suite:** Absätze/Ausrichtung/Listen, Seitenlayout, Kopf/Fuß nicht im Body, Feld-Tokens, Formatvorlagen und Tabellen ohne Steuerzeichen.
-- **DTP:** Lineale mm/pt/in mit Hilfslinien; Werkzeuge/Füllung/Kontur/Systemschriften auf der Auswahl.
+- **DTP:** Lineale mm/pt/in mit Hilfslinien; Werkzeuge/Füllung/Kontur/Systemschriften auf der Auswahl. Ribbon-Tab/Menü **DTP** öffnet sofort die DTP-Ansicht (PDF inklusive); bei Änderungen **Speichern / Nicht speichern / Abbrechen**.
 - **Word-Chrome:** Klassisch (Pull-down) / Ribbon / Kombiniert ohne Dokumentverlust; Ribbon-Overflow und Chrome-Modi klicken dieselben Pulldown-QActions.
 - **Absatz / Seitenlayout / Kopf / Fuß / Ersatzzeichen:** echte Dialoge auf den bestehenden Menüs `menuAbsatz` / `menuSeitenlayout`; Builtin-Tokens plus frei definierbare Felder.
 - **Formatvorlagen, Tabellen, Serienbrief:** Ribbon und Pulldown teilen QActions; Tabellen-Dialog; Seriendruck-Dialog.

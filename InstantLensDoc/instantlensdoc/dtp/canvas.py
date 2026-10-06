@@ -741,6 +741,8 @@ class DtpPane(QWidget):
         self._tool = "select"
         self._create_rect = None
         self._ghost = None
+        self._dirty = False
+        self._save_path: str | None = None
         self.scene = DtpScene(self.doc)
         self.view = DtpView(self.scene)
         self.view.strokeFinished.connect(self._on_stroke)
@@ -879,6 +881,16 @@ class DtpPane(QWidget):
         if idx >= 0:
             self.preset_combo.setCurrentIndex(idx)
         self._block_preset = False
+        self.clear_dirty()
+
+    def is_dirty(self) -> bool:
+        return bool(self._dirty)
+
+    def mark_dirty(self) -> None:
+        self._dirty = True
+
+    def clear_dirty(self) -> None:
+        self._dirty = False
 
     def editing_item(self) -> FrameItem | None:
         for it in self.scene._items.values():
@@ -1123,6 +1135,7 @@ class DtpPane(QWidget):
     def _refresh_after_tool(self, hit: ToolHit, *, rebuild: bool = False) -> None:
         if hit.is_caret:
             return
+        self.mark_dirty()
         if rebuild:
             ids = list(hit.ids)
             self.scene.rebuild()
@@ -1434,18 +1447,21 @@ class DtpPane(QWidget):
     def add_text_frame(self) -> DtpFrame:
         fr = self.doc.add_text_frame("Neuer Text", page=self.doc.current_page)
         self.scene.rebuild()
+        self.mark_dirty()
         self.statusMessage.emit(f"Textrahmen {fr.id}")
         return fr
 
     def add_image_frame(self) -> DtpFrame:
         fr = self.doc.add_image_frame(page=self.doc.current_page)
         self.scene.rebuild()
+        self.mark_dirty()
         self.statusMessage.emit(f"Bildrahmen {fr.id}")
         return fr
 
     def add_shape(self, kind: str = "rectangle") -> DtpFrame:
         fr = self.doc.add_shape(kind or "rectangle", page=self.doc.current_page)
         self.scene.rebuild()
+        self.mark_dirty()
         self.statusMessage.emit(f"Form {fr.shape}")
         return fr
 
@@ -1777,6 +1793,7 @@ class DtpPane(QWidget):
         pos = snap_to_unit(float(pos), unit)
         self.doc.add_guide(orientation, pos)
         self.scene.rebuild()
+        self.mark_dirty()
         self.statusMessage.emit(f"Hilfslinie {orientation} {format_unit(pos, unit)}")
 
     def _emit_export(self) -> None:
