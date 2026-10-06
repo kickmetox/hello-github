@@ -455,7 +455,13 @@ def save_document(
         if html:
             from instantlensdoc.core.richtext_docx import html_to_docx
 
-            html_to_docx(str(html), target, title=doc.title)
+            html_to_docx(
+                str(html),
+                target,
+                title=doc.title,
+                header=str((doc.meta or {}).get("header") or ""),
+                footer=str((doc.meta or {}).get("footer") or ""),
+            )
         else:
             from instantlensdoc.core.export import export_docx
 

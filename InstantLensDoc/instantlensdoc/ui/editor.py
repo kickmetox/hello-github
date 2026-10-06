@@ -221,6 +221,8 @@ class TextEditor(QPlainTextEdit):
         self._page_bg_active = False
         self._base_autofill = bool(self.autoFillBackground())
         self._in_margin_update = False
+        self._doc_header = ""
+        self._doc_footer = ""
         try:
             from instantlensdoc.core.editor_page_layout import EditorPageLayout
 
@@ -1984,9 +1986,15 @@ class TextEditor(QPlainTextEdit):
         # Vor setHtml: Importer leitet Standardgrößen vom Dokument-Default ab
         doc.setDefaultFont(font)
         try:
-            from instantlensdoc.core.ocr_word_suite import sanitize_ocr_html
+            from instantlensdoc.core.ocr_word_suite import (
+                extract_ild_header_footer,
+                sanitize_ocr_html,
+            )
 
             html = sanitize_ocr_html(html or "")
+            hdr, ftr = extract_ild_header_footer(html)
+            self._doc_header = hdr
+            self._doc_footer = ftr
         except Exception:
             html = html or ""
         doc.setHtml(html or "")
@@ -2011,7 +2019,47 @@ class TextEditor(QPlainTextEdit):
 
     def to_rich_html(self) -> str:
         """Aktuelles Dokument als HTML (Bold/Italic/Underline erhalten)."""
-        return self.document().toHtml()
+        html = self.document().toHtml()
+        try:
+            from instantlensdoc.core.ocr_word_suite import header_footer_html_comments
+
+            comments = header_footer_html_comments(
+                getattr(self, "_doc_header", "") or "",
+                getattr(self, "_doc_footer", "") or "",
+            )
+            if comments:
+                low = html.lower()
+                idx = low.find("<body")
+                if idx >= 0:
+                    gt = html.find(">", idx)
+                    if gt >= 0:
+                        html = html[: gt + 1] + comments + html[gt + 1 :]
+                else:
+                    html = comments + html
+        except Exception:
+            pass
+        return html
+
+    def document_header(self) -> str:
+        return str(getattr(self, "_doc_header", "") or "")
+
+    def document_footer(self) -> str:
+        return str(getattr(self, "_doc_footer", "") or "")
+
+    def set_document_header_footer(self, header: str = "", footer: str = "") -> bool:
+        """Kopf-/Fußzeile in Editor-Meta — nicht als Fließtext, keine ¶/Form-Feed."""
+        try:
+            from instantlensdoc.core.ocr_word_suite import sanitize_ocr_visible_text
+
+            header = sanitize_ocr_visible_text(header or "").strip()
+            footer = sanitize_ocr_visible_text(footer or "").strip()
+        except Exception:
+            header = str(header or "").replace("\x0c", " ").replace("\u00b6", " ").strip()
+            footer = str(footer or "").replace("\x0c", " ").replace("\u00b6", " ").strip()
+        self._ensure_rich_mode()
+        self._doc_header = header
+        self._doc_footer = footer
+        return True
 
     def _selection_or_word_cursor(self) -> QTextCursor:
         """Nur noch intern: Wort unter Cursor, wenn nichts markiert ist."""

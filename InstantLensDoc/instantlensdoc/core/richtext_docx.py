@@ -711,7 +711,14 @@ class _HtmlToDocxParser(HTMLParser):
         self._add_text(data)
 
 
-def html_to_docx(html: str, path: str | Path, *, title: Optional[str] = None) -> Path:
+def html_to_docx(
+    html: str,
+    path: str | Path,
+    *,
+    title: Optional[str] = None,
+    header: Optional[str] = None,
+    footer: Optional[str] = None,
+) -> Path:
     """HTML (inkl. Qt-Spans) → DOCX mit Bold/Italic/Underline."""
     try:
         from docx import Document as DocxDocument
@@ -738,8 +745,58 @@ def html_to_docx(html: str, path: str | Path, *, title: Optional[str] = None) ->
     parser.close()
     if parser._para is None and not d.paragraphs:
         d.add_paragraph("")
+    _apply_docx_header_footer(d, header, footer, html=html)
     d.save(str(path))
     return path
+
+
+def _clean_hf_text(value: str | None) -> str:
+    s = str(value or "")
+    return (
+        s.replace("\x0c", " ")
+        .replace("\u00b6", " ")
+        .replace("\u2028", " ")
+        .replace("\u2029", " ")
+        .strip()
+    )
+
+
+def _apply_docx_header_footer(
+    d,
+    header: str | None,
+    footer: str | None,
+    *,
+    html: str = "",
+) -> None:
+    """Kopf-/Fußzeile in DOCX-Section, nicht in den Body (keine ¶/Form-Feed)."""
+    h = _clean_hf_text(header)
+    f = _clean_hf_text(footer)
+    if (not h or not f) and html:
+        for m in re.finditer(r"<!--\s*ild-(header|footer)\s+(.*?)\s*-->", html or "", re.I | re.S):
+            kind = (m.group(1) or "").lower()
+            text = _clean_hf_text(html_lib.unescape(m.group(2) or ""))
+            if kind == "header" and not h:
+                h = text
+            elif kind == "footer" and not f:
+                f = text
+    if not h and not f:
+        return
+    try:
+        section = d.sections[0]
+    except Exception:
+        return
+    if h:
+        try:
+            hp = section.header.paragraphs[0] if section.header.paragraphs else section.header.add_paragraph()
+            hp.text = h
+        except Exception:
+            pass
+    if f:
+        try:
+            fp = section.footer.paragraphs[0] if section.footer.paragraphs else section.footer.add_paragraph()
+            fp.text = f
+        except Exception:
+            pass
 
 
 def html_to_rtf(html: str, path: str | Path, *, title: Optional[str] = None) -> Path:

@@ -43,6 +43,10 @@ _OCR_UL_RE = re.compile(
     r"\u25a0\u25a1●○▪▫–—]|[-*+])\s+"
 )
 _OCR_OL_RE = re.compile(r"^(\d{1,3})[.)]\s+")
+_PAGE_MARK_RE = re.compile(r"^---\s*Seite\s+\d+\b[^\n]*---\s*$")
+_ILD_HF_COMMENT_RE = re.compile(
+    r"<!--\s*ild-(header|footer)\s+(.*?)\s*-->", re.I | re.S
+)
 
 # Steuer-/Bidi-/Formatsteuerzeichen, die in QTextDocument als ¶ · Kästchen landen.
 _OCR_CONTROL_RE = re.compile(
@@ -354,7 +358,7 @@ def sanitize_ocr_visible_text(text: str) -> str:
 
 
 def sanitize_ocr_html(html: str) -> str:
-    """Steuerzeichen aus generiertem Word-Suite-HTML strippen (Tags bleiben)."""
+    """Steuerzeichen aus generiertem Word-Suite-HTML strippen (Tags/Kommentare bleiben)."""
     if not html:
         return ""
     s = (
@@ -365,6 +369,116 @@ def sanitize_ocr_html(html: str) -> str:
         .replace("\u2029", " ")
     )
     return _OCR_CONTROL_RE.sub("", s)
+
+
+def extract_ild_header_footer(html: str) -> tuple[str, str]:
+    """``<!-- ild-header/footer … -->`` aus HTML — nicht Teil des Fließtexts."""
+    header = ""
+    footer = ""
+    for m in _ILD_HF_COMMENT_RE.finditer(html or ""):
+        kind = (m.group(1) or "").lower()
+        text = sanitize_ocr_visible_text(html_lib.unescape(m.group(2) or "")).strip()
+        if not text:
+            continue
+        if kind == "header":
+            header = text
+        elif kind == "footer":
+            footer = text
+    return header, footer
+
+
+def header_footer_html_comments(header: str = "", footer: str = "") -> str:
+    """Kopf-/Fußzeile als HTML-Kommentar (kein ¶/Form-Feed im Body)."""
+    parts: List[str] = []
+    h = sanitize_ocr_visible_text(header or "").strip()
+    f = sanitize_ocr_visible_text(footer or "").strip()
+    if h:
+        parts.append(f"<!-- ild-header {html_lib.escape(h, quote=True)} -->")
+    if f:
+        parts.append(f"<!-- ild-footer {html_lib.escape(f, quote=True)} -->")
+    return "".join(parts)
+
+
+def _norm_hf_line(text: str) -> str:
+    t = sanitize_ocr_visible_text(text or "")
+    t = re.sub(r"\s+", " ", t).strip()
+    return t
+
+
+def _is_plausible_running_hf(text: str) -> bool:
+    t = _norm_hf_line(text)
+    if not t or len(t) > 80:
+        return False
+    if _PAGE_MARK_RE.match(t):
+        return False
+    if t.count(" ") > 12:
+        return False
+    return True
+
+
+def lift_running_header_footer(
+    blocks: Sequence[WordSuiteBlock] | None,
+) -> tuple[List[WordSuiteBlock], str, str]:
+    """Wiederholte erste/letzte Zeile je Seite → Kopf/Fuß, nicht Body."""
+    items = list(blocks or [])
+    pages: dict[int, List[WordSuiteBlock]] = {}
+    for b in items:
+        pages.setdefault(int(b.page or 0), []).append(b)
+    numbered = [p for p in pages if p > 0]
+    if len(numbered) < 2:
+        return items, "", ""
+    from collections import Counter
+
+    def _lines_of(b: WordSuiteBlock) -> List[str]:
+        raw = list(b.lines or []) or (b.text or "").splitlines() or [b.text or ""]
+        return [_norm_hf_line(x) for x in raw if _norm_hf_line(x)]
+
+    firsts: List[str] = []
+    lasts: List[str] = []
+    for p in sorted(numbered):
+        page_lines: List[str] = []
+        for b in pages[p]:
+            page_lines.extend(_lines_of(b))
+        if not page_lines:
+            continue
+        firsts.append(page_lines[0])
+        lasts.append(page_lines[-1])
+
+    def _majority(values: List[str]) -> str:
+        plausible = [v for v in values if _is_plausible_running_hf(v)]
+        if len(plausible) < 2:
+            return ""
+        line, n = Counter(plausible).most_common(1)[0]
+        if n >= 2 and n * 2 >= len(values):
+            return line
+        return ""
+
+    header = _majority(firsts)
+    footer = _majority(lasts)
+    if header and header == footer:
+        footer = ""
+    if not header and not footer:
+        return items, "", ""
+
+    out: List[WordSuiteBlock] = []
+    order = 0
+    for b in items:
+        lines = _lines_of(b)
+        if not lines:
+            continue
+        if header and lines and lines[0] == header:
+            lines = lines[1:]
+        if footer and lines and lines[-1] == footer:
+            lines = lines[:-1]
+        text = "\n".join(lines).strip()
+        if not text:
+            continue
+        b.text = text
+        b.lines = text.splitlines() or [text]
+        b.reading_order = order
+        out.append(b)
+        order += 1
+    return out, header, footer
 
 
 def _html_escape(text: str) -> str:
@@ -738,6 +852,8 @@ def blocks_to_word_suite_html(
     sidecar: str | None = None,
     font_family: str = DEFAULT_BODY_FONT,
     font_size_pt: float = DEFAULT_BODY_PT,
+    header: str = "",
+    footer: str = "",
 ) -> str:
     """Absätze + optionale Fonts/Seitenumbrüche als HTML für ``QTextDocument``."""
     items = list(blocks or [])
@@ -757,6 +873,7 @@ def blocks_to_word_suite_html(
     )
     if comment:
         head += f"<!-- ild-source {html_lib.escape(comment, quote=True)} -->"
+    head += header_footer_html_comments(header, footer)
     parts: List[str] = [head]
     last_page: int | None = None
     wrote = False
@@ -764,6 +881,8 @@ def blocks_to_word_suite_html(
     for b in items:
         body = (b.text or "").strip()
         if not body:
+            continue
+        if _PAGE_MARK_RE.match(body):
             continue
         page = int(b.page or 0)
         if last_page is not None and page and page != last_page:
@@ -824,6 +943,16 @@ def _finalize_word_suite_document(doc: WordSuiteDocument) -> WordSuiteDocument:
     """HTML, Überschriften und Quell-Link an ein Word-Suite-Dokument anhängen."""
     doc.blocks = expand_blocks_with_lists(doc.blocks)
     infer_block_styles(doc.blocks)
+    lifted_h, lifted_f = "", ""
+    doc.blocks, lifted_h, lifted_f = lift_running_header_footer(doc.blocks)
+    header = str(doc.meta.get("header") or lifted_h or "").strip()
+    footer = str(doc.meta.get("footer") or lifted_f or "").strip()
+    header = sanitize_ocr_visible_text(header).strip()
+    footer = sanitize_ocr_visible_text(footer).strip()
+    if header:
+        doc.meta["header"] = header
+    if footer:
+        doc.meta["footer"] = footer
     if doc.blocks and not doc.auto_formatted:
         rebuilt = blocks_to_word_suite_text(doc.blocks)
         if rebuilt:
@@ -877,6 +1006,8 @@ def _finalize_word_suite_document(doc: WordSuiteDocument) -> WordSuiteDocument:
         sidecar=doc.sidecar,
         font_family=str(doc.meta.get("font_family") or DEFAULT_BODY_FONT),
         font_size_pt=float(doc.meta.get("font_size_pt") or DEFAULT_BODY_PT),
+        header=str(doc.meta.get("header") or ""),
+        footer=str(doc.meta.get("footer") or ""),
     )
     return doc
 
@@ -1257,6 +1388,10 @@ def word_suite_to_document(ws: WordSuiteDocument):
         meta["source_page"] = int(ws.source_page)
     if ws.source_comment:
         meta["source_comment"] = ws.source_comment
+    if ws.meta.get("header"):
+        meta["header"] = str(ws.meta.get("header") or "")
+    if ws.meta.get("footer"):
+        meta["footer"] = str(ws.meta.get("footer") or "")
     return Document(
         kind=DocKind.DOCX,
         title=ws.title or "Word-Suite — OCR",

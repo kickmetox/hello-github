@@ -10637,6 +10637,19 @@ class MainWindow(QMainWindow):
                 self.doc.meta["rich_text"] = True
             except Exception:
                 pass
+            try:
+                hdr = self.editor.document_header()
+                ftr = self.editor.document_footer()
+                if hdr:
+                    self.doc.meta["header"] = hdr
+                else:
+                    self.doc.meta.pop("header", None)
+                if ftr:
+                    self.doc.meta["footer"] = ftr
+                else:
+                    self.doc.meta.pop("footer", None)
+            except Exception:
+                pass
         self.doc.dirty = True
 
     def _set_paragraph_alignment(self, alignment: str) -> None:
@@ -18569,6 +18582,20 @@ class MainWindow(QMainWindow):
                         doc.text = body
                     try:
                         self.editor._apply_page_layout()
+                    except Exception:
+                        pass
+                    try:
+                        h = str((doc.meta or {}).get("header") or "")
+                        f = str((doc.meta or {}).get("footer") or "")
+                        if h or f:
+                            self.editor.set_document_header_footer(h, f)
+                        else:
+                            h = self.editor.document_header()
+                            f = self.editor.document_footer()
+                            if h:
+                                doc.meta["header"] = h
+                            if f:
+                                doc.meta["footer"] = f
                     except Exception:
                         pass
                 except Exception:

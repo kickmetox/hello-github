@@ -204,6 +204,8 @@ def test_editor_ocr_bold_find_save() -> None:
 
     test_editor_ocr_paragraph_layout_align_list(win)
 
+    test_editor_ocr_header_footer_not_in_body(win)
+
     assert app is not None
 
 
@@ -469,6 +471,32 @@ def test_core_sanitize_and_hocr_layout() -> None:
     n_blocks = int((listed.meta or {}).get("block_count") or 0)
     if n_blocks < 4:
         _fail(f"Listen nicht in Absätze gesplittet: {n_blocks}")
+
+    hf_doc = open_ocr_result(
+        text=(
+            "--- Seite 1 ---\nFirma GmbH\nAbsatz eins\n-1-\n\n"
+            "--- Seite 2 ---\nFirma GmbH\nAbsatz zwei\n-1-\n"
+        ),
+        auto_format=False,
+        title="Word-Suite — Kopf/Fuß",
+    )
+    hf_html = str((hf_doc.meta or {}).get("html") or "")
+    hf_text = hf_doc.text or ""
+    for g in ("\x0c", "\u00b6"):
+        if g in hf_html or g in hf_text:
+            _fail(f"Kopf/Fuß-OCR enthält Steuerzeichen {g!r}")
+    if "--- Seite" in hf_text:
+        _fail("Seitenmarke landete im OCR-Fließtext")
+    if str((hf_doc.meta or {}).get("header") or "") != "Firma GmbH":
+        _fail(f"laufende Kopfzeile nicht in meta: {hf_doc.meta!r}")
+    if str((hf_doc.meta or {}).get("footer") or "") != "-1-":
+        _fail(f"laufende Fußzeile nicht in meta: {(hf_doc.meta or {}).get('footer')!r}")
+    if "ild-header" not in hf_html or "ild-footer" not in hf_html:
+        _fail("HTML ohne ild-header/footer-Kommentare")
+    if "Firma GmbH" in hf_text or "-1-" in hf_text:
+        _fail("Kopf/Fuß im Body statt Meta")
+    if "Absatz eins" not in hf_text or "Absatz zwei" not in hf_text:
+        _fail("Body-Absätze nach HF-Lift verloren")
     _ok("core: Steuerzeichen weg, hOCR Font/Fett/Kursiv/Align")
 
 
@@ -625,6 +653,64 @@ def test_editor_ocr_paragraph_layout_align_list(win) -> None:
         _fail(f"Seitenlayout pageSize nicht gesetzt: {pw}")
     win._sync_editor_rich_meta()
     _ok("qt: OCR Absatz/Ausrichtung/Liste/Seitenlayout")
+
+
+def test_editor_ocr_header_footer_not_in_body(win) -> None:
+    """Kopf-/Fußzeile am OCR-Dokument: Meta/DOCX, nicht als ¶/Form-Feed im Body."""
+    from instantlensdoc.core.documents import save_document
+
+    ok = win.open_ocr_result(
+        text=(
+            "--- Seite 1 ---\nFirma GmbH\nAbsatz eins\n-1-\n\n"
+            "--- Seite 2 ---\nFirma GmbH\nAbsatz zwei\n-1-\n"
+        ),
+        title="Word-Suite — Kopf/Fuß",
+        auto_format=False,
+    )
+    if not ok:
+        _fail("open_ocr_result für Kopf/Fuß-Test fehlgeschlagen")
+    ed = win.editor
+    plain = ed.toPlainText()
+    for g in ("\x0c", "\u00b6"):
+        if g in plain:
+            _fail(f"OCR-Body enthält Steuerzeichen {g!r}")
+    if "--- Seite" in plain:
+        _fail("Seitenmarke im Editor-Body")
+    if "Firma GmbH" in plain or "-1-" in plain:
+        _fail(f"Kopf/Fuß als Body-Text: {plain[:240]!r}")
+    if "Absatz eins" not in plain:
+        _fail("OCR-Body ohne Fließtext")
+    if ed.document_header() != "Firma GmbH":
+        _fail(f"document_header fehlt: {ed.document_header()!r}")
+    if ed.document_footer() != "-1-":
+        _fail(f"document_footer fehlt: {ed.document_footer()!r}")
+    if not ed.set_document_header_footer("Kopf\x0cZeile", "Fuß\u00b6zeile"):
+        _fail("set_document_header_footer auf OCR fehlgeschlagen")
+    if "\x0c" in ed.document_header() or "\u00b6" in ed.document_footer():
+        _fail("Kopf/Fuß-Setter ließ Steuerzeichen stehen")
+    if ed.document_header() != "Kopf Zeile" and "Kopf" not in ed.document_header():
+        _fail(f"Kopfzeile nach Sanitize: {ed.document_header()!r}")
+    if "Kopf" in ed.toPlainText() or "Fuß" in ed.toPlainText() or "Fuss" in ed.toPlainText():
+        _fail("set_document_header_footer schrieb in den Body")
+    win._sync_editor_rich_meta()
+    with tempfile.TemporaryDirectory() as td:
+        out = Path(td) / "ocr-header-footer.docx"
+        save_document(win.doc, out)
+        from docx import Document as DocxDocument
+
+        d = DocxDocument(str(out))
+        body = "\n".join(p.text for p in d.paragraphs)
+        if "\x0c" in body or "\u00b6" in body:
+            _fail("DOCX-Body mit Steuerzeichen")
+        hdr = " ".join(p.text for p in d.sections[0].header.paragraphs)
+        ftr = " ".join(p.text for p in d.sections[0].footer.paragraphs)
+        if "Kopf" not in hdr:
+            _fail(f"DOCX-Kopfzeile fehlt: {hdr!r}")
+        if "Fuß" not in ftr and "Fuss" not in ftr and "zeile" not in ftr.lower():
+            _fail(f"DOCX-Fußzeile fehlt: {ftr!r}")
+        if "Kopf" in body:
+            _fail("Kopfzeile im DOCX-Body")
+    _ok("qt: OCR Kopf/Fuß nicht im Body, persistiert in DOCX")
 
 
 def main() -> int:
