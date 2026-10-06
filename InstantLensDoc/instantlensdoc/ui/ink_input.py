@@ -98,7 +98,7 @@ class InkStroke:
         return min(xs) - pad, min(ys) - pad, max(xs) + pad, max(ys) + pad
 
     def is_closed(self, slop: float | None = None) -> bool:
-        if len(self.points) < 6:
+        if len(self.points) < 5:
             return False
         a, b = self.points[0], self.points[-1]
         limit = float(slop if slop is not None else max(12.0, float(self.width) * 4.0))
