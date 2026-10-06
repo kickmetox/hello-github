@@ -85,6 +85,8 @@ class InkStroke:
     fill: str = FILL_NONE
     fill_color: str = ""
     filled: bool = False
+    flood_origin: tuple[float, float] | None = None
+    flood_image: object | None = None
 
     def add(self, x: float, y: float, pressure: float = 0.5) -> None:
         self.points.append((float(x), float(y), max(0.0, min(1.0, float(pressure)))))
@@ -180,9 +182,11 @@ class InkSession(QObject):
         if len(st.points) < 2:
             self.changed.emit()
             return None
-        if st.fill in (FILL_CLOSED, FILL_FLOOD) and st.is_closed():
+        if st.fill == FILL_CLOSED and st.is_closed():
             st.filled = True
             st.fill_color = st.fill_color or st.color
+        elif st.fill == FILL_FLOOD:
+            apply_loop_flood_fill(st)
         self.strokes.append(st)
         self.changed.emit()
         return st
@@ -268,6 +272,97 @@ def accept_touch_events(widget: QWidget | None) -> None:
             pass
 
 
+def apply_loop_flood_fill(st: InkStroke) -> bool:
+    """Bucket-Fill im Inneren eines Tinten-Loops (auch fast-geschlossen)."""
+    from PIL import Image, ImageDraw
+
+    if len(st.points) < 5:
+        return False
+    box = st.bbox()
+    if box is None:
+        return False
+    x0, y0, x1, y1 = box
+    pad = max(8.0, float(st.width) * 3.0)
+    scale = 2.0
+    w = max(12, int((x1 - x0 + 2 * pad) * scale))
+    h = max(12, int((y1 - y0 + 2 * pad) * scale))
+    img = Image.new("L", (w, h), 0)
+    draw = ImageDraw.Draw(img)
+    pts = [
+        ((p[0] - x0 + pad) * scale, (p[1] - y0 + pad) * scale) for p in st.points
+    ]
+    wall = max(2, int(float(st.width or DEFAULT_INK_WIDTH) * scale))
+    if len(pts) == 1:
+        return False
+    draw.line(pts, fill=255, width=wall, joint="curve")
+    if not st.is_closed(slop=max(36.0, float(st.width) * 10.0)):
+        a, b = pts[0], pts[-1]
+        if math.hypot(a[0] - b[0], a[1] - b[1]) <= max(48.0, wall * 6):
+            draw.line([b, a], fill=255, width=wall)
+        else:
+            if st.is_closed():
+                st.filled = True
+                st.fill_color = st.fill_color or st.color
+            return st.filled
+    else:
+        draw.line([pts[-1], pts[0]], fill=255, width=wall)
+    cx = int(sum(p[0] for p in pts) / len(pts))
+    cy = int(sum(p[1] for p in pts) / len(pts))
+    seed = _flood_seed(img, cx, cy)
+    if seed is None:
+        if st.is_closed():
+            st.filled = True
+            st.fill_color = st.fill_color or st.color
+        return st.filled
+    ImageDraw.floodfill(img, seed, 128)
+    n_fill = 0
+    try:
+        n_fill = img.histogram()[128]
+    except Exception:
+        n_fill = 0
+    if n_fill < 8 or n_fill > (w * h) * 0.45:
+        if st.is_closed():
+            st.filled = True
+            st.fill_color = st.fill_color or st.color
+        return st.filled
+    fill = _qcolor(st.fill_color or st.color)
+    if normalize_ink_tool(st.tool) == TOOL_HIGHLIGHTER:
+        fill.setAlpha(70)
+    else:
+        fill.setAlpha(140)
+    rgba = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    pix = rgba.load()
+    src = img.load()
+    r, g, b, a = fill.red(), fill.green(), fill.blue(), fill.alpha()
+    for yy in range(h):
+        for xx in range(w):
+            if src[xx, yy] == 128:
+                pix[xx, yy] = (r, g, b, a)
+    from PySide6.QtGui import QImage
+
+    qimg = QImage(rgba.tobytes("raw", "RGBA"), w, h, QImage.Format.Format_RGBA8888).copy()
+    st.flood_image = qimg
+    st.flood_origin = (x0 - pad, y0 - pad)
+    st.filled = True
+    st.fill_color = st.fill_color or st.color
+    return True
+
+
+def _flood_seed(img, cx: int, cy: int) -> tuple[int, int] | None:
+    w, h = img.size
+    cx = max(0, min(w - 1, int(cx)))
+    cy = max(0, min(h - 1, int(cy)))
+    pix = img.load()
+    if pix[cx, cy] == 0:
+        return (cx, cy)
+    for rad in range(1, 24):
+        for dx, dy in ((rad, 0), (-rad, 0), (0, rad), (0, -rad), (rad, rad), (-rad, rad)):
+            x, y = cx + dx, cy + dy
+            if 0 <= x < w and 0 <= y < h and pix[x, y] == 0:
+                return (x, y)
+    return None
+
+
 def _stroke_pen(st: InkStroke, pressure: float = 0.55) -> QPen:
     color = _qcolor(st.color)
     tool = normalize_ink_tool(st.tool)
@@ -294,7 +389,11 @@ def paint_strokes(painter: QPainter, strokes: Iterable[InkStroke]) -> None:
         if len(st.points) < 1:
             continue
         pts = st.points
-        if st.filled and len(pts) >= 3:
+        flood = getattr(st, "flood_image", None)
+        origin = getattr(st, "flood_origin", None)
+        if flood is not None and origin is not None:
+            painter.drawImage(QPointF(origin[0], origin[1]), flood)
+        elif st.filled and len(pts) >= 3:
             poly = QPolygonF([QPointF(p[0], p[1]) for p in pts])
             fill = _qcolor(st.fill_color or st.color)
             if normalize_ink_tool(st.tool) == TOOL_HIGHLIGHTER:

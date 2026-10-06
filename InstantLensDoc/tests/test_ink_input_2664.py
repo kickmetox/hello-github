@@ -185,6 +185,17 @@ def test_pens_brush_fill_and_mouse_draw() -> None:
     assert st is not None
     assert st.filled is True
     session.clear()
+    _WIN._set_ink_fill("flood")
+    session.begin(30, 30, 0.5)
+    session.move(90, 30, 0.5)
+    session.move(90, 90, 0.5)
+    session.move(30, 90, 0.5)
+    session.move(30, 32, 0.5)
+    flooded = session.end()
+    assert flooded is not None
+    assert flooded.filled is True
+    assert flooded.flood_image is not None
+    session.clear()
     _WIN._set_ink_fill("none")
     _WIN._set_ink_tool("ballpoint")
     _WIN._toggle_ink_input(True)
