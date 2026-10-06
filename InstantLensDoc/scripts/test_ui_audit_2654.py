@@ -23,6 +23,8 @@ Dieser Test beweist:
 12. Auswahl-Hit-Test in PDF-Punkten: Klick Mitte Rechteck → selected + 8 Griffe;
     Gummiband zwei Objekte; Leerklick deselektiert; Werkzeug bleibt Auswahl.
 13. Auswahl → Ribbon-Farbe mutiert ``/C``; ohne Auswahl Select-All (Seite).
+14. Seite 1 Rect A, Seite 2 Rect B: Auswahl B + Strich ändert nur B (``/C``/``/Border``);
+    A unverändert. Seitenwechsel leert alte IDs.
 
 Aufruf: ``QT_QPA_PLATFORM=offscreen python3 scripts/test_ui_audit_2654.py``
 """
@@ -511,6 +513,100 @@ def test_viewer_style_selection(app, td: Path) -> None:
     v.close()
 
 
+def test_viewer_style_current_page_only(app, td: Path) -> None:
+    """Seite 1 Rect A, Seite 2 Rect B: Strich trifft nur die aktuelle Auswahl B."""
+    from ild_pdf import Annotation, AnnotationType, read_ild_annots
+    from instantlensdoc.ui.pdf_view import PdfViewer
+
+    pdf = td / "style_pages.pdf"
+    _make_multipage_pdf(pdf, ["PageOneAAA", "PageTwoBBB"])
+    v = PdfViewer()
+    v.resize(960, 720)
+    v.show()
+    app.processEvents()
+    assert v.load(pdf), f"load fehlgeschlagen: {v._last_refresh_error!r}"
+    v.set_annotations_locked(False)
+    v._suppress_default_zoom = True
+    _pump(app, 1.2, until=lambda: v._canvas_has_page_image())
+    v.set_scale(1.5, immediate=True)
+    _pump(app, 0.3)
+    v.set_tool(None)
+
+    rect_a = Annotation(
+        page=0,
+        type=AnnotationType.RECTANGLE,
+        x=80.0,
+        y=90.0,
+        width=120.0,
+        height=50.0,
+        color="#2980B9",
+        stroke_width=2.0,
+    )
+    rect_b = Annotation(
+        page=1,
+        type=AnnotationType.RECTANGLE,
+        x=80.0,
+        y=90.0,
+        width=120.0,
+        height=50.0,
+        color="#27AE60",
+        stroke_width=2.0,
+    )
+    v.store.add(rect_a)
+    v.store.add(rect_b)
+    v.refresh()
+    _pump(app, 0.2)
+
+    s = v._view_scale()
+    ax = (rect_a.x + rect_a.width / 2.0) * s
+    ay = (rect_a.y + rect_a.height / 2.0) * s
+    wx, wy = _canvas_page_to_widget(v.canvas, ax, ay)
+    _qclick(v.canvas, wx, wy)
+    _pump(app, 0.1)
+    assert rect_a.id in v.canvas._selected_ids, v.canvas._selected_ids
+    assert v.apply_toolbar_color("#1F618D") >= 1
+    assert v.store.get(rect_a.id).color.upper() == "#1F618D"
+
+    v.goto_page(1)
+    _pump(app, 0.8, until=lambda: v.page_index == 1 and v._canvas_has_page_image())
+    assert v.page_index == 1
+    assert rect_a.id not in v._selected_ann_ids, "Seitenwechsel muss alte Auswahl leeren"
+    assert rect_a.id not in (v.canvas._selected_ids or set())
+
+    bx = (rect_b.x + rect_b.width / 2.0) * s
+    by = (rect_b.y + rect_b.height / 2.0) * s
+    wx, wy = _canvas_page_to_widget(v.canvas, bx, by)
+    _qclick(v.canvas, wx, wy)
+    _pump(app, 0.1)
+    assert rect_b.id in v.canvas._selected_ids, v.canvas._selected_ids
+
+    # Stale Viewer-IDs von Seite 1 dürfen den Live-Klick nicht überschreiben
+    v._selected_ann_ids = {rect_a.id}
+    v._selected_ann_id = rect_a.id
+    n = v.apply_toolbar_color("#C0392B")
+    assert n >= 1, n
+    assert v.store.get(rect_b.id).color.upper() == "#C0392B", v.store.get(rect_b.id).color
+    assert v.store.get(rect_a.id).color.upper() == "#1F618D", v.store.get(rect_a.id).color
+    v._apply_toolbar_stroke(7.0, commit=True)
+    assert abs(float(v.store.get(rect_b.id).stroke_width) - 7.0) < 0.2
+    assert abs(float(v.store.get(rect_a.id).stroke_width) - 2.0) < 0.2
+
+    v.save_annotations()
+    native_a = read_ild_annots(pdf, page_index=0)
+    native_b = read_ild_annots(pdf, page_index=1)
+    rec_a = next(x for x in native_a if x["nm"] == f"ild:{rect_a.id}")
+    rec_b = next(x for x in native_b if x["nm"] == f"ild:{rect_b.id}")
+    ra, ga, ba = rec_a["c"]
+    rb, gb, bb = rec_b["c"]
+    assert ra < 0.35 and ga < 0.5 and ba > 0.45, rec_a["c"]
+    assert rb > 0.6 and gb < 0.35 and bb < 0.35, rec_b["c"]
+    if rec_b.get("border") is not None:
+        assert rec_b["border"] >= 6.5, rec_b["border"]
+        if rec_a.get("border") is not None:
+            assert rec_a["border"] <= 3.0, rec_a["border"]
+    v.close()
+
+
 def test_ribbon_undo_arrows() -> None:
     from instantlensdoc.ui.ribbon_bar import RibbonBar
 
@@ -765,6 +861,8 @@ def main() -> int:  # noqa: C901
         print("OK  7c Auswahl Klick/Gummiband/Griffe")
         test_viewer_style_selection(app, tdp)
         print("OK  7d Ribbon-Farbe auf Auswahl, Seite ohne Auswahl, Select-All global")
+        test_viewer_style_current_page_only(app, tdp)
+        print("OK  7e Seite2-Auswahl Strich ändert nur B /C, A unverändert")
         test_ribbon_undo_arrows()
         print("OK  8 ribbon ↶/↷")
         test_mainwindow_shortcuts(win)

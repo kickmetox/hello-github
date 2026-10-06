@@ -2379,7 +2379,8 @@ class PdfCanvas(QLabel):
                 if hit_any.id not in self._selected_ids:
                     # Outline + 8 Griffe sofort (vor dem Viewer-Slot)
                     self.set_selected_ids({hit_any.id})
-                    self.annotation_selected.emit(hit_any.id)
+                # Immer emittieren: Viewer-IDs dürfen nicht hinter dem Canvas zurückbleiben
+                self.annotation_selected.emit(hit_any.id)
                 ids = set(self._selected_ids) if self._selected_ids else {hit_any.id}
                 if not self._annotations_locked:
                     by_id = {a.id: a for a in self._annotations}
@@ -4007,19 +4008,73 @@ class PdfViewer(QWidget):
                 "Rechtsklick: speichern / zurücksetzen — 0.9.6"
             )
 
+    def _visible_annotation_id_set(self) -> set[str]:
+        """IDs der gerade angezeigten Seite (Canvas-Annots, sonst store.for_page)."""
+        ids: set[str] = set()
+        anns = getattr(getattr(self, "canvas", None), "_annotations", None) or []
+        for a in anns:
+            aid = getattr(a, "id", None)
+            if aid:
+                ids.add(str(aid))
+        if ids:
+            return ids
+        if self.store:
+            return {a.id for a in self.store.for_page(int(self.page_index))}
+        return set()
+
+    def _live_canvas_selected_ids(self) -> list[str]:
+        """Canvas-Auswahl, nur Objekte der aktuellen/sichtbaren Seite."""
+        canvas = getattr(self, "canvas", None)
+        if canvas is None:
+            return []
+        raw = list(getattr(canvas, "_selected_ids", None) or [])
+        sid = getattr(canvas, "_selected_id", None)
+        if sid and sid not in raw:
+            raw.append(sid)
+        allowed = self._visible_annotation_id_set()
+        out: list[str] = []
+        seen: set[str] = set()
+        for i in raw:
+            if i and i in allowed and i not in seen:
+                seen.add(i)
+                out.append(str(i))
+        return out
+
+    def _prune_selection_to_visible_page(self) -> list[str]:
+        """Verwirft IDs anderer Seiten; Canvas ist Quelle nach Klick-Select."""
+        allowed = self._visible_annotation_id_set()
+        live = self._live_canvas_selected_ids()
+        if not live:
+            viewer = list(self._selected_ann_ids) if self._selected_ann_ids else (
+                [self._selected_ann_id] if self._selected_ann_id else []
+            )
+            live = [i for i in viewer if i and i in allowed]
+        self._selected_ann_ids = set(live)
+        self._selected_ann_id = live[0] if live else None
+        canvas = getattr(self, "canvas", None)
+        if canvas is not None:
+            extra = set(getattr(canvas, "_selected_ids", None) or set()) - set(live)
+            if extra or set(getattr(canvas, "_selected_ids", None) or set()) != set(live):
+                canvas.set_selected_ids(live)
+        return live
+
     def _selected_annotation_ids(self) -> list[str]:
-        ids = list(self._selected_ann_ids) if self._selected_ann_ids else (
-            [self._selected_ann_id] if self._selected_ann_id else []
-        )
-        return [i for i in ids if i]
+        return self._prune_selection_to_visible_page()
 
     def _style_target_ids(self) -> tuple[list[str], str]:
-        """Ziele für Ribbon/Menü-Stil: Auswahl, sonst alle Annotationen der Seite."""
-        ids = self._selected_annotation_ids()
+        """Ziele: Live-Auswahl der aktuellen Seite, sonst alle Annots dieser Seite."""
+        ids = self._prune_selection_to_visible_page()
         if ids:
             return ids, "selection"
         if self.store:
-            page_ids = [a.id for a in self.store.for_page(self.page_index)]
+            allowed = self._visible_annotation_id_set()
+            page_ids = [
+                a.id
+                for a in self.store.for_page(int(self.page_index))
+                if a.id in allowed
+            ]
+            if not page_ids and not allowed:
+                page_ids = [a.id for a in self.store.for_page(int(self.page_index))]
             if page_ids:
                 return page_ids, "page"
         return [], "none"
@@ -4059,6 +4114,7 @@ class PdfViewer(QWidget):
         if scope == "selection":
             self.canvas.set_selected_ids(ids)
             self._selected_ann_ids = set(ids)
+            self._selected_ann_id = ids[0] if ids else None
         self.annotations_changed.emit()
         where = "Auswahl" if scope == "selection" else f"Seite {self.page_index + 1}"
         self.status.emit(f"Farbe {c} für {n} Annotation(en) ({where})")
@@ -4851,6 +4907,7 @@ class PdfViewer(QWidget):
                 new_page = self._continuous_offsets[-1][0]
         if new_page != self.page_index:
             self.page_index = new_page
+            self._prune_selection_to_visible_page()
             self._sync_page_nav_widgets(suffix=" (Scroll)")
             self.page_changed.emit(self.page_index)
 
@@ -6455,7 +6512,10 @@ class PdfViewer(QWidget):
                 group_ids = set(self.store.expand_group_ids([aid]))
             if not group_ids:
                 group_ids = {aid}
-            ids = set(self._selected_ann_ids)
+            allowed = self._visible_annotation_id_set()
+            if allowed:
+                group_ids = {i for i in group_ids if i in allowed} or {aid}
+            ids = set(self._selected_ann_ids) & (allowed or set(self._selected_ann_ids))
             if aid in ids:
                 ids -= group_ids
             else:
@@ -6492,6 +6552,9 @@ class PdfViewer(QWidget):
             return
         if aid and self.store:
             expanded = self.store.expand_group_ids([aid])
+            allowed = self._visible_annotation_id_set()
+            if expanded and allowed:
+                expanded = [i for i in expanded if i in allowed]
             self._selected_ann_ids = set(expanded) if expanded else {aid}
             self._selected_ann_id = aid
             self.canvas.set_selected_ids(self._selected_ann_ids)
@@ -6552,9 +6615,7 @@ class PdfViewer(QWidget):
             self.status.emit("Keine Annotationen")
             return False
         removed: list[str] = []
-        targets = list(self._selected_ann_ids) if self._selected_ann_ids else (
-            [self._selected_ann_id] if self._selected_ann_id else []
-        )
+        targets = self._selected_annotation_ids()
         for aid in targets:
             if aid and self.store.get(aid) and self.store.remove(aid):
                 removed.append(aid)
@@ -7384,8 +7445,17 @@ class PdfViewer(QWidget):
             self._last_render_blank_ok = not pil_has_ink(img)
             self.canvas.set_page_image(img, anns, scale=self.scale)
             self.canvas.set_uri_links(links)
-            if self._selected_ann_ids:
-                self.canvas.set_selected_ids(self._selected_ann_ids)
+            allowed = {a.id for a in anns if getattr(a, "id", None)}
+            keep = [i for i in (self._selected_ann_ids or set()) if i in allowed]
+            if self._selected_ann_id and self._selected_ann_id in allowed and self._selected_ann_id not in keep:
+                keep.append(self._selected_ann_id)
+            self._selected_ann_ids = set(keep)
+            self._selected_ann_id = (
+                self._selected_ann_id if self._selected_ann_id in self._selected_ann_ids else (
+                    keep[0] if keep else None
+                )
+            )
+            self.canvas.set_selected_ids(keep)
             self._update_page_box_overlay()
             self._update_printer_marks_overlay()
             self._update_layout_overlays()
@@ -7525,6 +7595,8 @@ class PdfViewer(QWidget):
         idx = min(idx, max(0, int(self.page_count or 1) - 1))
         old = int(self.page_index or 0)
         self.page_index = idx
+        if idx != old:
+            self.clear_annotation_selection()
         if self._search_query:
             self._rebuild_search_rects(keep_index=False)
         need_refresh = True
@@ -8718,12 +8790,6 @@ class PdfViewer(QWidget):
         self.annotations_changed.emit()
         self.status.emit(f"Deckkraft {float(value):.2f} für {n} Annotation(en)")
         return n
-
-    def _selected_annotation_ids(self) -> list[str]:
-        ids = list(self._selected_ann_ids) if self._selected_ann_ids else (
-            [self._selected_ann_id] if self._selected_ann_id else []
-        )
-        return [i for i in ids if i]
 
     def align_selected_annotations(self, mode: str = "left") -> int:
         """Auswahl ausrichten: left|center|right|top|middle|bottom (≥2)."""

@@ -306,6 +306,13 @@ def read_ild_annots(
                         color_c = [float(c_arr[0]), float(c_arr[1]), float(c_arr[2])]
                 except Exception:
                     color_c = None
+                border_w: float | None = None
+                try:
+                    border = obj.get("/Border")
+                    if border is not None and len(border) >= 3:
+                        border_w = float(border[2])
+                except Exception:
+                    border_w = None
                 out.append(
                     {
                         "nm": nm,
@@ -313,6 +320,7 @@ def read_ild_annots(
                         "rect": rect_l,
                         "contents": contents,
                         "c": color_c,
+                        "border": border_w,
                         "quad": (
                             [float(x) for x in obj.get("/QuadPoints")]
                             if obj.get("/QuadPoints") is not None
