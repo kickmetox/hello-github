@@ -3439,8 +3439,14 @@ class MainWindow(QMainWindow):
                 lambda: self.pdf_view.redactions_from_text_selection(),
             ),
             ("Schwärzungs-Annotationen löschen…", lambda: self.pdf_view.clear_redactions()),
-            ("Signaturfeld setzen…", lambda: self.pdf_view.place_signature_field()),
-            ("Signatur (Bild) einfügen…", lambda: self.pdf_view.insert_signature_image()),
+            (
+                "Signaturfeld setzen…",
+                self._place_signature_field_menu,
+            ),
+            (
+                "Signatur (Bild) einfügen…",
+                self._insert_signature_image_menu,
+            ),
         ]:
             a = QAction(title, self)
             if title == "Echt schwärzen…":
@@ -3894,9 +3900,47 @@ class MainWindow(QMainWindow):
 
     def _feature_dialog(self, title: str, body: str, object_name: str = "ildFeatureDialog") -> None:
         """Echter schließbarer Dialog statt Info-Box / show_planned."""
-        from instantlensdoc.ui.feature_dialog import FeatureDialog
+        try:
+            from instantlensdoc.ui.feature_dialog import FeatureDialog
 
-        FeatureDialog(self, title=title, body=body, object_name=object_name).exec()
+            FeatureDialog(self, title=title, body=body, object_name=object_name).exec()
+            return
+        except Exception:
+            pass
+        try:
+            QMessageBox.question(self, title, body, QMessageBox.Ok)
+        except Exception:
+            self._set_status(f"{title}: {body}")
+
+    def _pdf_selected_annotation_ids(self) -> set:
+        """Aktuelle PDF-Annotationsauswahl (Canvas + View), ohne Annot-Layer zu ändern."""
+        ids: set = set()
+        pv = getattr(self, "pdf_view", None)
+        if pv is None:
+            return ids
+        for attr in ("_selected_ann_id", "_selected_id"):
+            v = getattr(pv, attr, None)
+            if v:
+                ids.add(v)
+        for attr in ("_selected_ids", "_selected_ann_ids", "_move_ids"):
+            extra = getattr(pv, attr, None)
+            if extra:
+                try:
+                    ids.update(extra)
+                except Exception:
+                    pass
+        canvas = getattr(pv, "canvas", None)
+        if canvas is not None:
+            extra = getattr(canvas, "_selected_ids", None)
+            if extra:
+                try:
+                    ids.update(extra)
+                except Exception:
+                    pass
+            v = getattr(canvas, "_selected_id", None)
+            if v:
+                ids.add(v)
+        return {x for x in ids if x}
 
     def _pdf_menu_call(self, title: str, fn) -> None:
         """PDF-Menüslot: leere Voraussetzung → FeatureDialog, sonst echte Funktion."""
@@ -3907,6 +3951,17 @@ class MainWindow(QMainWindow):
         store = getattr(self.pdf_view, "store", None)
         low = t.lower()
         try:
+            if "messwerte" in low:
+                n = 0
+                try:
+                    n = len(store.list_measure_annotations()) if store is not None else 0
+                except Exception:
+                    n = 0
+                if n == 0:
+                    self._feature_dialog(
+                        "Messwerte", "Keine Mess-Annotationen vorhanden."
+                    )
+                    return
             if "formularfelder erkennen" in low:
                 from ild_pdf.acroform import detect_form_candidates
 
@@ -3919,14 +3974,16 @@ class MainWindow(QMainWindow):
                         "Keine Kandidaten auf dieser Seite (Labels „:“, ____, [ ]).",
                     )
                     return
-                n = len(store.list_measure_annotations()) if store is not None else 0
-                if n == 0:
-                    self._feature_dialog("Messwerte", "Keine Mess-Annotationen vorhanden.")
-                    return
             if "overlay" in low and "einbrenn" in low:
-                n = len(store.text_overlays()) if store is not None and hasattr(store, "text_overlays") else 0
+                n = (
+                    len(store.text_overlays())
+                    if store is not None and hasattr(store, "text_overlays")
+                    else 0
+                )
                 if n == 0:
-                    self._feature_dialog("Einbrennen", "Keine TEXT/TEXT_OVERLAY Annotationen.")
+                    self._feature_dialog(
+                        "Einbrennen", "Keine TEXT/TEXT_OVERLAY Annotationen."
+                    )
                     return
             if ("schwärz" in low or "redaction" in low) and "auswahl" not in low:
                 n = 0
@@ -3935,13 +3992,25 @@ class MainWindow(QMainWindow):
                     n = sum(
                         1
                         for a in anns
-                        if "redact" in str(getattr(getattr(a, "type", None), "value", a.type) or "").lower()
+                        if "redact"
+                        in str(
+                            getattr(getattr(a, "type", None), "value", a.type) or ""
+                        ).lower()
                     )
                 if n == 0:
                     self._feature_dialog(t, "Keine Schwärzungen vorhanden.")
                     return
-        except Exception:
-            pass
+            if "auswahl" in low and "schwärz" in low:
+                rects = list(getattr(self.pdf_view, "_text_selection_rects", None) or [])
+                if not rects:
+                    self._feature_dialog(
+                        t,
+                        "Keine Textauswahl. Zuerst Text auf der Seite markieren.",
+                    )
+                    return
+        except Exception as e:
+            self._feature_dialog(t, str(e) or "Vorprüfung fehlgeschlagen.")
+            return
         try:
             fn()
         except Exception as e:
@@ -4178,32 +4247,20 @@ class MainWindow(QMainWindow):
                         src = ""
                     label = (src or t).replace("&", "").lower()
                     if self._label_is_pdf_annotation(label, parent) or "treffer als highlight" in label:
-                        has_sel = False
-                        try:
-                            canvas = getattr(self.pdf_view, "canvas", None)
-                            ids = set()
-                            if canvas is not None:
-                                ids = set(getattr(canvas, "_selected_ids", None) or [])
-                                if getattr(canvas, "_selected_id", None):
-                                    ids.add(canvas._selected_id)
-                            need_sel = (
-                                "auswahl ausrichten" in parent
-                                or "auswahl-deckkraft" in label
-                                or "auswahl-farbe" in label
-                                or label.startswith("annotationen kopieren")
+                        ids = self._pdf_selected_annotation_ids()
+                        need_sel = (
+                            "auswahl ausrichten" in parent
+                            or "auswahl-deckkraft" in label
+                            or "auswahl-farbe" in label
+                            or label.startswith("annotationen kopieren")
+                        )
+                        if need_sel:
+                            self._set_action_available(
+                                a,
+                                is_pdf and bool(ids),
+                                "Keine Annotation ausgewählt",
                             )
-                            ok = is_pdf and (has_sel or ids or not need_sel)
-                            if need_sel:
-                                self._set_action_available(
-                                    a,
-                                    is_pdf and bool(ids),
-                                    "Keine Annotation ausgewählt",
-                                )
-                            else:
-                                self._set_action_available(
-                                    a, is_pdf, "Nur bei geöffnetem PDF verfügbar"
-                                )
-                        except Exception:
+                        else:
                             self._set_action_available(
                                 a, is_pdf, "Nur bei geöffnetem PDF verfügbar"
                             )
@@ -4324,13 +4381,53 @@ class MainWindow(QMainWindow):
                             dirty or untitled or is_pdf,
                             "Nichts zu speichern",
                         )
-                    elif t in (
-                        "andere tabs schließen",
-                        "tabs links schließen",
-                        "tabs rechts schließen",
-                    ):
+                    elif t == "andere tabs schließen":
                         self._set_action_available(
                             a, n_tabs > 1, "Kein weiterer Tab"
+                        )
+                    elif t == "tabs links schließen":
+                        idx = 0
+                        try:
+                            paths = list(self.sidebar.document_paths() or [])
+                            cur = (
+                                str(Path(self.doc.path))
+                                if self.doc and self.doc.path
+                                else ""
+                            )
+                            idx = next(
+                                (
+                                    i
+                                    for i, p in enumerate(paths)
+                                    if str(Path(str(p))) == str(Path(cur))
+                                ),
+                                0,
+                            )
+                        except Exception:
+                            idx = 0
+                        self._set_action_available(a, idx > 0, "Keine Tabs links")
+                    elif t == "tabs rechts schließen":
+                        idx = 0
+                        n_p = n_tabs
+                        try:
+                            paths = list(self.sidebar.document_paths() or [])
+                            n_p = len(paths)
+                            cur = (
+                                str(Path(self.doc.path))
+                                if self.doc and self.doc.path
+                                else ""
+                            )
+                            idx = next(
+                                (
+                                    i
+                                    for i, p in enumerate(paths)
+                                    if str(Path(str(p))) == str(Path(cur))
+                                ),
+                                n_p,
+                            )
+                        except Exception:
+                            idx = 0
+                        self._set_action_available(
+                            a, n_p > 1 and idx < n_p - 1, "Keine Tabs rechts"
                         )
 
         rb = getattr(self, "ribbon_bar", None)
@@ -6142,27 +6239,42 @@ class MainWindow(QMainWindow):
 
     def _align_selected_annotations(self, mode: str = "left"):
         if self.stack.currentWidget() is not self.pdf_view or not self.pdf_view.pdf_path:
-            self._set_status("Ausrichten nur im PDF-Modus")
+            self._feature_dialog("Auswahl ausrichten", "Ausrichten nur im PDF-Modus.")
             return
         n = self.pdf_view.align_selected_annotations(mode)
         if n:
             self._refresh_pdf_marks()
+            return
+        self._feature_dialog(
+            "Auswahl ausrichten",
+            "Keine Annotationen ausgewählt. Zuerst mindestens zwei Objekte markieren.",
+        )
 
     def _distribute_selected_annotations_horizontal(self):
         if self.stack.currentWidget() is not self.pdf_view or not self.pdf_view.pdf_path:
-            self._set_status("Verteilen nur im PDF-Modus")
+            self._feature_dialog("Verteilen", "Verteilen nur im PDF-Modus.")
             return
         n = self.pdf_view.distribute_selected_annotations_horizontal()
         if n:
             self._refresh_pdf_marks()
+            return
+        self._feature_dialog(
+            "Verteilen",
+            "Zu wenige Annotationen für horizontales Verteilen (mindestens 3).",
+        )
 
     def _distribute_selected_annotations_vertical(self):
         if self.stack.currentWidget() is not self.pdf_view or not self.pdf_view.pdf_path:
-            self._set_status("Verteilen nur im PDF-Modus")
+            self._feature_dialog("Verteilen", "Verteilen nur im PDF-Modus.")
             return
         n = self.pdf_view.distribute_selected_annotations_vertical()
         if n:
             self._refresh_pdf_marks()
+            return
+        self._feature_dialog(
+            "Verteilen",
+            "Zu wenige Annotationen für vertikales Verteilen (mindestens 3).",
+        )
 
     def _group_selected_annotations(self):
         if self.stack.currentWidget() is not self.pdf_view or not self.pdf_view.pdf_path:
@@ -10605,12 +10717,17 @@ class MainWindow(QMainWindow):
         try:
             out = self._render_pdf_page_image_path(idx)
         except Exception as e:
-            QMessageBox.warning(self, "Seitenbild", str(e))
+            self._feature_dialog("Seitenbild", str(e))
             return
-        self.stack.setCurrentWidget(self.editor_pane)
-        self.editor.insert_pdf_page_image_reference(out, page_label=f"Seite {idx + 1}")
-        self._on_text_changed()
-        self._set_status(f"Seitenbild Seite {idx + 1} → Editor ({out.name})")
+        from instantlensdoc.ui.feature_dialog import PathOpenDialog
+
+        PathOpenDialog(
+            self,
+            title=f"Seitenbild Seite {idx + 1}",
+            path=out,
+            object_name="ildPageImageDialog",
+        ).exec()
+        self._set_status(f"Seitenbild Seite {idx + 1}: {out}")
 
     def _insert_all_page_images_to_editor(self):
         if not self.pdf_view.pdf_path:
@@ -10618,19 +10735,24 @@ class MainWindow(QMainWindow):
             return
         n_pages = self.pdf_view.page_count
         if n_pages < 1:
+            self._feature_dialog("Seitenbilder", "PDF hat keine Seiten.")
             return
         paths: list[Path] = []
         try:
             for i in range(n_pages):
                 paths.append(self._render_pdf_page_image_path(i))
         except Exception as e:
-            QMessageBox.warning(self, "Seitenbilder", str(e))
+            self._feature_dialog("Seitenbilder", str(e))
             return
-        self.stack.setCurrentWidget(self.editor_pane)
-        for i, out in enumerate(paths):
-            self.editor.insert_pdf_page_image_reference(out, page_label=f"Seite {i + 1}")
-        self._on_text_changed()
-        self._set_status(f"{len(paths)} Seitenbild(er) → Editor")
+        from instantlensdoc.ui.feature_dialog import PathOpenDialog
+
+        PathOpenDialog(
+            self,
+            title=f"{len(paths)} Seitenbild(er)",
+            path=paths[0].parent if paths else self.pdf_view.pdf_path,
+            object_name="ildPageImagesDialog",
+        ).exec()
+        self._set_status(f"{len(paths)} Seitenbild(er) gespeichert")
 
     def _extract_page_text_to_editor(self):
         if not self.pdf_view.pdf_path:
@@ -10639,40 +10761,27 @@ class MainWindow(QMainWindow):
         pdf_path = self.pdf_view.pdf_path
         page_index = int(self.pdf_view.page_index or 0)
         password = self.pdf_view.password
-        if self.open_ocr_result(
-            pdf_extract=pdf_path,
-            page_index=page_index,
-            password=password,
-            title=f"Word-Suite — {Path(pdf_path).name} S.{page_index + 1}",
-            auto_format=False,
-            source_path=str(pdf_path),
-            source_page=page_index + 1,
-        ):
-            words = len((self.editor.toPlainText() or "").split())
-            self._set_status(
-                f"Seite {page_index + 1}: Text → Word-Suite ({words} Wörter)"
-            )
-            return
-        from ild_pdf import extract_page_plain_text
-
+        text = ""
         try:
+            from ild_pdf import extract_page_plain_text
+
             text = extract_page_plain_text(
                 pdf_path,
                 page_index,
                 password=password,
             )
         except Exception as e:
-            QMessageBox.warning(self, "Text extrahieren", str(e))
+            self._feature_dialog("Text extrahieren", str(e))
             return
-        self.open_ocr_result(
-            text=text,
-            title=f"Word-Suite — {Path(pdf_path).name} S.{page_index + 1}",
-            auto_format=False,
-            source_path=str(pdf_path),
-            source_page=page_index + 1,
-        )
+        from instantlensdoc.ui.feature_dialog import DetachedDocumentDialog
+
+        DetachedDocumentDialog(
+            self,
+            path=str(pdf_path),
+            body=text or "(kein Text auf dieser Seite)",
+        ).exec()
         self._set_status(
-            f"Seite {page_index + 1}: Text → Editor ({len(text.split()) if text.strip() else 0} Wörter)"
+            f"Seite {page_index + 1}: Text → Vorschau ({len(text.split()) if (text or '').strip() else 0} Wörter)"
         )
 
     def _extract_all_text_to_editor(self):
@@ -10685,6 +10794,9 @@ class MainWindow(QMainWindow):
         from ild_pdf.limits import TEXT_EXTRACT_ALL_WARN_PAGES
 
         n = int(self.pdf_view.page_count or 0)
+        if n < 1:
+            self._feature_dialog("Text extrahieren", "PDF hat keine Seiten.")
+            return
         # Große PDFs: Bestätigung — Default nur aktuelle Seite — 2.6.37
         if n >= int(TEXT_EXTRACT_ALL_WARN_PAGES):
             r = QMessageBox.question(
@@ -10721,31 +10833,24 @@ class MainWindow(QMainWindow):
             )
         except Exception as e:
             prog.close()
-            QMessageBox.warning(self, "Text extrahieren", str(e))
+            self._feature_dialog("Text extrahieren", str(e))
             return
         canceled = bool(prog.wasCanceled())
         prog.close()
         if canceled:
-            self._set_status("Text-Extraktion abgebrochen")
+            self._feature_dialog("Text extrahieren", "Text-Extraktion abgebrochen.")
             return
         pdf_path = self.pdf_view.pdf_path
-        if self.open_ocr_result(
-            text=text,
-            title=f"Word-Suite — {Path(pdf_path).name}",
-            auto_format=False,
-            source_path=str(pdf_path),
-        ):
-            words = len((self.editor.toPlainText() or "").split())
-            self._set_status(
-                f"Gesamter PDF-Text ({self.pdf_view.page_count} Seite(n)) → Word-Suite ({words} Wörter)"
-            )
-            return
-        self.editor.setPlainText(text)
-        self.stack.setCurrentWidget(self.editor_pane)
-        self._on_text_changed()
-        words = len(text.split()) if text.strip() else 0
+        from instantlensdoc.ui.feature_dialog import DetachedDocumentDialog
+
+        DetachedDocumentDialog(
+            self,
+            path=str(pdf_path),
+            body=text or "(kein Text im Dokument)",
+        ).exec()
+        words = len(text.split()) if (text or "").strip() else 0
         self._set_status(
-            f"Gesamter PDF-Text ({self.pdf_view.page_count} Seite(n)) → Editor ({words} Wörter)"
+            f"Gesamter PDF-Text ({self.pdf_view.page_count} Seite(n)) → Vorschau ({words} Wörter)"
         )
 
     def _on_pdf_undo_state(self, can_u: bool, tu: str, can_r: bool, tr: str) -> None:
@@ -10854,15 +10959,31 @@ class MainWindow(QMainWindow):
 
     def _zoom_in(self):
         if self.stack.currentWidget() is self.pdf_view:
-            self.pdf_view.zoom_in()
+            pv = self.pdf_view
+            if hasattr(pv, "set_scale"):
+                base = getattr(pv, "_pending_scale", None)
+                if base is None:
+                    base = getattr(pv, "scale", 1.0) or 1.0
+                pv.set_scale(float(base) + 0.25, immediate=True)
+            else:
+                pv.zoom_in()
+            self._set_status(f"Zoom {int(round(float(getattr(pv, 'scale', 1) or 1) * 100))}%")
         else:
-            self._set_status("Zoom gilt für die PDF-Ansicht")
+            self._feature_dialog("Vergrößern", "Zoom gilt für die PDF-Ansicht.")
 
     def _zoom_out(self):
         if self.stack.currentWidget() is self.pdf_view:
-            self.pdf_view.zoom_out()
+            pv = self.pdf_view
+            if hasattr(pv, "set_scale"):
+                base = getattr(pv, "_pending_scale", None)
+                if base is None:
+                    base = getattr(pv, "scale", 1.0) or 1.0
+                pv.set_scale(max(0.25, float(base) - 0.25), immediate=True)
+            else:
+                pv.zoom_out()
+            self._set_status(f"Zoom {int(round(float(getattr(pv, 'scale', 1) or 1) * 100))}%")
         else:
-            self._set_status("Zoom gilt für die PDF-Ansicht")
+            self._feature_dialog("Verkleinern", "Zoom gilt für die PDF-Ansicht.")
 
     def _fit_page(self):
         if self.stack.currentWidget() is self.pdf_view:
@@ -10966,7 +11087,11 @@ class MainWindow(QMainWindow):
             return
         query = self.sidebar.search_text()
         if not query.strip():
-            self._find_replace()
+            self._feature_dialog(
+                "Treffer markieren",
+                "Kein Suchbegriff. Zuerst suchen (Ctrl+F), dann Treffer als Highlight setzen.",
+                object_name="ildSearchHighlightDialog",
+            )
             return
         # Optionaler Tag: Combobox mit zuletzt genutzten Tags — 0.9.8/0.9.9
         recent = recent_tags_mod.load_recent_tags()
@@ -11000,10 +11125,12 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Treffer markieren", str(e))
             return
         if n <= 0:
-            self._set_status(
-                "Keine Treffer im Dokument"
+            self._feature_dialog(
+                "Treffer markieren",
+                "Keine Treffer im Dokument."
                 if all_pages
-                else "Keine Treffer auf der aktuellen Seite"
+                else "Keine Treffer auf der aktuellen Seite.",
+                object_name="ildSearchHighlightDialog",
             )
             return
         if tag:
@@ -11228,7 +11355,7 @@ class MainWindow(QMainWindow):
             return
         if self.stack.currentWidget() is self.pdf_view:
             if not q:
-                self._find_replace()
+                self._open_multi_doc_search()
                 return
             from ild_pdf.overlay import SearchPatternError
 
@@ -11291,7 +11418,7 @@ class MainWindow(QMainWindow):
             return
         if self.stack.currentWidget() is self.pdf_view:
             if not q:
-                self._find_replace()
+                self._open_multi_doc_search()
                 return
             from ild_pdf.overlay import SearchPatternError
 
@@ -11879,12 +12006,21 @@ class MainWindow(QMainWindow):
         self.dtp_pane.link_selected()
 
     def _dtp_toggle_grid(self) -> None:
-        if self._pdf_tab_active():
-            on = not bool(getattr(self.pdf_view, "_show_alignment_grid", False))
+        pv = getattr(self, "pdf_view", None)
+        if pv is not None and getattr(pv, "pdf_path", None):
+            if hasattr(pv, "show_alignment_grid"):
+                on = not bool(pv.show_alignment_grid())
+            else:
+                on = not bool(getattr(pv, "_show_alignment_grid", False))
             self._toggle_alignment_grid(on)
             return
-        self._enter_layout_mode()
-        self.dtp_pane.toggle_grid()
+        if self._layout_mode_active():
+            self.dtp_pane.toggle_grid()
+            return
+        self._feature_dialog(
+            "Raster",
+            "Ausrichtungsraster gilt in der PDF-Ansicht (Ansicht → Ausrichtungsraster).",
+        )
 
     def _dtp_export_pdf_dialog(self) -> None:
         self._enter_layout_mode()
@@ -12534,27 +12670,21 @@ class MainWindow(QMainWindow):
         final_order = list(order)
         mode = "ersetzt"
         if existing:
-            box = QMessageBox(self)
-            box.setWindowTitle("Bookmarks importieren")
-            box.setIcon(QMessageBox.Question)
-            box.setText(
+            r = QMessageBox.question(
+                self,
+                "Bookmarks importieren",
                 f"{len(order)} Outline-Seite(n) importieren.\n"
                 f"Bereits {len(existing)} Favorit(en)"
                 + (f", davon {len(dupes)} Duplikat(e)" if dupes else "")
                 + ".\n\n"
-                "Duplikate überspringen = bestehende behalten, nur neue anhängen.\n"
-                "Ersetzen = Favoritenliste durch Outline ersetzen."
+                "Ja = Duplikate überspringen (neue anhängen).\n"
+                "Nein = Favoritenliste durch Outline ersetzen.",
+                QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel,
+                QMessageBox.Yes,
             )
-            btn_skip = box.addButton(
-                "Duplikate überspringen", QMessageBox.AcceptRole
-            )
-            btn_replace = box.addButton("Ersetzen", QMessageBox.DestructiveRole)
-            box.addButton(QMessageBox.Cancel)
-            box.exec()
-            clicked = box.clickedButton()
-            if clicked is None or clicked not in (btn_skip, btn_replace):
+            if r == QMessageBox.Cancel:
                 return
-            if clicked is btn_skip:
+            if r == QMessageBox.Yes:
                 final_order = existing + [p for p in order if p not in existing_set]
                 mode = "übersprungen"
             else:
@@ -12594,23 +12724,19 @@ class MainWindow(QMainWindow):
                 + hint,
             )
             return
-        box = QMessageBox(self)
-        box.setWindowTitle("Bookmarks als Outlines exportieren")
-        box.setIcon(QMessageBox.Question)
-        box.setText(
+        box_r = QMessageBox.question(
+            self,
+            "Bookmarks als Outlines exportieren",
             f"{len(favs)} Bookmark(s) als PDF-Outline schreiben.\n\n"
-            "Ziel-PDF wählen:"
+            "Ja = aktuelles PDF\nNein = anderes PDF wählen",
+            QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel,
+            QMessageBox.Yes,
         )
-        btn_current = box.addButton("Aktuelles PDF", QMessageBox.AcceptRole)
-        btn_other = box.addButton("Anderes PDF…", QMessageBox.ActionRole)
-        box.addButton(QMessageBox.Cancel)
-        box.exec()
-        clicked = box.clickedButton()
-        if clicked is None or clicked not in (btn_current, btn_other):
+        if box_r == QMessageBox.Cancel:
             return
         source = Path(self.pdf_view.pdf_path)
         target = source
-        if clicked is btn_other:
+        if box_r == QMessageBox.No:
             start = dialog_start_dir(get_last_export_dir() or source.parent)
             suggest = str(Path(start) / f"{source.stem}_outlines.pdf")
             path, _ = QFileDialog.getSaveFileName(
@@ -13919,9 +14045,44 @@ class MainWindow(QMainWindow):
     def _bake_uri_links(self):
         """Sidecar-URL-Links als native PDF-Annotationen backen — 2.3.0."""
         if not self.pdf_view.pdf_path:
-            self._require_pdf("Links backen")
+            self._feature_dialog("Links backen", "Bitte zuerst ein PDF öffnen.")
+            return
+        store = getattr(self.pdf_view, "store", None)
+        links = []
+        try:
+            from ild_pdf import sidecar_links_from_annotations
+
+            if store is not None:
+                links = sidecar_links_from_annotations(store.annotations)
+        except Exception:
+            links = []
+        if not links:
+            self._feature_dialog(
+                "Links backen",
+                "Keine gültigen URL-Link-Annotationen (http/https) im Sidecar.",
+            )
             return
         self.pdf_view.bake_uri_links()
+
+    def _place_signature_field_menu(self) -> None:
+        if not getattr(self.pdf_view, "pdf_path", None):
+            self._feature_dialog("Signaturfeld", "Bitte zuerst ein PDF öffnen.")
+            return
+        try:
+            self.pdf_view.place_signature_field()
+        except Exception as e:
+            self._feature_dialog("Signaturfeld", str(e))
+            return
+        self._set_status("Signaturfeld: auf die Seite klicken")
+
+    def _insert_signature_image_menu(self) -> None:
+        if not getattr(self.pdf_view, "pdf_path", None):
+            self._feature_dialog("Signatur", "Bitte zuerst ein PDF öffnen.")
+            return
+        try:
+            self.pdf_view.insert_signature_image()
+        except Exception as e:
+            self._feature_dialog("Signatur", str(e))
 
     def _open_command_palette(self):
         """Ctrl+K Schnellaktionen-Palette — 2.3.0."""
@@ -14745,13 +14906,21 @@ class MainWindow(QMainWindow):
 
     def close_tabs_left_of_current(self) -> None:
         if not self.doc or not self.doc.path:
-            self._set_status("Kein Dokument geöffnet")
+            self._feature_dialog(
+                "Tabs schließen",
+                "Kein Dokument geöffnet — keine Tabs links zum Schließen.",
+                object_name="ildCloseTabsDialog",
+            )
             return
         self.close_tabs_left_of(str(self.doc.path))
 
     def close_tabs_right_of_current(self) -> None:
         if not self.doc or not self.doc.path:
-            self._set_status("Kein Dokument geöffnet")
+            self._feature_dialog(
+                "Tabs schließen",
+                "Kein Dokument geöffnet — keine Tabs rechts zum Schließen.",
+                object_name="ildCloseTabsDialog",
+            )
             return
         self.close_tabs_right_of(str(self.doc.path))
 
@@ -17286,11 +17455,12 @@ class MainWindow(QMainWindow):
             )
         else:
             self._set_status(f"Alles speichern: {saved} Datei(en)/Sidecar(s)")
-            if saved == 0:
-                self._feature_dialog(
-                    "Alles speichern",
-                    "Nichts zu speichern — keine Änderungen und keine Sidecars.",
-                )
+            self._feature_dialog(
+                "Alles speichern",
+                "Nichts zu speichern — keine Änderungen und keine Sidecars."
+                if saved == 0
+                else f"{saved} Datei(en)/Sidecar(s) gespeichert.",
+            )
 
     def save_as(self):
         if not self.doc:
@@ -18749,8 +18919,8 @@ class MainWindow(QMainWindow):
         from PySide6.QtWidgets import QApplication, QDialog, QProgressDialog
 
         if not self.doc or self.doc.kind != DocKind.PDF or not self.doc.path:
-            if not self._require_pdf("OCR gesamtes PDF"):
-                return
+            self._feature_dialog("OCR gesamtes PDF", "Bitte zuerst ein PDF öffnen.")
+            return
 
         ok, msg = ocr_mod.tesseract_available()
         # Seitenzahl vorab für Dialog (DPI + optional von–bis) — 1.1.2
@@ -18766,13 +18936,17 @@ class MainWindow(QMainWindow):
         except Exception:
             total = max(1, int(self.pdf_view.page_count or 1))
 
-        dlg = OcrDialog(
-            self,
-            need_file=False,
-            default_label=f"{Path(self.doc.path).name} (Batch)",
-            page_count=total,
-            show_page_range=True,
-        )
+        try:
+            dlg = OcrDialog(
+                self,
+                need_file=False,
+                default_label=f"{Path(self.doc.path).name} (Batch)",
+                page_count=total,
+                show_page_range=True,
+            )
+        except Exception as e:
+            self._feature_dialog("OCR gesamtes PDF", str(e))
+            return
         # Batch-OCR: Sprach-Preset + DPI 150/300 + optional Seitenbereich — 1.1.2
         dlg.setWindowTitle("OCR gesamtes PDF — Sprach-Preset / DPI")
         dlg.rb_editable.setChecked(True)
@@ -18780,15 +18954,7 @@ class MainWindow(QMainWindow):
         if dlg.exec() != QDialog.Accepted:
             return
         if not ok:
-            box = QMessageBox(self)
-            box.setIcon(QMessageBox.Information)
-            box.setWindowTitle("OCR — Tesseract fehlt")
-            box.setTextFormat(Qt.RichText)
-            box.setText(
-                ocr_mod.INSTALL_HINT_HTML
-                + f"<p><small>{msg.splitlines()[0] if msg else 'Tesseract fehlt'}</small></p>"
-            )
-            box.exec()
+            self._feature_dialog("OCR — Tesseract fehlt", msg)
             self._set_status("OCR nicht verfügbar")
             return
 

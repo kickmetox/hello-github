@@ -176,3 +176,57 @@ def test_detach_opens_dialog_on_docx() -> None:
     pump(_APP, 0.1)
     verd, det = classify_events(list(_REC.events), [])
     assert verd == "open", (verd, det, _REC.events)
+
+
+def test_pdf_measures_empty_opens_dialog() -> None:
+    load_effect_state(_WIN, _APP, "pdf", _FX)
+    _REC.reset()
+    _WIN._pdf_menu_call("Messwerte als CSV exportieren…", lambda: None)
+    pump(_APP, 0.1)
+    verd, det = classify_events(list(_REC.events), [])
+    assert verd == "open", (verd, det, _REC.events)
+
+
+def test_pdf_search_prev_opens_dialog() -> None:
+    load_effect_state(_WIN, _APP, "pdf", _FX)
+    _REC.reset()
+    _WIN._on_search_prev()
+    pump(_APP, 0.1)
+    verd, det = classify_events(list(_REC.events), [])
+    assert verd == "open", (verd, det, _REC.events)
+
+
+def test_pdf_highlight_all_empty_query_opens_dialog() -> None:
+    load_effect_state(_WIN, _APP, "pdf", _FX)
+    _REC.reset()
+    _WIN._on_search_annotate_hits(True)
+    pump(_APP, 0.1)
+    verd, det = classify_events(list(_REC.events), [])
+    assert verd == "open", (verd, det, _REC.events)
+
+
+def test_pdf_save_all_opens_dialog() -> None:
+    load_effect_state(_WIN, _APP, "pdf", _FX)
+    _REC.reset()
+    _WIN.save_all_docs()
+    pump(_APP, 0.1)
+    verd, det = classify_events(list(_REC.events), [])
+    assert verd == "open", (verd, det, _REC.events)
+
+
+def test_pdf_align_empty_opens_dialog() -> None:
+    load_effect_state(_WIN, _APP, "pdf", _FX)
+    _REC.reset()
+    _WIN._align_selected_annotations("center")
+    pump(_APP, 0.1)
+    verd, det = classify_events(list(_REC.events), [])
+    assert verd == "open", (verd, det, _REC.events)
+
+
+def test_pdf_extract_text_opens_dialog() -> None:
+    load_effect_state(_WIN, _APP, "pdf", _FX)
+    _REC.reset()
+    _WIN._extract_all_text_to_editor()
+    pump(_APP, 0.15)
+    verd, det = classify_events(list(_REC.events), [])
+    assert verd == "open", (verd, det, _REC.events)

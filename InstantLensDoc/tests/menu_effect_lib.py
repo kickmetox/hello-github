@@ -169,6 +169,8 @@ def snapshot_state(win) -> dict[str, Any]:
         stack = ""
     pv = getattr(win, "pdf_view", None)
     page = zoom = tool = n_ann = None
+    ocr_pending = False
+    zoom_lbl = ""
     if pv is not None:
         for attr in ("page_index", "current_page", "_page", "page"):
             if hasattr(pv, attr):
@@ -179,27 +181,43 @@ def snapshot_state(win) -> dict[str, Any]:
                     break
                 except Exception:
                     pass
-        for attr in ("zoom", "_zoom", "scale"):
-            if hasattr(pv, attr):
-                try:
-                    zoom = getattr(pv, attr)
-                    if callable(zoom):
-                        zoom = zoom()
-                    break
-                except Exception:
-                    pass
+        pending = getattr(pv, "_pending_scale", None)
+        if pending is not None:
+            zoom = pending
+        elif hasattr(pv, "scale"):
+            try:
+                zoom = pv.scale
+                if callable(zoom):
+                    zoom = zoom()
+            except Exception:
+                zoom = None
+        if zoom is None:
+            for attr in ("zoom", "_zoom"):
+                if hasattr(pv, attr):
+                    try:
+                        zoom = getattr(pv, attr)
+                        if callable(zoom):
+                            zoom = zoom()
+                        break
+                    except Exception:
+                        pass
         try:
             canvas = getattr(pv, "canvas", None)
-            if canvas is not None and getattr(canvas, "_scale", None) is not None:
+            if zoom is None and canvas is not None and getattr(canvas, "_scale", None) is not None:
                 zoom = canvas._scale
         except Exception:
             pass
+        try:
+            zoom_lbl = str(pv.lbl_zoom.text()) if getattr(pv, "lbl_zoom", None) is not None else ""
+        except Exception:
+            zoom_lbl = ""
         tool = getattr(pv, "tool", None) or getattr(pv, "_tool", None) or getattr(pv, "current_tool", None)
         if hasattr(tool, "value"):
             try:
                 tool = tool.value
             except Exception:
                 pass
+        ocr_pending = bool(getattr(pv, "_ocr_region_pending", False))
         try:
             store = getattr(pv, "store", None)
             n_ann = len(store.all()) if store is not None and hasattr(store, "all") else None
@@ -314,7 +332,9 @@ def snapshot_state(win) -> dict[str, Any]:
         "stack": stack,
         "page": page,
         "zoom": zoom,
+        "zoom_lbl": zoom_lbl,
         "tool": str(tool) if tool is not None else "",
+        "ocr_pending": ocr_pending,
         "n_ann": n_ann,
         "sidebar": sidebar,
         "split": split,
@@ -351,7 +371,9 @@ def state_changed(before: dict[str, Any], after: dict[str, Any]) -> list[str]:
         "stack",
         "page",
         "zoom",
+        "zoom_lbl",
         "tool",
+        "ocr_pending",
         "n_ann",
         "sidebar",
         "split",
