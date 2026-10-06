@@ -211,6 +211,8 @@ class TestScanDialogTimeoutUi(unittest.TestCase):
             self.assertTrue(dlg.btn_scan.isEnabled())
             self.assertIn("Zeitüberschreitung", dlg.device_status.text())
             self.assertIn("anderes Gerät", dlg.device_status.text())
+            self.assertIn("Energiesparmodus", dlg.device_status.text())
+            self.assertIn("Backend", dlg.device_status.text())
 
     def test_devices_menu_fill_from_cache_instant(self) -> None:
         from PySide6.QtGui import QAction
@@ -326,6 +328,36 @@ class TestScanProcTree(unittest.TestCase):
         self.assertIn("if ($UseDialog)", WIA_SCRIPT)
         self.assertGreater(WIA_SCRIPT.find("ShowAcquireImage"), WIA_SCRIPT.find("if ($UseDialog)"))
         self.assertIn("kein CommonDialog-Fallback", WIA_SCRIPT)
+        self.assertIn("kein CommonDialog/Vorschau für Netzwerk-MFP", WIA_SCRIPT)
+        self.assertGreater(
+            WIA_SCRIPT.find("ShowAcquireImage"),
+            WIA_SCRIPT.find("kein CommonDialog/Vorschau für Netzwerk-MFP"),
+        )
+
+    def test_reap_orphan_kills_wiaacmgr_even_without_pid_file(self) -> None:
+        from instantlensdoc.core import scan_procs as sp
+
+        def fake_named(names=("wiaacmgr.exe", "wiaacmgr")):
+            return [4242]
+
+        with patch.object(sp, "_load_persisted", return_value=[]), patch.object(
+            sp, "tracked_pids", return_value=[]
+        ), patch.object(sp, "kill_named", side_effect=fake_named) as kn:
+            killed = sp.reap_orphan_scan_children()
+        self.assertEqual(killed, [4242])
+        kn.assert_called()
+
+    def test_device_timeout_mentions_network_and_backend(self) -> None:
+        from instantlensdoc.core.device_io import DEVICE_TIMEOUT_DE
+        from instantlensdoc.core.scan_transfer import WIA_NETWORK_NO_PREVIEW_DE, WIA_NETWORK_TIMEOUT_DE
+
+        text = DEVICE_TIMEOUT_DE.format(seconds=12)
+        self.assertIn("Energiesparmodus", text)
+        self.assertIn("Netzwerk", text)
+        self.assertIn("Backend", text)
+        self.assertIn("eSCL", text)
+        self.assertIn("Energiesparmodus", WIA_NETWORK_NO_PREVIEW_DE)
+        self.assertIn("Backend", WIA_NETWORK_TIMEOUT_DE.format(seconds=12))
 
 
 if __name__ == "__main__":

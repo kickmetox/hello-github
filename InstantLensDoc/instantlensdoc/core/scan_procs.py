@@ -273,10 +273,11 @@ def kill_tracked_scan_children(*, wia_orphans: bool = True) -> List[int]:
 
 
 def reap_orphan_scan_children() -> List[int]:
-    """Nach Force-Close: PIDs aus der Datei + hängengebliebenes wiaacmgr."""
-    persisted = _load_persisted()
-    if not persisted:
-        return []
+    """Beim Start und nach Force-Close: PID-Datei **und** jedes ``wiaacmgr``.
+
+    Der WIA-CommonDialog (Vorschau „Was soll gescannt werden?“) überlebt oft,
+    obwohl die PID-Datei leer ist — deshalb immer ``wiaacmgr`` mitnehmen.
+    """
     return kill_tracked_scan_children(wia_orphans=True)
 
 
