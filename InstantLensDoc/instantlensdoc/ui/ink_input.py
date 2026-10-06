@@ -282,20 +282,33 @@ def recognize_ink_strokes(
         return {"ok": False, "skipped": True, "reason": "empty", "text": "", "html": ""}
     code = lang or ocr_lang_for_ink()
     try:
-        from instantlensdoc.core.ocr import ocr_image_handwriting
+        from instantlensdoc.core.ocr_word_suite import ocr_stroke_image_to_word_suite
 
-        raw = ocr_image_handwriting(img, lang=code)
+        ws = ocr_stroke_image_to_word_suite(
+            img, lang=code, auto_format=False, handwriting=True
+        )
+        raw = getattr(ws, "text", "") or ""
+        html = sanitize_ocr_html(getattr(ws, "html", "") or "")
     except Exception as exc:
-        return {
-            "ok": False,
-            "skipped": True,
-            "reason": "ocr_error",
-            "message": str(exc),
-            "text": "",
-            "html": "",
-        }
+        try:
+            from instantlensdoc.core.ocr import ocr_image_handwriting
+
+            raw = ocr_image_handwriting(img, lang=code)
+            html = ""
+        except Exception:
+            return {
+                "ok": False,
+                "skipped": True,
+                "reason": "ocr_error",
+                "message": str(exc),
+                "text": "",
+                "html": "",
+            }
     text = sanitize_ocr_visible_text(raw or "").strip()
-    html = recognized_text_to_html(text)
+    if not html:
+        html = recognized_text_to_html(text)
+    else:
+        html = sanitize_ocr_html(html)
     return {
         "ok": bool(text),
         "skipped": False,
