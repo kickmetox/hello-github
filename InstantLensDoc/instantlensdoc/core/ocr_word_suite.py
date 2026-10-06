@@ -601,9 +601,14 @@ def lift_running_header_footer(
 
 
 def _html_escape(text: str) -> str:
-    return html_lib.escape(sanitize_ocr_visible_text(text), quote=False).replace(
-        "\n", "<br/>"
-    )
+    raw = text or ""
+    try:
+        from instantlensdoc.ui.rich_lists import normalize_ocr_line
+
+        raw = normalize_ocr_line(raw)
+    except Exception:
+        raw = sanitize_ocr_visible_text(raw)
+    return html_lib.escape(normalize_field_tokens(raw), quote=False).replace("\n", "<br/>")
 
 
 def classify_ocr_list_line(line: str) -> tuple[str, str]:
@@ -1198,7 +1203,7 @@ def blocks_to_word_suite_html(
     ol_index = 0
     for b in items:
         cells = _sanitize_table_cells(getattr(b, "table_cells", None))
-        body = (b.text or "").strip()
+        body = (b.text or "").strip(" \t\r\n")
         if not body and not cells:
             continue
         if _PAGE_MARK_RE.match(body):
@@ -1216,14 +1221,20 @@ def blocks_to_word_suite_html(
             continue
         fam = html_lib.escape(b.font_name or font_family)
         size = float(b.font_size_pt or font_size_pt or DEFAULT_BODY_PT)
-        inner = wrap_field_tokens_in_html(_html_escape(body))
         kind = (b.list_kind or "").strip().lower()
+        if kind not in ("ul", "ol"):
+            detected, rest = classify_ocr_list_line(body)
+            if detected:
+                kind = detected
+                body = rest
+        inner = wrap_field_tokens_in_html(_html_escape(body))
         if kind == "ol":
             ol_index += 1
             inner = f"{ol_index}. {inner}"
         elif kind == "ul":
             ol_index = 0
-            inner = LIST_UL_PREFIX + inner
+            if not inner.startswith(LIST_UL_PREFIX) and not inner.startswith("•"):
+                inner = LIST_UL_PREFIX + inner
         else:
             ol_index = 0
             if b.italic:

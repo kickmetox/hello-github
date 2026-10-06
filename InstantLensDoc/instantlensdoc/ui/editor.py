@@ -18,6 +18,7 @@ from PySide6.QtGui import (
     QTextDocument,
     QTextFormat,
     QTextOption,
+    QTextTableCellFormat,
 )
 from PySide6.QtWidgets import QAbstractScrollArea, QApplication, QPlainTextEdit, QTextEdit, QWidget
 
@@ -1384,6 +1385,7 @@ class TextEditor(QPlainTextEdit):
             right = self.minimap_width()
             extra = 0
             top = 0
+            bottom = 0
             # Seitenlayout: Textspalte in Seitenbreite zentrieren — 2.6.53
             lay = getattr(self, "_page_layout", None)
             if lay is not None and self.page_layout_active():
@@ -1392,12 +1394,18 @@ class TextEditor(QPlainTextEdit):
                 avail = int(self.contentsRect().width()) - left - right
                 if avail > 0 and col < avail:
                     extra = max(0, (avail - col) // 2)
-                m_top = lay.margins_px(dpi)[0]
-                top = int(min(max(0.0, m_top), 48.0))
+                m_top, _m_bot, _m_l, _m_r = lay.margins_px(dpi)
+                top = int(min(max(0.0, m_top + (getattr(lay, "header_distance_mm", 0.0) or 0.0) * dpi / 25.4), 72.0))
+                bottom = int(
+                    min(
+                        max(0.0, (getattr(lay, "footer_distance_mm", 0.0) or 0.0) * dpi / 25.4),
+                        72.0,
+                    )
+                )
             self._page_extra_px = int(extra)
             self._page_top_px = int(top)
             before_w = int(self.viewport().width())
-            self.setViewportMargins(left + extra, top, right + extra, 0)
+            self.setViewportMargins(left + extra, top, right + extra, bottom)
             after_w = int(self.viewport().width())
             if after_w != before_w and after_w > 0:
                 # Qt liefert beim Rand-Wechsel während show()/resizeEvent keinen
@@ -2000,8 +2008,18 @@ class TextEditor(QPlainTextEdit):
             self._field_tokens = extract_field_tokens(html)
         except Exception:
             html = html or ""
+        try:
+            from instantlensdoc.ui.rich_lists import sanitize_rich_html
+
+            html = sanitize_rich_html(html or "")
+        except Exception:
+            pass
         doc.setHtml(html or "")
         doc.setDefaultFont(font)
+        try:
+            self._scrub_control_list_prefixes()
+        except Exception:
+            pass
         try:
             doc.setDocumentMargin(8.0)
         except Exception:
@@ -2429,7 +2447,20 @@ class TextEditor(QPlainTextEdit):
         return True
 
     @staticmethod
-    def _set_block_line_height(fmt: QTextBlockFormat, factor: float) -> None:
+    def _set_block_line_height(fmt: QTextBlockFormat, factor: float, mode: str = "multiple") -> None:
+        kind_mode = (mode or "multiple").lower().strip()
+        if kind_mode == "exact":
+            pts = max(4.0, float(factor))
+            try:
+                fmt.setLineHeight(pts, QTextBlockFormat.FixedHeight)
+                return
+            except Exception:
+                try:
+                    kind = int(QTextBlockFormat.LineHeightTypes.FixedHeight)
+                    fmt.setLineHeight(pts, kind)
+                    return
+                except Exception:
+                    pass
         pct = max(50.0, float(factor) * 100.0)
         try:
             fmt.setLineHeight(pct, QTextBlockFormat.ProportionalHeight)
@@ -2515,20 +2546,106 @@ class TextEditor(QPlainTextEdit):
         line_spacing: float | None = None,
         space_before_pt: float | None = None,
         space_after_pt: float | None = None,
+        first_line_indent_mm: float | None = None,
+        left_indent_mm: float | None = None,
+        right_indent_mm: float | None = None,
+        keep_with_next: bool | None = None,
+        widow_orphan: bool | None = None,
+        line_spacing_mode: str | None = None,
         all_paragraphs: bool = False,
     ) -> bool:
-        """Zeilen-/Absatzabstand via QTextBlockFormat — 2.6.55."""
+        """Zeilen-/Absatzabstand, Einzug, Textfluss via QTextBlockFormat."""
+        dpi = float(self.logicalDpiX() or 96.0)
+        mm_px = dpi / 25.4
+        keep_prop = int(QTextFormat.UserProperty) + 26591
+        widow_prop = int(QTextFormat.UserProperty) + 26592
+
         def _mut(fmt: QTextBlockFormat) -> None:
             if line_spacing is not None:
-                self._set_block_line_height(fmt, float(line_spacing))
+                self._set_block_line_height(
+                    fmt, float(line_spacing), mode=line_spacing_mode or "multiple"
+                )
             if space_before_pt is not None:
                 fmt.setTopMargin(max(0.0, float(space_before_pt)))
             if space_after_pt is not None:
                 fmt.setBottomMargin(max(0.0, float(space_after_pt)))
+            if first_line_indent_mm is not None:
+                fmt.setTextIndent(float(first_line_indent_mm) * mm_px)
+            if left_indent_mm is not None:
+                fmt.setLeftMargin(max(0.0, float(left_indent_mm) * mm_px))
+            if right_indent_mm is not None:
+                fmt.setRightMargin(max(0.0, float(right_indent_mm) * mm_px))
+            if keep_with_next is not None:
+                fmt.setProperty(keep_prop, bool(keep_with_next))
+            if widow_orphan is not None:
+                fmt.setProperty(widow_prop, bool(widow_orphan))
 
-        if line_spacing is None and space_before_pt is None and space_after_pt is None:
+        nothing = all(
+            v is None
+            for v in (
+                line_spacing,
+                space_before_pt,
+                space_after_pt,
+                first_line_indent_mm,
+                left_indent_mm,
+                right_indent_mm,
+                keep_with_next,
+                widow_orphan,
+            )
+        )
+        if nothing:
             return False
         return self._apply_to_selected_blocks(_mut, all_blocks=bool(all_paragraphs)) > 0
+
+    def current_paragraph_spec(self):
+        """Aktueller Absatz als ParagraphFormatSpec (Dialog-Vorbefüllung)."""
+        from instantlensdoc.ui.paragraph_dialog import ParagraphFormatSpec
+
+        dpi = float(self.logicalDpiX() or 96.0)
+        mm_px = dpi / 25.4 or 1.0
+        fmt = self.textCursor().blockFormat()
+        keep_prop = int(QTextFormat.UserProperty) + 26591
+        widow_prop = int(QTextFormat.UserProperty) + 26592
+        height = 1.15
+        mode = "multiple"
+        try:
+            raw = float(fmt.lineHeight() or 0.0)
+            kind = int(fmt.lineHeightType()) if hasattr(fmt, "lineHeightType") else 1
+            if kind == int(getattr(QTextBlockFormat, "FixedHeight", 2)) or kind == 2:
+                mode = "exact"
+                height = raw if raw > 0 else 12.0
+            elif raw >= 50.0:
+                height = raw / 100.0
+            elif raw > 0:
+                height = raw
+        except Exception:
+            pass
+        keep = fmt.property(keep_prop)
+        widow = fmt.property(widow_prop)
+        return ParagraphFormatSpec(
+            space_before_pt=float(fmt.topMargin() or 0.0),
+            space_after_pt=float(fmt.bottomMargin() or 0.0),
+            first_line_indent_mm=float(fmt.textIndent() or 0.0) / mm_px,
+            left_indent_mm=float(fmt.leftMargin() or 0.0) / mm_px,
+            right_indent_mm=float(fmt.rightMargin() or 0.0) / mm_px,
+            line_spacing=float(height),
+            line_spacing_mode=mode,
+            keep_with_next=bool(keep) if keep is not None else False,
+            widow_orphan=True if widow is None else bool(widow),
+        )
+
+    def apply_paragraph_spec(self, spec) -> bool:
+        return self.set_paragraph_spacing(
+            line_spacing=float(spec.line_spacing),
+            space_before_pt=float(spec.space_before_pt),
+            space_after_pt=float(spec.space_after_pt),
+            first_line_indent_mm=float(spec.first_line_indent_mm),
+            left_indent_mm=float(spec.left_indent_mm),
+            right_indent_mm=float(spec.right_indent_mm),
+            keep_with_next=bool(spec.keep_with_next),
+            widow_orphan=bool(spec.widow_orphan),
+            line_spacing_mode=str(spec.line_spacing_mode or "multiple"),
+        )
 
     def apply_style_paragraph(self, style_id: str = "body") -> bool:
         """Absatzstil (Normal/Überschrift/Zitat) als QText-Formate — 2.6.55."""
@@ -2665,34 +2782,241 @@ class TextEditor(QPlainTextEdit):
         return self._apply_to_selected_blocks(_mut) > 0
 
     def toggle_list(self, *, ordered: bool = False) -> bool:
-        """Aufzählung oder Nummerierung als sichtbare Präfixe — 2.6.55."""
-        import re
+        """Aufzählung oder Nummerierung als sichtbare Unicode-Präfixe (kein ¶/Form-Feed)."""
+        from instantlensdoc.ui.rich_lists import parse_list_prefix, prefix_for, replace_prefix
 
-        blocks = list(self._iter_selected_blocks(empty_means_document=False))
+        blocks = list(self._iter_selected_blocks(empty_means_document=True))
         if not blocks:
             return False
-        bullet_re = re.compile(r"^(\s*)(?:[•\-\*]\s|\d+\.\s)")
+        want_ordered = bool(ordered)
+        infos = [parse_list_prefix(b.text() or "") for b in blocks]
+        nonempty = [(b, inf) for b, inf in zip(blocks, infos) if (b.text() or "").strip()]
+        all_on = bool(nonempty) and all(
+            inf is not None and inf.ordered == want_ordered for _b, inf in nonempty
+        )
         cur = self.textCursor()
         cur.beginEditBlock()
         try:
             numbered = 1
             for block in blocks:
-                text = block.text()
+                text = block.text() or ""
                 bcur = QTextCursor(block)
                 bcur.movePosition(QTextCursor.StartOfBlock)
-                m = bullet_re.match(text)
-                if m:
-                    bcur.movePosition(
-                        QTextCursor.Right, QTextCursor.KeepAnchor, len(m.group(0))
+                if all_on:
+                    new_text = replace_prefix(text, None)
+                else:
+                    inf = parse_list_prefix(text)
+                    level = inf.level if inf else 0
+                    new_text = replace_prefix(
+                        text,
+                        prefix_for(ordered=want_ordered, index=numbered, level=level),
                     )
-                    bcur.removeSelectedText()
-                    continue
-                prefix = f"{numbered}. " if ordered else "• "
-                bcur.insertText(prefix)
-                numbered += 1
+                    numbered += 1
+                if new_text != text:
+                    bcur.movePosition(QTextCursor.EndOfBlock, QTextCursor.KeepAnchor)
+                    bcur.insertText(new_text)
         finally:
             cur.endEditBlock()
         return True
+
+    def _scrub_control_list_prefixes(self) -> None:
+        """Nach HTML-Import: ¶ / Form-Feed als Bullet durch • ersetzen."""
+        from instantlensdoc.ui.rich_lists import (
+            CONTROL_GLYPHS,
+            parse_list_prefix,
+            prefix_for,
+            replace_prefix,
+            strip_control_glyphs,
+        )
+
+        doc = self.document()
+        cur = QTextCursor(doc)
+        cur.beginEditBlock()
+        try:
+            block = doc.firstBlock()
+            while block.isValid():
+                text = block.text() or ""
+                info = parse_list_prefix(text)
+                dirty = any(ch in CONTROL_GLYPHS or ch == "¶" for ch in text)
+                if info and (info.glyph in CONTROL_GLYPHS or info.glyph in ("¶",)):
+                    new_text = replace_prefix(
+                        text,
+                        prefix_for(ordered=info.ordered, index=info.number or 1, level=info.level),
+                    )
+                elif dirty:
+                    new_text = strip_control_glyphs(text)
+                else:
+                    new_text = text
+                if new_text != text:
+                    bcur = QTextCursor(block)
+                    bcur.movePosition(QTextCursor.StartOfBlock)
+                    bcur.movePosition(QTextCursor.EndOfBlock, QTextCursor.KeepAnchor)
+                    bcur.insertText(new_text)
+                block = block.next()
+        finally:
+            cur.endEditBlock()
+
+    def sanitize_replacement_glyphs(self) -> bool:
+        """Ersatz-/Steuerzeichen in Auswahl oder ganzem Dokument entfernen."""
+        before = self.toPlainText()
+        self._scrub_control_list_prefixes()
+        return self.toPlainText() != before
+
+    def set_list_glyph(self, glyph: str) -> bool:
+        """Bullet-Zeichen der Auswahl (sonst ganzes Dokument) wechseln."""
+        from instantlensdoc.ui.rich_lists import parse_list_prefix, prefix_for, replace_prefix
+
+        blocks = list(self._iter_selected_blocks(empty_means_document=True))
+        if not blocks:
+            return False
+        cur = self.textCursor()
+        cur.beginEditBlock()
+        changed = False
+        try:
+            n = 1
+            for block in blocks:
+                text = block.text() or ""
+                inf = parse_list_prefix(text)
+                if inf is not None and inf.ordered:
+                    continue
+                new_text = replace_prefix(
+                    text, prefix_for(ordered=False, index=n, level=inf.level if inf else 0, glyph=glyph)
+                )
+                if new_text != text:
+                    bcur = QTextCursor(block)
+                    bcur.movePosition(QTextCursor.StartOfBlock)
+                    bcur.movePosition(QTextCursor.EndOfBlock, QTextCursor.KeepAnchor)
+                    bcur.insertText(new_text)
+                    changed = True
+                n += 1
+        finally:
+            cur.endEditBlock()
+        return changed
+
+    def restart_list_numbering(self) -> bool:
+        """Nummerierung ab aktuellem Absatz / Auswahl neu bei 1 starten."""
+        from instantlensdoc.ui.rich_lists import parse_list_prefix, prefix_for, replace_prefix
+
+        blocks = list(self._iter_selected_blocks(empty_means_document=False))
+        if not blocks:
+            return False
+        cur = self.textCursor()
+        cur.beginEditBlock()
+        changed = False
+        try:
+            n = 1
+            for block in blocks:
+                text = block.text() or ""
+                inf = parse_list_prefix(text)
+                if inf is None or not inf.ordered:
+                    continue
+                new_text = replace_prefix(text, prefix_for(ordered=True, index=n, level=inf.level))
+                if new_text != text:
+                    bcur = QTextCursor(block)
+                    bcur.movePosition(QTextCursor.StartOfBlock)
+                    bcur.movePosition(QTextCursor.EndOfBlock, QTextCursor.KeepAnchor)
+                    bcur.insertText(new_text)
+                    changed = True
+                n += 1
+        finally:
+            cur.endEditBlock()
+        return changed
+
+    def adjust_list_indent(self, delta: int = 1) -> bool:
+        """Listenebene erhöhen/verringern (verschachtelte Aufzählung) + Absatzeinzug."""
+        from instantlensdoc.ui.rich_lists import parse_list_prefix, prefix_for, replace_prefix
+
+        blocks = list(self._iter_selected_blocks(empty_means_document=False))
+        if not blocks:
+            blocks = list(self._iter_selected_blocks(empty_means_document=True))
+        if not blocks:
+            return False
+        step = 1 if int(delta) >= 0 else -1
+        cur = self.textCursor()
+        cur.beginEditBlock()
+        changed = False
+        try:
+            n = 1
+            for block in blocks:
+                text = block.text() or ""
+                inf = parse_list_prefix(text)
+                ordered = inf.ordered if inf else False
+                level = max(0, (inf.level if inf else 0) + step)
+                if inf is None and step < 0:
+                    continue
+                new_prefix = prefix_for(ordered=ordered, index=n, level=level)
+                new_text = replace_prefix(text, new_prefix)
+                if new_text != text:
+                    bcur = QTextCursor(block)
+                    bcur.movePosition(QTextCursor.StartOfBlock)
+                    bcur.movePosition(QTextCursor.EndOfBlock, QTextCursor.KeepAnchor)
+                    bcur.insertText(new_text)
+                    changed = True
+                bfmt = QTextBlockFormat(block.blockFormat())
+                bfmt.setLeftMargin(max(0.0, float(bfmt.leftMargin()) + (24.0 * step)))
+                QTextCursor(block).setBlockFormat(bfmt)
+                n += 1
+        finally:
+            cur.endEditBlock()
+        return changed or True
+
+    def insert_section_break(self) -> bool:
+        """Abschnittsumbruch (neuer Abschnitt, Seitenumbruch davor)."""
+        return self.insert_break("section")
+
+    def current_table(self):
+        try:
+            return self.textCursor().currentTable()
+        except Exception:
+            return None
+
+    def insert_rich_table(self, rows: int = 2, cols: int = 2) -> bool:
+        """Native QTextTable an der Cursorposition (für Zellenausrichtung)."""
+        rows = max(1, int(rows))
+        cols = max(1, int(cols))
+        self._ensure_rich_mode()
+        cur = self.textCursor()
+        try:
+            table = cur.insertTable(rows, cols)
+        except Exception:
+            return False
+        return table is not None
+
+    def set_table_cell_vertical_alignment(self, alignment: str) -> bool:
+        """Vertikale Ausrichtung in der aktuellen Tabellenzelle."""
+        table = self.current_table()
+        if table is None:
+            return False
+        mapping = {
+            "top": QTextCharFormat.AlignTop,
+            "middle": QTextCharFormat.AlignMiddle,
+            "center": QTextCharFormat.AlignMiddle,
+            "bottom": QTextCharFormat.AlignBottom,
+        }
+        valign = mapping.get((alignment or "top").lower().strip())
+        if valign is None:
+            return False
+        cur = self.textCursor()
+        cell = table.cellAt(cur)
+        fmt = QTextTableCellFormat(cell.format())
+        fmt.setVerticalAlignment(valign)
+        cell.setFormat(fmt)
+        return True
+
+    def current_cell_vertical_alignment(self) -> str | None:
+        table = self.current_table()
+        if table is None:
+            return None
+        cell = table.cellAt(self.textCursor())
+        try:
+            al = int(cell.format().verticalAlignment())
+        except Exception:
+            return "top"
+        if al == int(QTextCharFormat.AlignBottom):
+            return "bottom"
+        if al == int(QTextCharFormat.AlignMiddle):
+            return "middle"
+        return "top"
 
     def insert_break(self, kind: str = "line") -> bool:
         """Zeilen- oder Seitenumbruch an der Cursorposition — 2.6.55."""
@@ -2710,6 +3034,15 @@ class TextEditor(QPlainTextEdit):
                 cur.setBlockFormat(fmt)
                 cur.insertText("──── Seite ────")
                 cur.insertBlock()
+            elif k in ("section", "abschnitt", "sectionbreak"):
+                cur.insertBlock()
+                fmt = QTextBlockFormat(cur.blockFormat())
+                try:
+                    fmt.setPageBreakPolicy(QTextFormat.PageBreak_AlwaysBefore)
+                except Exception:
+                    pass
+                fmt.setProperty(int(QTextFormat.UserProperty) + 26593, True)
+                cur.setBlockFormat(fmt)
             else:
                 cur.insertText("\n")
         finally:
@@ -3390,6 +3723,14 @@ class EditorPane(QWidget):
                 False,
                 "Durchgestrichen (QTextCharFormat) — Ctrl+Shift+X",
             ),
+            ("align_left", "Links", False, "Absatz links ausrichten"),
+            ("align_center", "Zentriert", False, "Absatz zentrieren"),
+            ("align_right", "Rechts", False, "Absatz rechts ausrichten"),
+            ("align_justify", "Blocksatz", False, "Absatz im Blocksatz"),
+            ("bullet_list", "Aufzählung", False, "Aufzählungszeichen ein/aus"),
+            ("numbered_list", "Nummerierung", False, "Nummerierte Liste ein/aus"),
+            ("paragraph", "Absatz…", False, "Absatzformat (Abstand, Einzug, Zeilenabstand)"),
+            ("page_layout", "Seitenlayout…", False, "Seitenformat, Ränder, Spalten"),
             (
                 "clear_format",
                 "Format löschen",
@@ -3414,6 +3755,16 @@ class EditorPane(QWidget):
             btn.clicked.connect(lambda _=False, a=aid: self._on_tool_clicked(a))
             self._tool_buttons[aid] = btn
             row.addWidget(btn)
+        from PySide6.QtWidgets import QComboBox, QLabel
+
+        row.addWidget(QLabel("Layout"))
+        self.layout_picker = QComboBox()
+        self.layout_picker.setObjectName("editorToolbarLayoutPicker")
+        self.layout_picker.setToolTip("Seitenformat wählen (A4/Letter/Legal)")
+        for key, label in (("A4", "A4"), ("Letter", "Letter"), ("Legal", "Legal"), ("custom", "Benutzerdefiniert…")):
+            self.layout_picker.addItem(label, key)
+        self.layout_picker.currentIndexChanged.connect(self._on_layout_picker)
+        row.addWidget(self.layout_picker)
         row.addStretch(1)
         parent_layout.addWidget(host)
 
@@ -3433,6 +3784,13 @@ class EditorPane(QWidget):
                 except Exception:
                     pass
         self.tool_action.emit(aid)
+
+    def _on_layout_picker(self, _index: int = 0) -> None:
+        combo = getattr(self, "layout_picker", None)
+        if combo is None:
+            return
+        key = str(combo.currentData() or combo.currentText() or "").strip() or "A4"
+        self.tool_action.emit(f"page_size_{key.lower()}")
 
     def set_active_tool(self, action_id: str) -> None:
         """Checkable Modus-Buttons (Auswahl / Text bearbeiten) synchronisieren."""

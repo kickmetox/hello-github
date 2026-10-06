@@ -185,9 +185,33 @@ def default_palette_commands() -> list[PaletteCommand]:
         PaletteCommand(
             "para_align_justify",
             "Absatz Blocksatz",
-            "absatz align justify blocksatz",
-            "Bearbeiten",
+            "absatz align justify blocksatz ausrichtung",
+            "Ausrichtung",
             "Ctrl+J",
+        ),
+        PaletteCommand(
+            "paragraph",
+            "Absatz…",
+            "absatz paragraph einzug zeilenabstand",
+            "Absatz",
+        ),
+        PaletteCommand(
+            "list_glyph",
+            "Aufzählungszeichen ändern…",
+            "bullet glyph aufzählung",
+            "Absatz",
+        ),
+        PaletteCommand(
+            "header_footer",
+            "Kopf-/Fußzeile…",
+            "kopf fuss header footer",
+            "Seitenlayout",
+        ),
+        PaletteCommand(
+            "field_token",
+            "Ersatzzeichen…",
+            "feld token ersatzzeichen date page",
+            "Absatz",
         ),
         PaletteCommand(
             "toggle_rulers",

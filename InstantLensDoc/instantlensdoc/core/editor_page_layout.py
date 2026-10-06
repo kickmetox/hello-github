@@ -51,6 +51,9 @@ class EditorPageLayout:
     margin_bottom_mm: float = 20.0
     margin_left_mm: float = 25.0
     margin_right_mm: float = 20.0
+    columns: int = 1
+    header_distance_mm: float = 12.5
+    footer_distance_mm: float = 12.5
     extra: dict[str, Any] = field(default_factory=dict, repr=False, compare=False)
 
     # ---- Konstruktion ----------------------------------------------------
@@ -73,12 +76,24 @@ class EditorPageLayout:
             lay.width_pt, lay.height_pt = size
         ori = str(d.get("orientation", "portrait") or "portrait").lower()
         lay.orientation = ori if ori in ORIENTATIONS else "portrait"
-        for key in ("margin_top_mm", "margin_bottom_mm", "margin_left_mm", "margin_right_mm"):
+        for key in (
+            "margin_top_mm",
+            "margin_bottom_mm",
+            "margin_left_mm",
+            "margin_right_mm",
+            "header_distance_mm",
+            "footer_distance_mm",
+        ):
             try:
                 val = float(d.get(key, getattr(lay, key)))
             except (TypeError, ValueError):
                 val = float(getattr(lay, key))
             setattr(lay, key, max(0.0, min(val, 100.0)))
+        try:
+            cols = int(d.get("columns", 1) or 1)
+        except (TypeError, ValueError):
+            cols = 1
+        lay.columns = cols if cols in (1, 2, 3) else 1
         lay._clamp()
         return lay
 
@@ -124,11 +139,21 @@ class EditorPageLayout:
 
     def text_width_pt(self) -> float:
         w, _h = self.page_size_pt()
-        return max(mm_to_pt(40.0), w - mm_to_pt(self.margin_left_mm) - mm_to_pt(self.margin_right_mm))
+        full = max(mm_to_pt(40.0), w - mm_to_pt(self.margin_left_mm) - mm_to_pt(self.margin_right_mm))
+        cols = max(1, int(self.columns or 1))
+        if cols <= 1:
+            return full
+        gap = mm_to_pt(4.0) * (cols - 1)
+        return max(mm_to_pt(20.0), (full - gap) / float(cols))
 
     def text_height_pt(self) -> float:
         _w, h = self.page_size_pt()
-        return max(mm_to_pt(40.0), h - mm_to_pt(self.margin_top_mm) - mm_to_pt(self.margin_bottom_mm))
+        header = mm_to_pt(float(self.header_distance_mm or 0.0))
+        footer = mm_to_pt(float(self.footer_distance_mm or 0.0))
+        return max(
+            mm_to_pt(40.0),
+            h - mm_to_pt(self.margin_top_mm) - mm_to_pt(self.margin_bottom_mm) - header - footer,
+        )
 
     def page_size_px(self, dpi: float = 96.0) -> tuple[float, float]:
         w, h = self.page_size_pt()
@@ -159,10 +184,13 @@ class EditorPageLayout:
     def describe(self) -> str:
         w, h = self.page_size_pt()
         ori = "Querformat" if self.orientation == "landscape" else "Hochformat"
+        cols = max(1, int(self.columns or 1))
         return (
             f"{self.preset} {pt_to_mm(w):.0f}×{pt_to_mm(h):.0f} mm, {ori}, "
+            f"{cols} Spalte(n), "
             f"Ränder o/u/l/r {self.margin_top_mm:.0f}/{self.margin_bottom_mm:.0f}/"
             f"{self.margin_left_mm:.0f}/{self.margin_right_mm:.0f} mm, "
+            f"Kopf/Fuß {self.header_distance_mm:.0f}/{self.footer_distance_mm:.0f} mm, "
             f"Textbreite {pt_to_mm(self.text_width_pt()):.0f} mm"
         )
 
@@ -178,9 +206,27 @@ class EditorPageLayout:
         return self
 
     def with_preset(self, name: str) -> "EditorPageLayout":
-        size = preset_size(name)
+        raw = (name or "").strip()
+        resolved = raw
+        size = preset_size(raw)
+        if size is None and raw:
+            aliases = (
+                f"US {raw}",
+                raw.replace("US ", "").strip(),
+                "US Letter" if raw.lower() == "letter" else "",
+                "US Legal" if raw.lower() == "legal" else "",
+                "Letter" if raw.lower() in ("us letter", "usletter") else "",
+                "Legal" if raw.lower() in ("us legal", "uslegal") else "",
+            )
+            for alt in aliases:
+                if not alt:
+                    continue
+                size = preset_size(alt)
+                if size is not None:
+                    resolved = alt
+                    break
         if size is not None:
-            self.preset = name
+            self.preset = resolved
             self.width_pt, self.height_pt = size
         else:
             self.preset = CUSTOM_PRESET
