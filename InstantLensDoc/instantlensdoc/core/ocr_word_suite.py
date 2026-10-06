@@ -770,7 +770,9 @@ def expand_blocks_with_tables(blocks: Sequence[WordSuiteBlock] | None) -> List[W
             src, cells = pending[0]
             text = " | ".join(cells) if cells else (src.text or "")
             kind, rest = classify_ocr_list_line(text)
-            out.append(_clone_ws_block(src, rest or text, kind, order))
+            out.append(
+                _clone_ws_block(src, rest or text, kind or src.list_kind or "", order)
+            )
             order += 1
             pending.clear()
             return
@@ -812,13 +814,15 @@ def expand_blocks_with_tables(blocks: Sequence[WordSuiteBlock] | None) -> List[W
             body = rest if kind else sanitize_ocr_visible_text(ln or "").strip()
             if not body:
                 continue
-            out.append(_clone_ws_block(src, body, kind, order))
+            out.append(_clone_ws_block(src, body, kind or src.list_kind or "", order))
             order += 1
             emitted_line = True
         if not emitted_line and blob.strip() and not pending:
             kind, rest = classify_ocr_list_line(blob)
             if rest:
-                out.append(_clone_ws_block(src, rest, kind, order))
+                out.append(
+                    _clone_ws_block(src, rest, kind or src.list_kind or "", order)
+                )
                 order += 1
     _flush_pending()
     return out
