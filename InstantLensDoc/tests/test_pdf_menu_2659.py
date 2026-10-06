@@ -26,7 +26,12 @@ from menu_smoke_lib import (  # noqa: E402
     make_n_page_pdf,
 )
 from ild_pdf.menu_policy import pdf_menu_need  # noqa: E402
-from instantlensdoc.ui.menu_click import find_menubar_menu, iter_leaf_actions  # noqa: E402
+from instantlensdoc.ui.menu_click import (  # noqa: E402
+    find_menubar_menu,
+    iter_leaf_actions,
+    mouse_click_menu_action,
+    prepare_menu_for_clicks,
+)
 
 
 _APP = None
@@ -180,53 +185,125 @@ def test_docx_only_pdf_items_disabled() -> None:
     )
 
 
-def test_docx_with_sibling_pdf_asks_which() -> None:
+def test_pdf_menu_object_name_and_one_column() -> None:
+    menu = _pdf_menu()
+    assert menu.objectName() == "menuPdf"
+    prepare_menu_for_clicks(menu)
+    menu.popup(menu.parentWidget().mapToGlobal(menu.rect().topLeft()) if menu.parentWidget() else menu.pos())
+    menu.show()
+    pump(_APP, 0.1)
+    rect = menu.rect()
+    overflow_x = []
+    for path, _host, act in _leaf_actions():
+        geo = menu.actionGeometry(act)
+        if geo.isValid() and geo.x() > rect.width():
+            overflow_x.append(f"{path} x={geo.x()} w={rect.width()}")
+    menu.hide()
+    pump(_APP, 0.05)
+    assert not overflow_x, "PDF-Menü zweite Spalte (actionGeometry außerhalb):\n" + "\n".join(
+        overflow_x[:12]
+    )
+
+
+def test_docx_with_sibling_pdf_pdf_only_disabled() -> None:
     _close_all()
     _WIN.open_path(str(_PDF))
     pump(_APP, 0.2)
     _WIN.open_path(str(_DOCX))
     pump(_APP, 0.25)
     _WIN._sync_menu_enablement()
+    failed = []
+    always = []
     stats = None
     for path, _menu, act in _leaf_actions():
-        if "Dokument-Statistik" in (act.text() or ""):
+        text = (act.text() or "").replace("&", "").strip()
+        if "Dokument-Statistik" in text:
             stats = act
-            break
+        need = pdf_menu_need(text)
+        if need == "always":
+            always.append(path)
+            assert act.isEnabled(), f"always-on disabled bei DOCX: {path}"
+            continue
+        if act.isEnabled():
+            failed.append(path)
     assert stats is not None
-    assert stats.isEnabled(), "Statistik sollte bei offenem PDF-Tab wählbar sein"
-    _REC.events.clear()
-    stats.trigger()
-    pump(_APP, 0.2)
-    titles = [str(e.get("title") or "") for e in _REC.events]
-    assert _REC.events, "Kein Dialog bei DOCX+PDF-Sibling"
-    joined = " ".join(titles).lower()
-    assert "pdf" in joined or "statistik" in joined or "welches" in joined or any(
-        e.get("cls") for e in _REC.events
+    assert not stats.isEnabled(), "Statistik muss ohne aktuellen PDF-Tab disabled sein"
+    assert always, "always-on PDF-Einträge fehlen"
+    assert not failed, "PDF-only bei DOCX (PDF-Geschwister offen) noch enabled:\n" + "\n".join(
+        failed[:20]
     )
 
 
-def test_each_enabled_pdf_action_dialog_or_file() -> None:
+def test_qtest_mouseclick_pdf_always_on_without_pdf_tab() -> None:
+    _close_all()
+    _WIN.open_path(str(_DOCX))
+    pump(_APP, 0.25)
+    _WIN._sync_menu_enablement()
+    hits = {"n": 0}
+    act = None
+    host = None
+    for _path, host, act in _leaf_actions():
+        text = (act.text() or "").replace("&", "").strip()
+        if pdf_menu_need(text) == "always" and act.isEnabled():
+            break
+    else:
+        raise AssertionError("kein enabled always-on PDF-Eintrag")
+
+    def _hit(*_a, **_k):
+        hits["n"] += 1
+
+    act.triggered.connect(_hit)
+    _REC.events.clear()
+    try:
+        assert mouse_click_menu_action(_APP, host, act)
+        pump(_APP, 0.2)
+    finally:
+        try:
+            act.triggered.disconnect(_hit)
+        except Exception:
+            pass
+    assert hits["n"] >= 1, f"Mausklick always-on ohne PDF-Tab: triggered={hits['n']}"
+    assert _REC.events, "always-on Mausklick ohne Dialog"
+
+
+def test_qtest_mouseclick_each_enabled_pdf_action_fires_slot() -> None:
     _reload_pdf()
     fails: list[str] = []
     n_enabled = 0
-    for path, _menu, act in _leaf_actions():
+    for path, host, act in _leaf_actions():
         if not act.isEnabled():
             continue
         n_enabled += 1
         before = _snap()
         _REC.events.clear()
+        hits = {"n": 0}
+
+        def _hit(*_a, **_k):
+            hits["n"] += 1
+
+        act.triggered.connect(_hit)
         try:
-            act.trigger()
+            ok = mouse_click_menu_action(_APP, host, act)
         except Exception as e:
             fails.append(f"{path}: exception {e}")
+            try:
+                act.triggered.disconnect(_hit)
+            except Exception:
+                pass
             _reload_pdf()
             continue
         pump(_APP, 0.15)
+        try:
+            act.triggered.disconnect(_hit)
+        except Exception:
+            pass
         after = _snap()
         dlg = bool(_REC.events)
         changed = after != before
-        if not dlg and not changed:
-            fails.append(f"{path}: kein Dialog und keine Datei-/Ansichtsänderung")
+        if not ok or hits["n"] < 1:
+            fails.append(f"{path}: click={ok} triggered={hits['n']}")
+        elif not dlg and not changed:
+            fails.append(f"{path}: Mausklick ohne Dialog und ohne Datei-/Ansichtsänderung")
         try:
             _PDF.write_bytes(_ORIG)
             if getattr(_WIN.pdf_view, "pdf_path", None):
@@ -241,4 +318,4 @@ def test_each_enabled_pdf_action_dialog_or_file() -> None:
             pass
         pump(_APP, 0.05)
     assert n_enabled >= 40, f"zu wenige enabled PDF-Aktionen: {n_enabled}"
-    assert not fails, "No-Ops:\n" + "\n".join(fails[:30])
+    assert not fails, "Mausklick ohne Slot:\n" + "\n".join(fails[:30])
