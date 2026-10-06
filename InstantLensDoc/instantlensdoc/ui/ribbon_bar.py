@@ -1,11 +1,15 @@
-"""Ribbon-ähnliche Werkzeugleiste — 2.6.52 (Geräte/Scan + F12/Save-as, Alt-Parity)."""
+"""Ribbon-Chrome analog Word/SoftMaker — Overflow klickbar, Tabellentools kontextuell.
+
+Tabs: Datei, Start, Einfügen, Layout, Verweise, Sendungen, Überprüfen, Ansicht
+plus InstantLens: Bearbeiten, Fenster, PDF, Geräte, DTP und kontextuell Tabellentools.
+"""
 
 from __future__ import annotations
 
 from typing import Callable
 
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QAction, QKeySequence, QShortcut
+from PySide6.QtCore import QPoint, Qt, Signal
+from PySide6.QtGui import QAction, QIcon, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
@@ -18,18 +22,111 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from instantlensdoc.ui.menu_click import show_scrollable_menu
+from instantlensdoc.ui.styles import StyleGallery
+
+
+def _std_icon(widget: QWidget, pix) -> QIcon:
+    try:
+        return widget.style().standardIcon(pix)
+    except Exception:
+        return QIcon()
+
+
+class _OverflowPanel(QWidget):
+    """Eine Ribbon-Zeile: sichtbare Buttons + »-Overflow ohne tote Treffer."""
+
+    overflow_picked = Signal(str)
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
+        self._row = QHBoxLayout(self)
+        self._row.setContentsMargins(4, 2, 4, 2)
+        self._row.setSpacing(4)
+        self._items: list[QWidget] = []
+        self._overflow = QToolButton()
+        self._overflow.setObjectName("ribbonOverflow")
+        self._overflow.setText("»")
+        self._overflow.setToolTip("Weitere Befehle (scrollbares Menü)")
+        self._overflow.clicked.connect(self._open_overflow)
+        self._row.addWidget(self._overflow)
+        self._row.addStretch(1)
+        self._hidden_specs: list[tuple[str, str]] = []
+
+    def add_item(self, widget: QWidget) -> None:
+        idx = self._row.indexOf(self._overflow)
+        if idx < 0:
+            idx = max(0, self._row.count() - 1)
+        self._row.insertWidget(idx, widget)
+        self._items.append(widget)
+
+    def resizeEvent(self, event) -> None:  # noqa: N802
+        super().resizeEvent(event)
+        self._reflow()
+
+    def showEvent(self, event) -> None:  # noqa: N802
+        super().showEvent(event)
+        self._reflow()
+
+    def _reflow(self) -> None:
+        avail = max(40, self.width() - self._overflow.sizeHint().width() - 16)
+        used = 0
+        hidden: list[QWidget] = []
+        shown_any = False
+        for w in self._items:
+            hint = w.sizeHint().width() + 4
+            if shown_any and used + hint > avail:
+                w.setVisible(False)
+                hidden.append(w)
+                continue
+            w.setVisible(True)
+            used += hint
+            shown_any = True
+        self._hidden_specs = []
+        for w in hidden:
+            aid = str(w.property("ribbonActionId") or "")
+            label = ""
+            if isinstance(w, QToolButton):
+                label = w.text()
+            self._hidden_specs.append((aid or label, label or aid))
+        self._overflow.setVisible(bool(self._hidden_specs))
+        self._overflow.setEnabled(bool(self._hidden_specs))
+
+    def _open_overflow(self) -> None:
+        if not self._hidden_specs:
+            return
+        global_pos = self._overflow.mapToGlobal(QPoint(0, self._overflow.height()))
+        show_scrollable_menu(
+            self._hidden_specs,
+            self,
+            pos=global_pos,
+            on_pick=lambda aid: self.overflow_picked.emit(aid),
+        )
+
 
 class RibbonBar(QWidget):
     """
-    Ribbon-Chrome: Kategorie-Tabs + Button-Zeile.
-    Tabs: Start / Bearbeiten / Review / Ansicht / Fenster / PDF / Geräte / DTP — 2.6.54.
-    Alt+1…8 wählt Kategorien (Office-ähnliche Alt-Parity, vereinfacht).
+    Ribbon-Chrome: Word-Tabs + InstantLens (Geräte/PDF/DTP).
+    Overflow: scrollbares Einspalten-Menü (menu_click) — keine toten Hits.
+    Alt+1…8 wählt die ersten Word-Kategorien.
     """
 
-    action_triggered = Signal(str)  # action id
+    action_triggered = Signal(str)
 
-    # Alt-Mnemonic → Kategorie-Index (Smoke/Alt-Ribbon) — Geräte = 7 — 2.6.51
+    # Alt-Mnemonic → Kategorie-Index (Smoke/Alt-Ribbon) — Geräte bleibt erreichbar
     ALT_CATEGORY_KEYS = ("1", "2", "3", "4", "5", "6", "7", "8")
+
+    WORD_TAB_TITLES = (
+        "Datei",
+        "Start",
+        "Einfügen",
+        "Layout",
+        "Verweise",
+        "Sendungen",
+        "Überprüfen",
+        "Ansicht",
+    )
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -65,76 +162,178 @@ class RibbonBar(QWidget):
         self._cat_buttons: list[QPushButton] = []
         self._stack = QStackedWidget()
         self._actions: dict[str, QToolButton] = {}
-        # Alle Buttons je Aktion (undo/redo liegen in Start **und** Bearbeiten) — 2.6.54
         self._action_buttons: dict[str, list[QToolButton]] = {}
+        self._tab_index: dict[str, int] = {}
+        self._table_tab_index = -1
+        self.style_gallery: StyleGallery | None = None
 
-        panels = (
-                (
-                    "Start",
-                    (
-                        ("open", "Öffnen"),
-                        ("save", "Speichern"),
-                        ("save_as", "Speichern unter"),
-                        ("undo", "↶ Rückgängig"),
-                        ("redo", "↷ Wiederholen"),
-                        ("bold", "Fett"),
-                        ("italic", "Kursiv"),
-                        ("underline", "Unterstrichen"),
-                        ("strike", "Durchgestrichen"),
-                        ("highlight", "Textmarker"),
-                        ("highlight_color", "Hintergrundfarbe"),
-                        ("align_left", "Links"),
-                        ("align_center", "Zentriert"),
-                        ("align_right", "Rechts"),
-                        ("align_justify", "Blocksatz"),
-                        ("bullet_list", "Aufzählung"),
-                        ("numbered_list", "Nummerierung"),
-                        ("paragraph", "Absatz…"),
-                        ("clear_formatting", "Format löschen"),
-                        ("compare_pdfs", "Vergleichen"),
-                        ("find_replace", "Suchen"),
-                        ("spellcheck", "Rechtschreibung"),
-                    ),
-                ),
-                (
-                    "Bearbeiten",
-                    (
-                        ("undo", "↶ Rückgängig"),
-                        ("redo", "↷ Wiederholen"),
-                        ("highlight", "Textmarker"),
-                        ("highlight_color", "Hintergrundfarbe"),
-                        ("spellcheck", "Rechtschreibung"),
-                        ("find_replace", "Suchen/Ersetzen"),
-                        ("insert_hyperlink", "Hyperlink"),
-                        ("insert_table", "Tabelle"),
-                        ("style_h1", "Überschrift 1"),
-                        ("style_normal", "Normal"),
-                        ("insert_break", "Umbruch"),
-                        ("clear_formatting", "Format löschen"),
-                        ("autocorrect_toggle", "Autokorrektur"),
-                        ("insert_snippet", "Baustein"),
-                        ("page_layout", "Seitenlayout…"),
-                        ("auto_toc", "Inhaltsverz."),
-                        ("auto_lof", "Abbildungsverz."),
-                        ("auto_index", "Stichwortverz."),
-                        ("insert_shape", "Form"),
-                        ("export_epub", "EPUB"),
-                        ("export_pptx", "PPTX"),
-                    ),
-                ),
+        checkable = {
+            "book_layout",
+            "page_by_page",
+            "continuous_scroll",
+            "toggle_doc_tabs",
+            "autocorrect_toggle",
+            "doc_split",
+            "toggle_ribbon",
+            "review_mode",
+            "chrome_klassisch",
+            "chrome_ribbon",
+            "chrome_kombiniert",
+            "table_header_row",
+            "table_borders",
+        }
+
+        def _icon_for(aid: str) -> QIcon | None:
+            mapping = {
+                "open": QStyle.SP_DialogOpenButton,
+                "save": QStyle.SP_DialogSaveButton,
+                "undo": QStyle.SP_ArrowBack,
+                "redo": QStyle.SP_ArrowForward,
+                "mail_merge": QStyle.SP_FileDialogListView,
+                "insert_table": QStyle.SP_FileDialogDetailedView,
+                "page_layout": QStyle.SP_FileDialogContentsView,
+                "spellcheck": QStyle.SP_MessageBoxInformation,
+            }
+            pix = mapping.get(aid)
+            return _std_icon(self, pix) if pix is not None else None
+
+        def _add_button(panel: _OverflowPanel, aid: str, label: str) -> QToolButton:
+            tb = QToolButton()
+            tb.setText(label)
+            tb.setObjectName(f"ribbonAction_{aid}")
+            tb.setProperty("ribbonActionId", aid)
+            tb.setToolTip(f"{label}")
+            tb.setAutoRaise(False)
+            if aid in checkable:
+                tb.setCheckable(True)
+            icon = _icon_for(aid)
+            if icon is not None and not icon.isNull():
+                tb.setIcon(icon)
+                tb.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
+            if aid in ("undo", "redo"):
+                tb.setToolTip(
+                    "Rückgängig (Ctrl+Z)" if aid == "undo" else "Wiederholen (Ctrl+Y / Ctrl+Shift+Z)"
+                )
+            tb.clicked.connect(lambda _checked=False, a=aid: self.action_triggered.emit(a))
+            self._actions.setdefault(aid, tb)
+            self._action_buttons.setdefault(aid, []).append(tb)
+            panel.add_item(tb)
+            return tb
+
+        panels: list[tuple[str, tuple[tuple[str, str], ...], bool, bool]] = [
             (
-                "Review",
+                "Datei",
+                (
+                    ("open", "Öffnen"),
+                    ("save", "Speichern"),
+                    ("save_as", "Speichern unter"),
+                    ("print", "Drucken"),
+                    ("settings", "Einstellungen"),
+                ),
+                False,
+                False,
+            ),
+            (
+                "Start",
+                (
+                    ("undo", "↶ Rückgängig"),
+                    ("redo", "↷ Wiederholen"),
+                    ("bold", "Fett"),
+                    ("italic", "Kursiv"),
+                    ("underline", "Unterstrichen"),
+                    ("strike", "Durchgestrichen"),
+                    ("highlight", "Textmarker"),
+                    ("highlight_color", "Hintergrundfarbe"),
+                    ("font", "Schriftart"),
+                    ("font_color", "Farbe"),
+                    ("align_left", "Links"),
+                    ("align_center", "Zentriert"),
+                    ("align_right", "Rechts"),
+                    ("align_justify", "Blocksatz"),
+                    ("bullet_list", "Aufzählung"),
+                    ("numbered_list", "Nummerierung"),
+                    ("paragraph", "Absatz…"),
+                    ("clear_formatting", "Format löschen"),
+                    ("find_replace", "Suchen"),
+                    ("spellcheck", "Rechtschreibung"),
+                    ("styles_pane", "Formatvorlagen"),
+                ),
+                True,
+                False,
+            ),
+            (
+                "Einfügen",
+                (
+                    ("insert_table", "Tabelle"),
+                    ("insert_hyperlink", "Hyperlink"),
+                    ("insert_break", "Seitenumbruch"),
+                    ("insert_shape", "Form"),
+                    ("header_footer", "Kopf-/Fußzeile"),
+                    ("field_token", "Ersatzzeichen"),
+                    ("insert_nbsp", "Geschütztes Leerzeichen"),
+                    ("insert_shy", "Weiches Trennzeichen"),
+                    ("insert_snippet", "Baustein"),
+                ),
+                False,
+                False,
+            ),
+            (
+                "Layout",
+                (
+                    ("page_layout", "Seitenlayout…"),
+                    ("paragraph", "Absatz…"),
+                    ("align_left", "Links"),
+                    ("align_center", "Zentriert"),
+                    ("align_right", "Rechts"),
+                    ("align_justify", "Blocksatz"),
+                    ("bullet_list", "Aufzählung"),
+                    ("numbered_list", "Nummerierung"),
+                    ("header_footer", "Kopf-/Fußzeile"),
+                ),
+                False,
+                False,
+            ),
+            (
+                "Verweise",
+                (
+                    ("auto_toc", "Inhaltsverz."),
+                    ("auto_lof", "Abbildungsverz."),
+                    ("auto_index", "Stichwortverz."),
+                    ("insert_hyperlink", "Hyperlink"),
+                ),
+                False,
+                False,
+            ),
+            (
+                "Sendungen",
+                (
+                    ("mail_merge", "Seriendruck…"),
+                    ("mail_merge_data", "Datenquelle…"),
+                    ("mail_merge_field", "Feld einfügen"),
+                    ("mail_merge_preview", "Vorschau"),
+                    ("mail_merge_finish", "Zusammenführen"),
+                ),
+                False,
+                False,
+            ),
+            (
+                "Überprüfen",
                 (
                     ("review_mode", "Änderungen"),
                     ("doc_comments", "Kommentare"),
                     ("shared_review", "Gemeinsam"),
                     ("version_history", "Versionen"),
-                    ("mail_merge", "Seriendruck"),
+                    ("spellcheck", "Rechtschreibung"),
                 ),
+                False,
+                False,
             ),
             (
                 "Ansicht",
                 (
+                    ("chrome_klassisch", "Klassisch"),
+                    ("chrome_ribbon", "Ribbon"),
+                    ("chrome_kombiniert", "Kombiniert"),
                     ("page_layout", "Seitenlayout…"),
                     ("page_size_a4", "A4"),
                     ("page_size_letter", "Letter"),
@@ -146,6 +345,37 @@ class RibbonBar(QWidget):
                     ("toggle_doc_tabs", "Dokument-Tabs"),
                     ("toggle_ribbon", "Ribbon"),
                 ),
+                False,
+                False,
+            ),
+            (
+                "Bearbeiten",
+                (
+                    ("undo", "↶ Rückgängig"),
+                    ("redo", "↷ Wiederholen"),
+                    ("highlight", "Textmarker"),
+                    ("highlight_color", "Hintergrundfarbe"),
+                    ("spellcheck", "Rechtschreibung"),
+                    ("find_replace", "Suchen/Ersetzen"),
+                    ("insert_hyperlink", "Hyperlink"),
+                    ("insert_table", "Tabelle"),
+                    ("style_normal", "Normal"),
+                    ("style_h1", "Überschrift 1"),
+                    ("insert_break", "Umbruch"),
+                    ("clear_formatting", "Format löschen"),
+                    ("autocorrect_toggle", "Autokorrektur"),
+                    ("insert_snippet", "Baustein"),
+                    ("page_layout", "Seitenlayout…"),
+                    ("auto_toc", "Inhaltsverz."),
+                    ("auto_lof", "Abbildungsverz."),
+                    ("auto_index", "Stichwortverz."),
+                    ("insert_shape", "Form"),
+                    ("export_epub", "EPUB"),
+                    ("export_pptx", "PPTX"),
+                    ("compare_pdfs", "Vergleichen"),
+                ),
+                False,
+                False,
             ),
             (
                 "Fenster",
@@ -154,6 +384,8 @@ class RibbonBar(QWidget):
                     ("detach_window", "Separates Fenster"),
                     ("toggle_doc_tabs", "Tabs"),
                 ),
+                False,
+                False,
             ),
             (
                 "PDF",
@@ -165,6 +397,8 @@ class RibbonBar(QWidget):
                     ("scan_import", "Scannen…"),
                     ("devices_discover", "Geräte erkennen"),
                 ),
+                False,
+                False,
             ),
             (
                 "Geräte",
@@ -174,6 +408,8 @@ class RibbonBar(QWidget):
                     ("devices_discover", "Geräte erkennen…"),
                     ("devices_refresh", "Neu suchen"),
                 ),
+                False,
+                False,
             ),
             (
                 "DTP",
@@ -200,17 +436,36 @@ class RibbonBar(QWidget):
                     ("varfonts", "Variable Fonts"),
                     ("pades_sign", "PAdES"),
                 ),
+                False,
+                False,
             ),
-        )
+            (
+                "Tabellentools",
+                (
+                    ("table_add_row", "Zeile +"),
+                    ("table_add_col", "Spalte +"),
+                    ("table_del_row", "Zeile −"),
+                    ("table_del_col", "Spalte −"),
+                    ("table_merge", "Zellen verbinden"),
+                    ("table_split", "Zelle teilen"),
+                    ("table_borders", "Rahmen"),
+                    ("table_header_row", "Kopfzeile"),
+                    ("table_align_left", "Zelle links"),
+                    ("table_align_center", "Zelle Mitte"),
+                    ("table_align_right", "Zelle rechts"),
+                ),
+                False,
+                True,
+            ),
+        ]
 
-        for i, (title, buttons) in enumerate(panels):
-            # Alt-Parity: sichtbarer Shortcut-Hinweis in Tooltip
+        for i, (title, buttons, with_gallery, contextual) in enumerate(panels):
             mnemonic = self.ALT_CATEGORY_KEYS[i] if i < len(self.ALT_CATEGORY_KEYS) else ""
             btn = QPushButton(title)
             btn.setObjectName("ribbonCat")
             btn.setCheckable(True)
             btn.setChecked(i == 0)
-            tip = f"{title} — Ribbon 2.6.54"
+            tip = f"{title} — Ribbon"
             if mnemonic:
                 tip += f" (Alt+{mnemonic})"
             btn.setToolTip(tip)
@@ -218,59 +473,36 @@ class RibbonBar(QWidget):
             btn.clicked.connect(lambda _=False, idx=i: self._select_cat(idx))
             cats.addWidget(btn)
             self._cat_buttons.append(btn)
+            self._tab_index[title] = i
+            if contextual:
+                self._table_tab_index = i
+                btn.hide()
 
-            panel = QFrame()
-            # Ribbon darf die Fenster-Mindestbreite nicht diktieren (13 Buttons
-            # ≈ 1350 px): rechts überzählige Buttons werden geclippt — 2.6.52
-            panel.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
-            row = QHBoxLayout(panel)
-            row.setContentsMargins(4, 2, 4, 2)
-            row.setSpacing(4)
-            for aid, label in buttons:
-                tb = QToolButton()
-                tb.setText(label)
-                tb.setObjectName(f"ribbonAction_{aid}")
-                tb.setToolTip(f"{label} — Ribbon 2.6.54")
-                tb.setAutoRaise(False)
-                if aid in (
-                    "book_layout",
-                    "page_by_page",
-                    "continuous_scroll",
-                    "toggle_doc_tabs",
-                    "autocorrect_toggle",
-                    "doc_split",
-                    "toggle_ribbon",
-                    "review_mode",
-                ):
-                    tb.setCheckable(True)
-                if aid in ("undo", "redo"):
-                    # Sichtbare Pfeile „vor/zurück“; Enabled-Zustand folgt Editor-
-                    # bzw. PDF-Undo-Stack (MainWindow._sync_undo_redo_ui) — 2.6.54
-                    icon = self.style().standardIcon(
-                        QStyle.SP_ArrowBack if aid == "undo" else QStyle.SP_ArrowForward
-                    )
-                    tb.setIcon(icon)
-                    tb.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
-                    tb.setToolTip(
-                        "Rückgängig (Ctrl+Z)" if aid == "undo" else "Wiederholen (Ctrl+Y / Ctrl+Shift+Z)"
-                    )
-                tb.clicked.connect(
-                    lambda _checked=False, a=aid: self.action_triggered.emit(a)
+            panel = _OverflowPanel()
+            panel.overflow_picked.connect(self.action_triggered.emit)
+            if with_gallery:
+                self.style_gallery = StyleGallery(panel)
+                self.style_gallery.setProperty("ribbonActionId", "styles_pane")
+                self.style_gallery.style_chosen.connect(
+                    lambda sid: self.action_triggered.emit(f"style:{sid}")
                 )
-                self._actions.setdefault(aid, tb)
-                self._action_buttons.setdefault(aid, []).append(tb)
-                row.addWidget(tb)
-            row.addStretch(1)
+                self.style_gallery.pane_requested.connect(
+                    lambda: self.action_triggered.emit("styles_pane")
+                )
+                panel.add_item(self.style_gallery)
+            for aid, label in buttons:
+                _add_button(panel, aid, label)
             self._stack.addWidget(panel)
 
         cats.addStretch(1)
         root.addLayout(cats)
         root.addWidget(self._stack)
-        self._select_cat(0)
+        self._select_cat(1 if self.category_count() > 1 else 0)
         self._install_alt_shortcuts()
+        self.set_table_tools_visible(False)
 
     def _install_alt_shortcuts(self) -> None:
-        """Alt+1…8 → Ribbon-Kategorie (praktische Alt-Parity) — 2.6.54."""
+        """Alt+1…8 → Ribbon-Kategorie (praktische Alt-Parity)."""
         self._alt_shortcuts: list[QShortcut] = []
         for i, key in enumerate(self.ALT_CATEGORY_KEYS):
             sc = QShortcut(QKeySequence(f"Alt+{key}"), self)
@@ -279,6 +511,11 @@ class RibbonBar(QWidget):
             self._alt_shortcuts.append(sc)
 
     def _select_cat(self, index: int) -> None:
+        if index < 0 or index >= self._stack.count():
+            return
+        btn = self._cat_buttons[index]
+        if not btn.isVisible() and index == self._table_tab_index:
+            return
         self._stack.setCurrentIndex(index)
         for i, b in enumerate(self._cat_buttons):
             b.blockSignals(True)
@@ -290,10 +527,31 @@ class RibbonBar(QWidget):
         if 0 <= index < self._stack.count():
             self._select_cat(index)
 
+    def select_tab(self, title: str) -> None:
+        idx = self._tab_index.get(title)
+        if idx is not None:
+            self._select_cat(idx)
+
     def category_count(self) -> int:
         return self._stack.count()
 
+    def set_table_tools_visible(self, visible: bool) -> None:
+        if self._table_tab_index < 0:
+            return
+        btn = self._cat_buttons[self._table_tab_index]
+        btn.setVisible(bool(visible))
+        if visible:
+            self._select_cat(self._table_tab_index)
+        elif self._stack.currentIndex() == self._table_tab_index:
+            start = self._tab_index.get("Start", 1)
+            self._select_cat(start)
+
     def set_checked(self, action_id: str, checked: bool) -> None:
+        for btn in self._action_buttons.get(action_id, ()) or ():
+            if btn is not None and btn.isCheckable():
+                btn.blockSignals(True)
+                btn.setChecked(bool(checked))
+                btn.blockSignals(False)
         btn = self._actions.get(action_id)
         if btn is not None and btn.isCheckable():
             btn.blockSignals(True)
@@ -301,7 +559,7 @@ class RibbonBar(QWidget):
             btn.blockSignals(False)
 
     def set_enabled(self, action_id: str, enabled: bool) -> None:
-        """Alle Buttons einer Aktion (in allen Tabs) aktivieren/deaktivieren — 2.6.54."""
+        """Alle Buttons einer Aktion (in allen Tabs) aktivieren/deaktivieren."""
         for btn in self._action_buttons.get(action_id, ()):
             btn.setEnabled(bool(enabled))
 
@@ -313,7 +571,6 @@ class RibbonBar(QWidget):
         return list(self._action_buttons.get(action_id, ()))
 
     def set_action_enabled(self, action_id: str, enabled: bool) -> None:
-        """Alias für PDF-Undo-Tooltips / Annotation-Tests — 2.6.54."""
         self.set_enabled(action_id, enabled)
 
     def set_action_tooltip(self, action_id: str, text: str) -> None:

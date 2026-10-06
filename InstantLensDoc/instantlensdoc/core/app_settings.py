@@ -242,6 +242,8 @@ DEFAULTS: dict[str, Any] = {
     "true_redact_dpi": 150,  # Raster-DPI für echtes Schwärzen — 2.6.0
     "editor_text_encoding": "auto",
     "skip_splash": False,
+    "chrome_mode": "kombiniert",  # klassisch | ribbon | kombiniert — Word-Chrome
+    "custom_paragraph_styles": [],  # Benutzer-Formatvorlagen
     "spellcheck_dict_path": "",
     "spellcheck_use_builtin": True,  # Builtin-Wortliste der UI-Sprache — 2.6.20
     "spellcheck_grammar_hints": True,  # leichte Grammatik-Hinweise — 2.6.20
@@ -1914,12 +1916,30 @@ def set_doc_tabs_visible(enabled: bool) -> None:
 
 
 def get_ribbon_visible() -> bool:
-    """Ribbon-Chrome sichtbar (partiell) — 2.6.19."""
+    """Ribbon-Chrome sichtbar (partiell) — 2.6.19.
+
+    Folgt ``chrome_mode``: klassisch = aus, Ribbon/Kombiniert = an.
+    """
+    mode = str(load_settings().get("chrome_mode") or "").strip().lower()
+    if mode in ("klassisch", "classic", "pulldown", "pull-down", "menu", "menus"):
+        return False
+    if mode in ("ribbon", "kombiniert", "combined", "both", "office"):
+        return True
     return bool(load_settings().get("ribbon_visible", True))
 
 
 def set_ribbon_visible(enabled: bool) -> None:
-    save_settings({"ribbon_visible": bool(enabled)})
+    updates = {"ribbon_visible": bool(enabled)}
+    if not enabled:
+        updates["chrome_mode"] = "klassisch"
+    elif str(load_settings().get("chrome_mode") or "").strip().lower() in (
+        "klassisch",
+        "classic",
+        "pulldown",
+        "menu",
+    ):
+        updates["chrome_mode"] = "kombiniert"
+    save_settings(updates)
 
 
 def get_pdf_continuous_scroll() -> bool:

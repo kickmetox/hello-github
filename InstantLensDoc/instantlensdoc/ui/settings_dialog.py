@@ -485,6 +485,22 @@ class SettingsDialog(QDialog):
         )
         form.addRow(tr("ui_lang"), self.ui_lang)
 
+        from instantlensdoc.ui.chrome import CHROME_LABELS, get_chrome_mode
+
+        self.chrome_mode = QComboBox()
+        self.chrome_mode.setObjectName("settingsChromeMode")
+        cur_chrome = get_chrome_mode()
+        chrome_pick = 0
+        for i, (code, label) in enumerate(CHROME_LABELS.items()):
+            self.chrome_mode.addItem(label, code)
+            if code == cur_chrome:
+                chrome_pick = i
+        self.chrome_mode.setCurrentIndex(chrome_pick)
+        self.chrome_mode.setToolTip(
+            "Klassisch (nur Menüs), Ribbon oder kombiniert — ohne Dokumentverlust"
+        )
+        form.addRow("Oberfläche", self.chrome_mode)
+
         self.lang_combo = QComboBox()
         cur_lang = get_ocr_lang()
         pick = 0
@@ -4055,6 +4071,15 @@ class SettingsDialog(QDialog):
         set_ocr_table_csv_utf8_bom(self.ocr_csv_bom.isChecked())
         set_merge_close_preview_on_edit(self.merge_close_preview.isChecked())
         set_ui_lang(str(self.ui_lang.currentData() or "de"))
+        try:
+            from instantlensdoc.ui.chrome import set_chrome_mode
+
+            set_chrome_mode(str(self.chrome_mode.currentData() or "kombiniert"))
+            parent = self.parent()
+            if parent is not None and hasattr(parent, "_apply_chrome_mode"):
+                parent._apply_chrome_mode()
+        except Exception:
+            pass
         sync_from_settings()
         # Sprache + RTL auf Parent-Hauptfenster anwenden — 2.6.19
         try:
