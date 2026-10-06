@@ -5384,6 +5384,7 @@ class MainWindow(QMainWindow):
                     pass
         try:
             self._sync_layout_arrange()
+            self._sync_spellcheck_ribbon()
         except Exception:
             pass
 
@@ -8908,6 +8909,9 @@ class MainWindow(QMainWindow):
         "strike": "actEditStrike",
         "font": "actEditFont",
         "font_color": "actEditFontColor",
+        "cut": "actEditCut",
+        "copy": "actEditCopy",
+        "paste": "actEditPaste",
         "highlight_color": "actEditBackgroundColor",
         "clear_formatting": "actEditClearFormatting",
         "align_left": "actEditAlignLeft",
@@ -9041,6 +9045,15 @@ class MainWindow(QMainWindow):
         if aid.startswith("style:"):
             self._apply_paragraph_style(aid.split(":", 1)[1])
             return
+        try:
+            from instantlensdoc.ui.word_ribbon import disabled_reason
+
+            reason = disabled_reason(aid)
+            if reason:
+                self._set_status(reason)
+                return
+        except Exception:
+            pass
         act = (getattr(self, "_ribbon_qactions", None) or {}).get(aid)
         if act is not None:
             try:
@@ -9220,6 +9233,46 @@ class MainWindow(QMainWindow):
             "table_align_left": lambda: self._table_op("align_left"),
             "table_align_center": lambda: self._table_op("align_center"),
             "table_align_right": lambda: self._table_op("align_right"),
+            "cut": self._cut_editor,
+            "copy": self._copy,
+            "paste": self._paste_editor,
+            "format_painter": self._format_painter,
+            "font_size": self._choose_font_size,
+            "grow_font": self._grow_font,
+            "shrink_font": self._shrink_font,
+            "subscript": self._toggle_subscript,
+            "superscript": self._toggle_superscript,
+            "insert_blank_page": self._insert_blank_page,
+            "insert_picture": self._insert_picture_dialog,
+            "insert_bookmark": self._insert_bookmark_dialog,
+            "insert_page_number": self._insert_page_number,
+            "insert_text_box": self._insert_text_box,
+            "insert_date": self._insert_date_time,
+            "insert_symbol": self._insert_symbol_dialog,
+            "drop_cap": self._apply_drop_cap,
+            "auto_toc_update": self._update_auto_toc,
+            "insert_footnote": self._insert_footnote_dialog,
+            "insert_endnote": self._insert_endnote_dialog,
+            "insert_caption": self._insert_caption_dialog,
+            "bibliography": self._bibliography_dialog,
+            "envelopes": self._apply_envelope_layout,
+            "labels": self._apply_label_layout,
+            "word_count": self._word_count_dialog,
+            "view_print": lambda: self._set_word_view_mode("print"),
+            "view_draft": lambda: self._set_word_view_mode("draft"),
+            "view_web": lambda: self._set_word_view_mode("web"),
+            "toggle_rulers": lambda: self._toggle_rulers(
+                not bool(getattr(self.pdf_view, "_show_rulers", False))
+            ),
+            "toggle_grid": lambda: self._toggle_alignment_grid(
+                not bool(getattr(self.pdf_view, "_show_alignment_grid", False))
+            ),
+            "toggle_navigation": self._toggle_navigation_pane,
+            "zoom_100": self._zoom_100,
+            "zoom_page_width": self._fit_width,
+            "zoom_multi": lambda: self._toggle_book_layout(
+                not self.pdf_view.book_layout_enabled()
+            ),
         }
         fn = handlers.get(aid)
         if callable(fn):
@@ -9371,12 +9424,274 @@ class MainWindow(QMainWindow):
         try:
             if self._layout_mode_active():
                 pane = getattr(self, "dtp_pane", None)
-                doc = getattr(pane, "doc", None) if pane is not None else None
-                frames = list(getattr(doc, "frames", None) or [])
-                on = bool(frames)
+                sel = []
+                if pane is not None and getattr(pane, "scene", None) is not None:
+                    sel = list(pane.scene.selected_frames() or [])
+                on = any(getattr(fr, "kind", "") in ("text", "image", "shape") for fr in sel)
         except Exception:
             on = False
         rb.set_arrange_visible(on)
+
+    def _format_painter(self) -> None:
+        if not self._guard_editor_action("Format übertragen"):
+            return
+        if getattr(self, "_format_painter_armed", False):
+            self.editor.apply_format_painter()
+            self._format_painter_armed = False
+            self._sync_editor_rich_meta()
+            self._set_status("Format übertragen")
+            return
+        self.editor.copy_format_painter()
+        self._format_painter_armed = True
+        self._set_status("Format übertragen: Format kopiert — erneut klicken zum Anwenden")
+
+    def _grow_font(self) -> None:
+        if not self._guard_editor_action("Schriftgröße"):
+            return
+        self.editor.grow_font_selection(1.0)
+        self._sync_editor_rich_meta()
+        self._set_status("Schrift vergrößert")
+
+    def _shrink_font(self) -> None:
+        if not self._guard_editor_action("Schriftgröße"):
+            return
+        self.editor.shrink_font_selection(1.0)
+        self._sync_editor_rich_meta()
+        self._set_status("Schrift verkleinert")
+
+    def _toggle_subscript(self) -> None:
+        if not self._guard_editor_action("Tiefgestellt"):
+            return
+        self.editor.toggle_subscript_selection()
+        self._sync_editor_rich_meta()
+        self._set_status("Tiefgestellt")
+
+    def _toggle_superscript(self) -> None:
+        if not self._guard_editor_action("Hochgestellt"):
+            return
+        self.editor.toggle_superscript_selection()
+        self._sync_editor_rich_meta()
+        self._set_status("Hochgestellt")
+
+    def _insert_blank_page(self) -> None:
+        if not self._guard_editor_action("Leere Seite"):
+            return
+        self.editor.insert_blank_page()
+        self._sync_editor_rich_meta()
+        self._set_status("Leere Seite eingefügt")
+
+    def _insert_picture_dialog(self) -> None:
+        from instantlensdoc.ui.file_dialogs import get_open_file_name
+
+        if self._layout_mode_active():
+            self._dtp_replace_image()
+            return
+        path, _ok = get_open_file_name(
+            self, "Bild einfügen", "", "Bilder (*.png *.jpg *.jpeg *.bmp *.gif)"
+        )
+        if not path:
+            return
+        if self._editor_document_active():
+            self.editor.insert_picture(path)
+            self._sync_editor_rich_meta()
+        else:
+            self._insert_image()
+        self._set_status(f"Bild: {Path(path).name}")
+
+    def _insert_bookmark_dialog(self) -> None:
+        if not self._guard_editor_action("Textmarke"):
+            return
+        from PySide6.QtWidgets import QInputDialog
+
+        name, ok = QInputDialog.getText(self, "Textmarke", "Name:", text="marke")
+        if not ok:
+            return
+        self.editor.insert_bookmark(name)
+        self._sync_editor_rich_meta()
+        self._set_status(f"Textmarke: {name}")
+
+    def _insert_page_number(self) -> None:
+        if not self._guard_editor_action("Seitenzahl"):
+            return
+        self.editor.insert_page_number_field()
+        self._sync_editor_rich_meta()
+        self._set_status("Seitenzahl eingefügt")
+
+    def _insert_text_box(self) -> None:
+        if not self._guard_editor_action("Textfeld"):
+            return
+        self.editor.insert_text_box("Textfeld")
+        self._sync_editor_rich_meta()
+        self._set_status("Textfeld eingefügt")
+
+    def _insert_date_time(self) -> None:
+        if not self._guard_editor_action("Datum"):
+            return
+        self.editor.insert_date_time()
+        self._sync_editor_rich_meta()
+        self._set_status("Datum/Uhrzeit eingefügt")
+
+    def _insert_symbol_dialog(self) -> None:
+        if not self._guard_editor_action("Symbol"):
+            return
+        from PySide6.QtWidgets import QInputDialog
+
+        glyphs = ("©", "®", "™", "€", "§", "°", "•", "–", "—", "„", "“", "×", "±")
+        glyph, ok = QInputDialog.getItem(self, "Symbol", "Zeichen:", glyphs, 0, False)
+        if not ok:
+            return
+        self.editor.insert_symbol(glyph)
+        self._sync_editor_rich_meta()
+        self._set_status(f"Symbol: {glyph}")
+
+    def _insert_footnote_dialog(self) -> None:
+        if not self._guard_editor_action("Fußnote"):
+            return
+        from PySide6.QtWidgets import QInputDialog
+
+        body, ok = QInputDialog.getText(self, "Fußnote", "Text:", text="Fußnote")
+        if not ok:
+            return
+        self.editor.insert_footnote(body)
+        self._sync_editor_rich_meta()
+        self._set_status("Fußnote eingefügt")
+
+    def _insert_endnote_dialog(self) -> None:
+        if not self._guard_editor_action("Endnote"):
+            return
+        from PySide6.QtWidgets import QInputDialog
+
+        body, ok = QInputDialog.getText(self, "Endnote", "Text:", text="Endnote")
+        if not ok:
+            return
+        self.editor.insert_endnote(body)
+        self._sync_editor_rich_meta()
+        self._set_status("Endnote eingefügt")
+
+    def _insert_caption_dialog(self) -> None:
+        if not self._guard_editor_action("Beschriftung"):
+            return
+        from PySide6.QtWidgets import QInputDialog
+
+        body, ok = QInputDialog.getText(self, "Beschriftung", "Text:", text="Abbildung")
+        if not ok:
+            return
+        self.editor.insert_caption(body)
+        self._sync_editor_rich_meta()
+        self._set_status("Beschriftung eingefügt")
+
+    def _bibliography_dialog(self) -> None:
+        if not self._guard_editor_action("Literaturverzeichnis"):
+            return
+        from instantlensdoc.ui.bibliography_dialog import BibliographyDialog
+
+        dlg = BibliographyDialog(self)
+        if dlg.exec() != QDialog.Accepted:
+            return
+        self.editor.insert_bibliography_block(dlg.result_block())
+        self._sync_editor_rich_meta()
+        self._set_status("Literaturverzeichnis eingefügt")
+
+    def _apply_envelope_layout(self) -> None:
+        if not self._guard_editor_action("Umschläge"):
+            return
+        from ild_pdf.pages import mm_to_pt
+        from instantlensdoc.core.editor_page_layout import CUSTOM_PRESET, EditorPageLayout
+
+        lay = EditorPageLayout.from_dict((self.editor.page_layout() or EditorPageLayout()).to_dict())
+        lay.preset = CUSTOM_PRESET
+        lay.width_pt = mm_to_pt(220.0)
+        lay.height_pt = mm_to_pt(110.0)
+        lay.orientation = "landscape"
+        lay.set_margins(12.0, 12.0, 15.0, 15.0)
+        lay.enabled = True
+        lay.scope = "rich"
+        self._commit_page_layout(lay)
+        self._set_status("Umschlag DL 220×110 mm")
+
+    def _apply_label_layout(self) -> None:
+        if not self._guard_editor_action("Etiketten"):
+            return
+        from ild_pdf.pages import mm_to_pt
+        from instantlensdoc.core.editor_page_layout import CUSTOM_PRESET, EditorPageLayout
+
+        lay = EditorPageLayout.from_dict((self.editor.page_layout() or EditorPageLayout()).to_dict())
+        lay.preset = CUSTOM_PRESET
+        lay.width_pt = mm_to_pt(99.1)
+        lay.height_pt = mm_to_pt(38.1)
+        lay.orientation = "landscape"
+        lay.set_margins(3.0, 3.0, 3.0, 3.0)
+        lay.enabled = True
+        lay.scope = "rich"
+        self._commit_page_layout(lay)
+        self._set_status("Etikett 99,1×38,1 mm")
+
+    def _word_count_dialog(self) -> None:
+        from PySide6.QtWidgets import QDialog, QDialogButtonBox, QLabel, QVBoxLayout
+
+        stats = self.editor.word_count_stats() if self._editor_document_active() else {
+            "words": 0, "chars": 0, "chars_no_space": 0, "paragraphs": 0
+        }
+        dlg = QDialog(self)
+        dlg.setObjectName("wordCountDialog")
+        dlg.setWindowTitle("Wörter zählen")
+        lay = QVBoxLayout(dlg)
+        lay.addWidget(
+            QLabel(
+                f"Wörter: {stats['words']}\n"
+                f"Zeichen (mit Leerzeichen): {stats['chars']}\n"
+                f"Zeichen (ohne): {stats['chars_no_space']}\n"
+                f"Absätze: {stats['paragraphs']}"
+            )
+        )
+        box = QDialogButtonBox(QDialogButtonBox.Ok)
+        box.accepted.connect(dlg.accept)
+        lay.addWidget(box)
+        dlg.exec()
+        self._set_status(f"Wörter: {stats['words']}")
+
+    def _set_word_view_mode(self, mode: str) -> None:
+        if not self._guard_editor_action("Ansicht"):
+            return
+        key = self.editor.set_word_view_mode(mode)
+        labels = {"print": "Seitenlayout", "draft": "Entwurf", "web": "Weblayout"}
+        rb = getattr(self, "ribbon_bar", None)
+        if rb is not None:
+            for aid in ("view_print", "view_draft", "view_web"):
+                rb.set_checked(aid, aid == f"view_{key}")
+        self._set_status(f"Ansicht: {labels.get(key, key)}")
+
+    def _toggle_navigation_pane(self) -> None:
+        bar = getattr(self, "sidebar", None)
+        if bar is None:
+            self._set_status("Navigation nicht verfügbar")
+            return
+        on = not bar.isVisible()
+        bar.setVisible(on)
+        self._set_status("Navigation ein" if on else "Navigation aus")
+
+    def _sync_spellcheck_ribbon(self) -> None:
+        rb = getattr(self, "ribbon_bar", None)
+        if rb is None:
+            return
+        try:
+            from instantlensdoc.core.app_settings import (
+                get_spellcheck_dict_path,
+                get_spellcheck_use_builtin,
+            )
+
+            ok = bool(get_spellcheck_dict_path() or get_spellcheck_use_builtin())
+        except Exception:
+            ok = True
+        if ok:
+            rb.set_enabled("spellcheck", True)
+            rb.set_action_tooltip("spellcheck", "Rechtschreibung")
+        else:
+            rb.set_enabled("spellcheck", False)
+            rb.set_action_tooltip(
+                "spellcheck",
+                "Rechtschreibung: kein Wörterbuch und Builtin deaktiviert (Einstellungen).",
+            )
 
     def _toggle_doc_split_from_ribbon(self) -> None:
         """Ribbon-Toggle für Fenster teilen — 2.6.20."""

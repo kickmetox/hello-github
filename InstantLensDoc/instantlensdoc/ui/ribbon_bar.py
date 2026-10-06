@@ -26,6 +26,7 @@ from PySide6.QtWidgets import (
 
 from instantlensdoc.ui.menu_click import show_scrollable_menu
 from instantlensdoc.ui.styles import StyleGallery
+from instantlensdoc.ui.word_ribbon import WORD_TAB_GROUPS
 
 
 def _std_icon(widget: QWidget, pix) -> QIcon:
@@ -215,6 +216,13 @@ class RibbonBar(QWidget):
             "table_borders",
             "line_numbers",
             "dtp_layout",
+            "toggle_rulers",
+            "toggle_grid",
+            "toggle_navigation",
+            "format_painter",
+            "view_print",
+            "view_draft",
+            "view_web",
         }
 
         def _icon_for(aid: str) -> QIcon | None:
@@ -281,6 +289,58 @@ class RibbonBar(QWidget):
             self._action_buttons.setdefault(aid, []).append(tb)
             panel.add_item(tb)
             return tb
+
+        def _add_disabled_button(
+            panel: _OverflowPanel, aid: str, label: str, reason: str
+        ) -> QToolButton:
+            tb = _add_button(panel, aid, label)
+            tb.setEnabled(False)
+            tb.setProperty("ribbonUnavailable", True)
+            tip = f"{label}: {reason}"
+            tb.setToolTip(tip)
+            return tb
+
+        def _fill_group_items(panel: _OverflowPanel, items: tuple) -> None:
+            for spec in items:
+                aid = spec[0]
+                label = spec[1]
+                kind = spec[2] if len(spec) > 2 else ""
+                extra = spec[3] if len(spec) > 3 else None
+                if kind == "off":
+                    _add_disabled_button(panel, aid, label, str(extra or ""))
+                elif kind == "menu" and extra:
+                    _add_menu_button(panel, aid, label, tuple(extra))
+                else:
+                    _add_button(panel, aid, label)
+
+        def _build_grouped_tab(
+            title: str,
+            groups: tuple,
+            *,
+            with_gallery: bool = False,
+        ) -> QWidget:
+            wrap = QWidget()
+            wrap.setObjectName(f"ribbon{title}Tab")
+            row = QHBoxLayout(wrap)
+            row.setContentsMargins(0, 0, 0, 0)
+            row.setSpacing(0)
+            for gtitle, items in groups:
+                grp = _RibbonGroup(gtitle, wrap)
+                grp.panel.overflow_picked.connect(self.action_triggered.emit)
+                if with_gallery and gtitle == "Formatvorlagen" and self.style_gallery is None:
+                    self.style_gallery = StyleGallery(grp.panel)
+                    self.style_gallery.setProperty("ribbonActionId", "styles_pane")
+                    self.style_gallery.style_chosen.connect(
+                        lambda sid: self.action_triggered.emit(f"style:{sid}")
+                    )
+                    self.style_gallery.pane_requested.connect(
+                        lambda: self.action_triggered.emit("styles_pane")
+                    )
+                    grp.panel.add_item(self.style_gallery)
+                _fill_group_items(grp.panel, items)
+                row.addWidget(grp)
+            row.addStretch(1)
+            return wrap
 
         def _build_layout_tab() -> QWidget:
             wrap = QWidget()
@@ -388,46 +448,13 @@ class RibbonBar(QWidget):
             ),
             (
                 "Start",
-                (
-                    ("undo", "↶ Rückgängig"),
-                    ("redo", "↷ Wiederholen"),
-                    ("bold", "Fett"),
-                    ("italic", "Kursiv"),
-                    ("underline", "Unterstrichen"),
-                    ("strike", "Durchgestrichen"),
-                    ("highlight", "Textmarker"),
-                    ("highlight_color", "Hintergrundfarbe"),
-                    ("font", "Schriftart"),
-                    ("font_color", "Farbe"),
-                    ("align_left", "Links"),
-                    ("align_center", "Zentriert"),
-                    ("align_right", "Rechts"),
-                    ("align_justify", "Blocksatz"),
-                    ("bullet_list", "Aufzählung"),
-                    ("numbered_list", "Nummerierung"),
-                    ("paragraph", "Absatz…"),
-                    ("clear_formatting", "Format löschen"),
-                    ("find_replace", "Suchen"),
-                    ("spellcheck", "Rechtschreibung"),
-                    ("styles_pane", "Formatvorlagen"),
-                ),
+                (),
                 True,
                 False,
             ),
             (
                 "Einfügen",
-                (
-                    ("insert_table", "Tabelle"),
-                    ("insert_hyperlink", "Hyperlink"),
-                    ("insert_break", "Seitenumbruch"),
-                    ("insert_shape", "Form"),
-                    ("header_footer", "Kopf-/Fußzeile"),
-                    ("field_token", "Ersatzzeichen"),
-                    ("section_break", "Abschnittsumbruch"),
-                    ("insert_nbsp", "Geschütztes Leerzeichen"),
-                    ("insert_shy", "Weiches Trennzeichen"),
-                    ("insert_snippet", "Baustein"),
-                ),
+                (),
                 False,
                 False,
             ),
@@ -439,56 +466,25 @@ class RibbonBar(QWidget):
             ),
             (
                 "Verweise",
-                (
-                    ("auto_toc", "Inhaltsverz."),
-                    ("auto_lof", "Abbildungsverz."),
-                    ("auto_index", "Stichwortverz."),
-                    ("insert_hyperlink", "Hyperlink"),
-                ),
+                (),
                 False,
                 False,
             ),
             (
                 "Sendungen",
-                (
-                    ("mail_merge", "Seriendruck…"),
-                    ("mail_merge_data", "Datenquelle…"),
-                    ("mail_merge_field", "Feld einfügen"),
-                    ("mail_merge_preview", "Vorschau"),
-                    ("mail_merge_finish", "Zusammenführen"),
-                ),
+                (),
                 False,
                 False,
             ),
             (
                 "Überprüfen",
-                (
-                    ("review_mode", "Änderungen"),
-                    ("doc_comments", "Kommentare"),
-                    ("shared_review", "Gemeinsam"),
-                    ("version_history", "Versionen"),
-                    ("spellcheck", "Rechtschreibung"),
-                ),
+                (),
                 False,
                 False,
             ),
             (
                 "Ansicht",
-                (
-                    ("chrome_klassisch", "Klassisch"),
-                    ("chrome_ribbon", "Ribbon"),
-                    ("chrome_kombiniert", "Kombiniert"),
-                    ("page_layout", "Seitenlayout…"),
-                    ("page_size_a4", "A4"),
-                    ("page_size_letter", "Letter"),
-                    ("page_portrait", "Hochformat"),
-                    ("page_landscape", "Querformat"),
-                    ("book_layout", "Buch-Layout"),
-                    ("page_by_page", "Seite-für-Seite"),
-                    ("continuous_scroll", "Fortlaufend"),
-                    ("toggle_doc_tabs", "Dokument-Tabs"),
-                    ("toggle_ribbon", "Ribbon"),
-                ),
+                (),
                 False,
                 False,
             ),
@@ -625,6 +621,15 @@ class RibbonBar(QWidget):
             if title == "Layout":
                 self._stack.addWidget(_build_layout_tab())
                 continue
+            if title in WORD_TAB_GROUPS:
+                self._stack.addWidget(
+                    _build_grouped_tab(
+                        title,
+                        WORD_TAB_GROUPS[title],
+                        with_gallery=(title == "Start"),
+                    )
+                )
+                continue
 
             panel = _OverflowPanel()
             panel.overflow_picked.connect(self.action_triggered.emit)
@@ -757,6 +762,8 @@ class RibbonBar(QWidget):
             self._qactions[str(aid)] = act
             for tb in self._action_buttons.get(aid, ()):
                 if tb.menu() is not None:
+                    continue
+                if tb.property("ribbonUnavailable"):
                     continue
                 label = tb.text()
                 icon = tb.icon()

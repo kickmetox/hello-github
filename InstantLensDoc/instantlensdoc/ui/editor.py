@@ -5,7 +5,7 @@ from __future__ import annotations
 import tempfile
 from pathlib import Path
 
-from PySide6.QtCore import QRect, QSize, Qt, Signal
+from PySide6.QtCore import QRect, QSize, QUrl, Qt, Signal
 from PySide6.QtGui import (
     QBrush,
     QColor,
@@ -17,6 +17,7 @@ from PySide6.QtGui import (
     QTextCursor,
     QTextDocument,
     QTextFormat,
+    QTextImageFormat,
     QTextOption,
     QTextTableCellFormat,
 )
@@ -2568,6 +2569,223 @@ class TextEditor(QPlainTextEdit):
         fmt = QTextCharFormat()
         fmt.setForeground(QBrush(qcolor))
         return self._merge_char_format(fmt)
+
+    def toggle_subscript_selection(self) -> bool:
+        """Tiefgestellt (Glyphenversatz), kein Highlight."""
+        self._ensure_rich_mode()
+        probe = self._selection_probe_format(self.textCursor())
+        want = probe.verticalAlignment() != QTextCharFormat.AlignSubScript
+        fmt = QTextCharFormat()
+        fmt.setVerticalAlignment(
+            QTextCharFormat.AlignSubScript if want else QTextCharFormat.AlignNormal
+        )
+        return self._merge_char_format(fmt)
+
+    def toggle_superscript_selection(self) -> bool:
+        """Hochgestellt (Glyphenversatz), kein Highlight."""
+        self._ensure_rich_mode()
+        probe = self._selection_probe_format(self.textCursor())
+        want = probe.verticalAlignment() != QTextCharFormat.AlignSuperScript
+        fmt = QTextCharFormat()
+        fmt.setVerticalAlignment(
+            QTextCharFormat.AlignSuperScript if want else QTextCharFormat.AlignNormal
+        )
+        return self._merge_char_format(fmt)
+
+    def grow_font_selection(self, delta: float = 1.0) -> bool:
+        probe = self._selection_probe_format(self.textCursor())
+        size = float(probe.fontPointSize() or self.document().defaultFont().pointSize() or 11)
+        return self.apply_font_size(max(6.0, min(96.0, size + float(delta))))
+
+    def shrink_font_selection(self, delta: float = 1.0) -> bool:
+        return self.grow_font_selection(-abs(float(delta)))
+
+    def copy_format_painter(self) -> QTextCharFormat:
+        fmt = QTextCharFormat(self._selection_probe_format(self.textCursor()))
+        self._format_painter = QTextCharFormat(fmt)
+        return fmt
+
+    def apply_format_painter(self, fmt: QTextCharFormat | None = None) -> bool:
+        src = fmt if fmt is not None else getattr(self, "_format_painter", None)
+        if src is None:
+            return False
+        self._ensure_rich_mode()
+        return self._merge_char_format(QTextCharFormat(src))
+
+    def insert_blank_page(self) -> bool:
+        """Leere Seite: Seitenumbruch plus sichtbarer Absatz."""
+        ok = self.insert_break("page")
+        cur = self.textCursor()
+        cur.insertBlock()
+        cur.insertText(" ")
+        self.setTextCursor(cur)
+        return ok
+
+    def insert_picture(self, path: str) -> bool:
+        """Bild in den Rich-Text (sichtbar) oder als Marker."""
+        p = Path(path or "")
+        if not p.is_file():
+            return False
+        self._ensure_rich_mode()
+        img = QImage(str(p))
+        cur = self.textCursor()
+        cur.beginEditBlock()
+        try:
+            if not img.isNull():
+                url = QUrl.fromLocalFile(str(p.resolve()))
+                try:
+                    kind = QTextDocument.ImageResource
+                except AttributeError:
+                    kind = QTextDocument.ResourceType.ImageResource
+                self.document().addResource(kind, url, img)
+                fmt = QTextImageFormat()
+                fmt.setName(url.toString())
+                w = min(320.0, float(img.width() or 320))
+                fmt.setWidth(w)
+                cur.insertImage(fmt)
+            cur.insertText(f"\n[Bild: {p.name}]\n")
+        finally:
+            cur.endEditBlock()
+        self.setTextCursor(cur)
+        return True
+
+    def insert_bookmark(self, name: str) -> bool:
+        ident = (name or "").strip() or "marke"
+        self._ensure_rich_mode()
+        fmt = QTextCharFormat()
+        fmt.setAnchor(True)
+        fmt.setAnchorNames([ident])
+        fmt.setAnchorHref(f"#{ident}")
+        fmt.setForeground(QBrush(QColor("#0B3D91")))
+        cur = self.textCursor()
+        cur.insertText(f"[{ident}]", fmt)
+        self.setTextCursor(cur)
+        return True
+
+    def insert_comment_marker(self, body: str) -> bool:
+        text = (body or "").strip() or "Kommentar"
+        cur = self.textCursor()
+        cur.insertText(f" ⟦Kommentar: {text}⟧")
+        self.setTextCursor(cur)
+        return True
+
+    def insert_page_number_field(self) -> bool:
+        return bool(self.insert_field_token("page", display="{page}"))
+
+    def insert_text_box(self, text: str = "Textfeld") -> bool:
+        """1×1-Tabelle als Textfeld — sichtbar im Dokument."""
+        if not self.insert_table(1, 1):
+            return False
+        table = self.current_qtext_table()
+        if table is None:
+            cur = self.textCursor()
+            cur.insertText(f"\n[{text}]\n")
+            return True
+        cell = table.cellAt(0, 0)
+        c = cell.firstCursorPosition()
+        c.insertText(text or "Textfeld")
+        self.setTextCursor(c)
+        return True
+
+    def insert_date_time(self, stamp: str | None = None) -> bool:
+        from datetime import datetime
+
+        text = stamp or datetime.now().strftime("%d.%m.%Y %H:%M")
+        self.textCursor().insertText(text)
+        return True
+
+    def insert_symbol(self, glyph: str) -> bool:
+        ch = (glyph or "").strip()
+        if not ch:
+            return False
+        self.textCursor().insertText(ch)
+        return True
+
+    def insert_footnote(self, body: str) -> bool:
+        n = int(getattr(self, "_footnote_n", 0) or 0) + 1
+        self._footnote_n = n
+        self._ensure_rich_mode()
+        fmt = QTextCharFormat()
+        fmt.setVerticalAlignment(QTextCharFormat.AlignSuperScript)
+        cur = self.textCursor()
+        cur.insertText(str(n), fmt)
+        end = QTextCursor(self.document())
+        end.movePosition(QTextCursor.End)
+        end.insertText(f"\nFußnote {n}: {(body or '').strip() or '…'}")
+        return True
+
+    def insert_endnote(self, body: str) -> bool:
+        n = int(getattr(self, "_endnote_n", 0) or 0) + 1
+        self._endnote_n = n
+        self._ensure_rich_mode()
+        fmt = QTextCharFormat()
+        fmt.setVerticalAlignment(QTextCharFormat.AlignSuperScript)
+        cur = self.textCursor()
+        cur.insertText(f"i{n}", fmt)
+        end = QTextCursor(self.document())
+        end.movePosition(QTextCursor.End)
+        end.insertText(f"\nEndnote {n}: {(body or '').strip() or '…'}")
+        return True
+
+    def insert_caption(self, text: str = "") -> bool:
+        n = int(getattr(self, "_caption_n", 0) or 0) + 1
+        self._caption_n = n
+        label = (text or "").strip() or "Abbildung"
+        self.apply_style_paragraph("quote")
+        cur = self.textCursor()
+        cur.insertText(f"Abbildung {n}: {label}")
+        cur.insertBlock()
+        self.setTextCursor(cur)
+        return True
+
+    def insert_bibliography_block(self, block: str) -> bool:
+        blob = (block or "").strip()
+        if not blob:
+            return False
+        end = QTextCursor(self.document())
+        end.movePosition(QTextCursor.End)
+        end.insertBlock()
+        end.insertText(blob)
+        self.setTextCursor(end)
+        return True
+
+    def word_count_stats(self) -> dict[str, int]:
+        text = self.toPlainText() or ""
+        words = [w for w in text.split() if w]
+        return {
+            "words": len(words),
+            "chars": len(text),
+            "chars_no_space": len(text.replace(" ", "").replace("\n", "")),
+            "paragraphs": max(1, int(self.document().blockCount())),
+        }
+
+    def set_word_view_mode(self, mode: str) -> str:
+        """print / draft / web — sichtbarer Umbruch, keine Cloud-Ansicht."""
+        key = (mode or "print").strip().lower()
+        from instantlensdoc.core.editor_page_layout import EditorPageLayout
+
+        lay = self.page_layout() or EditorPageLayout.from_settings()
+        try:
+            lay = EditorPageLayout.from_dict(lay.to_dict())
+        except Exception:
+            lay = EditorPageLayout.from_settings()
+        if key in ("draft", "entwurf"):
+            lay.enabled = False
+            lay.scope = "off"
+            self.set_soft_wrap(True)
+            key = "draft"
+        elif key in ("web", "weblayout"):
+            lay.enabled = True
+            lay.scope = "all"
+            self.set_soft_wrap(True)
+            key = "web"
+        else:
+            lay.enabled = True
+            lay.scope = "rich"
+            self.set_soft_wrap(True)
+            key = "print"
+        self.set_page_layout(lay)
+        return key
 
     def apply_highlight_color(self, color: str | QColor = "#FFE066") -> bool:
         """Textmarker-Hintergrund setzen (kein Toggle) — 2.6.55."""
