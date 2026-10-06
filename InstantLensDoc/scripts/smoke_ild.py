@@ -762,6 +762,8 @@ def check_version() -> None:
     rb_t = (ROOT / "instantlensdoc" / "ui" / "ribbon_bar.py").read_text(encoding="utf-8")
     if "def bind_qactions(" not in rb_t:
         _fail("ribbon_bar.py fehlt bind_qactions (2.6.59 chrome_actions bind)")
+    if "CHROME_FEATURE_ACTION_IDS" not in ca or "Ausrichtung" not in ca or "Listen" not in ca:
+        _fail("chrome_actions.py fehlt Ausrichtung/Listen-Features (2.6.59 34c83b0)")
     _ok("2.6.59 word-suite/pdf-menu/ocr/dtp/chrome/ribbon: OK")
 
 
