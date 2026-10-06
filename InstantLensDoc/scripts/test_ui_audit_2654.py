@@ -303,13 +303,44 @@ def _qclick(canvas, x: float, y: float) -> None:
 
 
 def _qdrag(canvas, x0: float, y0: float, x1: float, y1: float) -> None:
-    from PySide6.QtCore import QPoint, Qt
+    from PySide6.QtCore import QEvent, QPoint, QPointF, Qt
+    from PySide6.QtGui import QMouseEvent
     from PySide6.QtTest import QTest
+    from PySide6.QtWidgets import QApplication
 
     p0 = QPoint(int(round(x0)), int(round(y0)))
     p1 = QPoint(int(round(x1)), int(round(y1)))
     QTest.mousePress(canvas, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier, p0)
-    QTest.mouseMove(canvas, p1)
+    app = QApplication.instance()
+    steps = 8
+    for i in range(1, steps + 1):
+        t = i / float(steps)
+        p = QPoint(
+            int(round(p0.x() + (p1.x() - p0.x()) * t)),
+            int(round(p0.y() + (p1.y() - p0.y()) * t)),
+        )
+        local = QPointF(float(p.x()), float(p.y()))
+        try:
+            ev = QMouseEvent(
+                QEvent.Type.MouseMove,
+                local,
+                Qt.MouseButton.NoButton,
+                Qt.MouseButton.LeftButton,
+                Qt.KeyboardModifier.NoModifier,
+            )
+        except TypeError:
+            ev = QMouseEvent(
+                QEvent.Type.MouseMove,
+                local,
+                local,
+                local,
+                Qt.MouseButton.NoButton,
+                Qt.MouseButton.LeftButton,
+                Qt.KeyboardModifier.NoModifier,
+            )
+        QApplication.sendEvent(canvas, ev)
+        if app is not None:
+            app.processEvents()
     QTest.mouseRelease(canvas, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier, p1)
 
 
@@ -399,20 +430,20 @@ def test_viewer_select_hit_test(app, td: Path) -> None:
     assert v.current_tool_id() == "select"
     assert v.canvas._select_mode
 
-    # Gummiband in Anzeige-Pixeln (Canvas._map_to_page) gegen Store-PDF-Punkte
-    vx0, vy0 = 70.0 * s, 80.0 * s
-    vx1, vy1 = 340.0 * s, 250.0 * s
+    # Gummiband: Drag auf leerer Fläche (nicht auf dem selektierten Rect) erfasst beide
+    vx0, vy0 = 20.0 * s, 20.0 * s
+    vx1, vy1 = 360.0 * s, 260.0 * s
     x0, y0 = _canvas_page_to_widget(v.canvas, vx0, vy0)
     x1, y1 = _canvas_page_to_widget(v.canvas, vx1, vy1)
     _qdrag(v.canvas, x0, y0, x1, y1)
-    _pump(app, 0.15)
-    if not (r1.id in v.canvas._selected_ids and r2.id in v.canvas._selected_ids):
-        v._on_rubber_band(vx0, vy0, vx1, vy1)
-        _pump(app, 0.05)
+    _pump(app, 0.2)
     assert r1.id in v.canvas._selected_ids and r2.id in v.canvas._selected_ids, (
-        f"Gummiband: {v.canvas._selected_ids!r} view=({vx0:.1f},{vy0:.1f})-({vx1:.1f},{vy1:.1f})"
+        f"Gummiband-Drag: {v.canvas._selected_ids!r} view=({vx0:.1f},{vy0:.1f})-({vx1:.1f},{vy1:.1f}) "
+        f"band={v.canvas._band_start!r}"
     )
     assert len(v.canvas._selected_ids) >= 2
+    handles = v.canvas.selected_handle_rects()
+    assert len(handles) == 8, handles
 
     # Leerklick deselektiert, Werkzeug bleibt Auswahl
     ex, ey = _canvas_page_to_widget(v.canvas, 20.0 * s, 20.0 * s)

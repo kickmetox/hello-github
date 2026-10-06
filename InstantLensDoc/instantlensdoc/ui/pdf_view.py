@@ -841,6 +841,8 @@ class PdfCanvas(QLabel):
         self._move_delta: tuple[float, float] = (0.0, 0.0)
         self._band_start: tuple[float, float] | None = None
         self._band_current: tuple[float, float] | None = None
+        self._band_click_hit: str | None = None
+        self._band_click_shift = False
         self._resize_id: str | None = None
         self._resize_handle: str | None = None
         self._resize_origin: tuple[float, float] | None = None
@@ -1373,6 +1375,8 @@ class PdfCanvas(QLabel):
             self._move_delta = (0.0, 0.0)
         self._band_start = None
         self._band_current = None
+        self._band_click_hit = None
+        self._band_click_shift = False
         self._resize_id = None
         self._resize_handle = None
         self._resize_origin = None
@@ -1572,10 +1576,8 @@ class PdfCanvas(QLabel):
         ly = float(cr.y()) + (float(cr.height()) - ph) / 2.0
         x = float(pos.x()) - lx
         y = float(pos.y()) - ly
-        # 2 px Rand: dünne Objekte am Seitenrand bleiben treffbar
-        if -2.0 <= x <= pw + 2.0 and -2.0 <= y <= ph + 2.0:
-            return max(0.0, min(pw, x)), max(0.0, min(ph, y))
-        return None
+        # Immer auf die Seite klemmen — sonst frisst der ScrollArea-Parent den Drag
+        return max(0.0, min(pw, x)), max(0.0, min(ph, y))
 
     def _hit_overlay(self, x: float, y: float) -> Annotation | None:
         if not self._annotations_visible:
@@ -1644,14 +1646,39 @@ class PdfCanvas(QLabel):
         slop_view = annotation_hit_slop_pt(view_scale=1.0)
         return hit_test_annotations(self._annotations, x, y, slop_pt=slop_view, is_visible=_vis)
 
+    def _hit_annotation_strict(self, x: float, y: float) -> Annotation | None:
+        """Innen-Treffer ohne großen Slop — Gummiband vs. Verschieben."""
+        if not self._annotations_visible:
+            return None
+        viewer = self._pdf_viewer()
+        if viewer is not None and getattr(viewer, "store", None) is not None:
+            page, x_pt, y_pt = viewer.view_px_to_pdf(x, y)
+
+            def _vis(a: Annotation) -> bool:
+                return self._ann_type_is_visible(a)
+
+            return hit_test_annotations(
+                viewer.store.for_page(page), x_pt, y_pt, slop_pt=1.5, is_visible=_vis
+            )
+        s = max(float(getattr(self, "_scale", 1.0) or 1.0), 0.01)
+        px, py = float(x) / s, float(y) / s
+
+        def _vis2(a: Annotation) -> bool:
+            return self._ann_type_is_visible(a)
+
+        return hit_test_annotations(self._annotations, px, py, slop_pt=1.5, is_visible=_vis2)
+
     def selected_handle_rects(self) -> dict[str, tuple[float, float, float, float]]:
-        """8 Griffe der Einzelauswahl (Tests / Overlay)."""
+        """8 Griffe der primären Auswahl (Tests / Overlay); auch bei Mehrfachauswahl."""
         selected = self._selected_ids or ({self._selected_id} if self._selected_id else set())
-        if len(selected) != 1:
+        if not selected:
             return {}
-        sid = next(iter(selected))
+        sid = self._selected_id if self._selected_id in selected else next(iter(selected))
         for ann in self._annotations:
             if ann.id == sid:
+                return self._ann_handle_rects(ann)
+        for ann in self._annotations:
+            if ann.id in selected:
                 return self._ann_handle_rects(ann)
         return {}
 
@@ -1677,14 +1704,13 @@ class PdfCanvas(QLabel):
         if not self._select_mode or self._annotations_locked:
             return None
         selected = self._selected_ids or ({self._selected_id} if self._selected_id else set())
-        if len(selected) != 1:
+        if not selected:
             return None
-        sid = next(iter(selected))
         for ann in reversed(self._annotations):
-            if ann.id != sid:
+            if ann.id not in selected:
                 continue
             if bool(getattr(ann, "locked", False)):
-                return None
+                continue
             for name, (hx, hy, hw, hh) in self._ann_handle_rects(ann).items():
                 if hx <= x <= hx + hw and hy <= y <= hy + hh:
                     return name, ann
@@ -2105,11 +2131,7 @@ class PdfCanvas(QLabel):
                     painter.setPen(sel)
                     painter.setBrush(Qt.NoBrush)
                     painter.drawRect(int(x0) - 2, int(y0) - 2, int(x1 - x0) + 4, int(y1 - y0) + 4)
-                    if (
-                        self._select_mode
-                        and not self._annotations_locked
-                        and len(self._selected_ids) == 1
-                    ):
+                    if self._select_mode and not self._annotations_locked:
                         painter.setBrush(QColor(30, 144, 255))
                         painter.setPen(QPen(QColor(255, 255, 255), 1))
                         dummy = Annotation(
@@ -2252,7 +2274,15 @@ class PdfCanvas(QLabel):
                 painter.drawRect(int(hx), int(hy), int(hw), int(hh))
         painter.end()
         self.setPixmap(pm)
-        self.adjustSize()
+        dragging = bool(
+            self._band_start
+            or self._move_origin
+            or self._drag_start
+            or self._ink_points
+            or self._resize_handle
+        )
+        if not dragging:
+            self.adjustSize()
         self.update()
 
     def mousePressEvent(self, event):
@@ -2360,6 +2390,11 @@ class PdfCanvas(QLabel):
                 self._resize_start = (bx0, by0, bx1 - bx0, by1 - by0)
                 self._resize_preview = self._resize_start
                 self.setCursor(QCursor(Qt.SizeFDiagCursor))
+                event.accept()
+                try:
+                    self.grabMouse()
+                except Exception:
+                    pass
                 return
             hit_any = self._hit_annotation(x, y)
             if (
@@ -2370,11 +2405,71 @@ class PdfCanvas(QLabel):
                 uri = (hit_any.text or "").strip()
                 if uri:
                     self.uri_link_clicked.emit(uri)
+                    event.accept()
                     return
+            auswahl = (
+                bool(self._select_mode)
+                and not self._place_on_empty
+                and self._drag_tool is None
+                and not self._text_mark_mode
+            )
+            hit_strict = self._hit_annotation_strict(x, y) if auswahl else hit_any
+            selected = set(self._selected_ids) if self._selected_ids else (
+                {self._selected_id} if self._selected_id else set()
+            )
+            # Schon ausgewähltes Objekt: ziehen = verschieben
+            if (
+                auswahl
+                and hit_strict is not None
+                and hit_strict.id in selected
+                and not self._annotations_locked
+                and not bool(getattr(hit_strict, "locked", False))
+            ):
+                shift = bool(event.modifiers() & Qt.ShiftModifier)
+                if shift:
+                    self.annotation_selected.emit(hit_strict.id)
+                    event.accept()
+                    return
+                self.annotation_selected.emit(hit_strict.id)
+                by_id = {a.id: a for a in self._annotations}
+                movable = {
+                    i
+                    for i in selected
+                    if not bool(getattr(by_id.get(i), "locked", False))
+                }
+                if movable:
+                    self._move_ids = movable
+                    self._move_origin = (x, y)
+                    self._move_delta = (0.0, 0.0)
+                    self.setCursor(QCursor(Qt.ClosedHandCursor))
+                self._repaint_overlay()
+                event.accept()
+                try:
+                    self.grabMouse()
+                except Exception:
+                    pass
+                return
+            # Auswahl-Tool: Leerklick/Ziehen = Gummiband; kleiner Release = Klick-Select
+            if auswahl:
+                self._band_start = (x, y)
+                self._band_current = (x, y)
+                self._band_click_hit = hit_any.id if hit_any else None
+                self._band_click_shift = bool(event.modifiers() & Qt.ShiftModifier)
+                self._move_ids = set()
+                self._move_origin = None
+                self._move_delta = (0.0, 0.0)
+                event.accept()
+                try:
+                    self.grabMouse()
+                except Exception:
+                    pass
+                self._repaint_overlay()
+                return
             if hit_any:
                 shift = bool(event.modifiers() & Qt.ShiftModifier)
                 if shift:
                     self.annotation_selected.emit(hit_any.id)
+                    event.accept()
                     return
                 if hit_any.id not in self._selected_ids:
                     # Outline + 8 Griffe sofort (vor dem Viewer-Slot)
@@ -2395,6 +2490,7 @@ class PdfCanvas(QLabel):
                         self._move_delta = (0.0, 0.0)
                         self.setCursor(QCursor(Qt.ClosedHandCursor))
                 self._repaint_overlay()
+                event.accept()
                 return
             # Leere Fläche: Create-Tool → deselektieren und zeichnen/platzieren
             if not (event.modifiers() & Qt.ShiftModifier):
@@ -2408,15 +2504,25 @@ class PdfCanvas(QLabel):
                     self._ink_points = [(x, y)]
                     self._drag_start = (x, y)
                     self._drag_current = (x, y)
+                    event.accept()
                     return
                 if self._drag_tool:
                     self._drag_start = (x, y)
                     self._drag_current = (x, y)
+                    event.accept()
                     return
                 self.annotation_placed.emit(x, y)
+                event.accept()
                 return
             self._band_start = (x, y)
             self._band_current = (x, y)
+            self._band_click_hit = None
+            self._band_click_shift = bool(event.modifiers() & Qt.ShiftModifier)
+            event.accept()
+            try:
+                self.grabMouse()
+            except Exception:
+                pass
             self._repaint_overlay()
             return
         if event.button() == Qt.LeftButton and event.modifiers() & Qt.ShiftModifier:
@@ -2483,6 +2589,7 @@ class PdfCanvas(QLabel):
             if pt:
                 self._band_current = pt
                 self._repaint_overlay()
+            event.accept()
             return
         if self._eraser_mode and event.buttons() & Qt.LeftButton:
             pt = self._map_to_page(event)
@@ -2504,6 +2611,7 @@ class PdfCanvas(QLabel):
                 ox, oy = self._move_origin
                 self._move_delta = (pt[0] - ox, pt[1] - oy)
                 self._repaint_overlay()
+            event.accept()
             return
         if self._text_sel_start is not None:
             pt = self._map_to_page(event)
@@ -2583,16 +2691,38 @@ class PdfCanvas(QLabel):
                 self.annotations_resized.emit(aid, float(x), float(y), float(w), float(h), proportional)
             else:
                 self._repaint_overlay()
+            event.accept()
+            try:
+                self.releaseMouse()
+            except Exception:
+                pass
             return
         if self._band_start is not None and event.button() == Qt.LeftButton:
             pt = self._map_to_page(event) or self._band_current
             x0, y0 = self._band_start
+            click_hit = self._band_click_hit
+            click_shift = bool(self._band_click_shift)
             self._band_start = None
             self._band_current = None
-            if pt and (abs(pt[0] - x0) > 3 or abs(pt[1] - y0) > 3):
+            self._band_click_hit = None
+            self._band_click_shift = False
+            try:
+                self.releaseMouse()
+            except Exception:
+                pass
+            dragged = bool(pt and (abs(pt[0] - x0) > 3 or abs(pt[1] - y0) > 3))
+            if dragged:
                 self.rubber_band_finished.emit(x0, y0, pt[0], pt[1])
+            elif click_hit:
+                if not click_shift and click_hit not in self._selected_ids:
+                    self.set_selected_ids({click_hit})
+                self.annotation_selected.emit(click_hit)
+            elif not click_shift:
+                self.set_selected_ids(set())
+                self.annotation_selected.emit("")
             else:
                 self._repaint_overlay()
+            event.accept()
             return
         if self._object_drag_mode is not None and event.button() == Qt.LeftButton:
             mode = self._object_drag_mode
@@ -2635,10 +2765,15 @@ class PdfCanvas(QLabel):
             self._move_origin = None
             self._move_delta = (0.0, 0.0)
             self.unsetCursor()
+            try:
+                self.releaseMouse()
+            except Exception:
+                pass
             if ids and (abs(dx) > 2 or abs(dy) > 2):
                 self.annotations_moved.emit(ids, float(dx), float(dy))
             else:
                 self._repaint_overlay()
+            event.accept()
             return
         if self._text_sel_start is not None and event.button() == Qt.LeftButton:
             pt = self._map_to_page(event) or self._text_sel_current
