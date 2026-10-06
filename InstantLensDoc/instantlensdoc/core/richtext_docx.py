@@ -919,6 +919,32 @@ def _apply_docx_header_footer(
             pass
 
 
+def docx_header_footer_author(path: str | Path) -> tuple[str, str, str]:
+    """Kopf-/Fußzeile und Autor aus DOCX-Section/Core-Properties."""
+    try:
+        from docx import Document as DocxDocument
+    except ImportError:
+        return "", "", ""
+    try:
+        d = DocxDocument(str(path))
+    except Exception:
+        return "", "", ""
+    header = ""
+    footer = ""
+    author = ""
+    try:
+        section = d.sections[0]
+        header = _clean_hf_text("\n".join(p.text for p in section.header.paragraphs))
+        footer = _clean_hf_text("\n".join(p.text for p in section.footer.paragraphs))
+    except Exception:
+        pass
+    try:
+        author = str(getattr(d.core_properties, "author", "") or "").strip()
+    except Exception:
+        author = ""
+    return header, footer, author
+
+
 def html_to_rtf(html: str, path: str | Path, *, title: Optional[str] = None) -> Path:
     """HTML → einfaches RTF mit \\b/\\i/\\ul."""
 

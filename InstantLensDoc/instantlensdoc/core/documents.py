@@ -306,6 +306,37 @@ def open_document(path: str | Path, *, encoding: str | None = None) -> Document:
                     doc.meta["font_size_pt"] = float(size_pt)
             except Exception:
                 pass
+            try:
+                from instantlensdoc.core.richtext_docx import docx_header_footer_author
+
+                header, footer, author = docx_header_footer_author(path)
+                if header:
+                    doc.meta["header"] = header
+                if footer:
+                    doc.meta["footer"] = footer
+                if author:
+                    doc.meta.setdefault("author", author)
+            except Exception:
+                pass
+            try:
+                from instantlensdoc.core.field_tokens import (
+                    extract_field_tokens,
+                    load_field_tokens_sidecar,
+                    merge_field_specs,
+                    read_docx_custom_field_tokens,
+                    serialize_field_specs,
+                )
+
+                merged = merge_field_specs(
+                    extract_field_tokens((doc.text or "") + "\n" + str(doc.meta.get("html") or "")),
+                    read_docx_custom_field_tokens(path),
+                    load_field_tokens_sidecar(path),
+                    (doc.meta or {}).get("field_tokens"),
+                )
+                if merged:
+                    doc.meta["field_tokens"] = serialize_field_specs(merged)
+            except Exception:
+                pass
         except Exception as rich_err:
             # Nicht still degradieren: Grund loggen + im Meta vermerken — 2.6.52
             import logging
@@ -353,6 +384,19 @@ def open_document(path: str | Path, *, encoding: str | None = None) -> Document:
         doc.text = path.read_text(encoding=enc, errors="replace")
         doc.kind = DocKind.TEXT
         doc.meta["encoding"] = enc
+    try:
+        from instantlensdoc.core.field_tokens import (
+            load_field_tokens_sidecar,
+            merge_field_specs,
+            serialize_field_specs,
+        )
+
+        side = load_field_tokens_sidecar(path)
+        if side:
+            merged = merge_field_specs((doc.meta or {}).get("field_tokens"), side)
+            doc.meta["field_tokens"] = serialize_field_specs(merged)
+    except Exception:
+        pass
     return doc
 
 
@@ -466,6 +510,16 @@ def save_document(
             from instantlensdoc.core.export import export_docx
 
             export_docx(doc.text, target, title=doc.title)
+        try:
+            from instantlensdoc.core.field_tokens import persist_document_field_tokens
+
+            persist_document_field_tokens(
+                target,
+                (doc.meta or {}).get("field_tokens"),
+                kind="docx",
+            )
+        except Exception:
+            pass
     elif kind == DocKind.RTF:
         html = (doc.meta or {}).get("html")
         if html:
@@ -528,4 +582,15 @@ def save_document(
     doc.kind = kind
     doc.dirty = False
     doc.title = target.name
+    try:
+        from instantlensdoc.core.field_tokens import persist_document_field_tokens
+
+        if kind != DocKind.DOCX:
+            persist_document_field_tokens(
+                target,
+                (doc.meta or {}).get("field_tokens"),
+                kind=kind.name if hasattr(kind, "name") else str(kind),
+            )
+    except Exception:
+        pass
     return target

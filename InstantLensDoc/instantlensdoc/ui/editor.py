@@ -225,6 +225,7 @@ class TextEditor(QPlainTextEdit):
         self._doc_header = ""
         self._doc_footer = ""
         self._field_tokens: dict[str, str] = {}
+        self._field_token_specs: dict = {}
         try:
             from instantlensdoc.core.editor_page_layout import EditorPageLayout
 
@@ -2006,6 +2007,12 @@ class TextEditor(QPlainTextEdit):
             self._doc_header = hdr
             self._doc_footer = ftr
             self._field_tokens = extract_field_tokens(html)
+            try:
+                from instantlensdoc.core.field_tokens import coerce_field_specs
+
+                self._field_token_specs = coerce_field_specs(self._field_tokens)
+            except Exception:
+                self._field_token_specs = {}
         except Exception:
             html = html or ""
         try:
@@ -2083,21 +2090,93 @@ class TextEditor(QPlainTextEdit):
         return True
 
     def field_tokens(self) -> dict[str, str]:
-        return dict(getattr(self, "_field_tokens", {}) or {})
+        tokens = dict(getattr(self, "_field_tokens", {}) or {})
+        try:
+            from instantlensdoc.core.field_tokens import serialize_field_specs
 
-    def insert_field_token(self, name: str, *, display: str | None = None) -> bool:
-        """Datum/Zeit/Seite oder eigenes Token an Cursor — kein ¶/Form-Feed/Kasten."""
-        from instantlensdoc.core.ocr_word_suite import (
+            specs = getattr(self, "_field_token_specs", None) or {}
+            if specs:
+                serialized = serialize_field_specs(specs)
+                for name, val in serialized.items():
+                    if isinstance(val, str):
+                        tokens.setdefault(name, val)
+                    else:
+                        tokens[name] = val
+        except Exception:
+            pass
+        return tokens
+
+    def field_token_specs(self) -> dict:
+        try:
+            from instantlensdoc.core.field_tokens import coerce_field_specs
+
+            specs = coerce_field_specs(getattr(self, "_field_token_specs", {}) or {})
+            extra = coerce_field_specs(getattr(self, "_field_tokens", {}) or {})
+            for name, spec in extra.items():
+                specs.setdefault(name, spec)
+            return specs
+        except Exception:
+            return dict(getattr(self, "_field_token_specs", {}) or {})
+
+    def set_field_token_specs(self, specs) -> None:
+        try:
+            from instantlensdoc.core.field_tokens import (
+                canonical_field_token,
+                coerce_field_specs,
+            )
+
+            coerced = coerce_field_specs(specs or {})
+            self._field_token_specs = coerced
+            tokens = dict(getattr(self, "_field_tokens", {}) or {})
+            for name, spec in coerced.items():
+                tokens[name] = spec.value or canonical_field_token(name)
+            self._field_tokens = tokens
+        except Exception:
+            self._field_token_specs = dict(specs or {})
+
+    def insert_field_token(
+        self,
+        name: str,
+        *,
+        display: str | None = None,
+        target: str = "body",
+    ) -> bool:
+        """Datum/Zeit/Seite/Custom an Caret in Fließtext, Kopf- oder Fußzeile.
+
+        Ohne Caret/Auswahl wird an der aktuellen Position (Ende) eingefügt —
+        niemals stiller No-Op.
+        """
+        from instantlensdoc.core.field_tokens import (
             canonical_field_name,
             canonical_field_token,
+            canonical_insert_target,
+            coerce_field_spec,
             safe_field_display,
         )
 
-        ident = canonical_field_name(name)
-        if not ident:
-            return False
+        ident = canonical_field_name(name) or "date"
         self._ensure_rich_mode()
         visible = safe_field_display(ident, display)
+        if not visible:
+            visible = canonical_field_token(ident) or "{date}"
+        dest = canonical_insert_target(target)
+        if dest == "header":
+            self._insert_into_header_footer_band("header", visible)
+        elif dest == "footer":
+            self._insert_into_header_footer_band("footer", visible)
+        else:
+            self._insert_field_token_at_caret(visible, ident)
+        tokens = dict(getattr(self, "_field_tokens", {}) or {})
+        tokens[ident] = canonical_field_token(ident)
+        self._field_tokens = tokens
+        specs = dict(getattr(self, "_field_token_specs", {}) or {})
+        spec = coerce_field_spec(ident, specs.get(ident))
+        if spec is not None:
+            specs[ident] = spec
+            self._field_token_specs = specs
+        return True
+
+    def _insert_field_token_at_caret(self, visible: str, ident: str) -> None:
         fmt = QTextCharFormat()
         fmt.setForeground(QBrush(QColor("#1565C0")))
         fmt.setFontUnderline(True)
@@ -2106,25 +2185,134 @@ class TextEditor(QPlainTextEdit):
         except Exception:
             pass
         cur = self.textCursor()
+        if cur.isNull():
+            cur = QTextCursor(self.document())
+            cur.movePosition(QTextCursor.End)
         cur.insertText(visible, fmt)
         self.setTextCursor(cur)
-        tokens = dict(getattr(self, "_field_tokens", {}) or {})
-        tokens[ident] = canonical_field_token(ident)
-        self._field_tokens = tokens
-        return True
+
+    def _insert_into_header_footer_band(self, band: str, text: str) -> None:
+        current = self.document_header() if band == "header" else self.document_footer()
+        current = str(current or "")
+        updated = current + text
+        if band == "header":
+            self.set_document_header_footer(updated, self.document_footer())
+        else:
+            self.set_document_header_footer(self.document_header(), updated)
+
+    def insert_field_token_into_band(self, name: str, band_text: str, caret: int | None = None) -> str:
+        """Token in Kopf-/Fuß-String an Caret; ohne Caret ans Ende — nie leer."""
+        from instantlensdoc.core.field_tokens import canonical_field_name, canonical_field_token, safe_field_display
+
+        ident = canonical_field_name(name) or "date"
+        visible = safe_field_display(ident, None) or canonical_field_token(ident) or "{date}"
+        src = str(band_text or "")
+        pos = len(src) if caret is None else max(0, min(int(caret), len(src)))
+        return src[:pos] + visible + src[pos:]
 
     def set_field_token_ersatz(self, name: str, ersatz: str) -> str:
         """Frei definiertes Ersatzzeichen; Steuerzeichen → ``{name}``."""
-        from instantlensdoc.core.ocr_word_suite import canonical_field_name, safe_field_display
+        from instantlensdoc.core.field_tokens import (
+            canonical_field_name,
+            canonical_field_token,
+            coerce_field_spec,
+            safe_field_display,
+        )
 
-        ident = canonical_field_name(name)
-        if not ident:
-            return ""
+        ident = canonical_field_name(name) or "date"
         visible = safe_field_display(ident, ersatz)
         tokens = dict(getattr(self, "_field_tokens", {}) or {})
         tokens[ident] = visible
         self._field_tokens = tokens
+        specs = dict(getattr(self, "_field_token_specs", {}) or {})
+        spec = coerce_field_spec(ident, specs.get(ident))
+        if spec is not None:
+            spec.value = "" if visible == canonical_field_token(ident) else visible
+            specs[ident] = spec
+            self._field_token_specs = specs
         return visible
+
+    def print_with_field_tokens(self, printer, ctx=None) -> bool:
+        """Dokument drucken; Tokens mit QDateTime/strftime/Seitenindex auflösen."""
+        from instantlensdoc.core.field_tokens import (
+            make_resolve_context,
+            resolve_field_tokens_in_text,
+        )
+
+        context = ctx or make_resolve_context(specs=self.field_token_specs())
+        html = self.to_rich_html()
+        header = resolve_field_tokens_in_text(self.document_header(), context)
+        footer = resolve_field_tokens_in_text(self.document_footer(), context)
+        try:
+            from PySide6.QtGui import QPainter, QTextDocument
+            from PySide6.QtCore import QRectF
+        except Exception:
+            self.print_(printer)
+            return True
+        try:
+            page_rect = printer.pageRect(printer.Unit.DevicePixel)
+        except Exception:
+            try:
+                page_rect = printer.pageRect()
+            except Exception:
+                self.print_(printer)
+                return True
+        page_w = max(1.0, float(page_rect.width()))
+        page_h = max(1.0, float(page_rect.height()))
+        probe = QTextDocument()
+        probe.setHtml(resolve_field_tokens_in_text(html, context.with_page(1, 1)))
+        probe.setPageSize(page_rect.size())
+        total = max(1, int(probe.pageCount() or 1))
+        painter = QPainter(printer)
+        try:
+            for i in range(total):
+                if i:
+                    printer.newPage()
+                page_ctx = context.with_page(i + 1, total)
+                page_html = resolve_field_tokens_in_text(html, page_ctx)
+                doc = QTextDocument()
+                doc.setHtml(page_html)
+                doc.setPageSize(page_rect.size())
+                painter.save()
+                painter.translate(0, -i * page_h)
+                clip = QRectF(0, i * page_h, page_w, page_h)
+                doc.drawContents(painter, clip)
+                painter.restore()
+                htxt = resolve_field_tokens_in_text(header, page_ctx)
+                ftxt = resolve_field_tokens_in_text(footer, page_ctx)
+                if htxt:
+                    painter.drawText(QRectF(0, 0, page_w, min(48.0, page_h * 0.08)), htxt)
+                if ftxt:
+                    painter.drawText(
+                        QRectF(0, page_h - min(48.0, page_h * 0.08), page_w, min(48.0, page_h * 0.08)),
+                        ftxt,
+                    )
+        finally:
+            painter.end()
+        return True
+
+    def resolved_field_preview_html(self, ctx=None) -> str:
+        from instantlensdoc.core.field_tokens import make_resolve_context, resolve_field_tokens_in_text
+
+        context = ctx or make_resolve_context(specs=self.field_token_specs())
+        html = resolve_field_tokens_in_text(self.to_rich_html(), context)
+        header = resolve_field_tokens_in_text(self.document_header(), context)
+        footer = resolve_field_tokens_in_text(self.document_footer(), context)
+        extra = ""
+        if header:
+            extra += f"<p><i>Kopfzeile: {header}</i></p>"
+        if footer:
+            extra += f"<p><i>Fußzeile: {footer}</i></p>"
+        if extra:
+            low = html.lower()
+            idx = low.find("<body")
+            if idx >= 0:
+                gt = html.find(">", idx)
+                if gt >= 0:
+                    html = html[: gt + 1] + extra + html[gt + 1 :]
+            else:
+                html = extra + html
+        return html
 
     def _selection_or_word_cursor(self) -> QTextCursor:
         """Nur noch intern: Wort unter Cursor, wenn nichts markiert ist."""

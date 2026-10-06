@@ -15,6 +15,14 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Iterable, List, Optional, Sequence, Union
 
+from instantlensdoc.core.field_tokens import (
+    _FIELD_TOKEN_RE,
+    canonical_field_name,
+    canonical_field_token,
+    extract_field_tokens,
+    normalize_field_tokens,
+    safe_field_display,
+)
 from instantlensdoc.core.ocr import (
     OcrLayoutBlock,
     OcrLayoutPage,
@@ -46,14 +54,6 @@ _OCR_OL_RE = re.compile(r"^(\d{1,3})[.)]\s+")
 _PAGE_MARK_RE = re.compile(r"^---\s*Seite\s+\d+\b[^\n]*---\s*$")
 _ILD_HF_COMMENT_RE = re.compile(
     r"<!--\s*ild-(header|footer)\s+(.*?)\s*-->", re.I | re.S
-)
-_BUILTIN_FIELD_TOKENS = frozenset({"date", "time", "page", "n", "total"})
-_FIELD_TOKEN_RE = re.compile(r"\{([A-Za-z_][A-Za-z0-9_]*)\}")
-_FIELD_TOKEN_DBL_RE = re.compile(r"\{\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*\}\}")
-_FIELD_TOKEN_PAD_RE = re.compile(r"\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*\}")
-_FIELD_TOKEN_GUILLEMET_RE = re.compile(r"«\s*([A-Za-z_][A-Za-z0-9_]*)\s*»")
-_FIELD_SPAN_ATTR_RE = re.compile(
-    r"data-ild-field\s*=\s*['\"]([^'\"]+)['\"]", re.I
 )
 
 # Steuer-/Bidi-/Formatsteuerzeichen, die in QTextDocument als ¶ · Kästchen landen.
@@ -386,55 +386,6 @@ def sanitize_ocr_visible_text(text: str) -> str:
     return normalize_field_tokens(s)
 
 
-def canonical_field_name(name: str) -> str:
-    ident = re.sub(r"[^A-Za-z0-9_]", "", str(name or "").strip())
-    if not ident:
-        return ""
-    if ident.lower() in _BUILTIN_FIELD_TOKENS:
-        return ident.lower()
-    return ident
-
-
-def canonical_field_token(name: str) -> str:
-    ident = canonical_field_name(name)
-    return f"{{{ident}}}" if ident else ""
-
-
-def safe_field_display(name: str, ersatz: str | None = None) -> str:
-    """Sichtbares Feld-Token — nie ¶ / Form-Feed / Replacement-Kasten."""
-    token = canonical_field_token(name)
-    if not token:
-        return ""
-    if ersatz is None:
-        return token
-    cleaned = (
-        str(ersatz)
-        .replace("\x0c", "")
-        .replace("\u00b6", "")
-        .replace("\ufffd", "")
-        .replace("\u2028", "")
-        .replace("\u2029", "")
-    )
-    cleaned = _OCR_CONTROL_RE.sub("", cleaned).strip()
-    if not cleaned:
-        return token
-    return cleaned
-
-
-def normalize_field_tokens(text: str) -> str:
-    """``{{date}}`` / ``{ DATE }`` / ``«page»`` → ``{date}`` / ``{page}``; Custom bleibt."""
-    if not text:
-        return ""
-
-    def _canon(raw: str) -> str:
-        return canonical_field_token(raw) or ("{" + raw + "}" if raw else "")
-
-    s = _FIELD_TOKEN_DBL_RE.sub(lambda m: _canon(m.group(1)), str(text))
-    s = _FIELD_TOKEN_GUILLEMET_RE.sub(lambda m: _canon(m.group(1)), s)
-    s = _FIELD_TOKEN_PAD_RE.sub(lambda m: _canon(m.group(1)), s)
-    return s
-
-
 def field_token_html_span(name: str, display: str | None = None) -> str:
     ident = canonical_field_name(name)
     if not ident:
@@ -452,21 +403,6 @@ def wrap_field_tokens_in_html(inner: str) -> str:
         return field_token_html_span(m.group(1))
 
     return _FIELD_TOKEN_RE.sub(_wrap, inner)
-
-
-def extract_field_tokens(text_or_html: str) -> dict[str, str]:
-    """Feldnamen aus Fließtext/HTML (data-ild-field + ``{name}``)."""
-    blob = text_or_html or ""
-    out: dict[str, str] = {}
-    for m in _FIELD_SPAN_ATTR_RE.finditer(blob):
-        ident = canonical_field_name(m.group(1))
-        if ident:
-            out[ident] = canonical_field_token(ident)
-    for m in _FIELD_TOKEN_RE.finditer(blob):
-        ident = canonical_field_name(m.group(1))
-        if ident:
-            out.setdefault(ident, canonical_field_token(ident))
-    return out
 
 
 def sanitize_ocr_html(html: str) -> str:

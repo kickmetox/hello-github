@@ -315,12 +315,80 @@ def test_header_footer_and_field_token_dialogs() -> None:
     ident, display = ft.result_field()
     assert ident
     assert "\x0c" not in display and "¶" not in display
+    assert ft.table.objectName() == "fieldTokenTable"
+    assert ft.format_combo.objectName() == "fieldTokenFormat"
+    assert ft.target_combo.objectName() == "fieldTokenTarget"
+    assert ft.add_btn.objectName() == "fieldTokenAdd"
+    names = {ft.field_combo.itemData(i) for i in range(ft.field_combo.count())}
+    for need in ("date", "time", "page", "total", "filename", "author"):
+        assert need in names, need
     ft.close()
     glyph = ListGlyphDialog("•", _WIN)
     assert glyph.objectName() == "listGlyphDialog"
     assert glyph.result_glyph() == "•"
     glyph.close()
     assert isinstance(QDialog, type)
+
+
+def test_field_tokens_insert_header_footer_and_resolve() -> None:
+    from instantlensdoc.core.documents import Document, DocKind, save_document, open_document
+    from instantlensdoc.core.field_tokens import (
+        make_resolve_context,
+        read_docx_custom_field_tokens,
+        resolve_field_tokens_in_text,
+        load_field_tokens_sidecar,
+    )
+
+    load_state(_WIN, _APP, "empty", _FIXTURES)
+    pump(_APP, 0.1)
+    ed = _WIN.editor
+    ed.setPlainText("")
+    assert ed.insert_field_token("") is True
+    assert "{date}" in ed.toPlainText()
+    assert ed.insert_field_token("filename", target="body") is True
+    assert "{filename}" in ed.toPlainText()
+    assert ed.insert_field_token("author", target="header") is True
+    assert "{author}" in ed.document_header()
+    before_footer = ed.document_footer()
+    assert ed.insert_field_token("total", target="footer") is True
+    assert "{total}" in ed.document_footer()
+    assert ed.document_footer() != before_footer or "{total}" in ed.document_footer()
+    ed.set_field_token_ersatz("kunde", "ACME")
+    ed.insert_field_token("kunde", display="{kunde}")
+    _WIN._sync_editor_rich_meta()
+    specs = ed.field_token_specs()
+    assert "kunde" in specs
+    ctx = make_resolve_context(
+        page=3,
+        page_count=9,
+        filename="vertrag.docx",
+        author="Andreas",
+        specs=specs,
+    )
+    resolved = resolve_field_tokens_in_text(
+        "{date} {time} {page} {total} {filename} {author} {kunde}",
+        ctx,
+    )
+    assert "3" in resolved and "9" in resolved
+    assert "vertrag.docx" in resolved
+    assert "Andreas" in resolved
+    assert "ACME" in resolved
+    assert "{date}" not in resolved
+    html = ed.resolved_field_preview_html(ctx)
+    assert "vertrag.docx" in html or "Andreas" in html or "ACME" in html
+    tmp = Path(_TD.name) / "felder.docx"
+    _WIN.doc.kind = DocKind.DOCX
+    _WIN.doc.path = tmp
+    _WIN._sync_editor_rich_meta()
+    save_document(_WIN.doc, tmp)
+    side = load_field_tokens_sidecar(tmp)
+    assert "kunde" in side
+    custom = read_docx_custom_field_tokens(tmp)
+    assert "kunde" in custom
+    opened = open_document(tmp)
+    ft = (opened.meta or {}).get("field_tokens") or {}
+    assert "kunde" in ft
+    assert "{author}" in str((opened.meta or {}).get("header") or "")
 
 
 def test_editor_only_new_menus_disabled_on_pdf() -> None:

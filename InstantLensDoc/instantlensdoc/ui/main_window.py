@@ -3673,6 +3673,14 @@ class MainWindow(QMainWindow):
         # Geräte-Menü idempotent nachziehen — 2.6.51
         self._ensure_devices_menu(mb)
 
+        act_field = QAction("Ersatzzeichen…", self)
+        act_field.setObjectName("actFieldToken")
+        act_field.setToolTip(
+            "Felder: Datum, Uhrzeit, Seite, Seitenanzahl, Dateiname, Autor und eigene Werte"
+        )
+        act_field.triggered.connect(self._field_token_dialog)
+        self._field_token_action = act_field
+
         m_ins = mb.addMenu("&Einfügen")
         a = QAction("Textrahmen", self)
         a.triggered.connect(self._add_text_frame)
@@ -3748,6 +3756,8 @@ class MainWindow(QMainWindow):
         )
         a.triggered.connect(self._apply_master_page_dialog)
         m_ins.addAction(a)
+        m_ins.addSeparator()
+        m_ins.addAction(act_field)
 
         m_extra = mb.addMenu("E&xtras")
         a = QAction("Einstellungen…", self)
@@ -4158,11 +4168,7 @@ class MainWindow(QMainWindow):
         act_vbottom.triggered.connect(lambda: self._set_cell_vertical_align("bottom"))
         m_absatz.addAction(self._track_editor_action(act_vbottom))
         m_absatz.addSeparator()
-        act_field = QAction("Ersatzzeichen…", self)
-        act_field.setObjectName("actFieldToken")
-        act_field.setToolTip("Feld-Token {date}/{page}/Custom — Steuerzeichen werden verworfen")
-        act_field.triggered.connect(self._field_token_dialog)
-        m_absatz.addAction(self._track_editor_action(act_field))
+        m_absatz.addAction(self._track_editor_action(self._field_token_action))
         self._absatz_menu = m_absatz
         self._editor_only_menus.append(m_absatz)
 
@@ -11308,13 +11314,80 @@ class MainWindow(QMainWindow):
             return
         from instantlensdoc.ui.field_token_dialog import FieldTokenDialog
 
-        dlg = FieldTokenDialog(self)
+        dlg = FieldTokenDialog(
+            self,
+            specs=self.editor.field_token_specs(),
+            header=self.editor.document_header(),
+            footer=self.editor.document_footer(),
+        )
+
+        def _insert_now() -> None:
+            ident, display = dlg.result_field()
+            target = dlg.result_target()
+            self._apply_field_token_dialog_state(dlg, ident, display, target)
+            dlg.mark_inserted()
+
+        dlg.insert_requested.connect(_insert_now)
         if dlg.exec() != QDialog.Accepted:
             return
         ident, display = dlg.result_field()
-        self.editor.insert_field_token(ident, display=display)
+        target = dlg.result_target()
+        if not dlg.did_insert():
+            self._apply_field_token_dialog_state(dlg, ident, display, target)
+        else:
+            self.editor.set_field_token_specs(dlg.result_specs())
+            header, footer = dlg.result_header_footer()
+            self.editor.set_document_header_footer(header, footer)
+            self._sync_editor_rich_meta()
+        self._set_status(f"Ersatzzeichen: {{{ident}}} → {dlg.target_combo.currentText()}")
+
+    def _apply_field_token_dialog_state(self, dlg, ident: str, display: str, target: str) -> None:
+        self.editor.set_field_token_specs(dlg.result_specs())
+        dest = target or "body"
+        if dest in {"header", "footer"}:
+            dlg.insert_token_at_target(ident, display)
+            header, footer = dlg.result_header_footer()
+            self.editor.set_document_header_footer(header, footer)
+        else:
+            self.editor.insert_field_token(ident, display=display, target="body")
+            header, footer = dlg.result_header_footer()
+            self.editor.set_document_header_footer(header, footer)
         self._sync_editor_rich_meta()
-        self._set_status(f"Ersatzzeichen: {{{ident}}}")
+
+    def _field_resolve_context(self, *, page: int = 1, page_count: int | None = None):
+        from instantlensdoc.core.field_tokens import make_resolve_context
+
+        filename = ""
+        author = ""
+        if self.doc is not None:
+            try:
+                if self.doc.path:
+                    filename = Path(self.doc.path).name
+                elif self.doc.title:
+                    filename = str(self.doc.title)
+            except Exception:
+                filename = str(getattr(self.doc, "title", "") or "")
+            author = str((self.doc.meta or {}).get("author") or "")
+        if not author:
+            try:
+                import getpass
+
+                author = getpass.getuser() or ""
+            except Exception:
+                author = ""
+        total = page_count
+        if total is None:
+            try:
+                total = int(self.editor.document().pageCount() or 1)
+            except Exception:
+                total = 1
+        return make_resolve_context(
+            page=page,
+            page_count=max(1, int(total or 1)),
+            filename=filename,
+            author=author,
+            specs=self.editor.field_token_specs(),
+        )
 
     def _sync_editor_rich_meta(self) -> None:
         """Plaintext + HTML-Meta aus dem Editor für DOCX/HTML/RTF-Speichern — 2.6.49."""
@@ -11359,6 +11432,11 @@ class MainWindow(QMainWindow):
                     self.doc.meta["field_tokens"] = dict(ft)
                 else:
                     self.doc.meta.pop("field_tokens", None)
+                specs = self.editor.field_token_specs()
+                if specs:
+                    from instantlensdoc.core.field_tokens import serialize_field_specs
+
+                    self.doc.meta["field_tokens"] = serialize_field_specs(specs)
             except Exception:
                 pass
         self.doc.dirty = True
@@ -12203,14 +12281,36 @@ class MainWindow(QMainWindow):
                 self.pdf_view.print_current_page()
                 return
             if self.stack.currentWidget() is self.editor_pane:
-                from PySide6.QtPrintSupport import QPrintDialog, QPrinter
+                from PySide6.QtPrintSupport import QPrintDialog, QPrintPreviewDialog, QPrinter
 
                 printer = QPrinter(QPrinter.HighResolution)
                 printer.setDocName(self.doc.display_name if self.doc else "InstantLens Doc")
+                ctx = self._field_resolve_context()
+
+                def _paint(p) -> None:
+                    self.editor.print_with_field_tokens(p, ctx)
+
+                show_preview = True
+                try:
+                    from instantlensdoc.core.app_settings import get_print_preview
+
+                    show_preview = bool(get_print_preview())
+                except Exception:
+                    show_preview = True
+                if show_preview:
+                    try:
+                        preview = QPrintPreviewDialog(printer, self)
+                        preview.setWindowTitle("Druckvorschau")
+                        preview.paintRequested.connect(_paint)
+                        preview.exec()
+                        self._set_status("Editor-Druckvorschau")
+                        return
+                    except Exception:
+                        pass
                 dlg = QPrintDialog(printer, self)
                 dlg.setWindowTitle("Editor drucken")
                 if dlg.exec() == QPrintDialog.Accepted:
-                    self.editor.print_(printer)
+                    _paint(printer)
                     self._set_status("Editor gedruckt")
                 return
             QMessageBox.information(
@@ -18568,6 +18668,13 @@ class MainWindow(QMainWindow):
                         str(self.doc.path),
                         html=(self.doc.meta or {}).get("html"),
                     )
+                from instantlensdoc.core.field_tokens import persist_document_field_tokens
+
+                persist_document_field_tokens(
+                    self.doc.path,
+                    (self.doc.meta or {}).get("field_tokens"),
+                    kind=getattr(self.doc.kind, "name", "") or "",
+                )
             except Exception:
                 pass
             self._remember_path(self.doc.path)
@@ -19403,9 +19510,14 @@ class MainWindow(QMainWindow):
                                 doc.meta["footer"] = f
                         ft = dict((doc.meta or {}).get("field_tokens") or {})
                         if ft:
-                            self.editor._field_tokens = {
-                                str(k): str(v) for k, v in ft.items() if str(k).strip()
-                            }
+                            try:
+                                self.editor.set_field_token_specs(ft)
+                            except Exception:
+                                self.editor._field_tokens = {
+                                    str(k): str(v)
+                                    for k, v in ft.items()
+                                    if str(k).strip() and not isinstance(v, dict)
+                                }
                         elif getattr(self.editor, "_field_tokens", None):
                             doc.meta["field_tokens"] = dict(self.editor.field_tokens())
                     except Exception:

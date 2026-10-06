@@ -210,7 +210,7 @@ def default_palette_commands() -> list[PaletteCommand]:
         PaletteCommand(
             "field_token",
             "Ersatzzeichen…",
-            "feld token ersatzzeichen date page",
+            "feld token ersatzzeichen date time page filename author datum uhrzeit",
             "Absatz",
         ),
         PaletteCommand(
