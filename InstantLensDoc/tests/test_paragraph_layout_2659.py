@@ -462,3 +462,24 @@ def test_chrome_can_place_start_layout_insert_qactions() -> None:
         if w.objectName() == "ildRibbonBar"
     ]
     assert len(ribbons) == 1
+
+
+def test_chrome_feature_qactions_absatz_align_lists() -> None:
+    load_state(_WIN, _APP, "empty", _FIXTURES)
+    pump(_APP, 0.1)
+    absatz = _WIN.chrome_feature_qactions("Absatz")
+    align = _WIN.chrome_feature_qactions("Ausrichtung")
+    listen = _WIN.chrome_feature_qactions("Listen")
+    assert absatz["paragraph"].objectName() == "actEditParagraph"
+    assert align["align_justify"].objectName() == "actEditAlignJustify"
+    assert listen["bullet_list"].objectName() == "actEditBulletList"
+    assert _WIN.chrome_feature_qactions("Kopf/Fuß")["header_footer"] is _WIN.chrome_qactions()[
+        "header_footer"
+    ]
+    assert _WIN.chrome_feature_qactions("Ersatzzeichen")["field_token"] is _WIN.chrome_qactions()[
+        "field_token"
+    ]
+    layout = _WIN.chrome_tab_qactions("Seitenlayout")
+    assert "align_left" in layout
+    assert "bullet_list" in layout
+    assert "header_footer" in layout
