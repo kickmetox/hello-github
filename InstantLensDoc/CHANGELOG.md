@@ -1,3 +1,12 @@
+## 2.6.57 - Release: Scan-Timeout/eSCL-first, Bearbeiten-Klick, Strich auf aktuelles Objekt
+
+Pack `InstantLensDoc-2.6.57-pack.zip`; VERSION **2.6.57**. HEAD `d7e0ad7` (Merge `cursor/scan-timeout-c22f` inkl. `6722fdf` / `51b66a7` / `39deb09`) plus `4a62b9a` Bearbeiten-Klick und `94f11d1` Strich auf aktuelles Objekt. Nach 2.6.56-Pack (`d617265`).
+
+- **Scan-Timeout / Cache / eSCL-first:** Geräte-I/O im Worker (Watchdog 10 s, WIA 12 s); Menü **Geräte** sofort aus `device_cache.json`; Netzwerk/ECOSYS → eSCL/ScanTuxio zuerst, **kein** WIA-CommonDialog/`ShowAcquireImage`/Vorschau für Netzwerk-MFP.
+- **WIA-Waisen:** `reap_orphan_scan_children` tötet `wiaacmgr` bei Timeout, Abbrechen, Quit, `atexit` und nächstem Start (auch ohne PID-Datei).
+- **Bearbeiten-Klick:** Format/Bearbeiten eine Spalte (`SH_Menu_Scrollable`, kein `maxHeight`-Schnitt); Mausklick löst denselben Slot wie das Kürzel (`menu_click.py`).
+- **Strich auf aktuelles Objekt:** Style-Ziele nur Live-Canvas-IDs der sichtbaren Seite (`_live_canvas_selected_ids` / `_prune_selection_to_visible_page`); Seitenwechsel leert alte Auswahl.
+
 ## 2.6.56 - Release: Menü-Audit 0 FAIL (DOCX/OCR/PDF)
 
 Pack `InstantLensDoc-2.6.56-pack.zip`; VERSION **2.6.56**. HEAD nach 2.6.55-Pack (`2e87d56`) inkl. Menü-Audit `f5bca42` (0 FAIL auf DOCX/OCR/PDF).

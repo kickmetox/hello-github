@@ -1,4 +1,12 @@
-InstantLens Doc 2.6.56 - Installation
+InstantLens Doc 2.6.57 - Installation
+
+Neu in 2.6.57:
+- Scan: Timeout im Worker, Geraete-Menue aus Cache, Netzwerk/ECOSYS eSCL-first
+- WIA-Waisen (wiaacmgr) beim Timeout/Quit/Start toeten (reap_orphan_scan_children)
+- Kein WIA-Vorschau-Dialog fuer Netzwerk-MFP
+- Bearbeiten/Format-Mausklick loest denselben Slot wie das Kuerzel (eine Spalte)
+- Strich/Farbe/Deckkraft/Schrift nur auf aktuelles Objekt / sichtbare Seite
+- Pack InstantLensDoc-2.6.57-pack.zip
 
 Neu in 2.6.56:
 - Menue-Audit 0 FAIL auf DOCX/OCR/PDF (Dialog oder sichtbarer Effekt)

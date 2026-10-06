@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.6.56.
+"""Nightly/CI Smoke: CLI + Import-Checks für InstantLens Doc — 2.1.0–2.6.57.
 
 Leichtgewichtig. Exit-Codes:
   0  OK  (ok=true)
@@ -14,12 +14,12 @@ Aufruf:
   python scripts/smoke_ild.py -h
 
 JSON-Schema (--json), Erfolg:
-  {"ok": true, "version": "2.6.56", "duration_ms": 1234,
+  {"ok": true, "version": "2.6.57", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 
 JSON bei Fail: checks[] enthält Objekt mit error-Text (max 200 Zeichen, Truncate …);
 Exitcode spiegelt ok (0↔true, 1↔false) — 2.2.0:
-  {"ok": false, "version": "2.6.56", "duration_ms": 12,
+  {"ok": false, "version": "2.6.57", "duration_ms": 12,
    "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 """
 
@@ -41,7 +41,7 @@ if str(ROOT) not in sys.path:
 # Headless/CI: Qt ohne Display
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-EXPECTED_VERSION = "2.6.56"
+EXPECTED_VERSION = "2.6.57"
 FAIL_ERROR_MAX_LEN = 200
 
 EXIT_OK = 0
@@ -662,6 +662,32 @@ def check_version() -> None:
     if not (ROOT / "scripts" / "menu_audit_2655.py").is_file():
         _fail("scripts/menu_audit_2655.py fehlt (2.6.56)")
     _ok("2.6.56 menu-audit 0-FAIL DOCX/OCR/PDF enablement/dialog: OK")
+    # 2.6.57: Scan-Timeout, eSCL-first, WIA-Waisen, Bearbeiten-Klick, Strich auf aktuelles Objekt
+    sp = (ROOT / "instantlensdoc" / "core" / "scan_procs.py").read_text(encoding="utf-8")
+    if "def reap_orphan_scan_children(" not in sp:
+        _fail("scan_procs.py fehlt reap_orphan_scan_children (2.6.57 WIA-Waisen)")
+    if "def name_looks_network_mfp(" not in sp:
+        _fail("scan_procs.py fehlt name_looks_network_mfp (2.6.57 ECOSYS/Netzwerk)")
+    st = (ROOT / "instantlensdoc" / "core" / "scan_transfer.py").read_text(encoding="utf-8")
+    if "name_looks_network_mfp" not in st:
+        _fail("scan_transfer.py fehlt name_looks_network_mfp (2.6.57 eSCL-first)")
+    app_t = (ROOT / "instantlensdoc" / "app.py").read_text(encoding="utf-8")
+    if "reap_orphan_scan_children" not in app_t:
+        _fail("app.py fehlt reap_orphan_scan_children (2.6.57 Start-Reap)")
+    mc = ROOT / "instantlensdoc" / "ui" / "menu_click.py"
+    if not mc.is_file():
+        _fail("ui/menu_click.py fehlt (2.6.57 Bearbeiten-Klick)")
+    mc_t = mc.read_text(encoding="utf-8")
+    if "SH_Menu_Scrollable" not in mc_t:
+        _fail("menu_click.py fehlt SH_Menu_Scrollable (2.6.57 eine Spalte)")
+    pv = (ROOT / "instantlensdoc" / "ui" / "pdf_view.py").read_text(encoding="utf-8")
+    if "def _live_canvas_selected_ids(" not in pv:
+        _fail("pdf_view.py fehlt _live_canvas_selected_ids (2.6.57 Strich auf aktuelles Objekt)")
+    if "def _prune_selection_to_visible_page(" not in pv:
+        _fail("pdf_view.py fehlt _prune_selection_to_visible_page (2.6.57)")
+    if not (ROOT / "scripts" / "test_scan_timeout_2657.py").is_file():
+        _fail("scripts/test_scan_timeout_2657.py fehlt (2.6.57)")
+    _ok("2.6.57 scan-timeout/eSCL-first/wia-orphans/edit-click/stroke-current: OK")
 
 
 def check_imports(*, with_qt: bool) -> None:
@@ -1561,6 +1587,8 @@ def check_changelog() -> None:
         _fail("CHANGELOG fehlt ## 2.6.49")
     if "## 2.6.51" not in cl:
         _fail("CHANGELOG fehlt ## 2.6.51")
+    if "## 2.6.57" not in cl:
+        _fail("CHANGELOG fehlt ## 2.6.57")
     if "## 2.6.56" not in cl:
         _fail("CHANGELOG fehlt ## 2.6.56")
     if "## 2.6.55" not in cl:
@@ -3034,11 +3062,11 @@ Exit-Codes:
 Laufzeit: am Ende als „Laufzeit: N ms“ (oder duration_ms im JSON).
 
 Beispiel --json (Erfolg):
-  {"ok": true, "version": "2.6.56", "duration_ms": 1234,
+  {"ok": true, "version": "2.6.57", "duration_ms": 1234,
    "checks": ["version", "imports", "cli", "measure_diff_import", "changelog"]}
 
 Beispiel --json (Fail):
-  {"ok": false, "version": "2.6.56", "duration_ms": 12,
+  {"ok": false, "version": "2.6.57", "duration_ms": 12,
    "checks": ["version", {"name": "imports", "error": "import x: …"}]}
 """.rstrip()
     )
