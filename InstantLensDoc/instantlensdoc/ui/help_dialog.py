@@ -278,12 +278,13 @@ HELP_HTML = f"""
     Gerät (Dropdown, merkt letztes Gerät je Backend), DPI/Farbe/Duplex,
     <b>Scannen</b> (Bild kommt ins Dokument) und <b>ScanTuxio öffnen</b>.
     Scan-Backend unter <b>Erweitert</b> bzw. <b>Einstellungen → Scannen</b>:
-    Automatisch (ScanTuxio-Ablauf: WIA direkt → NAPS2-Konsole → eSCL → Windows-Dialog),
+    Automatisch (lokal WIA/NAPS2; Netzwerk: eSCL/AirScan zuerst),
     ScanTuxio Win, WIA (direkt), NAPS2, eSCL/AirScan, TWAIN (über NAPS2),
     externes Programm (Befehlszeile mit <code>{{output}}</code> <code>{{outdir}}</code>
     <code>{{dpi}}</code> <code>{{device}}</code> <code>{{color}}</code> <code>{{source}}</code>
     plus Ausgabeordner). Pfad wählen für NAPS2.Console / ScanTuxio.
-    Diagnose: <code>%LOCALAPPDATA%\\InstantLensDoc\\scan.log</code> — <b>2.6.54</b></li>
+    Menü Geräte öffnet sofort (Cache); Scan im Worker, Timeout 8–12 s.
+    Diagnose: <code>%LOCALAPPDATA%\\InstantLensDoc\\scan.log</code> — <b>2.6.54 / 2.6.57</b></li>
 <li><b>OCR</b>: Extras → OCR (Seite/Bild) oder <b>OCR gesamtes PDF</b> (Batch mit
     <b>Sprach-Preset</b>-Combobox, Fortschritt/Abbrechen;
     Ergebnis als <b>neue Textdatei-Tab</b> <code>*-ocr.txt</code>) —

@@ -1526,6 +1526,7 @@ class MainWindow(QMainWindow):
                 if any(
                     a.objectName() == "actDevicesScanner" for a in m_devices.actions()
                 ):
+                    self._bind_devices_menu_live(m_devices)
                     return m_devices
             except Exception:
                 pass
@@ -1606,7 +1607,113 @@ class MainWindow(QMainWindow):
             prepare_menu_for_clicks(m_devices)
         except Exception:
             pass
+        self._bind_devices_menu_live(m_devices)
         return m_devices
+
+    def _bind_devices_menu_live(self, menu) -> None:
+        """aboutToShow: Cache sofort, Hardware-Suche nur im Hintergrund."""
+        if getattr(self, "_devices_menu_live_bound", False):
+            return
+        self._devices_menu_live_bound = True
+        try:
+            menu.aboutToShow.connect(self._on_devices_menu_about_to_show)
+        except Exception:
+            pass
+        QTimer.singleShot(0, self._schedule_device_cache_refresh)
+
+    def _on_devices_menu_about_to_show(self) -> None:
+        menu = None
+        try:
+            menu = self.findChild(QMenu, "menuDevices")
+        except Exception:
+            menu = None
+        if menu is None:
+            return
+        self._fill_devices_menu_from_cache(menu)
+        self._schedule_device_cache_refresh()
+
+    def _fill_devices_menu_from_cache(self, menu) -> None:
+        """Menü Geräte mit letzter Liste füllen — ohne discover_devices()."""
+        from PySide6.QtGui import QAction
+
+        from instantlensdoc.core.devices import (
+            DeviceInfo,
+            DeviceKind,
+            devices_menu_entries,
+            load_cached_discovery,
+        )
+
+        for act in list(menu.actions()):
+            try:
+                name = act.objectName() or ""
+            except Exception:
+                name = ""
+            if name.startswith("actCachedDevice") or name in (
+                "actDevicesCacheSep",
+                "actDevicesCacheHint",
+            ):
+                menu.removeAction(act)
+        entries = devices_menu_entries(load_cached_discovery())
+        sep = menu.addSeparator()
+        sep.setObjectName("actDevicesCacheSep")
+        if not entries:
+            hint = QAction("(letzte Geräteliste leer — Suche im Hintergrund)", self)
+            hint.setObjectName("actDevicesCacheHint")
+            hint.setEnabled(False)
+            menu.addAction(hint)
+            return
+        for i, (label, dev) in enumerate(entries):
+            act = QAction(label, self)
+            act.setObjectName(f"actCachedDevice{i}")
+            if isinstance(dev, DeviceInfo) and dev.kind == DeviceKind.PRINTER:
+                act.setToolTip("Drucker (keine Geräteöffnung beim Klick)")
+            else:
+                act.setToolTip("Scanner öffnen — kein Probe/Connect beim Klick")
+            act.triggered.connect(
+                lambda _checked=False, d=dev: self._on_cached_device_clicked(d)
+            )
+            menu.addAction(act)
+
+    def _on_cached_device_clicked(self, dev) -> None:
+        from instantlensdoc.core.devices import DeviceInfo, DeviceKind
+
+        if not isinstance(dev, DeviceInfo):
+            return
+        if dev.kind == DeviceKind.PRINTER:
+            self._show_devices_dialog(filter_kind="printer")
+            return
+        self._preferred_scan_device_id = dev.device_id or dev.name
+        self._run_scan_import()
+
+    def _schedule_device_cache_refresh(self) -> None:
+        if getattr(self, "_device_refresh_inflight", False):
+            return
+        self._device_refresh_inflight = True
+        from instantlensdoc.core.device_io import MENU_REFRESH_TIMEOUT_S
+        from instantlensdoc.core.devices import DeviceDiscoveryResult, discover_devices
+        from instantlensdoc.ui.async_worker import watch_worker
+
+        def _done(result) -> None:
+            self._device_refresh_inflight = False
+            if isinstance(result, DeviceDiscoveryResult):
+                try:
+                    menu = self.findChild(QMenu, "menuDevices")
+                except Exception:
+                    menu = None
+                if menu is not None and menu.isVisible():
+                    self._fill_devices_menu_from_cache(menu)
+
+        def _to() -> None:
+            self._device_refresh_inflight = False
+
+        watch_worker(
+            self,
+            discover_devices,
+            timeout=MENU_REFRESH_TIMEOUT_S,
+            on_done=_done,
+            on_timeout=_to,
+            on_error=lambda _e: _to(),
+        )
 
     def _build_menus(self):
         mb = self.menuBar()
@@ -17959,12 +18066,15 @@ class MainWindow(QMainWindow):
         except Exception:
             pass
         try:
+            prefer = str(getattr(self, "_preferred_scan_device_id", "") or "")
             if hasattr(self.pdf_view, "scan_import_dialog"):
                 self.pdf_view.scan_import_dialog()
             else:
                 from instantlensdoc.ui.scan_dialog import ScanDialog
 
-                ScanDialog(self.pdf_view, self).exec()
+                ScanDialog(
+                    self.pdf_view, self, preferred_device_id=prefer or None
+                ).exec()
         except Exception as e:
             from PySide6.QtWidgets import QMessageBox
 

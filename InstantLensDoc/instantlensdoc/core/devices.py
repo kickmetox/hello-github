@@ -12,6 +12,7 @@ Primaerquelle: vendored ``instantlensdoc.core.scantuxio`` (Upload
 
 from __future__ import annotations
 
+import json
 import os
 import platform
 import re
@@ -21,6 +22,8 @@ import sys
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Callable, List, Optional, Sequence, Tuple
+
+from instantlensdoc.core.device_io import DISCOVERY_STEP_TIMEOUT_S
 
 
 class DeviceKind(str, Enum):
@@ -99,11 +102,13 @@ WINDOWS_SCANNER_DRIVER_HINT_DE = (
     "  • Ohne Hardware: im Scan-Dialog „Bilder importieren…“ nutzen"
 )
 
-# Offensichtliche UI-Einstiege (DE) — Statusleiste / Dialog / Hilfe — 2.6.41 / 2.6.54
+# Offensichtliche UI-Einstiege (DE) — Statusleiste / Dialog / Hilfe — 2.6.41 / 2.6.54 / 2.6.57
 SCAN_START_HINT_DE = (
     "Scannen: Menü Geräte → Scannen… (Ctrl+Shift+S) "
     "· Toolbar „Scan…“ · Startseite „Scannen…“ "
-    "— Gerät wählen, „Scannen“ klicken; Backend unter Erweitert / Einstellungen → Scannen"
+    "— Gerät wählen, „Scannen“ klicken; Backend unter Erweitert / Einstellungen → Scannen. "
+    "Geräteliste aus Cache (sofort), Suche im Hintergrund. "
+    "Netzwerkscanner: eSCL/AirScan. Gerät antwortet nicht: anderes Gerät wählen."
 )
 
 NO_DEVICE_STATUS_DE = (
@@ -369,15 +374,16 @@ def _list_printers_win32print() -> tuple[List[DeviceInfo], List[str]]:
     return out, warnings
 
 
-def _run_powershell(script: str, *, timeout: float = 30.0) -> tuple[str, str, int]:
-    """PowerShell ausführen; (stdout, stderr, returncode)."""
+def _run_powershell(script: str, *, timeout: float = DISCOVERY_STEP_TIMEOUT_S) -> tuple[str, str, int]:
+    """PowerShell ausführen; (stdout, stderr, returncode). Kill nach Timeout."""
     if platform.system() != "Windows":
         return "", "not-windows", -1
     ps = shutil.which("powershell") or shutil.which("pwsh")
     if not ps:
         return "", "PowerShell nicht gefunden", -1
+    kwargs = dict(_subprocess_kwargs())
     try:
-        proc = subprocess.run(
+        proc = subprocess.Popen(
             [
                 ps,
                 "-NoProfile",
@@ -387,20 +393,32 @@ def _run_powershell(script: str, *, timeout: float = 30.0) -> tuple[str, str, in
                 "-Command",
                 script,
             ],
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            stdin=subprocess.DEVNULL,
             text=True,
-            timeout=timeout,
-            check=False,
-            **_subprocess_kwargs(),
+            **kwargs,
         )
+    except Exception as e:
+        return "", str(e), -1
+    try:
+        out, err = proc.communicate(timeout=timeout)
     except subprocess.TimeoutExpired:
+        try:
+            proc.kill()
+        except Exception:
+            pass
+        try:
+            proc.communicate(timeout=2)
+        except Exception:
+            pass
         return "", "PowerShell Timeout", -1
     except Exception as e:
         return "", str(e), -1
-    return (proc.stdout or ""), (proc.stderr or ""), int(proc.returncode)
+    return (out or ""), (err or ""), int(proc.returncode or 0)
 
 
-def _powershell_json(script: str, *, timeout: float = 30.0) -> tuple[Optional[object], Optional[str]]:
+def _powershell_json(script: str, *, timeout: float = DISCOVERY_STEP_TIMEOUT_S) -> tuple[Optional[object], Optional[str]]:
     """PowerShell → JSON (Windows). Toleriert ERR:-Prefix und BOM."""
     if platform.system() != "Windows":
         return None, None
@@ -531,11 +549,40 @@ def _device_group_key(d: DeviceInfo) -> str:
     return key or did
 
 
-def _device_backend_rank(d: DeviceInfo) -> int:
+def device_is_network(d: DeviceInfo) -> bool:
+    """Netzwerk-/eSCL-Gerät? WIA-Connect hängt hier oft im Energiesparmodus."""
+    if d.scope == DeviceScope.NETWORK:
+        return True
     did = (d.device_id or "").lower()
     be = (d.backend or "").lower()
+    name = (d.name or "").lower()
+    if did.startswith(("native-escl:", "escl:", "mdns:", "airscan:", "http://", "https://")):
+        return True
+    if any(x in be for x in ("escl", "mdns", "airscan", "netzwerk")):
+        return True
+    if any(x in name for x in ("netzwerk", "network", "escl", "airscan")):
+        return True
+    return False
+
+
+def _device_backend_rank(d: DeviceInfo) -> int:
+    """Niedriger = besser. Netzwerk: eSCL vor WIA (ScanTuxio-Netzmodus)."""
+    did = (d.device_id or "").lower()
+    be = (d.backend or "").lower()
+    if device_is_network(d):
+        if did.startswith(("native-escl:", "escl:")) or "escl" in be:
+            return 0
+        if did.startswith("mdns:") or "mdns" in be:
+            return 1
+        if did.startswith("naps2:"):
+            return 2
+        if "sane" in be or did.startswith(("airscan:", "net:")):
+            return 3
+        if "wia" in be or (did.startswith("{") and "}" in did):
+            return 20
+        return 8
     if did.startswith("{") and "}" in did:
-        return 0  # WIA-DeviceID (direkt nutzbar)
+        return 0  # lokales WIA-DeviceID
     if did.startswith("naps2:wia:"):
         return 1
     if did.startswith(("native-escl:", "escl:")):
@@ -620,6 +667,12 @@ def scanner_choices(
         suffix = " · ".join(x for x in ([scope] if scope else []) + tags[:3])
         label = f"{base} ({suffix})" if suffix else base
         out.append(ScannerChoice(label=label, primary=primary, alternates=devs[1:]))
+    out.sort(
+        key=lambda ch: (
+            0 if device_is_network(ch.primary) else 1,
+            _device_backend_rank(ch.primary),
+        )
+    )
     if include_wia_dialog is None:
         include_wia_dialog = platform.system() == "Windows" and (backend or "auto") in (
             "auto",
@@ -655,7 +708,7 @@ def _list_scanners_scantuxio() -> tuple[List[DeviceInfo], List[str], List[str]]:
     except Exception as e:
         return [], [f"ScanTuxio scanner: {e}"], notes
     try:
-        devices = st_scanner.list_devices_all(timeout=25)
+        devices = st_scanner.list_devices_all(timeout=int(DISCOVERY_STEP_TIMEOUT_S))
     except Exception as e:
         return [], [f"ScanTuxio list_devices_all: {e}"], notes
     for d in devices or []:
@@ -715,12 +768,12 @@ def _list_network_scantuxio() -> tuple[List[DeviceInfo], List[str], List[str]]:
     net_devs = []
     try:
         if hasattr(st_discovery, "discover_network_devices"):
-            net_devs.extend(st_discovery.discover_network_devices(timeout=4) or [])
+            net_devs.extend(st_discovery.discover_network_devices(timeout=3) or [])
     except Exception as e:
         notes.append(f"avahi: {e}")
     try:
         if hasattr(st_discovery, "discover_network_devices_zeroconf"):
-            net_devs.extend(st_discovery.discover_network_devices_zeroconf(timeout=3.0) or [])
+            net_devs.extend(st_discovery.discover_network_devices_zeroconf(timeout=2.5) or [])
     except Exception as e:
         notes.append(f"zeroconf: {e}")
     seen: set[tuple[str, str]] = set()
@@ -979,7 +1032,7 @@ if (Test-Path $tw) {
 }
 if (-not $items) { '[]' } else { $items | Select-Object -Unique Name, DeviceID, Backend | ConvertTo-Json -Compress -Depth 3 }
 """
-    data3, err3 = _powershell_json(twain_script, timeout=20.0)
+    data3, err3 = _powershell_json(twain_script, timeout=DISCOVERY_STEP_TIMEOUT_S)
     if err3:
         notes.append(f"TWAIN-Hinweis: {err3}")
     else:
@@ -1053,7 +1106,7 @@ try {
 $items = $items | Where-Object { $_.Name } | Select-Object -Unique Name, DeviceID, Status
 if (-not $items) { '[]' } else { $items | ConvertTo-Json -Compress -Depth 3 }
 """
-    data_cim, err_cim = _powershell_json(cim_script, timeout=20.0)
+    data_cim, err_cim = _powershell_json(cim_script, timeout=DISCOVERY_STEP_TIMEOUT_S)
     if err_cim:
         notes.append(f"CIM-Image: {err_cim}")
     else:
@@ -1099,7 +1152,7 @@ def _list_scanners_sane() -> tuple[List[DeviceInfo], List[str], List[str]]:
             [exe, "-L"],
             capture_output=True,
             text=True,
-            timeout=20,
+            timeout=DISCOVERY_STEP_TIMEOUT_S,
             check=False,
         )
     except Exception as e:
@@ -1251,6 +1304,10 @@ def discover_devices(
             result.backend_notes.append(f"Scanner: {len(scanners)}")
     except Exception as e:
         result.warnings.append(f"Geräteerkennung fehlgeschlagen: {e}")
+    try:
+        save_cached_discovery(result)
+    except Exception:
+        pass
     return result
 
 
@@ -1278,3 +1335,115 @@ def format_discovery_status(result: DeviceDiscoveryResult) -> str:
         if first and first not in msg:
             msg += f" — {first}"
     return msg
+
+
+DEVICE_CACHE_NAME = "device_cache.json"
+
+
+def device_cache_path():
+    """JSON-Cache der letzten Geräteliste (Menü öffnet daraus sofort)."""
+    try:
+        from instantlensdoc.config import config_dir
+
+        return config_dir() / DEVICE_CACHE_NAME
+    except Exception:
+        from pathlib import Path
+
+        return Path.home() / ".config" / "InstantLensDoc" / DEVICE_CACHE_NAME
+
+
+def _device_to_dict(d: DeviceInfo) -> dict:
+    return {
+        "kind": d.kind.value,
+        "name": d.name,
+        "device_id": d.device_id,
+        "scope": d.scope.value,
+        "backend": d.backend,
+        "details": d.details,
+    }
+
+
+def _device_from_dict(raw: object) -> Optional[DeviceInfo]:
+    if not isinstance(raw, dict):
+        return None
+    kind_s = str(raw.get("kind") or "scanner")
+    try:
+        kind = DeviceKind(kind_s)
+    except ValueError:
+        kind = DeviceKind.SCANNER
+    scope_s = str(raw.get("scope") or "unknown")
+    try:
+        scope = DeviceScope(scope_s)
+    except ValueError:
+        scope = DeviceScope.UNKNOWN
+    name = str(raw.get("name") or "").strip()
+    if not name:
+        return None
+    return DeviceInfo(
+        kind=kind,
+        name=name,
+        device_id=str(raw.get("device_id") or ""),
+        scope=scope,
+        backend=str(raw.get("backend") or ""),
+        details=str(raw.get("details") or ""),
+    )
+
+
+def save_cached_discovery(result: DeviceDiscoveryResult) -> None:
+    """Letzte Erkennung persistieren. Wirft nie."""
+    try:
+        payload = {
+            "version": 1,
+            "printers": [_device_to_dict(d) for d in result.printers],
+            "scanners": [_device_to_dict(d) for d in result.scanners],
+            "warnings": list(result.warnings[:12]),
+            "backend_notes": list(result.backend_notes[:12]),
+        }
+        path = device_cache_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    except Exception:
+        pass
+
+
+def load_cached_discovery() -> DeviceDiscoveryResult:
+    """Letzte Geräteliste (sofort, ohne Hardware). Leer wenn kein Cache."""
+    result = DeviceDiscoveryResult()
+    try:
+        path = device_cache_path()
+        if not path.is_file():
+            return result
+        raw = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(raw, dict):
+            return result
+        for row in raw.get("scanners") or []:
+            d = _device_from_dict(row)
+            if d is not None and d.kind == DeviceKind.SCANNER:
+                result.scanners.append(d)
+        for row in raw.get("printers") or []:
+            d = _device_from_dict(row)
+            if d is not None and d.kind == DeviceKind.PRINTER:
+                result.printers.append(d)
+        for w in raw.get("warnings") or []:
+            result.warnings.append(str(w))
+        result.backend_notes.append("aus Cache")
+    except Exception:
+        return DeviceDiscoveryResult()
+    return result
+
+
+def devices_menu_entries(
+    result: Optional[DeviceDiscoveryResult] = None,
+    *,
+    limit: int = 16,
+) -> List[Tuple[str, DeviceInfo]]:
+    """Einträge für Menü Geräte — nur Cache/übergebene Liste, nie Hardware."""
+    src = result if result is not None else load_cached_discovery()
+    out: List[Tuple[str, DeviceInfo]] = []
+    for d in list(src.scanners) + list(src.printers):
+        if d is None:
+            continue
+        out.append((d.label(), d))
+        if len(out) >= max(1, int(limit)):
+            break
+    return out

@@ -101,6 +101,11 @@ FILE_WAIT_S = 6.0
 EXTERNAL_FILE_WAIT_S = 12.0
 LOG_MAX_BYTES = 2 * 1024 * 1024
 
+try:
+    from instantlensdoc.core.device_io import WIA_HANG_TIMEOUT_S
+except Exception:  # pragma: no cover
+    WIA_HANG_TIMEOUT_S = 12.0
+
 _WIA_FORMAT_BMP = "{B96B3CAB-0728-11D3-9D7B-0000F81EF32E}"
 
 _BUSY_PATTERNS = (
@@ -622,7 +627,7 @@ def backend_availability(settings: Optional[dict] = None) -> List[BackendStatus]
             BACKEND_AUTO,
             BACKEND_LABELS_DE[BACKEND_AUTO],
             True,
-            "Reihenfolge je Gerät: WIA direkt → NAPS2 → eSCL → Windows-Scannerdialog",
+            "Lokal: WIA → NAPS2 → Dialog. Netzwerk: eSCL/AirScan zuerst (kein WIA-Connect im Sleep).",
         )
     )
     st_path = ""
@@ -1112,7 +1117,10 @@ def _run_wia(
     attempt.command = format_command(cmd)
     scan_log(f"WIA start: {attempt.command}")
     t0 = time.monotonic()
-    rc, out, err, to = run_process(cmd, timeout=job.timeout, cwd=str(out_dir))
+    wia_timeout = min(float(job.timeout or DEFAULT_TIMEOUT_S), float(WIA_HANG_TIMEOUT_S))
+    if use_dialog:
+        wia_timeout = float(job.timeout or DEFAULT_TIMEOUT_S)
+    rc, out, err, to = run_process(cmd, timeout=wia_timeout, cwd=str(out_dir))
     attempt.returncode, attempt.stdout, attempt.stderr, attempt.timed_out = rc, out, err, to
     attempt.duration_s = time.monotonic() - t0
     scan_log(
@@ -1138,7 +1146,10 @@ def _run_wia(
             attempt.cancelled = True
             attempt.error = "Scan abgebrochen (Windows-Scannerdialog)."
         elif to:
-            attempt.error = f"Zeitüberschreitung ({int(job.timeout)} s) beim WIA-Scan."
+            attempt.error = (
+                f"Zeitüberschreitung ({int(wia_timeout)} s) beim WIA-Scan. "
+                "Gerät im Energiesparmodus oder nicht erreichbar — anderes Gerät wählen."
+            )
         else:
             msg = _tail(err, 400) or f"Exit-Code {rc}"
             if is_busy_text(err):
@@ -1365,7 +1376,31 @@ class _Step:
         return (self.kind, self.driver, (self.device_id or self.device_name).lower())
 
 
-def _steps_for_device(device_id: str, device_name: str, device_backend: str, *, naps2_ok: bool, core_only: bool) -> List[_Step]:
+def _job_looks_network(job: ScanJob) -> bool:
+    blob = f"{job.device_id} {job.device_name} {job.device_backend}".lower()
+    if any(
+        x in blob
+        for x in (
+            "native-escl:",
+            "escl:",
+            "mdns:",
+            "airscan:",
+            "netzwerk",
+            "network",
+            "http://",
+            "https://",
+        )
+    ):
+        return True
+    if classify_device_id(job.device_id, job.device_backend) == "escl":
+        return True
+    for did, _dn, dbe in job.fallback_devices or []:
+        if classify_device_id(did, dbe) == "escl":
+            return True
+    return False
+
+
+def _steps_for_device(device_id: str, device_name: str, device_backend: str, *, naps2_ok: bool, core_only: bool, skip_wia: bool = False) -> List[_Step]:
     """Reihenfolge je Gerät (Automatik). ``core_only``: nur ScanTuxio-Backends (kein PowerShell-WIA)."""
     cls = classify_device_id(device_id, device_backend)
     name = clean_device_name(device_name)
@@ -1376,13 +1411,13 @@ def _steps_for_device(device_id: str, device_name: str, device_backend: str, *, 
     if cls == "naps2":
         drv, nm = parse_naps2_id(device_id)
         steps.append(_Step("naps2", device_id, nm or name, drv))
-        if win and not core_only and drv == "wia":
+        if win and not core_only and drv == "wia" and not skip_wia:
             steps.append(_Step("wia", "", nm or name))
         return steps
     if cls == "escl":
         return [_Step("escl", device_id, name)]
     if cls == "wia":
-        if win and not core_only:
+        if win and not core_only and not skip_wia:
             steps.append(_Step("wia", device_id, name))
         if naps2_ok and name:
             steps.append(_Step("naps2", "", name, "wia"))
@@ -1390,11 +1425,11 @@ def _steps_for_device(device_id: str, device_name: str, device_backend: str, *, 
     if cls == "twain":
         if naps2_ok and name:
             steps.append(_Step("naps2", "", name, "twain"))
-        if win and not core_only and name:
+        if win and not core_only and name and not skip_wia:
             steps.append(_Step("wia", "", name))
         return steps
     if cls == "pnp":
-        if win and not core_only and name:
+        if win and not core_only and name and not skip_wia:
             steps.append(_Step("wia", "", name))
         if naps2_ok and name:
             steps.append(_Step("naps2", "", name, "wia"))
@@ -1402,9 +1437,9 @@ def _steps_for_device(device_id: str, device_name: str, device_backend: str, *, 
     if cls == "sane" or (cls == "unknown" and not win):
         return [_Step("sane", device_id, name)]
     if cls == "none":
-        return [_Step("wia-dialog")] if win else [_Step("sane", "", "")]
+        return [_Step("wia-dialog")] if win and not skip_wia else ([_Step("sane", "", "")] if not win else [])
     # unknown unter Windows: Name probieren
-    if win and not core_only and name:
+    if win and not core_only and name and not skip_wia:
         steps.append(_Step("wia", "", name))
     if naps2_ok and name:
         steps.append(_Step("naps2", "", name, "wia"))
@@ -1451,10 +1486,19 @@ def plan_steps(job: ScanJob) -> List[_Step]:
             steps = [_Step("escl", job.device_id, name)]
     else:
         core_only = backend == BACKEND_SCANTUXIO
+        skip_wia = _job_looks_network(job)
         for did, dn, dbe in devices:
-            steps.extend(_steps_for_device(did, dn, dbe, naps2_ok=naps2_ok, core_only=core_only))
-        if win and not core_only:
+            steps.extend(
+                _steps_for_device(
+                    did, dn, dbe, naps2_ok=naps2_ok, core_only=core_only, skip_wia=skip_wia
+                )
+            )
+        if win and not core_only and not skip_wia:
             steps.append(_Step("wia-dialog"))
+        if skip_wia:
+            escl_steps = [s for s in steps if s.kind == "escl"]
+            rest = [s for s in steps if s.kind != "escl" and s.kind != "wia"]
+            steps = escl_steps + rest
     seen: set = set()
     uniq: List[_Step] = []
     for s in steps:
