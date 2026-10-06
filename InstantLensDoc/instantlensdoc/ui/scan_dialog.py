@@ -421,6 +421,12 @@ class ScanDialog(QDialog):
                 self._st_timer.stop()
         except Exception:
             pass
+        try:
+            from instantlensdoc.core.scan_procs import kill_tracked_scan_children
+
+            kill_tracked_scan_children(wia_orphans=True)
+        except Exception:
+            pass
         self._save_scan_prefs()
         super().closeEvent(event)
 
@@ -868,6 +874,12 @@ class ScanDialog(QDialog):
             msg = DEVICE_TIMEOUT_DE.format(seconds=seconds)
             self._set_acquire_status(msg)
             scan_log(f"UI: Timeout {seconds}s — {msg}")
+            try:
+                from instantlensdoc.core.scan_procs import kill_tracked_scan_children
+
+                kill_tracked_scan_children(wia_orphans=True)
+            except Exception:
+                pass
 
         self._acquire_watch = watch_worker(
             self,

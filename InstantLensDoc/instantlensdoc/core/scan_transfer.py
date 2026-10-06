@@ -333,10 +333,28 @@ def run_process(
     env: Optional[dict] = None,
     hide_window: bool = True,
 ) -> Tuple[Optional[int], str, str, bool]:
-    """Prozess starten, auf Ende warten; (returncode, stdout, stderr, timed_out)."""
+    """Prozess starten, auf Ende warten; (returncode, stdout, stderr, timed_out).
+
+    Trackt die PID und tötet bei Timeout den ganzen Baum inkl. neuem wiaacmgr.
+    """
+    from instantlensdoc.core.scan_procs import (
+        kill_new_since,
+        kill_process_tree,
+        register_pid,
+        snapshot_scan_pids,
+        unregister_pid,
+    )
+
     kwargs: dict = {}
     if hide_window:
         kwargs.update(_hidden_kwargs())
+    if is_windows():
+        flags = int(kwargs.get("creationflags") or 0)
+        flags |= int(getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0x00000200) or 0)
+        kwargs["creationflags"] = flags
+    else:
+        kwargs["start_new_session"] = True
+    before = snapshot_scan_pids()
     proc = subprocess.Popen(
         [str(c) for c in cmd],
         stdout=subprocess.PIPE,
@@ -346,19 +364,29 @@ def run_process(
         env=env,
         **kwargs,
     )
+    register_pid(proc.pid)
     timed_out = False
     try:
         out, err = proc.communicate(timeout=timeout)
     except subprocess.TimeoutExpired:
         timed_out = True
         try:
-            proc.kill()
+            kill_process_tree(proc.pid)
+        except Exception:
+            try:
+                proc.kill()
+            except Exception:
+                pass
+        try:
+            kill_new_since(before)
         except Exception:
             pass
         try:
             out, err = proc.communicate(timeout=5)
         except Exception:
             out, err = b"", b""
+    finally:
+        unregister_pid(proc.pid)
     return proc.returncode, decode_output(out), decode_output(err), timed_out
 
 
@@ -935,71 +963,79 @@ try {
   if (-not (Test-Path -LiteralPath $OutDir)) { New-Item -ItemType Directory -Path $OutDir -Force | Out-Null }
   $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
   $base = Join-Path $OutDir ('scan_wia_' + $stamp)
-  $cd = New-Object -ComObject WIA.CommonDialog
   $item = $null
-  if (-not $UseDialog -and ($DeviceId -or $DeviceName)) {
-    $dm = New-Object -ComObject WIA.DeviceManager
-    $info = $null
-    foreach ($d in $dm.DeviceInfos) {
-      $did = ''
-      $dname = ''
-      try { $did = [string]$d.DeviceID } catch { }
-      try { $dname = [string]$d.Properties.Item('Name').Value } catch { }
-      if ($DeviceId -and $did -eq $DeviceId) { $info = $d; break }
-      if ($DeviceName -and $dname -and ($dname -eq $DeviceName -or $dname -like ('*' + $DeviceName + '*') -or $DeviceName -like ('*' + $dname + '*'))) { $info = $d; break }
-    }
-    if ($null -eq $info) {
-      Write-Err ("WIA: Gerät nicht gefunden (" + $DeviceId + " / " + $DeviceName + ") - Windows-Scannerdialog wird verwendet.")
-    } else {
-      $dev = $info.Connect()
-      try {
-        if ($Source -ne 'Flatbed') {
-          $sel = 1
-          if ($Source -like '*Duplex*') { $sel = $sel -bor 4 }
-          foreach ($p in $dev.Properties) { if ([int]$p.PropertyID -eq 3088) { $p.Value = $sel; break } }
-        }
-      } catch { Write-Err ('WIA: Papierquelle nicht setzbar: ' + $_.Exception.Message) }
-      try { $item = $dev.Items.Item(1) } catch { foreach ($i in $dev.Items) { $item = $i; break } }
-      if ($null -eq $item) { throw 'WIA: Scanner-Item nicht gefunden (Gerät ohne Items).' }
-      try {
-        $intent = 1
-        if ($ColorMode -eq 'Gray') { $intent = 2 } elseif ($ColorMode -eq 'Lineart') { $intent = 4 }
-        foreach ($p in $item.Properties) {
-          $propId = [int]$p.PropertyID
-          try {
-            if ($propId -eq 6146) { $p.Value = $intent }
-            elseif ($propId -eq 6147 -or $propId -eq 6148) { $p.Value = $Dpi }
-          } catch { Write-Err ('WIA: Eigenschaft ' + $propId + ' nicht setzbar: ' + $_.Exception.Message) }
-        }
-      } catch { Write-Err ('WIA: DPI/Farbmodus nicht setzbar: ' + $_.Exception.Message) }
-      $maxPages = 1
-      if ($Source -ne 'Flatbed') { $maxPages = 200 }
-      for ($k = 0; $k -lt $maxPages; $k++) {
-        $img = $null
-        try {
-          $img = $item.Transfer($fmtBmp)
-        } catch {
-          $m = $_.Exception.Message
-          $hr = 0
-          try { $hr = $_.Exception.HResult } catch { }
-          if ($k -gt 0 -and ($hr -eq -2145320957 -or $m -match 'empty|leer|paper|Papier')) { break }
-          throw
-        }
-        if ($null -eq $img) { break }
-        $path = Next-Path $base (Image-Ext $img)
-        if (-not (Save-Image $img $path)) { throw 'WIA: Bild konnte nicht gespeichert werden (unerwarteter Rückgabetyp).' }
-        Write-Result $path
-        $saved++
-      }
-    }
-  }
-  if ($saved -eq 0) {
+  if ($UseDialog) {
+    # Nur mit Watchdog (ILD killt wiaacmgr-Baum bei Timeout). Nie stiller Fallback.
+    $cd = New-Object -ComObject WIA.CommonDialog
     $img = $cd.ShowAcquireImage()
     if ($null -eq $img) { Write-Output 'CANCELLED'; exit 3 }
     $path = Next-Path $base (Image-Ext $img)
     if (-not (Save-Image $img $path)) { throw 'WIA: Bild konnte nicht gespeichert werden (Dialog).' }
     Write-Result $path
     $saved++
+    exit 0
+  }
+  if (-not ($DeviceId -or $DeviceName)) {
+    Write-Err 'WIA: kein Gerät und kein Dialog — Abbruch (kein CommonDialog-Fallback).'
+    exit 1
+  }
+  $dm = New-Object -ComObject WIA.DeviceManager
+  $info = $null
+  foreach ($d in $dm.DeviceInfos) {
+    $did = ''
+    $dname = ''
+    try { $did = [string]$d.DeviceID } catch { }
+    try { $dname = [string]$d.Properties.Item('Name').Value } catch { }
+    if ($DeviceId -and $did -eq $DeviceId) { $info = $d; break }
+    if ($DeviceName -and $dname -and ($dname -eq $DeviceName -or $dname -like ('*' + $DeviceName + '*') -or $DeviceName -like ('*' + $dname + '*'))) { $info = $d; break }
+  }
+  if ($null -eq $info) {
+    Write-Err ("WIA: Gerät nicht gefunden (" + $DeviceId + " / " + $DeviceName + ") — kein Windows-Scannerdialog.")
+    exit 1
+  }
+  $dev = $info.Connect()
+  try {
+    if ($Source -ne 'Flatbed') {
+      $sel = 1
+      if ($Source -like '*Duplex*') { $sel = $sel -bor 4 }
+      foreach ($p in $dev.Properties) { if ([int]$p.PropertyID -eq 3088) { $p.Value = $sel; break } }
+    }
+  } catch { Write-Err ('WIA: Papierquelle nicht setzbar: ' + $_.Exception.Message) }
+  try { $item = $dev.Items.Item(1) } catch { foreach ($i in $dev.Items) { $item = $i; break } }
+  if ($null -eq $item) { throw 'WIA: Scanner-Item nicht gefunden (Gerät ohne Items).' }
+  try {
+    $intent = 1
+    if ($ColorMode -eq 'Gray') { $intent = 2 } elseif ($ColorMode -eq 'Lineart') { $intent = 4 }
+    foreach ($p in $item.Properties) {
+      $propId = [int]$p.PropertyID
+      try {
+        if ($propId -eq 6146) { $p.Value = $intent }
+        elseif ($propId -eq 6147 -or $propId -eq 6148) { $p.Value = $Dpi }
+      } catch { Write-Err ('WIA: Eigenschaft ' + $propId + ' nicht setzbar: ' + $_.Exception.Message) }
+    }
+  } catch { Write-Err ('WIA: DPI/Farbmodus nicht setzbar: ' + $_.Exception.Message) }
+  $maxPages = 1
+  if ($Source -ne 'Flatbed') { $maxPages = 200 }
+  for ($k = 0; $k -lt $maxPages; $k++) {
+    $img = $null
+    try {
+      $img = $item.Transfer($fmtBmp)
+    } catch {
+      $m = $_.Exception.Message
+      $hr = 0
+      try { $hr = $_.Exception.HResult } catch { }
+      if ($k -gt 0 -and ($hr -eq -2145320957 -or $m -match 'empty|leer|paper|Papier')) { break }
+      throw
+    }
+    if ($null -eq $img) { break }
+    $path = Next-Path $base (Image-Ext $img)
+    if (-not (Save-Image $img $path)) { throw 'WIA: Bild konnte nicht gespeichert werden (unerwarteter Rückgabetyp).' }
+    Write-Result $path
+    $saved++
+  }
+  if ($saved -eq 0) {
+    Write-Err 'WIA: kein Bild übertragen (kein CommonDialog-Fallback).'
+    exit 1
   }
   exit 0
 } catch {
@@ -1009,6 +1045,7 @@ try {
   if ($saved -gt 0) { exit 0 }
   exit 1
 }
+
 """
 
 
@@ -1118,8 +1155,6 @@ def _run_wia(
     scan_log(f"WIA start: {attempt.command}")
     t0 = time.monotonic()
     wia_timeout = min(float(job.timeout or DEFAULT_TIMEOUT_S), float(WIA_HANG_TIMEOUT_S))
-    if use_dialog:
-        wia_timeout = float(job.timeout or DEFAULT_TIMEOUT_S)
     rc, out, err, to = run_process(cmd, timeout=wia_timeout, cwd=str(out_dir))
     attempt.returncode, attempt.stdout, attempt.stderr, attempt.timed_out = rc, out, err, to
     attempt.duration_s = time.monotonic() - t0
@@ -1377,7 +1412,11 @@ class _Step:
 
 
 def _job_looks_network(job: ScanJob) -> bool:
+    from instantlensdoc.core.scan_procs import name_looks_network_mfp
+
     blob = f"{job.device_id} {job.device_name} {job.device_backend}".lower()
+    if name_looks_network_mfp(blob):
+        return True
     if any(
         x in blob
         for x in (
@@ -1394,8 +1433,8 @@ def _job_looks_network(job: ScanJob) -> bool:
         return True
     if classify_device_id(job.device_id, job.device_backend) == "escl":
         return True
-    for did, _dn, dbe in job.fallback_devices or []:
-        if classify_device_id(did, dbe) == "escl":
+    for did, dn, dbe in job.fallback_devices or []:
+        if classify_device_id(did, dbe) == "escl" or name_looks_network_mfp(f"{did} {dn} {dbe}"):
             return True
     return False
 
@@ -1444,6 +1483,29 @@ def _steps_for_device(device_id: str, device_name: str, device_backend: str, *, 
     if naps2_ok and name:
         steps.append(_Step("naps2", "", name, "wia"))
     return steps
+
+
+def _escl_step_from_cache(name: str) -> Optional[_Step]:
+    """Netzwerk-MFP (ECOSYS): eSCL-ID aus der letzten Geräteliste, wenn Auto WIA vermieden wird."""
+    key = clean_device_name(name).strip().lower()
+    if not key:
+        return None
+    try:
+        from instantlensdoc.core.devices import load_cached_discovery
+    except Exception:
+        return None
+    try:
+        cached = load_cached_discovery()
+    except Exception:
+        return None
+    for d in getattr(cached, "scanners", ()) or ():
+        did = str(getattr(d, "device_id", "") or "")
+        if classify_device_id(did, str(getattr(d, "backend", "") or "")) != "escl":
+            continue
+        other = clean_device_name(str(getattr(d, "name", "") or "")).strip().lower()
+        if key in other or other in key:
+            return _Step("escl", did, clean_device_name(getattr(d, "name", "") or name))
+    return None
 
 
 def plan_steps(job: ScanJob) -> List[_Step]:
@@ -1497,7 +1559,16 @@ def plan_steps(job: ScanJob) -> List[_Step]:
             steps.append(_Step("wia-dialog"))
         if skip_wia:
             escl_steps = [s for s in steps if s.kind == "escl"]
-            rest = [s for s in steps if s.kind != "escl" and s.kind != "wia"]
+            if not escl_steps:
+                extra = _escl_step_from_cache(name)
+                if extra is not None:
+                    escl_steps = [extra]
+            rest = [
+                s
+                for s in steps
+                if s.kind not in ("escl", "wia", "wia-dialog")
+                and not (s.kind == "naps2" and s.driver == "wia")
+            ]
             steps = escl_steps + rest
     seen: set = set()
     uniq: List[_Step] = []

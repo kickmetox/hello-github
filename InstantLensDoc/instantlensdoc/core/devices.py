@@ -375,13 +375,25 @@ def _list_printers_win32print() -> tuple[List[DeviceInfo], List[str]]:
 
 
 def _run_powershell(script: str, *, timeout: float = DISCOVERY_STEP_TIMEOUT_S) -> tuple[str, str, int]:
-    """PowerShell ausführen; (stdout, stderr, returncode). Kill nach Timeout."""
+    """PowerShell ausführen; (stdout, stderr, returncode). Kill nach Timeout inkl. Baum."""
     if platform.system() != "Windows":
         return "", "not-windows", -1
     ps = shutil.which("powershell") or shutil.which("pwsh")
     if not ps:
         return "", "PowerShell nicht gefunden", -1
+    from instantlensdoc.core.scan_procs import (
+        kill_new_since,
+        kill_process_tree,
+        register_pid,
+        snapshot_scan_pids,
+        unregister_pid,
+    )
+
     kwargs = dict(_subprocess_kwargs())
+    flags = int(kwargs.get("creationflags") or 0)
+    flags |= int(getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0x00000200) or 0)
+    kwargs["creationflags"] = flags
+    before = snapshot_scan_pids()
     try:
         proc = subprocess.Popen(
             [
@@ -401,11 +413,19 @@ def _run_powershell(script: str, *, timeout: float = DISCOVERY_STEP_TIMEOUT_S) -
         )
     except Exception as e:
         return "", str(e), -1
+    register_pid(proc.pid)
     try:
         out, err = proc.communicate(timeout=timeout)
     except subprocess.TimeoutExpired:
         try:
-            proc.kill()
+            kill_process_tree(proc.pid)
+        except Exception:
+            try:
+                proc.kill()
+            except Exception:
+                pass
+        try:
+            kill_new_since(before)
         except Exception:
             pass
         try:
@@ -415,6 +435,8 @@ def _run_powershell(script: str, *, timeout: float = DISCOVERY_STEP_TIMEOUT_S) -
         return "", "PowerShell Timeout", -1
     except Exception as e:
         return "", str(e), -1
+    finally:
+        unregister_pid(proc.pid)
     return (out or ""), (err or ""), int(proc.returncode or 0)
 
 
@@ -562,6 +584,13 @@ def device_is_network(d: DeviceInfo) -> bool:
         return True
     if any(x in name for x in ("netzwerk", "network", "escl", "airscan")):
         return True
+    try:
+        from instantlensdoc.core.scan_procs import name_looks_network_mfp
+
+        if name_looks_network_mfp(name) or name_looks_network_mfp(did):
+            return True
+    except Exception:
+        pass
     return False
 
 

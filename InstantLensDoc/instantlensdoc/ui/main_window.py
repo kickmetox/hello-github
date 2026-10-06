@@ -406,6 +406,12 @@ class MainWindow(QMainWindow):
             self._save_session()
         except Exception:
             pass
+        try:
+            from instantlensdoc.core.scan_procs import kill_tracked_scan_children
+
+            kill_tracked_scan_children(wia_orphans=True)
+        except Exception:
+            pass
         if self._tray is not None:
             self._tray.hide()
         super().closeEvent(event)

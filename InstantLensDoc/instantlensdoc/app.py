@@ -413,6 +413,16 @@ def main(argv: list[str] | None = None) -> int:
 
     app = QApplication(qt_argv)
     apply_theme(app)
+    try:
+        from instantlensdoc.core.scan_procs import (
+            kill_tracked_scan_children,
+            reap_orphan_scan_children,
+        )
+
+        reap_orphan_scan_children()
+        app.aboutToQuit.connect(lambda: kill_tracked_scan_children(wia_orphans=True))
+    except Exception:
+        pass
     # OS-Theme-Wechsel live nachziehen wenn „System folgen“ — 1.4.2
     install_system_theme_watch()
     app.setApplicationName(DISPLAY_NAME)
