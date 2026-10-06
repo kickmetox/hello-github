@@ -1220,12 +1220,36 @@ class DtpPane(QWidget):
             if fr.kind != "text":
                 continue
             self.doc.apply_font_attrs(
-                fr.id, family=family, size=size, weight=weight, italic=italic, color=color
+                fr.id,
+                family=family,
+                size=size,
+                weight=weight,
+                italic=italic,
+                color=None,
+                clear_rich=not bool(color),
             )
+            if color:
+                self._apply_frame_glyph_color(fr.id, color)
         self._refresh_after_tool(hit, rebuild=False)
         self._on_selection_chrome()
         self.statusMessage.emit(f"Schrift {hit.scope} ({len(hit.frames)})")
         return hit
+
+    def _apply_frame_glyph_color(self, frame_id: str, color: str) -> None:
+        """Glyphenfarbe (setForeground), nicht Rahmen-Füllung."""
+        q = QColor(str(color or ""))
+        if not q.isValid():
+            return
+        it = (getattr(self.scene, "_items", None) or {}).get(frame_id)
+        if it is None or it.text_item is None:
+            return
+        cur = QTextCursor(it.text_item.document())
+        cur.select(QTextCursor.Document)
+        fmt = QTextCharFormat()
+        fmt.setForeground(q)
+        cur.mergeCharFormat(fmt)
+        it.text_item.setDefaultTextColor(q)
+        it.commit_rich()
 
     def apply_wrap_mode(self, mode: str | None = None, *, dialog: bool = False) -> ToolHit:
         if dialog or not mode:

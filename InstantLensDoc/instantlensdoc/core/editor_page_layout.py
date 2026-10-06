@@ -18,6 +18,18 @@ SCOPES: tuple[str, ...] = ("rich", "all", "off")
 ORIENTATIONS: tuple[str, ...] = ("portrait", "landscape")
 CUSTOM_PRESET = "Benutzerdefiniert"
 
+# Word-Seitenränder (oben, unten, links, rechts) in mm.
+MARGIN_PRESETS: dict[str, tuple[float, float, float, float]] = {
+    "normal": (25.0, 20.0, 25.0, 20.0),
+    "schmal": (12.7, 12.7, 12.7, 12.7),
+    "breit": (25.4, 25.4, 50.8, 50.8),
+}
+MARGIN_PRESET_ALIASES: dict[str, str] = {
+    "narrow": "schmal",
+    "wide": "breit",
+    "standard": "normal",
+}
+
 
 def page_presets() -> list[tuple[str, float, float]]:
     """(Name, Breite pt, Höhe pt) — DTP-Reihenfolge, Duplikate (gleiche Maße) entfernt."""
@@ -204,6 +216,30 @@ class EditorPageLayout:
         self.margin_right_mm = float(sp.margin_outside_mm)
         self._clamp()
         return self
+
+    def set_margins(
+        self,
+        top_mm: float,
+        bottom_mm: float,
+        left_mm: float,
+        right_mm: float,
+    ) -> "EditorPageLayout":
+        """Seitenränder in Millimeter setzen (Word-Benutzerdefiniert)."""
+        self.margin_top_mm = float(top_mm)
+        self.margin_bottom_mm = float(bottom_mm)
+        self.margin_left_mm = float(left_mm)
+        self.margin_right_mm = float(right_mm)
+        self._clamp()
+        return self
+
+    def apply_margin_preset(self, name: str) -> "EditorPageLayout":
+        """Normal / Schmal / Breit — Word-Seitenränder."""
+        key = str(name or "").strip().lower().replace(" ", "")
+        key = MARGIN_PRESET_ALIASES.get(key, key)
+        vals = MARGIN_PRESETS.get(key)
+        if vals is None:
+            return self
+        return self.set_margins(*vals)
 
     def with_preset(self, name: str) -> "EditorPageLayout":
         raw = (name or "").strip()

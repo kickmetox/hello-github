@@ -13,6 +13,8 @@ from PySide6.QtGui import QAction, QIcon, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
+    QLabel,
+    QMenu,
     QPushButton,
     QSizePolicy,
     QStackedWidget,
@@ -111,6 +113,27 @@ class _OverflowPanel(QWidget):
         )
 
 
+class _RibbonGroup(QWidget):
+    """Beschriftete Word-Gruppe (Seite einrichten / Absatz / Anordnen)."""
+
+    def __init__(self, title: str, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setObjectName("ribbonGroup")
+        self.setStyleSheet(
+            "QWidget#ribbonGroup { border-right: 1px solid #C5CCD6; }"
+            "QLabel#ribbonGroupTitle { color: #5A6A7A; font-size: 10px; }"
+        )
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(4, 0, 6, 0)
+        lay.setSpacing(0)
+        self.panel = _OverflowPanel(self)
+        lab = QLabel(title)
+        lab.setObjectName("ribbonGroupTitle")
+        lab.setAlignment(Qt.AlignHCenter)
+        lay.addWidget(self.panel, 1)
+        lay.addWidget(lab)
+
+
 class RibbonBar(QWidget):
     """
     Ribbon-Chrome: Word-Tabs + InstantLens (Geräte/PDF/DTP).
@@ -171,6 +194,7 @@ class RibbonBar(QWidget):
         self._action_buttons: dict[str, list[QToolButton]] = {}
         self._tab_index: dict[str, int] = {}
         self._table_tab_index = -1
+        self._arrange_group: QWidget | None = None
         self.style_gallery: StyleGallery | None = None
 
         checkable = {
@@ -187,6 +211,7 @@ class RibbonBar(QWidget):
             "chrome_kombiniert",
             "table_header_row",
             "table_borders",
+            "line_numbers",
         }
 
         def _icon_for(aid: str) -> QIcon | None:
@@ -225,6 +250,125 @@ class RibbonBar(QWidget):
             self._action_buttons.setdefault(aid, []).append(tb)
             panel.add_item(tb)
             return tb
+
+        def _add_menu_button(
+            panel: _OverflowPanel,
+            aid: str,
+            label: str,
+            items: tuple[tuple[str, str], ...],
+        ) -> QToolButton:
+            tb = QToolButton()
+            tb.setText(label)
+            tb.setObjectName(f"ribbonAction_{aid}")
+            tb.setProperty("ribbonActionId", aid)
+            tb.setToolTip(label)
+            tb.setAutoRaise(False)
+            tb.setPopupMode(QToolButton.InstantPopup)
+            menu = QMenu(tb)
+            menu.setObjectName(f"ribbonMenu_{aid}")
+            for item_aid, item_label in items:
+                act = QAction(item_label, tb)
+                act.setObjectName(f"ribbonMenuAction_{item_aid}")
+                act.triggered.connect(
+                    lambda _checked=False, a=item_aid: self.action_triggered.emit(a)
+                )
+                menu.addAction(act)
+            tb.setMenu(menu)
+            self._actions.setdefault(aid, tb)
+            self._action_buttons.setdefault(aid, []).append(tb)
+            panel.add_item(tb)
+            return tb
+
+        def _build_layout_tab() -> QWidget:
+            wrap = QWidget()
+            wrap.setObjectName("ribbonLayoutTab")
+            row = QHBoxLayout(wrap)
+            row.setContentsMargins(0, 0, 0, 0)
+            row.setSpacing(0)
+            g_page = _RibbonGroup("Seite einrichten", wrap)
+            g_page.panel.overflow_picked.connect(self.action_triggered.emit)
+            _add_menu_button(
+                g_page.panel,
+                "page_margins",
+                "Seitenränder",
+                (
+                    ("page_margins_normal", "Normal"),
+                    ("page_margins_narrow", "Schmal"),
+                    ("page_margins_wide", "Breit"),
+                    ("page_margins_custom", "Benutzerdefiniert…"),
+                ),
+            )
+            _add_menu_button(
+                g_page.panel,
+                "page_orientation",
+                "Ausrichtung",
+                (
+                    ("page_portrait", "Hochformat"),
+                    ("page_landscape", "Querformat"),
+                ),
+            )
+            _add_menu_button(
+                g_page.panel,
+                "page_size",
+                "Format",
+                (
+                    ("page_size_a4", "A4"),
+                    ("page_size_letter", "Letter"),
+                    ("page_size_legal", "Legal"),
+                    ("page_layout", "Benutzerdefiniert…"),
+                ),
+            )
+            _add_menu_button(
+                g_page.panel,
+                "page_columns",
+                "Spalten",
+                (
+                    ("page_columns_1", "1 Spalte"),
+                    ("page_columns_2", "2 Spalten"),
+                    ("page_columns_3", "3 Spalten"),
+                ),
+            )
+            _add_menu_button(
+                g_page.panel,
+                "page_breaks",
+                "Umbrüche",
+                (
+                    ("insert_break", "Seitenumbruch"),
+                    ("section_break", "Abschnittsumbruch"),
+                ),
+            )
+            _add_button(g_page.panel, "line_numbers", "Zeilennummern")
+            _add_menu_button(
+                g_page.panel,
+                "hyphenate",
+                "Silbentrennung",
+                (
+                    ("hyphenate_de", "Deutsch"),
+                    ("hyphenate_en", "English"),
+                    ("hyphenate_fr", "Français"),
+                    ("hyphenate_es", "Español"),
+                    ("hyphenate_it", "Italiano"),
+                ),
+            )
+            _add_button(g_page.panel, "page_layout", "Seitenlayout…")
+            row.addWidget(g_page, 1)
+
+            g_para = _RibbonGroup("Absatz", wrap)
+            g_para.panel.overflow_picked.connect(self.action_triggered.emit)
+            _add_button(g_para.panel, "outdent", "Einzug −")
+            _add_button(g_para.panel, "indent", "Einzug +")
+            _add_button(g_para.panel, "paragraph", "Abstand…")
+            row.addWidget(g_para)
+
+            g_arr = _RibbonGroup("Anordnen", wrap)
+            g_arr.setObjectName("ribbonArrangeGroup")
+            g_arr.panel.overflow_picked.connect(self.action_triggered.emit)
+            _add_button(g_arr.panel, "bring_forward", "Vorwärts")
+            _add_button(g_arr.panel, "send_backward", "Rückwärts")
+            row.addWidget(g_arr)
+            self._arrange_group = g_arr
+            row.addStretch(1)
+            return wrap
 
         panels: list[tuple[str, tuple[tuple[str, str], ...], bool, bool]] = [
             (
@@ -286,27 +430,7 @@ class RibbonBar(QWidget):
             ),
             (
                 "Layout",
-                (
-                    ("page_layout", "Seitenlayout…"),
-                    ("paragraph", "Absatz…"),
-                    ("align_left", "Links"),
-                    ("align_center", "Zentriert"),
-                    ("align_right", "Rechts"),
-                    ("align_justify", "Blocksatz"),
-                    ("bullet_list", "Aufzählung"),
-                    ("numbered_list", "Nummerierung"),
-                    ("header_footer", "Kopf-/Fußzeile"),
-                    ("page_portrait", "Hochformat"),
-                    ("page_landscape", "Querformat"),
-                    ("page_size_a4", "A4"),
-                    ("page_size_letter", "Letter"),
-                    ("page_size_legal", "Legal"),
-                    ("page_columns_1", "1 Spalte"),
-                    ("page_columns_2", "2 Spalten"),
-                    ("page_columns_3", "3 Spalten"),
-                    ("section_break", "Abschnittsumbruch"),
-                    ("field_token", "Ersatzzeichen"),
-                ),
+                (),
                 False,
                 False,
             ),
@@ -499,6 +623,10 @@ class RibbonBar(QWidget):
                 self._table_tab_index = i
                 btn.hide()
 
+            if title == "Layout":
+                self._stack.addWidget(_build_layout_tab())
+                continue
+
             panel = _OverflowPanel()
             panel.overflow_picked.connect(self.action_triggered.emit)
             if with_gallery:
@@ -524,6 +652,7 @@ class RibbonBar(QWidget):
         self._select_cat(1 if self.category_count() > 1 else 0)
         self._install_alt_shortcuts()
         self.set_table_tools_visible(False)
+        self.set_arrange_visible(False)
 
     def _install_alt_shortcuts(self) -> None:
         """Alt+1…8 → Ribbon-Kategorie (praktische Alt-Parity)."""
@@ -570,6 +699,11 @@ class RibbonBar(QWidget):
             start = self._tab_index.get("Start", 1)
             self._select_cat(start)
 
+    def set_arrange_visible(self, visible: bool) -> None:
+        g = getattr(self, "_arrange_group", None)
+        if g is not None:
+            g.setVisible(bool(visible))
+
     def set_checked(self, action_id: str, checked: bool) -> None:
         for btn in self._action_buttons.get(action_id, ()) or ():
             if btn is not None and btn.isCheckable():
@@ -613,6 +747,8 @@ class RibbonBar(QWidget):
                 continue
             self._qactions[str(aid)] = act
             for tb in self._action_buttons.get(aid, ()):
+                if tb.menu() is not None:
+                    continue
                 label = tb.text()
                 icon = tb.icon()
                 style = tb.toolButtonStyle()

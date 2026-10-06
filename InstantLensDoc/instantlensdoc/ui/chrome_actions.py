@@ -88,6 +88,14 @@ CHROME_FEATURE_ACTION_IDS: dict[str, tuple[str, ...]] = {
         "page_columns_2",
         "page_columns_3",
         "section_break",
+        "page_margins_normal",
+        "page_margins_narrow",
+        "page_margins_wide",
+        "page_margins_custom",
+        "line_numbers",
+        "hyphenate",
+        "bring_forward",
+        "send_backward",
     ),
     "Kopf/Fuß": ("header_footer",),
     "Ersatzzeichen": ("field_token",),
@@ -104,6 +112,10 @@ CHROME_TAB_ACTION_IDS: dict[str, tuple[str, ...]] = {
         *CHROME_FEATURE_ACTION_IDS["Ausrichtung"][:4],
         *CHROME_FEATURE_ACTION_IDS["Listen"][:2],
         *CHROME_FEATURE_ACTION_IDS["Kopf/Fuß"],
+        "paragraph",
+        "indent",
+        "outdent",
+        "insert_break",
     ),
     "Einfügen": (
         *CHROME_FEATURE_ACTION_IDS["Kopf/Fuß"],
@@ -148,6 +160,16 @@ CHROME_ACTION_OBJECT_NAMES: dict[str, str] = {
     "header_footer": "actHeaderFooter",
     "field_token": "actFieldToken",
     "insert_break": "actEditInsertPageBreak",
+    "page_margins_normal": "actPageMarginsNormal",
+    "page_margins_narrow": "actPageMarginsNarrow",
+    "page_margins_wide": "actPageMarginsWide",
+    "page_margins_custom": "actPageMarginsCustom",
+    "line_numbers": "actLineNumbers",
+    "hyphenate": "actHyphenate",
+    "indent": "actEditIndent",
+    "outdent": "actEditOutdent",
+    "bring_forward": "actArrangeBringForward",
+    "send_backward": "actArrangeSendBackward",
 }
 
 CHROME_ACTION_ATTRS: tuple[tuple[str, str], ...] = (
@@ -162,6 +184,10 @@ CHROME_ACTION_ATTRS: tuple[tuple[str, str], ...] = (
     ("line_spacing_15", "_act_spacing_15"),
     ("page_layout", "_page_layout_action"),
     ("field_token", "_field_token_action"),
+    ("line_numbers", "_line_numbers_action"),
+    ("hyphenate", "_hyphenate_action"),
+    ("indent", "_act_indent"),
+    ("outdent", "_act_outdent"),
 )
 
 

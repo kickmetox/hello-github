@@ -270,6 +270,7 @@ class MainWindow(QMainWindow):
         self._last_tab_close_ms: float = 0.0  # Diagnose: Dauer des letzten Tab-Schließens
         self._editor_only_actions: list = []
         self._editor_only_menus: list = []
+        self._hyphenate_action = None
         self._last_backup_path = None  # Pfad der letzten Backup-Datei — 1.0.1
         self._last_outline_export_dir = None  # Zielordner Outlines-Export — 1.3.4
         self._last_text_pdf_status_path = None  # Text→PDF Status-Klick → Ordner — 1.7.4
@@ -2081,9 +2082,12 @@ class MainWindow(QMainWindow):
         m_edit.addAction(self._track_editor_action(act_font_size))
         act_font_color = QAction("Schriftfarbe…", self)
         act_font_color.setObjectName("actEditFontColor")
-        act_font_color.setToolTip("Textfarbe (QColorDialog)")
+        act_font_color.setToolTip(
+            "Glyphenfarbe (QColorDialog / QTextCharFormat.setForeground) — "
+            "DOCX, OCR, Klartext, PDF-Text, DTP-Rahmen"
+        )
         act_font_color.triggered.connect(self._choose_font_color)
-        m_edit.addAction(self._track_editor_action(act_font_color))
+        m_edit.addAction(act_font_color)
         act_highlight = QAction("Texthervorhebung…", self)
         act_highlight.setObjectName("actEditHighlight")
         act_highlight.setToolTip(
@@ -2436,12 +2440,14 @@ class MainWindow(QMainWindow):
         self._autocorrect_action = act_ac
         act_indent = QAction("Einrückung erhöhen", self)
         act_indent.setShortcut(QKeySequence("Ctrl+]"))
+        act_indent.setObjectName("actEditIndent")
         act_indent.setToolTip("Zeilen/Block einrücken (auch Tab)")
         act_indent.triggered.connect(self._indent_selection)
         m_edit.addAction(self._track_editor_action(act_indent))
         self._act_indent = act_indent
         act_outdent = QAction("Einrückung verringern", self)
         act_outdent.setShortcut(QKeySequence("Ctrl+["))
+        act_outdent.setObjectName("actEditOutdent")
         act_outdent.setToolTip("Zeilen/Block ausrücken (auch Shift+Tab)")
         act_outdent.triggered.connect(self._outdent_selection)
         m_edit.addAction(self._track_editor_action(act_outdent))
@@ -2718,6 +2724,7 @@ class MainWindow(QMainWindow):
         self._workspace_layout_menu = m_view.addMenu("Arbeitsbereich-Layouts")
         self._refresh_workspace_layout_menu()
         self._line_numbers_action = QAction("Zeilennummern", self)
+        self._line_numbers_action.setObjectName("actLineNumbers")
         self._line_numbers_action.setCheckable(True)
         from instantlensdoc.core.app_settings import (
             get_editor_line_numbers,
@@ -4217,6 +4224,42 @@ class MainWindow(QMainWindow):
             )
             m_seiten.addAction(self._track_editor_action(act_c))
         m_seiten.addSeparator()
+        m_rand = m_seiten.addMenu("Seitenränder")
+        m_rand.setObjectName("menuPageMargins")
+        for key, objn, lab in (
+            ("normal", "actPageMarginsNormal", "Normal"),
+            ("schmal", "actPageMarginsNarrow", "Schmal"),
+            ("breit", "actPageMarginsWide", "Breit"),
+        ):
+            act_m = QAction(lab, self)
+            act_m.setObjectName(objn)
+            act_m.setToolTip(f"Seitenränder {lab} (mm)")
+            act_m.triggered.connect(
+                lambda _c=False, k=key: self._apply_margin_preset(k)
+            )
+            m_rand.addAction(self._track_editor_action(act_m))
+        act_m_custom = QAction("Benutzerdefiniert…", self)
+        act_m_custom.setObjectName("actPageMarginsCustom")
+        act_m_custom.setToolTip("Seitenränder in Millimeter")
+        act_m_custom.triggered.connect(self._show_custom_margins_dialog)
+        m_rand.addAction(self._track_editor_action(act_m_custom))
+        act_hy = QAction("Silbentrennung", self)
+        act_hy.setObjectName("actHyphenate")
+        act_hy.setToolTip("Silbentrennung Deutsch")
+        act_hy.triggered.connect(lambda: self._hyphenate_document("de"))
+        m_seiten.addAction(self._track_editor_action(act_hy))
+        self._hyphenate_action = act_hy
+        act_fwd = QAction("Vorwärts", self)
+        act_fwd.setObjectName("actArrangeBringForward")
+        act_fwd.setToolTip("Ausgewählte Rahmen nach vorn")
+        act_fwd.triggered.connect(self._arrange_bring_forward)
+        m_seiten.addAction(act_fwd)
+        act_back = QAction("Rückwärts", self)
+        act_back.setObjectName("actArrangeSendBackward")
+        act_back.setToolTip("Ausgewählte Rahmen nach hinten")
+        act_back.triggered.connect(self._arrange_send_backward)
+        m_seiten.addAction(act_back)
+        m_seiten.addSeparator()
         act_sec = QAction("Abschnittsumbruch einfügen", self)
         act_sec.setObjectName("actInsertSectionBreak")
         act_sec.triggered.connect(self._insert_section_break)
@@ -4829,7 +4872,6 @@ class MainWindow(QMainWindow):
             "durchgestrichen",
             "schriftart",
             "schriftgröße",
-            "schriftfarbe",
             "texthervorhebung",
             "hintergrundfarbe",
             "textmarker",
@@ -5047,6 +5089,12 @@ class MainWindow(QMainWindow):
                             self._set_action_available(
                                 a, is_pdf, "Nur bei geöffnetem PDF verfügbar"
                             )
+                    elif "schriftfarbe" in label:
+                        self._set_action_available(
+                            a,
+                            bool(is_editor or is_pdf),
+                            "Schriftfarbe: Editor, OCR, PDF-Text oder DTP",
+                        )
                     elif self._label_is_editor_only(label) or parent.strip().lower() == "absatz":
                         self._set_action_available(
                             a,
@@ -5275,7 +5323,6 @@ class MainWindow(QMainWindow):
                 "outdent",
                 "clear_formatting",
                 "font",
-                "font_color",
                 "paragraph",
                 "header_footer",
                 "insert_special_chars",
@@ -5299,11 +5346,14 @@ class MainWindow(QMainWindow):
                 "table_align_center",
                 "table_align_right",
             }
+            color_ids = {"font_color"}
             for aid, btn in (getattr(rb, "_actions", {}) or {}).items():
                 if aid in always:
                     on = True
                 elif aid in pdf_ids:
                     on = bool(is_pdf)
+                elif aid in color_ids:
+                    on = bool(is_editor or is_pdf)
                 elif aid in editor_ids:
                     on = bool(is_editor)
                 else:
@@ -5320,6 +5370,10 @@ class MainWindow(QMainWindow):
                     tb.setEnabled(bool(is_editor))
                 except Exception:
                     pass
+        try:
+            self._sync_layout_arrange()
+        except Exception:
+            pass
 
     def _refresh_recent(self):
         # Fehlende Dateien aus der persistierten Liste streichen — 2.6.54
@@ -8930,6 +8984,8 @@ class MainWindow(QMainWindow):
         for aid, attr in (
             ("undo", "_undo_action"),
             ("redo", "_redo_action"),
+            ("line_numbers", "_line_numbers_action"),
+            ("hyphenate", "_hyphenate_action"),
             ("page_layout", "_page_layout_action"),
             ("book_layout", "_book_layout_action"),
             ("page_by_page", "_page_by_page_action"),
@@ -9101,6 +9157,29 @@ class MainWindow(QMainWindow):
             "page_columns_1": lambda: self._apply_page_columns(1),
             "page_columns_2": lambda: self._apply_page_columns(2),
             "page_columns_3": lambda: self._apply_page_columns(3),
+            "page_margins": self._show_custom_margins_dialog,
+            "page_margins_normal": lambda: self._apply_margin_preset("normal"),
+            "page_margins_narrow": lambda: self._apply_margin_preset("schmal"),
+            "page_margins_wide": lambda: self._apply_margin_preset("breit"),
+            "page_margins_custom": self._show_custom_margins_dialog,
+            "page_orientation": lambda: self._apply_page_orientation("portrait"),
+            "page_size": self._show_page_layout_dialog,
+            "page_columns": lambda: self._apply_page_columns(1),
+            "page_breaks": lambda: self._insert_break("page"),
+            "line_numbers": lambda: self._toggle_line_numbers(
+                not bool(
+                    getattr(self, "_line_numbers_action", None)
+                    and self._line_numbers_action.isChecked()
+                )
+            ),
+            "hyphenate": lambda: self._hyphenate_document("de"),
+            "hyphenate_de": lambda: self._hyphenate_document("de"),
+            "hyphenate_en": lambda: self._hyphenate_document("en"),
+            "hyphenate_fr": lambda: self._hyphenate_document("fr"),
+            "hyphenate_es": lambda: self._hyphenate_document("es"),
+            "hyphenate_it": lambda: self._hyphenate_document("it"),
+            "bring_forward": self._arrange_bring_forward,
+            "send_backward": self._arrange_send_backward,
             "cell_align_top": lambda: self._set_cell_vertical_align("top"),
             "cell_align_middle": lambda: self._set_cell_vertical_align("middle"),
             "cell_align_bottom": lambda: self._set_cell_vertical_align("bottom"),
@@ -9180,6 +9259,8 @@ class MainWindow(QMainWindow):
         preset: str | None = None,
         orientation: str | None = None,
         columns: int | None = None,
+        margin_preset: str | None = None,
+        margins_mm: tuple[float, float, float, float] | None = None,
     ) -> None:
         """Menü-Picker: bestehendes EditorPageLayout anwenden — kein neuer Dialog."""
         if not self._guard_editor_action("Seitenlayout"):
@@ -9200,6 +9281,10 @@ class MainWindow(QMainWindow):
             lay.orientation = orientation
         if columns is not None:
             lay.columns = columns if columns in (1, 2, 3) else 1
+        if margin_preset:
+            lay.apply_margin_preset(margin_preset)
+        if margins_mm is not None and len(margins_mm) == 4:
+            lay.set_margins(*margins_mm)
         lay.enabled = True
         if lay.scope == "off":
             lay.scope = "rich"
@@ -9230,6 +9315,56 @@ class MainWindow(QMainWindow):
 
     def _apply_page_columns(self, columns: int) -> None:
         self._apply_editor_page_layout_pick(columns=int(columns))
+
+    def _apply_margin_preset(self, name: str) -> None:
+        self._apply_editor_page_layout_pick(margin_preset=str(name or "normal"))
+
+    def _show_custom_margins_dialog(self) -> None:
+        """Word: Seitenränder → Benutzerdefiniert (Millimeter)."""
+        if not self._guard_editor_action("Seitenränder"):
+            return
+        from instantlensdoc.ui.page_margins_dialog import PageMarginsDialog
+
+        current = self.editor.page_layout()
+        dlg = PageMarginsDialog(current, self)
+        if dlg.exec() != QDialog.Accepted:
+            return
+        self._commit_page_layout(dlg.result_layout())
+
+    def _arrange_bring_forward(self) -> None:
+        if not self._layout_mode_active():
+            self._set_status("Anordnen nur im Layout-Modus (DTP-Rahmen)")
+            return
+        pane = getattr(self, "dtp_pane", None)
+        if pane is None:
+            return
+        pane.bring_forward()
+        self._set_status("Rahmen nach vorn")
+
+    def _arrange_send_backward(self) -> None:
+        if not self._layout_mode_active():
+            self._set_status("Anordnen nur im Layout-Modus (DTP-Rahmen)")
+            return
+        pane = getattr(self, "dtp_pane", None)
+        if pane is None:
+            return
+        pane.send_backward()
+        self._set_status("Rahmen nach hinten")
+
+    def _sync_layout_arrange(self) -> None:
+        rb = getattr(self, "ribbon_bar", None)
+        if rb is None or not hasattr(rb, "set_arrange_visible"):
+            return
+        on = False
+        try:
+            if self._layout_mode_active():
+                pane = getattr(self, "dtp_pane", None)
+                doc = getattr(pane, "doc", None) if pane is not None else None
+                frames = list(getattr(doc, "frames", None) or [])
+                on = bool(frames)
+        except Exception:
+            on = False
+        rb.set_arrange_visible(on)
 
     def _toggle_doc_split_from_ribbon(self) -> None:
         """Ribbon-Toggle für Fenster teilen — 2.6.20."""
@@ -11217,18 +11352,47 @@ class MainWindow(QMainWindow):
         self._set_status(f"Schriftgröße: {size} pt")
 
     def _choose_font_color(self) -> None:
-        if not self._guard_editor_action("Schriftfarbe"):
-            return
+        """Glyphenfarbe in Editor/OCR/Klartext, PDF-Text und DTP-Rahmen."""
         self._defer_format_dialog(self._run_font_color_dialog)
 
+    def _probe_font_color(self) -> QColor:
+        if self._layout_mode_active():
+            try:
+                pane = self.dtp_pane
+                editing = pane.editing_item() if pane is not None else None
+                if editing is not None and editing.text_item is not None:
+                    c = editing.text_item.textCursor().charFormat().foreground().color()
+                    if c.isValid():
+                        return c
+            except Exception:
+                pass
+        if self._pdf_tab_active():
+            try:
+                view = self.pdf_view
+                ids, _scope = view._style_target_ids()
+                for i in ids:
+                    ann = view.store.get(i) if view.store else None
+                    if ann is None:
+                        continue
+                    c0 = QColor(str(getattr(ann, "color", "") or ""))
+                    if c0.isValid():
+                        return c0
+            except Exception:
+                pass
+        try:
+            c = self.editor.currentCharFormat().foreground().color()
+            if c.isValid():
+                return c
+        except Exception:
+            pass
+        return QColor("#000000")
+
     def _run_font_color_dialog(self) -> None:
-        if not self._guard_editor_action("Schriftfarbe"):
-            return
         import os
 
         from PySide6.QtWidgets import QColorDialog
 
-        initial = self.editor.currentCharFormat().foreground().color()
+        initial = self._probe_font_color()
         if os.environ.get("ILD_SMOKE_QT") == "1":
             color = QColorDialog.getColor(initial, self, "Schriftfarbe")
             if color is None or not color.isValid():
@@ -11237,9 +11401,40 @@ class MainWindow(QMainWindow):
             color = QColorDialog.getColor(initial, self, "Schriftfarbe")
         if color is None or not color.isValid():
             return
-        self.editor.apply_font_color(color)
-        self._sync_editor_rich_meta()
-        self._set_status(f"Schriftfarbe: {color.name()}")
+        self._apply_font_color(color)
+
+    def _apply_font_color(self, color: str | QColor) -> None:
+        """Glyph-Farbe (setForeground / Annotation.color), kein Highlight-Fill."""
+        qcolor = color if isinstance(color, QColor) else QColor(str(color or ""))
+        if not qcolor.isValid():
+            self._set_status("Schriftfarbe ungültig")
+            return
+        hexc = qcolor.name()
+        if self._layout_mode_active():
+            pane = getattr(self, "dtp_pane", None)
+            if pane is not None:
+                pane.apply_font(color=hexc, dialog=False)
+                self._set_status(f"Schriftfarbe: {hexc} (DTP)")
+                return
+        if self._pdf_tab_active():
+            view = getattr(self, "pdf_view", None)
+            if view is not None and hasattr(view, "apply_font_color"):
+                n = view.apply_font_color(qcolor)
+                if n:
+                    self._set_status(f"Schriftfarbe: {hexc} ({n} PDF-Text)")
+                else:
+                    self._set_status("Schriftfarbe: kein PDF-Text in Auswahl/Seite")
+                return
+        if self._editor_document_active() or (
+            getattr(self, "stack", None) is not None
+            and getattr(self, "editor_pane", None) is not None
+            and self.stack.currentWidget() is self.editor_pane
+        ):
+            self.editor.apply_font_color(qcolor)
+            self._sync_editor_rich_meta()
+            self._set_status(f"Schriftfarbe: {hexc}")
+            return
+        self._set_status("Schriftfarbe: kein Text-Dokument")
 
     def _choose_highlight_color(self) -> None:
         if not self._guard_editor_action("Texthervorhebung"):
@@ -13370,6 +13565,7 @@ class MainWindow(QMainWindow):
         try:
             self._sync_editor_only_actions()
             self._sync_menu_enablement()
+            self._sync_layout_arrange()
         except Exception:
             pass
 

@@ -4289,6 +4289,44 @@ class PdfViewer(QWidget):
         self.status.emit(f"Schriftgröße {float(size):.0f} pt für {n} Annotation(en)")
         return n
 
+    def apply_font_color(self, color: str | QColor) -> int:
+        """Glyphenfarbe für FreeText/Overlay (ann.color), nicht fill_color/Highlight."""
+        if not self.store:
+            return 0
+        q = color if isinstance(color, QColor) else QColor(str(color or ""))
+        if not q.isValid():
+            return 0
+        hexc = q.name().upper()
+        ids, scope = self._style_target_ids()
+        text_types = {
+            AnnotationType.TEXT,
+            AnnotationType.TEXT_OVERLAY,
+            AnnotationType.STICKY,
+            AnnotationType.CALLOUT,
+            AnnotationType.STAMP,
+        }
+        targets = [
+            i
+            for i in ids
+            if (ann := self.store.get(i)) is not None and ann.type in text_types
+        ]
+        if not targets:
+            self.status.emit("Keine Text-Annotation in der Auswahl/Seite")
+            return 0
+        n = self.store.set_colors(targets, hexc)
+        if n <= 0:
+            return 0
+        try:
+            self.schedule_sidecar_save(force=True)
+        except Exception:
+            pass
+        self.refresh()
+        if scope == "selection":
+            self.canvas.set_selected_ids(self._selected_annotation_ids())
+        self.annotations_changed.emit()
+        self.status.emit(f"Schriftfarbe {hexc} für {n} Annotation(en)")
+        return n
+
     def select_all_text_or_annotations(self) -> int:
         """Globale Aktion ohne Auswahl: alle Annotationen der Seite."""
         return self.select_all_annotations_on_page()

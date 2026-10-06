@@ -23,6 +23,7 @@ from ild_pdf.pages import convert_pt, format_size_pair, pt_to_mm, to_pt
 from instantlensdoc.core.app_settings import get_page_size_unit, set_page_size_unit
 from instantlensdoc.core.editor_page_layout import (
     CUSTOM_PRESET,
+    MARGIN_PRESETS,
     EditorPageLayout,
     page_presets,
     preset_size,
@@ -120,6 +121,14 @@ class PageLayoutDialog(QDialog):
             lab = QLabel(name)
             self._margin_labels[key] = lab
             margin_form.addRow(lab, spin)
+        preset_row = QHBoxLayout()
+        for key, label in (("normal", "Normal"), ("schmal", "Schmal"), ("breit", "Breit")):
+            btn_p = QPushButton(label)
+            btn_p.setObjectName(f"pageLayoutMarginPreset_{key}")
+            btn_p.setToolTip(f"Seitenränder {label} (mm)")
+            btn_p.clicked.connect(lambda _=False, k=key: self._apply_margin_preset(k))
+            preset_row.addWidget(btn_p)
+        margin_form.addRow("Voreinstellung", preset_row)
         btn_sp = QPushButton("Satzspiegel-Vorschlag (DTP)")
         btn_sp.setObjectName("pageLayoutSatzspiegel")
         btn_sp.setToolTip(
@@ -295,6 +304,18 @@ class PageLayoutDialog(QDialog):
             idx = self.preset.findData(hit or CUSTOM_PRESET)
             if idx >= 0:
                 self.preset.setCurrentIndex(idx)
+        finally:
+            self._updating = False
+        self._refresh_info()
+
+    def _apply_margin_preset(self, name: str) -> None:
+        vals = MARGIN_PRESETS.get(str(name or "").lower())
+        if not vals:
+            return
+        self._updating = True
+        try:
+            for spin, mm in zip((self.m_top, self.m_bottom, self.m_left, self.m_right), vals):
+                spin.setValue(convert_pt(to_pt(mm, "mm"), self._unit))
         finally:
             self._updating = False
         self._refresh_info()
