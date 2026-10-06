@@ -3910,6 +3910,22 @@ class MainWindow(QMainWindow):
         }
     )
     _FORMAT_MENU_SUBS = frozenset({"Formatvorlagen", "Silbentrennung"})
+    _ABSATZ_MENU_ORDER = (
+        "Absatz…",
+        None,
+        "Absatz links",
+        "Absatz zentriert",
+        "Absatz rechts",
+        "Absatz Blocksatz",
+        None,
+        "Aufzählungszeichen",
+        "Nummerierung",
+        "Einrückung erhöhen",
+        "Einrückung verringern",
+        None,
+        "Zeilenabstand 1,5",
+        "Zeilenabstand 1,15 (Standard)",
+    )
     _FENSTER_MENU_TEXTS = frozenset(
         {
             "Fenster teilen (zwei Docs)",
@@ -3961,6 +3977,73 @@ class MainWindow(QMainWindow):
                 if text in self._FORMAT_MENU_TEXTS:
                     m_format.addAction(act)
 
+        m_absatz = QMenu("&Absatz", self)
+        m_absatz.setObjectName("menuAbsatz")
+        m_absatz.setToolTip(
+            "Absatzdialog, Ausrichtung, Aufzählung/Nummerierung — Word-Suite/DOCX"
+        )
+        by_edit = {}
+        styles_src = None
+        if m_edit is not None:
+            for act in m_edit.actions():
+                if act.isSeparator():
+                    continue
+                sub = act.menu() if hasattr(act, "menu") else None
+                if sub is not None:
+                    st = (sub.title() or "").replace("&", "").strip()
+                    if st == "Formatvorlagen":
+                        styles_src = sub
+                    continue
+                by_edit[(act.text() or "").replace("&", "").strip()] = act
+        for text in self._ABSATZ_MENU_ORDER:
+            if text is None:
+                m_absatz.addSeparator()
+                continue
+            shared = by_edit.get(text)
+            if shared is not None:
+                m_absatz.addAction(shared)
+        if styles_src is not None:
+            nm = m_absatz.addMenu("Formatvorlagen")
+            for sa in styles_src.actions():
+                if sa.isSeparator():
+                    nm.addSeparator()
+                else:
+                    nm.addAction(sa)
+        self._absatz_menu = m_absatz
+
+        m_seiten = QMenu("Seiten&layout", self)
+        m_seiten.setObjectName("menuSeitenlayout")
+        m_seiten.setToolTip(
+            "Seitenformat-Picker und Ausrichtung für den Word-Suite-/DOCX-Editor"
+        )
+        if getattr(self, "_page_layout_action", None) is not None:
+            m_seiten.addAction(self._page_layout_action)
+        m_seiten.addSeparator()
+        act_port = QAction("Hochformat", self)
+        act_port.setObjectName("actPageLayoutPortrait")
+        act_port.setToolTip("Seitenlayout Hochformat")
+        act_port.triggered.connect(
+            lambda: self._apply_editor_page_layout_pick(orientation="portrait")
+        )
+        m_seiten.addAction(self._track_editor_action(act_port))
+        act_land = QAction("Querformat", self)
+        act_land.setObjectName("actPageLayoutLandscape")
+        act_land.setToolTip("Seitenlayout Querformat")
+        act_land.triggered.connect(
+            lambda: self._apply_editor_page_layout_pick(orientation="landscape")
+        )
+        m_seiten.addAction(self._track_editor_action(act_land))
+        m_seiten.addSeparator()
+        for preset, objn in (("A4", "actPageLayoutA4"), ("US Letter", "actPageLayoutLetter")):
+            act_p = QAction(preset, self)
+            act_p.setObjectName(objn)
+            act_p.setToolTip(f"Seitenformat {preset}")
+            act_p.triggered.connect(
+                lambda _c=False, n=preset: self._apply_editor_page_layout_pick(preset=n)
+            )
+            m_seiten.addAction(self._track_editor_action(act_p))
+        self._seitenlayout_menu = m_seiten
+
         m_fenster = QMenu("&Fenster", self)
         m_fenster.setObjectName("menuFenster")
         m_fenster.setToolTip("Teilung, Sync-Scroll, separates Dokumentfenster")
@@ -3996,12 +4079,40 @@ class MainWindow(QMainWindow):
 
         if extra_act is not None:
             mb.insertMenu(extra_act, m_format)
+            mb.insertMenu(extra_act, m_absatz)
+            mb.insertMenu(extra_act, m_seiten)
         else:
             mb.addMenu(m_format)
+            mb.addMenu(m_absatz)
+            mb.addMenu(m_seiten)
         if help_act is not None:
             mb.insertMenu(help_act, m_fenster)
         else:
             mb.addMenu(m_fenster)
+        try:
+            from instantlensdoc.ui.menu_click import prepare_menu_for_clicks
+
+            for menu in (m_format, m_absatz, m_seiten, m_fenster):
+                prepare_menu_for_clicks(menu)
+                menu.aboutToShow.connect(self._on_word_suite_menu_about_to_show)
+        except Exception:
+            pass
+
+    def _on_word_suite_menu_about_to_show(self) -> None:
+        """Eine Spalte + Enablement bevor Absatz/Seitenlayout/Format layoutet."""
+        try:
+            from instantlensdoc.ui.menu_click import prepare_menu_for_clicks
+            from PySide6.QtWidgets import QMenu
+
+            menu = self.sender()
+            if isinstance(menu, QMenu):
+                prepare_menu_for_clicks(menu)
+        except Exception:
+            pass
+        try:
+            self._sync_menu_enablement()
+        except Exception:
+            pass
 
     def _install_editor_context_menu(self) -> None:
         ed = getattr(self, "editor", None)
@@ -4508,6 +4619,10 @@ class MainWindow(QMainWindow):
         t = (label or "").strip().lower()
         needles = (
             "seitenlayout",
+            "hochformat",
+            "querformat",
+            "us letter",
+            "a4",
             "zeilennummern",
             "editor-minimap",
             "minimap",
@@ -4682,7 +4797,7 @@ class MainWindow(QMainWindow):
                             self._set_action_available(
                                 a, is_pdf, "Nur bei geöffnetem PDF verfügbar"
                             )
-                    elif self._label_is_editor_only(label):
+                    elif self._label_is_editor_only(label) or parent.strip().lower() == "absatz":
                         self._set_action_available(
                             a,
                             is_editor,
@@ -4734,9 +4849,9 @@ class MainWindow(QMainWindow):
                 _walk(menu, "pdf")
             elif title == "Einfügen":
                 _walk(menu, "insert")
-            elif title in ("Bearbeiten", "Edit", "Format"):
+            elif title in ("Bearbeiten", "Edit", "Format", "Absatz"):
                 _walk(menu, "edit")
-            elif title in ("Ansicht", "View", "Fenster"):
+            elif title in ("Ansicht", "View", "Fenster", "Seitenlayout"):
                 _walk(menu, "view-editor")
             elif title in ("Extras", "Extra"):
                 _walk(menu, "extra")
@@ -8520,6 +8635,42 @@ class MainWindow(QMainWindow):
             self._set_status(
                 f"Seitenlayout gespeichert ({layout.describe()}) — gilt für Word-/DOCX-Dokumente"
             )
+
+    def _apply_editor_page_layout_pick(
+        self, *, preset: str | None = None, orientation: str | None = None
+    ) -> None:
+        """Menü-Picker: bestehendes EditorPageLayout anwenden — kein neuer Dialog."""
+        if not self._guard_editor_action("Seitenlayout"):
+            return
+        from instantlensdoc.core.editor_page_layout import EditorPageLayout
+
+        lay = self.editor.page_layout()
+        if lay is None:
+            lay = EditorPageLayout.from_settings()
+        else:
+            try:
+                lay = EditorPageLayout.from_dict(lay.to_dict())
+            except Exception:
+                lay = EditorPageLayout.from_settings()
+        if preset:
+            lay.with_preset(preset)
+        if orientation in ("portrait", "landscape"):
+            lay.orientation = orientation
+        lay.enabled = True
+        if lay.scope == "off":
+            lay.scope = "rich"
+        try:
+            lay.save()
+        except Exception:
+            pass
+        self.editor.set_page_layout(lay)
+        try:
+            sec = getattr(self, "secondary_editor", None)
+            if sec is not None and hasattr(sec, "set_page_layout"):
+                sec.set_page_layout(lay)
+        except Exception:
+            pass
+        self._set_status(f"Seitenlayout: {lay.describe()}")
 
     def _toggle_doc_split_from_ribbon(self) -> None:
         """Ribbon-Toggle für Fenster teilen — 2.6.20."""
