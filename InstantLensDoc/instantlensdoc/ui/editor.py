@@ -204,6 +204,7 @@ class TextEditor(QPlainTextEdit):
         self._clipboard_history: list[str] = []
         self._find_selections: list = []
         self._mark_selections: list = []
+        self._char_hl_selections: list = []
         self._bracket_selections: list = []
         self._spell_selections: list = []
         self._current_line_selections: list = []
@@ -928,12 +929,42 @@ class TextEditor(QPlainTextEdit):
     def _apply_extra_selections(self) -> None:
         merged = (
             list(getattr(self, "_current_line_selections", []) or [])
+            + list(getattr(self, "_char_hl_selections", []) or [])
             + list(self._find_selections)
             + list(self._mark_selections)
             + list(self._bracket_selections)
             + list(getattr(self, "_spell_selections", []) or [])
         )
         self.setExtraSelections(merged)
+
+    def _sync_char_background_extras(self) -> None:
+        """QPlainTextEdit zeichnet Char-Background nicht — ExtraSelections spiegeln setBackground."""
+        sels: list = []
+        doc = self.document()
+        block = doc.begin()
+        while block.isValid():
+            it = block.begin()
+            while not it.atEnd():
+                frag = it.fragment()
+                if frag.isValid() and frag.length() > 0:
+                    f = frag.charFormat()
+                    brush = f.background()
+                    if brush.style() != Qt.NoBrush:
+                        sel = QTextEdit.ExtraSelection()
+                        c = QTextCursor(doc)
+                        c.setPosition(frag.position())
+                        c.setPosition(
+                            frag.position() + frag.length(), QTextCursor.KeepAnchor
+                        )
+                        fmt = QTextCharFormat()
+                        fmt.setBackground(brush)
+                        sel.cursor = c
+                        sel.format = fmt
+                        sels.append(sel)
+                it += 1
+            block = block.next()
+        self._char_hl_selections = sels
+        self._apply_extra_selections()
 
     _BRACKET_PAIRS = {"(": ")", "[": "]", "{": "}", ")": "(", "]": "[", "}": "{"}
     _BRACKET_OPEN = frozenset("([{")
@@ -1631,10 +1662,12 @@ class TextEditor(QPlainTextEdit):
             except Exception:
                 pass
         super().setPlainText(text)
+        self._char_hl_selections = []
         try:
             self.setCurrentCharFormat(QTextCharFormat())
         except Exception:
             pass
+        self._apply_extra_selections()
         if was_rich:
             self.set_soft_wrap(self._soft_wrap)
             try:
@@ -1967,6 +2000,7 @@ class TextEditor(QPlainTextEdit):
         except Exception:
             pass
         self._apply_page_layout()
+        self._sync_char_background_extras()
 
     def to_rich_html(self) -> str:
         """Aktuelles Dokument als HTML (Bold/Italic/Underline erhalten)."""
@@ -2186,7 +2220,7 @@ class TextEditor(QPlainTextEdit):
         return bool(self._selection_probe_format(self.textCursor()).fontStrikeOut())
 
     def apply_font_family(self, family: str) -> bool:
-        """Schriftart auf Auswahl bzw. Cursor — 2.6.55."""
+        """Schriftart auf Auswahl bzw. ganzes Dokument."""
         name = (family or "").strip()
         if not name:
             return False
@@ -2196,6 +2230,15 @@ class TextEditor(QPlainTextEdit):
             fmt.setFontFamilies([name])
         except Exception:
             fmt.setFontFamily(name)
+        return self._merge_char_format(fmt)
+
+    def apply_qfont(self, font: QFont) -> bool:
+        """QFont (QFontDialog/QFontDatabase) auf Auswahl oder ganzes Dokument mergen."""
+        if font is None or not font.family():
+            return False
+        self._ensure_rich_mode()
+        fmt = QTextCharFormat()
+        fmt.setFont(font)
         return self._merge_char_format(fmt)
 
     def apply_font_size(self, point_size: float) -> bool:
@@ -2226,7 +2269,9 @@ class TextEditor(QPlainTextEdit):
         self._ensure_rich_mode()
         fmt = QTextCharFormat()
         fmt.setBackground(QBrush(qcolor))
-        return self._merge_char_format(fmt)
+        ok = self._merge_char_format(fmt)
+        self._sync_char_background_extras()
+        return ok
 
     def _merge_char_format(self, fmt: QTextCharFormat) -> bool:
         work, restore, expanded = self._global_format_cursor()
@@ -2278,6 +2323,7 @@ class TextEditor(QPlainTextEdit):
         finally:
             work.endEditBlock()
         self._restore_format_cursor(work, restore, expanded)
+        self._sync_char_background_extras()
         return True
 
     @staticmethod
@@ -2745,6 +2791,7 @@ class TextEditor(QPlainTextEdit):
             fmt.setBackground(QBrush(qcolor))
         work.mergeCharFormat(fmt)
         self._restore_format_cursor(work, restore, expanded)
+        self._sync_char_background_extras()
         return True
 
     def selection_highlighted(self) -> bool:
@@ -2778,6 +2825,7 @@ class TextEditor(QPlainTextEdit):
                 block = block.next()
         finally:
             cur.endEditBlock()
+        self._sync_char_background_extras()
         return n
 
     def selected_snippet(self, max_len: int = 80) -> str:

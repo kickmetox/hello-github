@@ -68,6 +68,7 @@ REQUIRED_EDIT_LABELS = (
     "Schriftgröße…",
     "Schriftfarbe…",
     "Texthervorhebung…",
+    "Hintergrundfarbe…",
     "Absatz links",
     "Absatz zentriert",
     "Einrückung erhöhen",
@@ -96,6 +97,7 @@ START_TWIN_IDS = (
     "underline",
     "strike",
     "highlight",
+    "highlight_color",
     "find_replace",
     "spellcheck",
     "clear_formatting",
@@ -501,3 +503,110 @@ def test_qtest_mouseclick_all_enabled_bearbeiten_format_leaves() -> None:
         assert fails == [], "Mausklick ohne Slot/Dialog/Effekt:\n" + "\n".join(fails[:24])
     finally:
         rec.restore()
+
+
+def _bg_name_at(ed, pos: int) -> str:
+    cur = QTextCursor(ed.document())
+    cur.setPosition(max(0, pos))
+    cur.setPosition(
+        min(pos + 1, max(1, ed.document().characterCount() - 1)),
+        QTextCursor.KeepAnchor,
+    )
+    fmt = ed._selection_probe_format(cur)
+    if fmt.background().style() == 0:
+        return ""
+    return fmt.background().color().name().lower()
+
+
+def _assert_editor_highlight(ed, sample: str = "Hallo Marker Absatz.") -> None:
+    ed.setPlainText(sample)
+    cur = ed.textCursor()
+    cur.setPosition(0)
+    cur.setPosition(5, QTextCursor.KeepAnchor)
+    ed.setTextCursor(cur)
+    assert ed.apply_highlight_color("#ffe066")
+    html = ed.to_rich_html().lower()
+    assert "background" in html, html[:400]
+    assert _bg_name_at(ed, 1)
+    extras = ed.extraSelections()
+    assert extras, "Textmarker ohne ExtraSelection (QPlainTextEdit-Sichtbarkeit)"
+
+
+def test_highlight_on_plain_text_unit(qapp) -> None:
+    from instantlensdoc.ui.editor import TextEditor
+
+    ed = TextEditor()
+    _assert_editor_highlight(ed)
+    ed.deleteLater()
+
+
+def test_highlight_on_new_docx_ocr_and_plain() -> None:
+    for state in ("empty", "docx"):
+        load_state(_WIN, _APP, state, _FIXTURES)
+        pump(_APP, 0.15)
+        _reseed_for_click(_WIN, "Hallo Marker Absatz fuer Test.")
+        _WIN._choose_highlight_color()
+        pump(_APP, 0.1)
+        html = _WIN.editor.to_rich_html().lower()
+        assert "background" in html, f"{state}: {html[:300]}"
+        assert _WIN.editor.selection_highlighted() or _bg_name_at(_WIN.editor, 0)
+    _WIN._show_scan_ocr_text("OCR Marker Absatz genug Text.", title="OCR — Highlight")
+    pump(_APP, 0.15)
+    cur = _WIN.editor.textCursor()
+    cur.setPosition(0)
+    cur.setPosition(3, QTextCursor.KeepAnchor)
+    _WIN.editor.setTextCursor(cur)
+    _WIN._choose_highlight_color()
+    pump(_APP, 0.1)
+    html = _WIN.editor.to_rich_html().lower()
+    assert "background" in html, html[:300]
+
+
+def test_highlight_persists_in_docx(tmp_path, qapp) -> None:
+    from instantlensdoc.core.richtext_docx import docx_to_html, html_to_docx
+    from instantlensdoc.ui.editor import TextEditor
+
+    ed = TextEditor()
+    ed.setPlainText("Hallo Marker Absatz.")
+    cur = ed.textCursor()
+    cur.select(QTextCursor.Document)
+    ed.setTextCursor(cur)
+    ed.apply_highlight_color("#ffe066")
+    dest = Path(tmp_path) / "hl.docx"
+    html_to_docx(ed.to_rich_html(), dest, title="hl")
+    back = docx_to_html(dest).lower()
+    assert "background" in back, back[:500]
+    ed.deleteLater()
+
+
+def test_font_dialog_uses_qfontdialog_not_families_enum() -> None:
+    import inspect
+
+    src = inspect.getsource(_WIN._choose_font) + inspect.getsource(_WIN._run_font_dialog)
+    assert "QFontDialog.getFont" in src
+    assert "families()" not in src
+    assert "QInputDialog.getItem" not in src
+    load_state(_WIN, _APP, "empty", _FIXTURES)
+    pump(_APP, 0.1)
+    _reseed_for_click(_WIN, "Schrift Test Absatz.")
+    _WIN._choose_font()
+    pump(_APP, 0.1)
+    html = _WIN.editor.to_rich_html().lower()
+    assert "arial" in html or "font-family" in html, html[:400]
+
+
+def test_ribbon_highlight_color_wired() -> None:
+    rb = _WIN.ribbon_bar
+    assert "highlight" in rb._actions
+    assert "highlight_color" in rb._actions
+    import inspect
+
+    src = inspect.getsource(_WIN._on_ribbon_action)
+    assert '"highlight_color"' in src
+    load_state(_WIN, _APP, "empty", _FIXTURES)
+    pump(_APP, 0.1)
+    _reseed_for_click(_WIN, "Ribbon Marker Text.")
+    _WIN._on_ribbon_action("highlight")
+    pump(_APP, 0.05)
+    html = _WIN.editor.to_rich_html().lower()
+    assert "background" in html, html[:300]

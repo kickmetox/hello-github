@@ -2070,9 +2070,16 @@ class MainWindow(QMainWindow):
         m_edit.addAction(self._track_editor_action(act_font_color))
         act_highlight = QAction("Texthervorhebung…", self)
         act_highlight.setObjectName("actEditHighlight")
-        act_highlight.setToolTip("Textmarker-Farbe (QTextCharFormat.background)")
+        act_highlight.setToolTip(
+            "Textmarker/Hintergrundfarbe — QTextCharFormat.setBackground, bleibt in DOCX"
+        )
         act_highlight.triggered.connect(self._choose_highlight_color)
         m_edit.addAction(self._track_editor_action(act_highlight))
+        act_bg = QAction("Hintergrundfarbe…", self)
+        act_bg.setObjectName("actEditBackgroundColor")
+        act_bg.setToolTip("Hintergrundfarbe mergen (QTextCharFormat.setBackground)")
+        act_bg.triggered.connect(self._choose_highlight_color)
+        m_edit.addAction(self._track_editor_action(act_bg))
         act_clear_fmt = QAction("Formatierungen löschen", self)
         act_clear_fmt.setShortcut(QKeySequence("Ctrl+Space"))
         act_clear_fmt.setObjectName("actEditClearFormatting")
@@ -2337,7 +2344,9 @@ class MainWindow(QMainWindow):
         act_mark = QAction("Auswahl markieren", self)
         # Ctrl+H = Suchen/Ersetzen (Word); Markieren → Ctrl+Shift+H — 2.6.10
         act_mark.setShortcut(QKeySequence("Ctrl+Shift+H"))
-        act_mark.setToolTip("Auswahl markieren (früher Ctrl+H) — 2.6.10")
+        act_mark.setToolTip(
+            "Textmarker: QTextCharFormat.setBackground auf Auswahl oder ganzes Dokument"
+        )
         act_mark.triggered.connect(self._mark_selection)
         m_edit.addAction(act_mark)
         act_toggle_case = QAction("Groß-/Kleinschreibung umschalten", self)
@@ -3873,6 +3882,7 @@ class MainWindow(QMainWindow):
             "Schriftgröße…",
             "Schriftfarbe…",
             "Texthervorhebung…",
+            "Hintergrundfarbe…",
             "Formatierungen löschen",
             "Aufzählungszeichen",
             "Nummerierung",
@@ -4216,6 +4226,8 @@ class MainWindow(QMainWindow):
             "schriftgröße",
             "schriftfarbe",
             "texthervorhebung",
+            "hintergrundfarbe",
+            "textmarker",
             "formatierungen löschen",
             "formatvorlage",
             "aufzählungszeichen",
@@ -4593,6 +4605,7 @@ class MainWindow(QMainWindow):
                 "underline",
                 "strike",
                 "highlight",
+                "highlight_color",
                 "align_left",
                 "align_center",
                 "align_right",
@@ -8102,6 +8115,7 @@ class MainWindow(QMainWindow):
             "underline": self._toggle_underline,
             "strike": self._toggle_strike,
             "highlight": self._mark_selection,
+            "highlight_color": self._choose_highlight_color,
             "align_left": lambda: self._set_paragraph_alignment("left"),
             "align_center": lambda: self._set_paragraph_alignment("center"),
             "align_right": lambda: self._set_paragraph_alignment("right"),
@@ -10146,33 +10160,49 @@ class MainWindow(QMainWindow):
         self.editor.paste()
         self._sync_editor_rich_meta()
 
+    def _defer_format_dialog(self, slot) -> None:
+        """Menü zuerst schließen, dann modalen Dialog — kein Font-/Scan-Enum vorher."""
+        import os
+
+        if os.environ.get("ILD_SMOKE_QT") == "1":
+            slot()
+            return
+        QTimer.singleShot(0, slot)
+
     def _choose_font(self) -> None:
         if not self._guard_editor_action("Schriftart"):
             return
-        import os
+        self._defer_format_dialog(self._run_font_dialog)
 
-        from PySide6.QtGui import QFont
+    def _run_font_dialog(self) -> None:
+        """QFontDialog.getFont (QFontDatabase/Windows-Schriften), Auswahl oder Dokument."""
+        if not self._guard_editor_action("Schriftart"):
+            return
+        from PySide6.QtGui import QFontDatabase
         from PySide6.QtWidgets import QFontDialog
 
         current = self.editor.currentCharFormat().font()
-        if current.family() == "":
-            current = QFont(self.editor.document().defaultFont())
-        if os.environ.get("ILD_SMOKE_QT") == "1":
-            font, ok = QFontDialog.getFont(current, self, "Schriftart")
-            if not ok:
-                font, ok = current, True
+        if not current.family():
+            try:
+                current = QFontDatabase.systemFont(QFontDatabase.SystemFont.GeneralFont)
+            except Exception:
+                current = self.editor.document().defaultFont()
+        # Native QFontDialog liest die Plattform-Fontliste (Windows) selbst — nichts vorab enumerieren.
+        result = QFontDialog.getFont(current, self, "Schriftart")
+        if isinstance(result, tuple) and len(result) >= 2:
+            font, ok = result[0], result[1]
         else:
-            font, ok = QFontDialog.getFont(current, self, "Schriftart")
+            font, ok = result, True
         if not ok or font is None:
             return
-        family = (font.family() or "").strip()
-        if family:
-            self.editor.apply_font_family(family)
-        size = float(font.pointSizeF() or font.pointSize() or 0)
-        if size > 0:
-            self.editor.apply_font_size(size)
+        try:
+            if not font.family():
+                return
+        except Exception:
+            return
+        self.editor.apply_qfont(font)
         self._sync_editor_rich_meta()
-        self._set_status(f"Schriftart: {family or current.family()}")
+        self._set_status(f"Schriftart: {font.family()} {int(font.pointSize() or 0)} pt")
 
     def _choose_font_size(self) -> None:
         if not self._guard_editor_action("Schriftgröße"):
@@ -10191,16 +10221,22 @@ class MainWindow(QMainWindow):
     def _choose_font_color(self) -> None:
         if not self._guard_editor_action("Schriftfarbe"):
             return
+        self._defer_format_dialog(self._run_font_color_dialog)
+
+    def _run_font_color_dialog(self) -> None:
+        if not self._guard_editor_action("Schriftfarbe"):
+            return
         import os
 
         from PySide6.QtWidgets import QColorDialog
 
+        initial = self.editor.currentCharFormat().foreground().color()
         if os.environ.get("ILD_SMOKE_QT") == "1":
-            color = QColor("#cc0000")
+            color = QColorDialog.getColor(initial, self, "Schriftfarbe")
+            if color is None or not color.isValid():
+                color = QColor("#cc0000")
         else:
-            color = QColorDialog.getColor(
-                self.editor.currentCharFormat().foreground().color(), self, "Schriftfarbe"
-            )
+            color = QColorDialog.getColor(initial, self, "Schriftfarbe")
         if color is None or not color.isValid():
             return
         self.editor.apply_font_color(color)
@@ -10210,22 +10246,34 @@ class MainWindow(QMainWindow):
     def _choose_highlight_color(self) -> None:
         if not self._guard_editor_action("Texthervorhebung"):
             return
+        self._defer_format_dialog(self._run_highlight_color_dialog)
+
+    def _run_highlight_color_dialog(self) -> None:
+        if not self._guard_editor_action("Texthervorhebung"):
+            return
         import os
 
         from PySide6.QtWidgets import QColorDialog
 
+        initial = QColor(self.editor.HIGHLIGHT_COLOR)
+        try:
+            probe = self.editor._selection_probe_format(self.editor.textCursor())
+            if probe.background().style() != Qt.NoBrush:
+                initial = probe.background().color()
+        except Exception:
+            pass
         if os.environ.get("ILD_SMOKE_QT") == "1":
-            color = QColor(self.editor.HIGHLIGHT_COLOR)
+            color = QColorDialog.getColor(initial, self, "Hintergrundfarbe")
+            if color is None or not color.isValid():
+                color = QColor(self.editor.HIGHLIGHT_COLOR)
         else:
-            color = QColorDialog.getColor(
-                QColor(self.editor.HIGHLIGHT_COLOR), self, "Texthervorhebung"
-            )
+            color = QColorDialog.getColor(initial, self, "Hintergrundfarbe")
         if color is None or not color.isValid():
             return
         self.editor.apply_highlight_color(color)
         self._sync_editor_rich_meta()
         scope = "Auswahl" if self.editor.textCursor().hasSelection() else "Dokument"
-        self._set_status(f"Texthervorhebung ({scope}): {color.name()}")
+        self._set_status(f"Hintergrundfarbe ({scope}): {color.name()}")
 
     def _clear_formatting(self) -> None:
         if not self._guard_editor_action("Formatierungen löschen"):

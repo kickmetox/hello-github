@@ -82,6 +82,7 @@ class RibbonBar(QWidget):
                         ("underline", "Unterstrichen"),
                         ("strike", "Durchgestrichen"),
                         ("highlight", "Textmarker"),
+                        ("highlight_color", "Hintergrundfarbe"),
                         ("align_left", "Links"),
                         ("align_center", "Zentriert"),
                         ("align_right", "Rechts"),
@@ -98,6 +99,8 @@ class RibbonBar(QWidget):
                     (
                         ("undo", "↶ Rückgängig"),
                         ("redo", "↷ Wiederholen"),
+                        ("highlight", "Textmarker"),
+                        ("highlight_color", "Hintergrundfarbe"),
                         ("spellcheck", "Rechtschreibung"),
                         ("find_replace", "Suchen/Ersetzen"),
                         ("insert_hyperlink", "Hyperlink"),
