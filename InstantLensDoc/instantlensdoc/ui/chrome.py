@@ -4,8 +4,8 @@ Default: Kombiniert (Pull-down-Menüs + Ribbon). Umschalten verwirft
 kein offenes Dokument — nur Sichtbarkeit von Menüleiste und Ribbon.
 
 Layout (diese Datei): Menü/Ribbon schrumpfen mit dem Fenster. Zu schmal:
-horizontale Scrollbar, keine verlorenen Einträge. Overflow-» bleibt
-Ribbon-Sache und löst die echte QAction aus.
+horizontale Scrollbar, keine verlorenen Einträge. Pulldowns bleiben
+eine Spalte (SH_Menu_Scrollable).
 """
 
 from __future__ import annotations
@@ -116,10 +116,16 @@ class HScrollHost(QScrollArea):
         hint = inner.sizeHint()
         min_h = max(hint.height(), inner.minimumSizeHint().height(), 24)
         vw = max(1, self.viewport().width())
-        need = int(hint.width()) > int(vw)
-        inner.setMinimumWidth(max(1, hint.width()))
+        hint_w = max(
+            int(hint.width()),
+            int(inner.minimumSizeHint().width()),
+            int(inner.minimumWidth() or 0),
+            1,
+        )
+        need = hint_w > int(vw)
+        inner.setMinimumWidth(hint_w)
         if not self.widgetResizable():
-            inner.resize(max(int(hint.width()), vw), min_h)
+            inner.resize(max(hint_w, vw), min_h)
         sbh = self.horizontalScrollBar().sizeHint().height() if need else 0
         self.setFixedHeight(min_h + sbh)
 

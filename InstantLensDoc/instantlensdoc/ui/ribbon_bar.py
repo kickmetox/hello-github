@@ -1,4 +1,4 @@
-"""Ribbon-Chrome analog Word/SoftMaker — Overflow klickbar, Tabellentools kontextuell.
+"""Ribbon-Chrome analog Word/SoftMaker — zu schmal: Scrollbar, keine verlorenen Tools.
 
 Tabs: Datei, Start, Einfügen, Layout, Verweise, Sendungen, Überprüfen, Ansicht
 plus InstantLens: Bearbeiten, Fenster, PDF, Geräte, DTP und kontextuell Tabellentools.
@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Callable
 
-from PySide6.QtCore import QPoint, QSize, Qt, Signal
+from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtGui import QAction, QIcon, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QFrame,
@@ -25,7 +25,6 @@ from PySide6.QtWidgets import (
 )
 
 from instantlensdoc.ui.chrome import wrap_hscroll
-from instantlensdoc.ui.menu_click import show_scrollable_menu
 from instantlensdoc.ui.styles import StyleGallery
 from instantlensdoc.ui.word_ribbon import WORD_TAB_GROUPS
 
@@ -38,32 +37,25 @@ def _std_icon(widget: QWidget, pix) -> QIcon:
 
 
 class _OverflowPanel(QWidget):
-    """Eine Ribbon-Zeile: sichtbare Buttons + »-Overflow ohne tote Treffer."""
+    """Eine Ribbon-Zeile: alle Buttons bleiben sichtbar; zu schmal scrollt der Host."""
 
     overflow_picked = Signal(str)
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
+        self.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Preferred)
         self._row = QHBoxLayout(self)
         self._row.setContentsMargins(4, 2, 4, 2)
         self._row.setSpacing(4)
         self._items: list[QWidget] = []
-        self._overflow = QToolButton()
-        self._overflow.setObjectName("ribbonOverflow")
-        self._overflow.setText("»")
-        self._overflow.setToolTip("Weitere Befehle (scrollbares Menü)")
-        self._overflow.clicked.connect(self._open_overflow)
-        self._row.addWidget(self._overflow)
-        self._row.addStretch(1)
         self._hidden_specs: list[tuple[str, str]] = []
+        self._row.addStretch(1)
 
     def add_item(self, widget: QWidget) -> None:
-        idx = self._row.indexOf(self._overflow)
-        if idx < 0:
-            idx = max(0, self._row.count() - 1)
+        idx = max(0, self._row.count() - 1)
         self._row.insertWidget(idx, widget)
         self._items.append(widget)
+        widget.setVisible(True)
 
     def resizeEvent(self, event) -> None:  # noqa: N802
         super().resizeEvent(event)
@@ -74,60 +66,26 @@ class _OverflowPanel(QWidget):
         self._reflow()
 
     def _reflow(self) -> None:
-        avail = max(40, self.width() - self._overflow.sizeHint().width() - 16)
-        used = 0
-        hidden: list[QWidget] = []
-        shown_any = False
+        """Nie ausblenden — horizontale Scrollbar am Ribbon-Host, kein »-Popup."""
         for w in self._items:
-            hint = w.sizeHint().width() + 4
-            if shown_any and used + hint > avail:
-                w.setVisible(False)
-                hidden.append(w)
-                continue
-            w.setVisible(True)
-            used += hint
-            shown_any = True
+            try:
+                w.setVisible(True)
+            except Exception:
+                pass
         self._hidden_specs = []
-        for w in hidden:
-            aid = str(w.property("ribbonActionId") or "")
-            label = ""
-            if isinstance(w, QToolButton):
-                label = w.text()
-            self._hidden_specs.append((aid or label, label or aid))
-        self._overflow.setVisible(bool(self._hidden_specs))
-        self._overflow.setEnabled(bool(self._hidden_specs))
 
     def minimumSizeHint(self) -> QSize:  # noqa: N802
-        h = super().minimumSizeHint().height()
-        w = self._overflow.sizeHint().width() + 20
-        if self._items:
-            w += max(24, self._items[0].sizeHint().width())
-        return QSize(w, h)
+        return self.sizeHint()
 
     def sizeHint(self) -> QSize:  # noqa: N802
         h = super().sizeHint().height()
-        w = self._overflow.sizeHint().width() + 12
+        w = 8
         for item in self._items:
-            w += item.sizeHint().width() + 4
-        return QSize(max(w, 80), h)
-
-    def _open_overflow(self) -> None:
-        if not self._hidden_specs:
-            return
-        global_pos = self._overflow.mapToGlobal(QPoint(0, self._overflow.height()))
-        ribbon = self.parentWidget()
-        while ribbon is not None and not hasattr(ribbon, "_pick_overflow"):
-            ribbon = ribbon.parentWidget()
-        on_pick = ribbon._pick_overflow if ribbon is not None else (
-            lambda aid: self.overflow_picked.emit(str(aid))
-        )
-        show_scrollable_menu(
-            self._hidden_specs,
-            self,
-            pos=global_pos,
-            on_pick=on_pick,
-            qactions=getattr(ribbon, "_qactions", None) if ribbon is not None else None,
-        )
+            try:
+                w += int(item.sizeHint().width()) + 4
+            except Exception:
+                w += 28
+        return QSize(max(w, 80), max(h, 28))
 
 
 class _RibbonGroup(QWidget):
@@ -136,7 +94,7 @@ class _RibbonGroup(QWidget):
     def __init__(self, title: str, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setObjectName("ribbonGroup")
-        self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
+        self.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Preferred)
         self.setStyleSheet(
             "QWidget#ribbonGroup { border-right: 1px solid #C5CCD6; }"
             "QLabel#ribbonGroupTitle { color: #5A6A7A; font-size: 10px; }"
@@ -155,7 +113,7 @@ class _RibbonGroup(QWidget):
 class RibbonBar(QWidget):
     """
     Ribbon-Chrome: Word-Tabs + InstantLens (Geräte/PDF/DTP).
-    Overflow: scrollbares Einspalten-Menü (menu_click) — keine toten Hits.
+    Zu schmal: horizontale Scrollbar, Befehle bleiben erreichbar (kein Verstecken).
     Alt+1…8 wählt die ersten Word-Kategorien.
     """
 
@@ -212,6 +170,7 @@ class RibbonBar(QWidget):
         cats.setSpacing(0)
         self._cat_buttons: list[QPushButton] = []
         self._stack = QStackedWidget()
+        self._stack.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Preferred)
         self._actions: dict[str, QToolButton] = {}
         self._action_buttons: dict[str, list[QToolButton]] = {}
         self._tab_index: dict[str, int] = {}
@@ -357,6 +316,7 @@ class RibbonBar(QWidget):
         ) -> QWidget:
             wrap = QWidget()
             wrap.setObjectName(f"ribbon{title}Tab")
+            wrap.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Preferred)
             row = QHBoxLayout(wrap)
             row.setContentsMargins(0, 0, 0, 0)
             row.setSpacing(0)
@@ -381,6 +341,7 @@ class RibbonBar(QWidget):
         def _build_layout_tab() -> QWidget:
             wrap = QWidget()
             wrap.setObjectName("ribbonLayoutTab")
+            wrap.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Preferred)
             row = QHBoxLayout(wrap)
             row.setContentsMargins(0, 0, 0, 0)
             row.setSpacing(0)
@@ -704,15 +665,10 @@ class RibbonBar(QWidget):
             self._stack.addWidget(panel)
 
         cats.addStretch(1)
-        root.addWidget(wrap_hscroll(cat_strip, object_name="ildRibbonTabScroll"))
-        root.addWidget(
-            wrap_hscroll(
-                self._stack,
-                object_name="ildRibbonBodyScroll",
-                widget_resizable=True,
-            ),
-            1,
-        )
+        self._tab_scroll = wrap_hscroll(cat_strip, object_name="ildRibbonTabScroll")
+        self._body_scroll = wrap_hscroll(self._stack, object_name="ildRibbonBodyScroll")
+        root.addWidget(self._tab_scroll)
+        root.addWidget(self._body_scroll, 1)
         # Chrome-Tab „Seitenlayout“ = bestehendes Ribbon-Tab „Layout“ (kein zweites Ribbon).
         if "Layout" in self._tab_index:
             self._tab_index["Seitenlayout"] = self._tab_index["Layout"]
@@ -747,6 +703,18 @@ class RibbonBar(QWidget):
             b.blockSignals(False)
         if notify:
             self.categorySelected.emit((btn.text() or "").strip())
+        page = self._stack.currentWidget()
+        if page is not None:
+            try:
+                self._stack.setMinimumWidth(max(1, int(page.sizeHint().width())))
+            except Exception:
+                pass
+        host = getattr(self, "_body_scroll", None)
+        if host is not None and hasattr(host, "_fit"):
+            try:
+                host._fit()
+            except Exception:
+                pass
 
     def restore_previous_category(self) -> None:
         """Nach Abbruch (Speichern-Dialog) den vorherigen Ribbon-Tab wiederherstellen."""
@@ -883,6 +851,18 @@ class RibbonBar(QWidget):
             except Exception:
                 pass
         self.action_triggered.emit(str(aid))
+
+    def resizeEvent(self, event) -> None:  # noqa: N802
+        super().resizeEvent(event)
+        for host in (
+            getattr(self, "_tab_scroll", None),
+            getattr(self, "_body_scroll", None),
+        ):
+            if host is not None and hasattr(host, "_fit"):
+                try:
+                    host._fit()
+                except Exception:
+                    pass
 
     def bind(self, handlers: dict[str, Callable[[], None]]) -> None:
         """Optional: direkte Handler statt Signal (Smoke/Tests)."""

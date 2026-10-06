@@ -548,7 +548,11 @@ class MainWindow(QMainWindow):
             return False
 
     def _on_main_splitter_moved(self, *_args) -> None:
-        """Splitter ziehen → Session merken (debounced über Timer)."""
+        """Splitter ziehen → Chrome-Scrollbar nachziehen, Session merken."""
+        try:
+            self._fit_chrome_hscroll()
+        except Exception:
+            pass
         try:
             self._persist_right_toolbox_width()
         except Exception:
@@ -558,6 +562,24 @@ class MainWindow(QMainWindow):
             self._splitter_save_timer.setSingleShot(True)
             self._splitter_save_timer.timeout.connect(self._save_session)
         self._splitter_save_timer.start(400)
+
+    def _fit_chrome_hscroll(self) -> None:
+        """Menü/Ribbon nach Dock-/Splitter-Resize: Scrollbar, keine verlorenen Tools."""
+        hosts = [getattr(self, "_ild_menubar_host", None)]
+        rb = getattr(self, "ribbon_bar", None)
+        if rb is not None:
+            hosts.extend(
+                (
+                    getattr(rb, "_tab_scroll", None),
+                    getattr(rb, "_body_scroll", None),
+                )
+            )
+        for host in hosts:
+            if host is not None and hasattr(host, "_fit"):
+                try:
+                    host._fit()
+                except Exception:
+                    pass
 
     def _capture_current_tab_view_state(self) -> None:
         """Aktuelle Seite/Zoom/Scroll für den geöffneten Tab merken (0.9.1)."""
