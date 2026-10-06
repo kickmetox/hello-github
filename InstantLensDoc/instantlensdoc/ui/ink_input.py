@@ -663,9 +663,10 @@ class InkGlass(QWidget):
 
 
 class TouchInkFilter(QObject):
-    """Touch + Tablet + Linksklick-Fallback; Pinch; Tippen setzt Caret; Long-Press-Menü.
+    """Maus, Touch und Tablet zeichnen dieselben Tintenwerkzeuge.
 
-    Bei ausgeschalteter Stifteingabe: Ein-Finger-Events durchreichen (Maus bleibt).
+    Linksziehen (Maus) = Finger/Stift: begin/move/end auf derselben Session.
+    Bei ausgeschalteter Stifteingabe: Events durchreichen (Auswahl/Caret bleiben).
     Zwei Finger: Pinch-Zoom (auch ohne Stiftmodus).
     """
 
@@ -685,6 +686,7 @@ class TouchInkFilter(QObject):
         self._tablet_active = False
         self._last_ptr: tuple[float, float, float] | None = None
         self._mouse_draw = False
+        self._hosts: list[QWidget] = []
 
     def eventFilter(self, obj, event) -> bool:  # noqa: N802
         if not isinstance(obj, QWidget):
@@ -839,6 +841,7 @@ class TouchInkFilter(QObject):
         return False
 
     def _on_mouse_press(self, obj: QWidget, event) -> bool:
+        # Synthetisierte Maus vom aktiven Stift nicht verdoppeln; echte Maus bleibt vollwertig.
         if self._tablet_active:
             event.accept()
             return True
@@ -1022,7 +1025,7 @@ def apply_pinch_zoom(window, widget: QWidget, factor: float) -> None:
 
 
 def install_ink_input(window) -> InkSession:
-    """Touch/Tablet auf Editor-, PDF- und DTP-Fläche; Glasplatte für Tinte."""
+    """Maus, Touch und Tablet auf Editor-, PDF- und DTP-Fläche; Glasplatte für Tinte."""
     session = InkSession(window)
     filt = TouchInkFilter(session, window, window)
     glasses: list[InkGlass] = []
@@ -1046,14 +1049,18 @@ def install_ink_input(window) -> InkSession:
             accept_touch_events(view.viewport())
         except Exception:
             pass
-    for host in hosts:
-        if host is None:
-            continue
+    filt._hosts = [h for h in hosts if h is not None]
+    for host in filt._hosts:
         host.installEventFilter(filt)
+        try:
+            host.setMouseTracking(True)
+        except Exception:
+            pass
         glasses.append(InkGlass(host, session))
     window._ink_session = session
     window._ink_filter = filt
     window._ink_glasses = glasses
+    window._ink_hosts = list(filt._hosts)
     return session
 
 

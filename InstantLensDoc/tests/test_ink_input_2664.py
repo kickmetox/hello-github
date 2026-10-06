@@ -257,3 +257,53 @@ def test_ocr_stroke_apis_used_by_recognize() -> None:
     assert img is not None
     assert img.size[0] >= 32
 
+
+def test_mouse_left_drag_draws_same_tools_as_stylus() -> None:
+    from PySide6.QtCore import QEvent, QPoint, QPointF
+    from PySide6.QtGui import QMouseEvent
+    from PySide6.QtWidgets import QApplication
+
+    from instantlensdoc.ui.ink_input import TOOL_BRUSH
+
+    session = _WIN._ink_session
+    _WIN.editor.setReadOnly(False)
+    _WIN._set_ink_tool("brush")
+    _WIN._set_ink_fill("none")
+    session.set_color("#C0392B")
+    session.width = 5.0
+    session.clear()
+    assert session.enabled is True
+    vp = _WIN.editor.viewport()
+    vp.resize(400, 300)
+    pump(_APP, 0.02)
+
+    def _send(etype, x, y, button, buttons):
+        local = QPointF(x, y)
+        glob = QPointF(vp.mapToGlobal(QPoint(int(x), int(y))))
+        ev = QMouseEvent(etype, local, glob, button, buttons, Qt.NoModifier)
+        QApplication.sendEvent(vp, ev)
+
+    _send(QEvent.Type.MouseButtonPress, 30, 40, Qt.LeftButton, Qt.LeftButton)
+    _send(QEvent.Type.MouseMove, 70, 48, Qt.NoButton, Qt.LeftButton)
+    _send(QEvent.Type.MouseMove, 110, 56, Qt.NoButton, Qt.LeftButton)
+    _send(QEvent.Type.MouseButtonRelease, 110, 56, Qt.LeftButton, Qt.NoButton)
+    pump(_APP, 0.05)
+    assert len(session.strokes) == 1
+    st = session.strokes[0]
+    assert st.tool == TOOL_BRUSH
+    assert st.color.upper() == "#C0392B"
+    assert abs(st.width - 5.0) < 0.01
+    assert len(st.points) >= 2
+    html = _WIN._act_recognize_handwriting is not None
+    assert html
+    session.clear()
+    _WIN._toggle_ink_input(False)
+    n = len(session.strokes)
+    _send(QEvent.Type.MouseButtonPress, 40, 40, Qt.LeftButton, Qt.LeftButton)
+    _send(QEvent.Type.MouseMove, 90, 50, Qt.NoButton, Qt.LeftButton)
+    _send(QEvent.Type.MouseButtonRelease, 90, 50, Qt.LeftButton, Qt.NoButton)
+    pump(_APP, 0.02)
+    assert len(session.strokes) == n
+    _WIN._set_ink_tool("ballpoint")
+    _WIN._toggle_ink_input(False)
+
