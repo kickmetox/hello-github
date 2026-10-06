@@ -239,8 +239,27 @@ class InkToolsPane(QWidget):
             else:
                 btn.setVisible(False)
 
+    def _hook_action(self, btn, act) -> None:
+        if btn is None or act is None:
+            return
+        try:
+            btn.clicked.disconnect()
+        except Exception:
+            pass
+        btn.clicked.connect(act.trigger)
+
     def bind_window(self, window) -> None:
+        """Knöpfe lösen dieselben QActions aus wie Ansicht/Ribbon."""
         self._window = window
+        pens = getattr(window, "_ink_pen_actions", None) or {}
+        for key, btn in self._tool_btns.items():
+            self._hook_action(btn, pens.get(key))
+        fills = getattr(window, "_ink_fill_actions", None) or {}
+        for key, btn in self._fill_btns.items():
+            self._hook_action(btn, fills.get(key))
+        self._hook_action(self._color_btn, getattr(window, "_act_ink_color", None))
+        rec = self.findChild(QPushButton, "inkTool_recognize")
+        self._hook_action(rec, getattr(window, "_act_recognize_handwriting", None))
         session = getattr(window, "_ink_session", None)
         if session is not None:
             self.sync_from_session(session)

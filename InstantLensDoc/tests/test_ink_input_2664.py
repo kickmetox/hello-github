@@ -241,6 +241,21 @@ def test_right_toolbox_and_schreibschutz_tools() -> None:
     pump(_APP, 0.02)
     assert "ink_brush" in rb._actions
     assert "right_toolbox" in rb._actions
+    from instantlensdoc.core.app_settings import get_right_toolbox_width
+
+    w = get_right_toolbox_width()
+    assert 160 <= w <= 360
+    pane._tool_btns["brush"].click()
+    pump(_APP, 0.02)
+    assert _WIN._ink_session.tool == "brush"
+    assert _WIN._ink_pen_actions["brush"].isChecked()
+    _WIN._ink_pen_actions["felt"].trigger()
+    pump(_APP, 0.02)
+    assert _WIN._ink_session.tool == "felt"
+    assert pane._tool_btns["felt"].isChecked()
+    pane._fill_btns["closed"].click()
+    pump(_APP, 0.02)
+    assert _WIN._ink_session.fill_mode == "closed"
 
 
 def test_ocr_stroke_apis_used_by_recognize() -> None:
