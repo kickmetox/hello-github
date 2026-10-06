@@ -47,6 +47,14 @@ _PAGE_MARK_RE = re.compile(r"^---\s*Seite\s+\d+\b[^\n]*---\s*$")
 _ILD_HF_COMMENT_RE = re.compile(
     r"<!--\s*ild-(header|footer)\s+(.*?)\s*-->", re.I | re.S
 )
+_BUILTIN_FIELD_TOKENS = frozenset({"date", "time", "page", "n", "total"})
+_FIELD_TOKEN_RE = re.compile(r"\{([A-Za-z_][A-Za-z0-9_]*)\}")
+_FIELD_TOKEN_DBL_RE = re.compile(r"\{\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*\}\}")
+_FIELD_TOKEN_PAD_RE = re.compile(r"\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*\}")
+_FIELD_TOKEN_GUILLEMET_RE = re.compile(r"«\s*([A-Za-z_][A-Za-z0-9_]*)\s*»")
+_FIELD_SPAN_ATTR_RE = re.compile(
+    r"data-ild-field\s*=\s*['\"]([^'\"]+)['\"]", re.I
+)
 
 # Steuer-/Bidi-/Formatsteuerzeichen, die in QTextDocument als ¶ · Kästchen landen.
 _OCR_CONTROL_RE = re.compile(
@@ -354,7 +362,90 @@ def sanitize_ocr_visible_text(text: str) -> str:
     )
     s = _OCR_CONTROL_RE.sub("", s)
     s = s.replace("\r\n", "\n").replace("\r", "\n")
+    return normalize_field_tokens(s)
+
+
+def canonical_field_name(name: str) -> str:
+    ident = re.sub(r"[^A-Za-z0-9_]", "", str(name or "").strip())
+    if not ident:
+        return ""
+    if ident.lower() in _BUILTIN_FIELD_TOKENS:
+        return ident.lower()
+    return ident
+
+
+def canonical_field_token(name: str) -> str:
+    ident = canonical_field_name(name)
+    return f"{{{ident}}}" if ident else ""
+
+
+def safe_field_display(name: str, ersatz: str | None = None) -> str:
+    """Sichtbares Feld-Token — nie ¶ / Form-Feed / Replacement-Kasten."""
+    token = canonical_field_token(name)
+    if not token:
+        return ""
+    if ersatz is None:
+        return token
+    cleaned = (
+        str(ersatz)
+        .replace("\x0c", "")
+        .replace("\u00b6", "")
+        .replace("\ufffd", "")
+        .replace("\u2028", "")
+        .replace("\u2029", "")
+    )
+    cleaned = _OCR_CONTROL_RE.sub("", cleaned).strip()
+    if not cleaned:
+        return token
+    return cleaned
+
+
+def normalize_field_tokens(text: str) -> str:
+    """``{{date}}`` / ``{ DATE }`` / ``«page»`` → ``{date}`` / ``{page}``; Custom bleibt."""
+    if not text:
+        return ""
+
+    def _canon(raw: str) -> str:
+        return canonical_field_token(raw) or ("{" + raw + "}" if raw else "")
+
+    s = _FIELD_TOKEN_DBL_RE.sub(lambda m: _canon(m.group(1)), str(text))
+    s = _FIELD_TOKEN_GUILLEMET_RE.sub(lambda m: _canon(m.group(1)), s)
+    s = _FIELD_TOKEN_PAD_RE.sub(lambda m: _canon(m.group(1)), s)
     return s
+
+
+def field_token_html_span(name: str, display: str | None = None) -> str:
+    ident = canonical_field_name(name)
+    if not ident:
+        return html_lib.escape(display or "", quote=False)
+    vis = html_lib.escape(safe_field_display(ident, display), quote=False)
+    return f'<span data-ild-field="{html_lib.escape(ident, quote=True)}">{vis}</span>'
+
+
+def wrap_field_tokens_in_html(inner: str) -> str:
+    """Bereits geescapten Fließtext: ``{date}`` als Span, kein Steuerzeichen."""
+    if not inner or "{" not in inner:
+        return inner or ""
+
+    def _wrap(m: re.Match[str]) -> str:
+        return field_token_html_span(m.group(1))
+
+    return _FIELD_TOKEN_RE.sub(_wrap, inner)
+
+
+def extract_field_tokens(text_or_html: str) -> dict[str, str]:
+    """Feldnamen aus Fließtext/HTML (data-ild-field + ``{name}``)."""
+    blob = text_or_html or ""
+    out: dict[str, str] = {}
+    for m in _FIELD_SPAN_ATTR_RE.finditer(blob):
+        ident = canonical_field_name(m.group(1))
+        if ident:
+            out[ident] = canonical_field_token(ident)
+    for m in _FIELD_TOKEN_RE.finditer(blob):
+        ident = canonical_field_name(m.group(1))
+        if ident:
+            out.setdefault(ident, canonical_field_token(ident))
+    return out
 
 
 def sanitize_ocr_html(html: str) -> str:
@@ -892,7 +983,7 @@ def blocks_to_word_suite_html(
             last_page = page
         fam = html_lib.escape(b.font_name or font_family)
         size = float(b.font_size_pt or font_size_pt or DEFAULT_BODY_PT)
-        inner = _html_escape(body)
+        inner = wrap_field_tokens_in_html(_html_escape(body))
         kind = (b.list_kind or "").strip().lower()
         if kind == "ol":
             ol_index += 1
@@ -923,7 +1014,9 @@ def blocks_to_word_suite_html(
         wrote = True
     if not wrote and (text or "").strip():
         for para in _paragraphs_as_blocks(text):
-            parts.append(f'<p align="left">{_html_escape(para.text)}</p>')
+            parts.append(
+                f'<p align="left">{wrap_field_tokens_in_html(_html_escape(para.text))}</p>'
+            )
     parts.append("</body></html>")
     return sanitize_ocr_html("".join(parts))
 
@@ -1009,6 +1102,11 @@ def _finalize_word_suite_document(doc: WordSuiteDocument) -> WordSuiteDocument:
         header=str(doc.meta.get("header") or ""),
         footer=str(doc.meta.get("footer") or ""),
     )
+    tokens = extract_field_tokens((doc.text or "") + "\n" + (doc.html or ""))
+    if tokens:
+        existing = dict(doc.meta.get("field_tokens") or {})
+        existing.update(tokens)
+        doc.meta["field_tokens"] = existing
     return doc
 
 

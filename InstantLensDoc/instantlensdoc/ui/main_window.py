@@ -10650,6 +10650,14 @@ class MainWindow(QMainWindow):
                     self.doc.meta.pop("footer", None)
             except Exception:
                 pass
+            try:
+                ft = self.editor.field_tokens()
+                if ft:
+                    self.doc.meta["field_tokens"] = dict(ft)
+                else:
+                    self.doc.meta.pop("field_tokens", None)
+            except Exception:
+                pass
         self.doc.dirty = True
 
     def _set_paragraph_alignment(self, alignment: str) -> None:
@@ -18596,6 +18604,13 @@ class MainWindow(QMainWindow):
                                 doc.meta["header"] = h
                             if f:
                                 doc.meta["footer"] = f
+                        ft = dict((doc.meta or {}).get("field_tokens") or {})
+                        if ft:
+                            self.editor._field_tokens = {
+                                str(k): str(v) for k, v in ft.items() if str(k).strip()
+                            }
+                        elif getattr(self.editor, "_field_tokens", None):
+                            doc.meta["field_tokens"] = dict(self.editor.field_tokens())
                     except Exception:
                         pass
                 except Exception:

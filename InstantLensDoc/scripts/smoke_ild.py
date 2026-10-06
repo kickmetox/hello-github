@@ -615,6 +615,8 @@ def check_version() -> None:
         _fail("ocr_word_suite fehlt Listen/Absatz-Klassifikation (kein ¶/Form-Feed als Marker)")
     if "extract_ild_header_footer" not in ocr_ws or "lift_running_header_footer" not in ocr_ws:
         _fail("ocr_word_suite fehlt Kopf-/Fußzeile (nicht als Body-Steuerzeichen)")
+    if "normalize_field_tokens" not in ocr_ws or "safe_field_display" not in ocr_ws:
+        _fail("ocr_word_suite fehlt Feld-Tokens (date/time/page, kein Steuerzeichen)")
     if 'align="' not in ocr_ws or "margin-bottom" not in ocr_ws:
         _fail("ocr_word_suite HTML ohne align/margin (Absatz/Ausrichtung)")
     if "source_comment" not in ocr_ws:

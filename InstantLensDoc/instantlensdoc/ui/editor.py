@@ -223,6 +223,7 @@ class TextEditor(QPlainTextEdit):
         self._in_margin_update = False
         self._doc_header = ""
         self._doc_footer = ""
+        self._field_tokens: dict[str, str] = {}
         try:
             from instantlensdoc.core.editor_page_layout import EditorPageLayout
 
@@ -1987,6 +1988,7 @@ class TextEditor(QPlainTextEdit):
         doc.setDefaultFont(font)
         try:
             from instantlensdoc.core.ocr_word_suite import (
+                extract_field_tokens,
                 extract_ild_header_footer,
                 sanitize_ocr_html,
             )
@@ -1995,6 +1997,7 @@ class TextEditor(QPlainTextEdit):
             hdr, ftr = extract_ild_header_footer(html)
             self._doc_header = hdr
             self._doc_footer = ftr
+            self._field_tokens = extract_field_tokens(html)
         except Exception:
             html = html or ""
         doc.setHtml(html or "")
@@ -2060,6 +2063,50 @@ class TextEditor(QPlainTextEdit):
         self._doc_header = header
         self._doc_footer = footer
         return True
+
+    def field_tokens(self) -> dict[str, str]:
+        return dict(getattr(self, "_field_tokens", {}) or {})
+
+    def insert_field_token(self, name: str, *, display: str | None = None) -> bool:
+        """Datum/Zeit/Seite oder eigenes Token an Cursor — kein ¶/Form-Feed/Kasten."""
+        from instantlensdoc.core.ocr_word_suite import (
+            canonical_field_name,
+            canonical_field_token,
+            safe_field_display,
+        )
+
+        ident = canonical_field_name(name)
+        if not ident:
+            return False
+        self._ensure_rich_mode()
+        visible = safe_field_display(ident, display)
+        fmt = QTextCharFormat()
+        fmt.setForeground(QBrush(QColor("#1565C0")))
+        fmt.setFontUnderline(True)
+        try:
+            fmt.setProperty(QTextFormat.UserProperty, f"ild-field:{ident}")
+        except Exception:
+            pass
+        cur = self.textCursor()
+        cur.insertText(visible, fmt)
+        self.setTextCursor(cur)
+        tokens = dict(getattr(self, "_field_tokens", {}) or {})
+        tokens[ident] = canonical_field_token(ident)
+        self._field_tokens = tokens
+        return True
+
+    def set_field_token_ersatz(self, name: str, ersatz: str) -> str:
+        """Frei definiertes Ersatzzeichen; Steuerzeichen → ``{name}``."""
+        from instantlensdoc.core.ocr_word_suite import canonical_field_name, safe_field_display
+
+        ident = canonical_field_name(name)
+        if not ident:
+            return ""
+        visible = safe_field_display(ident, ersatz)
+        tokens = dict(getattr(self, "_field_tokens", {}) or {})
+        tokens[ident] = visible
+        self._field_tokens = tokens
+        return visible
 
     def _selection_or_word_cursor(self) -> QTextCursor:
         """Nur noch intern: Wort unter Cursor, wenn nichts markiert ist."""

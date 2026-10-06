@@ -206,6 +206,8 @@ def test_editor_ocr_bold_find_save() -> None:
 
     test_editor_ocr_header_footer_not_in_body(win)
 
+    test_editor_ocr_field_tokens(win)
+
     assert app is not None
 
 
@@ -393,8 +395,10 @@ def test_core_sanitize_and_hocr_layout() -> None:
     from instantlensdoc.core.ocr_word_suite import (
         blocks_to_word_suite_html,
         classify_ocr_list_line,
+        normalize_field_tokens,
         open_ocr_result,
         parse_hocr_to_blocks,
+        safe_field_display,
         sanitize_ocr_visible_text,
     )
 
@@ -497,6 +501,33 @@ def test_core_sanitize_and_hocr_layout() -> None:
         _fail("Kopf/Fuß im Body statt Meta")
     if "Absatz eins" not in hf_text or "Absatz zwei" not in hf_text:
         _fail("Body-Absätze nach HF-Lift verloren")
+
+    if normalize_field_tokens("{{date}} { TIME } «page» {kunde}") != "{date} {time} {page} {kunde}":
+        _fail(f"normalize_field_tokens: {normalize_field_tokens('{{date}} { TIME } «page» {kunde}')!r}")
+    if safe_field_display("date", "\x0c") != "{date}":
+        _fail("date-Ersatz aus Form-Feed nicht auf {{date}} gemappt")
+    if safe_field_display("kunde", "\u00b6") != "{kunde}":
+        _fail("Custom-Ersatz ¶ nicht auf Token gemappt")
+    if "\ufffd" in safe_field_display("time", "\ufffd"):
+        _fail("Replacement-Kasten als time-Token")
+    tok_doc = open_ocr_result(
+        text="Stand {{date}} Uhr { TIME } Seite «page» Kunde {kunde}",
+        auto_format=False,
+        title="Word-Suite — Felder",
+    )
+    thtml = str((tok_doc.meta or {}).get("html") or "")
+    ttext = tok_doc.text or ""
+    for g in ("\x0c", "\u00b6", "\ufffd"):
+        if g in thtml or g in ttext:
+            _fail(f"Feld-OCR enthält Steuerzeichen {g!r}")
+    for needle in ("{date}", "{time}", "{page}", "{kunde}"):
+        if needle not in ttext:
+            _fail(f"Feld-Token fehlt im Text: {needle} / {ttext!r}")
+    if "data-ild-field" not in thtml:
+        _fail(f"HTML ohne data-ild-field: {thtml[:400]}")
+    ft = (tok_doc.meta or {}).get("field_tokens") or {}
+    if "date" not in ft or "page" not in ft:
+        _fail(f"field_tokens unvollständig: {ft!r}")
     _ok("core: Steuerzeichen weg, hOCR Font/Fett/Kursiv/Align")
 
 
@@ -711,6 +742,59 @@ def test_editor_ocr_header_footer_not_in_body(win) -> None:
         if "Kopf" in body:
             _fail("Kopfzeile im DOCX-Body")
     _ok("qt: OCR Kopf/Fuß nicht im Body, persistiert in DOCX")
+
+
+def test_editor_ocr_field_tokens(win) -> None:
+    """Feld-Tokens Datum/Zeit/Seite + Custom am OCR-Dokument, keine Steuerzeichen."""
+    from instantlensdoc.core.documents import save_document
+
+    ok = win.open_ocr_result(
+        text="Stand {{date}} Seite «page»",
+        title="Word-Suite — Felder",
+        auto_format=False,
+    )
+    if not ok:
+        _fail("open_ocr_result für Feld-Token-Test fehlgeschlagen")
+    ed = win.editor
+    plain = ed.toPlainText()
+    for g in ("\x0c", "\u00b6", "\ufffd"):
+        if g in plain:
+            _fail(f"Feld-OCR-Body enthält Steuerzeichen {g!r}")
+    if "{date}" not in plain or "{page}" not in plain:
+        _fail(f"Feld-Tokens fehlen nach OCR-Open: {plain!r}")
+    if not ed.insert_field_token("time"):
+        _fail("insert_field_token time fehlgeschlagen")
+    if not ed.insert_field_token("kunde", display="\x0c"):
+        _fail("insert_field_token custom mit Form-Feed-Ersatz fehlgeschlagen")
+    after = ed.toPlainText()
+    if "{time}" not in after:
+        _fail(f"time-Token nicht im OCR-Editor: {after!r}")
+    if "{kunde}" not in after:
+        _fail(f"Custom-Token nicht auf {{kunde}} gemappt: {after!r}")
+    for g in ("\x0c", "\u00b6", "\ufffd"):
+        if g in after:
+            _fail(f"insert_field_token schrieb Steuerzeichen {g!r}")
+    ersatz = ed.set_field_token_ersatz("vertrag", "\u00b6")
+    if ersatz != "{vertrag}":
+        _fail(f"set_field_token_ersatz ¶: {ersatz!r}")
+    win._sync_editor_rich_meta()
+    ft = (win.doc.meta or {}).get("field_tokens") or {}
+    if "date" not in ft or "time" not in ft or "kunde" not in ft:
+        _fail(f"field_tokens nicht in Meta: {ft!r}")
+    with tempfile.TemporaryDirectory() as td:
+        out = Path(td) / "ocr-fields.docx"
+        save_document(win.doc, out)
+        from docx import Document as DocxDocument
+
+        d = DocxDocument(str(out))
+        body = "\n".join(p.text for p in d.paragraphs)
+        if "{date}" not in body or "{time}" not in body or "{page}" not in body:
+            _fail(f"DOCX ohne Feld-Tokens: {body[:300]!r}")
+        if "{kunde}" not in body:
+            _fail(f"DOCX ohne Custom-Token: {body[:300]!r}")
+        if "\x0c" in body or "\u00b6" in body or "\ufffd" in body:
+            _fail("DOCX-Body mit Steuerzeichen statt Tokens")
+    _ok("qt: OCR Feld-Tokens date/time/page/custom ohne Steuerzeichen")
 
 
 def main() -> int:
