@@ -91,19 +91,19 @@ def main() -> int:
                 f"fail={sm['fail']} disabled={sm['disabled']}",
                 flush=True,
             )
+            json_path = STORE / "internal" / "instantlensdoc-2655-menu-inventory.json"
+            json_path.parent.mkdir(parents=True, exist_ok=True)
+            json_path.write_text(
+                json.dumps(report, ensure_ascii=False, indent=2, default=str),
+                encoding="utf-8",
+            )
+            print("JSON", json_path, flush=True)
         try:
             win.close()
         except Exception:
             pass
 
     rec.restore()
-    json_path = STORE / "internal" / "instantlensdoc-2655-menu-inventory.json"
-    json_path.parent.mkdir(parents=True, exist_ok=True)
-    json_path.write_text(
-        json.dumps(report, ensure_ascii=False, indent=2, default=str),
-        encoding="utf-8",
-    )
-    print("JSON", json_path, flush=True)
 
     xvfb_dir = STORE / "media" / "menu-2655" / "xvfb"
     xvfb_dir.mkdir(parents=True, exist_ok=True)

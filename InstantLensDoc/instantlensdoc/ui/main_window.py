@@ -14905,14 +14905,21 @@ class MainWindow(QMainWindow):
             )
 
     def close_tabs_left_of_current(self) -> None:
-        if not self.doc or not self.doc.path:
+        try:
+            if not self.doc or not self.doc.path:
+                self._feature_dialog(
+                    "Tabs schließen",
+                    "Kein Dokument geöffnet — keine Tabs links zum Schließen.",
+                    object_name="ildCloseTabsDialog",
+                )
+                return
+            self.close_tabs_left_of(str(self.doc.path))
+        except Exception as e:
             self._feature_dialog(
                 "Tabs schließen",
-                "Kein Dokument geöffnet — keine Tabs links zum Schließen.",
+                str(e) or "Keine Tabs links zum Schließen.",
                 object_name="ildCloseTabsDialog",
             )
-            return
-        self.close_tabs_left_of(str(self.doc.path))
 
     def close_tabs_right_of_current(self) -> None:
         if not self.doc or not self.doc.path:
@@ -17403,64 +17410,73 @@ class MainWindow(QMainWindow):
 
     def save_all_docs(self):
         """Aktuelles Dokument speichern und Annotation-Sidecars aller offenen PDF-Tabs flushen."""
-        st = self.license_manager.status()
-        if not st.allowed:
-            QMessageBox.warning(self, "Lizenz", "Speichern nicht möglich — Lizenz/Trial abgelaufen.")
-            return
         saved = 0
         errors: list[str] = []
-        current = str(self.doc.path) if self.doc and self.doc.path else ""
-        # Aktuelles Doc zuerst
-        if self.doc:
-            try:
-                if self.doc.kind == DocKind.PDF:
-                    if self.pdf_view.store is not None:
-                        self.pdf_view.store.save(force=True)
+        try:
+            st = self.license_manager.status()
+            if not st.allowed:
+                self._feature_dialog(
+                    "Lizenz",
+                    "Speichern nicht möglich — Lizenz/Trial abgelaufen.",
+                )
+                return
+            current = str(self.doc.path) if self.doc and self.doc.path else ""
+            if self.doc:
+                try:
+                    if self.doc.kind == DocKind.PDF:
+                        if self.pdf_view.store is not None:
+                            self.pdf_view.store.save(force=True)
+                            saved += 1
+                    elif self.doc.path:
+                        if self.doc.kind in (
+                            DocKind.TEXT,
+                            DocKind.MARKDOWN,
+                            DocKind.HTML,
+                            DocKind.DOCX,
+                        ):
+                            self._sync_editor_text_before_save()
+                            self.doc.text = self.editor.toPlainText()
+                        save_document(self.doc)
                         saved += 1
-                elif self.doc.path:
-                    if self.doc.kind in (DocKind.TEXT, DocKind.MARKDOWN, DocKind.HTML, DocKind.DOCX):
-                        self._sync_editor_text_before_save()
-                        self.doc.text = self.editor.toPlainText()
-                    save_document(self.doc)
-                    saved += 1
-                elif self.doc.dirty:
-                    self.save_as()
-                    if self.doc.path:
-                        saved += 1
-            except Exception as e:
-                errors.append(str(e))
-        # Andere offene PDF-Tabs: Sidecar neu schreiben (bereits auf Disk = no-op bei clean)
-        from ild_pdf import AnnotationStore
+                    elif self.doc.dirty:
+                        self.save_as()
+                        if self.doc.path:
+                            saved += 1
+                except Exception as e:
+                    errors.append(str(e))
+            from ild_pdf import AnnotationStore
 
-        for path in self.sidebar.document_paths():
-            p = Path(path)
-            if str(p.resolve()) == (str(Path(current).resolve()) if current else ""):
-                continue
-            if p.suffix.lower() != ".pdf" or not p.is_file():
-                continue
             try:
-                store = AnnotationStore(p)
-                if store.annotations and store.sidecar_path.is_file():
-                    # Sidecar existiert → erneut speichern (garantiert Flush)
-                    store.dirty = True
-                    store.save(force=True)
-                    saved += 1
-            except Exception as e:
-                errors.append(f"{p.name}: {e}")
-        if errors:
-            QMessageBox.warning(
-                self,
-                "Alles speichern",
-                f"Gespeichert: {saved}\nFehler:\n" + "\n".join(errors[:8]),
-            )
-        else:
-            self._set_status(f"Alles speichern: {saved} Datei(en)/Sidecar(s)")
-            self._feature_dialog(
-                "Alles speichern",
+                extra_paths = list(self.sidebar.document_paths() or [])
+            except Exception:
+                extra_paths = []
+            for path in extra_paths:
+                try:
+                    p = Path(path)
+                    if current and str(p.resolve()) == str(Path(current).resolve()):
+                        continue
+                    if p.suffix.lower() != ".pdf" or not p.is_file():
+                        continue
+                    store = AnnotationStore(p)
+                    if store.annotations and store.sidecar_path.is_file():
+                        store.dirty = True
+                        store.save(force=True)
+                        saved += 1
+                except Exception as e:
+                    errors.append(f"{Path(str(path)).name}: {e}")
+        except Exception as e:
+            errors.append(str(e))
+        self._set_status(f"Alles speichern: {saved} Datei(en)/Sidecar(s)")
+        body = (
+            f"Gespeichert: {saved}\nFehler:\n" + "\n".join(errors[:8])
+            if errors
+            else (
                 "Nichts zu speichern — keine Änderungen und keine Sidecars."
                 if saved == 0
-                else f"{saved} Datei(en)/Sidecar(s) gespeichert.",
+                else f"{saved} Datei(en)/Sidecar(s) gespeichert."
             )
+        )
+        self._feature_dialog("Alles speichern", body)
 
     def save_as(self):
         if not self.doc:

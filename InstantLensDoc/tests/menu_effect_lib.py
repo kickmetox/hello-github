@@ -762,6 +762,8 @@ def should_skip(row: dict, state: str) -> bool:
         return True
     if row.get("kind") in ("shortcut", "ribbon-tab", "palette"):
         return True
+    if str(row.get("path") or "").startswith("Palette ▸"):
+        return True
     if not row.get("enabled", True):
         return True
     if row.get("kind") == "context" and state == "pdf" and "Kontext Editor" in (row.get("path") or ""):
@@ -912,6 +914,27 @@ def walk_state(
                     "text": row.get("text") or "",
                     "verdict": verdict,
                     "detail": "skip" if verdict == "skip" else "disabled",
+                }
+            )
+            continue
+        try:
+            win._sync_menu_enablement()
+        except Exception:
+            pass
+        if act is not None:
+            try:
+                enabled = bool(act.isEnabled())
+                row["enabled"] = enabled
+            except Exception:
+                pass
+        if not enabled:
+            out.append(
+                {
+                    "path": path,
+                    "kind": kind,
+                    "text": row.get("text") or "",
+                    "verdict": "disabled",
+                    "detail": "disabled",
                 }
             )
             continue
