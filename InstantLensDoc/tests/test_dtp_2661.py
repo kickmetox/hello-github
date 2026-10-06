@@ -144,25 +144,77 @@ def test_unsaved_prompt_german_buttons() -> None:
     assert box.button(QMessageBox.Cancel).text() == "Abbrechen"
 
 
-def test_dirty_document_still_keeps_pdf_surface(monkeypatch) -> None:
+def test_dirty_document_cancel_aborts_enter(monkeypatch) -> None:
     _reload_pdf()
     monkeypatch.setattr(_WIN, "_document_is_dirty", lambda: True)
-    assert _WIN._enter_layout_mode() is True
-    assert _WIN._layout_mode_active()
+    seen: dict[str, str] = {}
+
+    def fake_exec(self, *a, **k):
+        seen["title"] = self.windowTitle()
+        save_btn = self.button(QMessageBox.Save)
+        seen["save"] = save_btn.text() if save_btn is not None else ""
+        return QMessageBox.Cancel
+
+    monkeypatch.setattr(QMessageBox, "exec", fake_exec)
+    monkeypatch.setattr(QDialog, "exec", fake_exec)
+    assert _WIN._enter_layout_mode() is False
+    assert not _WIN._layout_mode_active()
+    assert not _WIN.dtp_pane.isVisible()
     assert _WIN.stack.currentWidget() is _WIN.pdf_view
-    assert _WIN.dtp_pane.isVisible()
+    assert seen.get("save") == "Speichern"
+    assert seen.get("title") == "Layout-Modus"
 
 
-def test_ribbon_dtp_keeps_word_chrome_on_dirty_document(monkeypatch) -> None:
+def test_ribbon_dtp_cancel_restores_previous_tab(monkeypatch) -> None:
     _reload_pdf()
     _WIN.ribbon_bar.select_tab("Start")
     pump(_APP, 0.05)
     monkeypatch.setattr(_WIN, "_document_is_dirty", lambda: True)
+    monkeypatch.setattr(QMessageBox, "exec", lambda self, *a, **k: QMessageBox.Cancel)
+    monkeypatch.setattr(QDialog, "exec", lambda self, *a, **k: QMessageBox.Cancel)
     _WIN.ribbon_bar.select_tab("DTP")
     pump(_APP, 0.05)
+    assert not _WIN._layout_mode_active()
+    assert _checked_ribbon_title() == "Start"
+
+
+def test_dirty_document_discard_enters_dtp(monkeypatch) -> None:
+    _reload_pdf()
+    monkeypatch.setattr(_WIN, "_document_is_dirty", lambda: True)
+    monkeypatch.setattr(QMessageBox, "exec", lambda self, *a, **k: QMessageBox.Discard)
+    monkeypatch.setattr(QDialog, "exec", lambda self, *a, **k: QMessageBox.Discard)
+    assert _WIN._enter_layout_mode() is True
     assert _WIN._layout_mode_active()
+    assert _WIN.dtp_pane.isVisible()
     assert _WIN.stack.currentWidget() is _WIN.pdf_view
-    assert "Start" in _WIN.ribbon_bar._tab_index
+
+
+def test_dtp_help_from_menu_and_f1(monkeypatch) -> None:
+    from PySide6.QtGui import QAction
+
+    from instantlensdoc.dtp import help_dialog as hd
+
+    _reload_pdf()
+    assert _WIN._enter_layout_mode() is True
+    seen: list[str] = []
+
+    def fake_exec(self):
+        seen.append(self.objectName())
+        seen.append(self.windowTitle())
+        return 0
+
+    monkeypatch.setattr(hd.DtpHelpDialog, "exec", fake_exec)
+    _WIN._show_dtp_help()
+    assert "ildDtpHelpDialog" in seen
+    assert "DTP-Hilfe" in seen
+    seen.clear()
+    _WIN._show_help_dialog()
+    assert "DTP-Hilfe" in seen
+    act = _WIN.findChild(QAction, "actDtpHelp")
+    assert act is not None
+    seen.clear()
+    act.trigger()
+    assert "ildDtpHelpDialog" in seen
 
 
 def test_dirty_layout_cancel_stays_in_dtp(monkeypatch) -> None:

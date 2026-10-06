@@ -4445,7 +4445,7 @@ class MainWindow(QMainWindow):
             pass
 
     def _on_dtp_menu_about_to_show(self) -> None:
-        """Menütitel DTP: eine Spalte; Werkzeuge in derselben Ansicht."""
+        """Menütitel DTP (11f8876): aboutToShow → _enter_layout_mode, eine Spalte."""
         if getattr(self, "_dtp_switching", False):
             return
         self._dtp_menu_showing = True
@@ -14351,6 +14351,8 @@ class MainWindow(QMainWindow):
             return
         if getattr(self, "_dtp_switching", False):
             return
+        if getattr(self, "_dtp_menu_showing", False):
+            return
         self._enter_layout_mode()
 
     def _on_layout_mode_triggered(self, checked: bool = True) -> None:
@@ -14401,6 +14403,16 @@ class MainWindow(QMainWindow):
             return True
         self._dtp_switching = True
         try:
+            if not self._confirm_document_unsaved(title="Layout-Modus"):
+                self._sync_layout_mode_checked(False)
+                if not getattr(self, "_dtp_menu_showing", False):
+                    rb = getattr(self, "ribbon_bar", None)
+                    if rb is not None and hasattr(rb, "restore_previous_category"):
+                        try:
+                            rb.restore_previous_category()
+                        except Exception:
+                            pass
+                return False
             try:
                 from instantlensdoc.dtp.model import DtpDocument
 
