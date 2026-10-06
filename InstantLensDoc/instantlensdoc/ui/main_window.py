@@ -1782,6 +1782,13 @@ class MainWindow(QMainWindow):
             on_error=lambda _e: _to(),
         )
 
+    def menuBar(self):
+        """Gescrollte Chrome-Menüleiste, falls installiert — sonst Qt-Default."""
+        mb = getattr(self, "_ild_chrome_menubar", None)
+        if mb is not None:
+            return mb
+        return super().menuBar()
+
     def _build_menus(self):
         mb = self.menuBar()
 
@@ -4140,6 +4147,12 @@ class MainWindow(QMainWindow):
         apply_clickable_popup_menus(self)
         self._bind_ribbon_qactions()
         self._install_ink_input()
+        try:
+            from instantlensdoc.ui.chrome import install_chrome_shrink_layout
+
+            install_chrome_shrink_layout(self)
+        except Exception:
+            pass
 
     _FORMAT_MENU_TEXTS = frozenset(
         {

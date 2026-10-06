@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Callable
 
-from PySide6.QtCore import QPoint, Qt, Signal
+from PySide6.QtCore import QPoint, QSize, Qt, Signal
 from PySide6.QtGui import QAction, QIcon, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QFrame,
@@ -24,6 +24,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from instantlensdoc.ui.chrome import wrap_hscroll
 from instantlensdoc.ui.menu_click import show_scrollable_menu
 from instantlensdoc.ui.styles import StyleGallery
 from instantlensdoc.ui.word_ribbon import WORD_TAB_GROUPS
@@ -96,6 +97,20 @@ class _OverflowPanel(QWidget):
         self._overflow.setVisible(bool(self._hidden_specs))
         self._overflow.setEnabled(bool(self._hidden_specs))
 
+    def minimumSizeHint(self) -> QSize:  # noqa: N802
+        h = super().minimumSizeHint().height()
+        w = self._overflow.sizeHint().width() + 20
+        if self._items:
+            w += max(24, self._items[0].sizeHint().width())
+        return QSize(w, h)
+
+    def sizeHint(self) -> QSize:  # noqa: N802
+        h = super().sizeHint().height()
+        w = self._overflow.sizeHint().width() + 12
+        for item in self._items:
+            w += item.sizeHint().width() + 4
+        return QSize(max(w, 80), h)
+
     def _open_overflow(self) -> None:
         if not self._hidden_specs:
             return
@@ -111,6 +126,7 @@ class _OverflowPanel(QWidget):
             self,
             pos=global_pos,
             on_pick=on_pick,
+            qactions=getattr(ribbon, "_qactions", None) if ribbon is not None else None,
         )
 
 
@@ -120,6 +136,7 @@ class _RibbonGroup(QWidget):
     def __init__(self, title: str, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setObjectName("ribbonGroup")
+        self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
         self.setStyleSheet(
             "QWidget#ribbonGroup { border-right: 1px solid #C5CCD6; }"
             "QLabel#ribbonGroupTitle { color: #5A6A7A; font-size: 10px; }"
@@ -188,7 +205,10 @@ class RibbonBar(QWidget):
         root.setContentsMargins(4, 2, 4, 4)
         root.setSpacing(2)
 
-        cats = QHBoxLayout()
+        cat_strip = QWidget()
+        cat_strip.setObjectName("ildRibbonTabStrip")
+        cats = QHBoxLayout(cat_strip)
+        cats.setContentsMargins(0, 0, 0, 0)
         cats.setSpacing(0)
         self._cat_buttons: list[QPushButton] = []
         self._stack = QStackedWidget()
@@ -675,8 +695,15 @@ class RibbonBar(QWidget):
             self._stack.addWidget(panel)
 
         cats.addStretch(1)
-        root.addLayout(cats)
-        root.addWidget(self._stack)
+        root.addWidget(wrap_hscroll(cat_strip, object_name="ildRibbonTabScroll"))
+        root.addWidget(
+            wrap_hscroll(
+                self._stack,
+                object_name="ildRibbonBodyScroll",
+                widget_resizable=True,
+            ),
+            1,
+        )
         # Chrome-Tab „Seitenlayout“ = bestehendes Ribbon-Tab „Layout“ (kein zweites Ribbon).
         if "Layout" in self._tab_index:
             self._tab_index["Seitenlayout"] = self._tab_index["Layout"]

@@ -445,13 +445,16 @@ def test_ribbon_overflow_one_column_triggers_bound_qaction() -> None:
             [("bold", "Fett"), ("mail_merge", "Seriendruck…")],
             rb,
             on_pick=rb._pick_overflow,
+            qactions=getattr(rb, "_qactions", None),
         )
         assert menu is not None
-        items = menu.findChildren(QToolButton, "ildOverflowItem")
-        assert items, "Overflow-Spalte ohne Einträge"
-        geos = [it.geometry() for it in items]
-        assert all(g.x() < 40 for g in geos), "Overflow nicht eine Spalte"
-        QTest.mouseClick(items[0], Qt.MouseButton.LeftButton)
+        acts = [a for a in menu.actions() if not a.isSeparator()]
+        assert acts, "Overflow-Menü ohne Einträge"
+        geos = [menu.actionGeometry(a) for a in acts]
+        assert all(g.isValid() and g.x() < 48 for g in geos), "Overflow nicht eine Spalte"
+        from instantlensdoc.ui.menu_click import mouse_click_menu_action
+
+        mouse_click_menu_action(_APP, menu, acts[0])
         pump(_APP, 0.12)
     finally:
         try:

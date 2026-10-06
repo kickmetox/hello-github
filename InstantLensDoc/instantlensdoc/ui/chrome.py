@@ -2,11 +2,23 @@
 
 Default: Kombiniert (Pull-down-Menüs + Ribbon). Umschalten verwirft
 kein offenes Dokument — nur Sichtbarkeit von Menüleiste und Ribbon.
+
+Layout (diese Datei): Menü/Ribbon schrumpfen mit dem Fenster. Zu schmal:
+horizontale Scrollbar, keine verlorenen Einträge. Overflow-» bleibt
+Ribbon-Sache und löst die echte QAction aus.
 """
 
 from __future__ import annotations
 
 from typing import Literal
+
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import (
+    QFrame,
+    QScrollArea,
+    QSizePolicy,
+    QWidget,
+)
 
 ChromeMode = Literal["klassisch", "ribbon", "kombiniert"]
 
@@ -66,6 +78,86 @@ def set_chrome_mode(mode: str) -> ChromeMode:
     return resolved
 
 
+class HScrollHost(QScrollArea):
+    """Chrome-Streifen: Inhalt behält Größe, bei zu schmalem Fenster Scrollbar."""
+
+    def __init__(
+        self,
+        inner: QWidget,
+        *,
+        object_name: str = "ildChromeHScroll",
+        widget_resizable: bool = False,
+    ) -> None:
+        super().__init__()
+        self.setObjectName(object_name)
+        self.setFrameShape(QFrame.NoFrame)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.setWidgetResizable(bool(widget_resizable))
+        self.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
+        self.setFocusPolicy(Qt.NoFocus)
+        inner.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)
+        self.setWidget(inner)
+        self._inner = inner
+        self._fit()
+
+    def resizeEvent(self, event) -> None:  # noqa: N802
+        super().resizeEvent(event)
+        self._fit()
+
+    def showEvent(self, event) -> None:  # noqa: N802
+        super().showEvent(event)
+        self._fit()
+
+    def _fit(self) -> None:
+        inner = getattr(self, "_inner", None)
+        if inner is None:
+            return
+        hint = inner.sizeHint()
+        min_h = max(hint.height(), inner.minimumSizeHint().height(), 24)
+        vw = max(1, self.viewport().width())
+        need = int(hint.width()) > int(vw)
+        inner.setMinimumWidth(max(1, hint.width()))
+        if not self.widgetResizable():
+            inner.resize(max(int(hint.width()), vw), min_h)
+        sbh = self.horizontalScrollBar().sizeHint().height() if need else 0
+        self.setFixedHeight(min_h + sbh)
+
+
+def wrap_hscroll(
+    inner: QWidget,
+    *,
+    object_name: str,
+    widget_resizable: bool = False,
+) -> HScrollHost:
+    return HScrollHost(
+        inner, object_name=object_name, widget_resizable=widget_resizable
+    )
+
+
+def install_chrome_shrink_layout(window) -> None:
+    """Menüleiste in horizontale Scrollbar legen — keine verlorenen Titel."""
+    if getattr(window, "_ild_menubar_host", None) is not None:
+        return
+    if not hasattr(window, "menuBar"):
+        return
+    mb = window.menuBar()
+    if mb is None:
+        return
+    try:
+        mb.setNativeMenuBar(False)
+    except Exception:
+        pass
+    host = wrap_hscroll(mb, object_name="ildMenuBarScroll")
+    window._ild_chrome_menubar = mb
+    window._ild_menubar_host = host
+    try:
+        window.setMenuWidget(host)
+    except Exception:
+        window._ild_menubar_host = None
+        window._ild_chrome_menubar = None
+
+
 def apply_chrome(window, mode: str | None = None) -> ChromeMode:
     """Menüleiste/Ribbon laut Modus — Dokument bleibt unangetastet."""
     resolved = normalize_chrome_mode(mode if mode is not None else get_chrome_mode())
@@ -74,6 +166,9 @@ def apply_chrome(window, mode: str | None = None) -> ChromeMode:
     ribbon = getattr(window, "ribbon_bar", None)
     show_menu = (not presentation) and resolved in (CHROME_KLASSISCH, CHROME_KOMBINIERT)
     show_ribbon = (not presentation) and resolved in (CHROME_RIBBON, CHROME_KOMBINIERT)
+    host = getattr(window, "_ild_menubar_host", None)
+    if host is not None:
+        host.setVisible(bool(show_menu))
     if menubar is not None:
         menubar.setVisible(bool(show_menu))
     if ribbon is not None:

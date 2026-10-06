@@ -82,9 +82,24 @@ def _scroll_style() -> ScrollableMenuStyle:
 def prepare_menu_for_clicks(menu: QMenu) -> None:
     """Eine Spalte, scrollbar — keine abgeschnittene zweite Spalte."""
     if menu.property("ildScrollableMenu"):
+        _cap_menu_height(menu)
         return
     menu.setStyle(_scroll_style())
     menu.setProperty("ildScrollableMenu", True)
+    _cap_menu_height(menu)
+
+
+def _cap_menu_height(menu: QMenu) -> None:
+    app = QApplication.instance()
+    screen = app.primaryScreen() if app is not None else None
+    if screen is not None:
+        cap = max(160, int(screen.availableGeometry().height() * 0.55))
+    else:
+        cap = 360
+    try:
+        menu.setMaximumHeight(cap)
+    except Exception:
+        pass
 
 
 def _event_pos(event: QMouseEvent):
@@ -298,20 +313,41 @@ def show_scrollable_menu(
     *,
     pos: QPoint | None = None,
     on_pick: Callable[[str], None] | None = None,
-) -> ScrollableActionMenu | None:
-    """Popup an ``pos`` (global) oder Cursor. Leere Listen werden ignoriert."""
+    qactions: dict | None = None,
+) -> QMenu | None:
+    """Einspaltiges QMenu (actionAt). Overflow löst die echte QAction aus."""
     specs = [(str(a), str(lbl)) for a, lbl in (items or ()) if a]
     if not specs:
         return None
-    menu = ScrollableActionMenu(specs, parent)
-    if on_pick is not None:
-        menu.action_chosen.connect(on_pick)
+    menu = QMenu(parent)
+    menu.setObjectName("ildScrollableActionMenu")
+    prepare_menu_for_clicks(menu)
+    mapping = qactions or {}
+    for aid, label in specs:
+        real = mapping.get(aid)
+        act = QAction(str(label or aid), menu)
+        act.setObjectName(f"ildOverflowAction_{aid}")
+        act.setProperty("ribbonActionId", aid)
+        if real is not None:
+            try:
+                act.setEnabled(bool(real.isEnabled()))
+            except Exception:
+                pass
+            try:
+                tip = real.toolTip() or ""
+                if tip:
+                    act.setToolTip(str(tip))
+            except Exception:
+                pass
+            act.triggered.connect(real.trigger)
+        elif on_pick is not None:
+            act.triggered.connect(lambda _=False, a=aid: on_pick(a))
+        menu.addAction(act)
     where = pos
     if where is None:
         where = QCursor.pos()
-    menu.move(where)
+    menu.popup(where)
     menu.show()
-    menu.raise_()
     app = QApplication.instance()
     if app is not None:
         app.processEvents()
