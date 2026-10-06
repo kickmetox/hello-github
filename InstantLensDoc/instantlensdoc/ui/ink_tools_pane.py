@@ -24,14 +24,14 @@ from PySide6.QtWidgets import (
 from instantlensdoc.ui.ink_input import (
     DEFAULT_INK_COLOR,
     DEFAULT_INK_WIDTH,
-    FILL_CLOSED,
-    FILL_FLOOD,
     FILL_NONE,
     INK_FILL_LABELS,
     INK_FILLS,
     INK_TOOL_LABELS,
     INK_TOOLS,
     INK_WIDTHS,
+    STAMP_TOOL_LABELS,
+    STAMP_TOOLS,
     TOOL_BALLPOINT,
     mm_to_pt,
     pt_to_mm,
@@ -180,18 +180,12 @@ class InkToolsPane(QWidget):
         rec.clicked.connect(self.recognizeRequested.emit)
         self._col.addWidget(rec)
         self._add_heading("Stempel")
-        for aid, label in (
-            ("place", "Stempel setzen"),
-            ("frame", "Rahmen ein/aus"),
-            ("color", "Stempelfarbe"),
-            ("text_only", "Nur Text"),
-            ("shadow", "Schatten"),
-            ("outline", "Kontur"),
-            ("edit", "Stempel bearbeiten"),
-        ):
-            b = QPushButton(label)
+        self._stamp_btns: dict[str, QPushButton] = {}
+        for aid in STAMP_TOOLS:
+            b = QPushButton(STAMP_TOOL_LABELS[aid])
             b.setObjectName(f"inkStamp_{aid}")
             b.clicked.connect(lambda _=False, k=aid: self.stampAction.emit(k))
+            self._stamp_btns[aid] = b
             self._col.addWidget(b)
         self._col.addStretch(1)
         scroll.setWidget(inner)
@@ -260,6 +254,9 @@ class InkToolsPane(QWidget):
         self._hook_action(self._color_btn, getattr(window, "_act_ink_color", None))
         rec = self.findChild(QPushButton, "inkTool_recognize")
         self._hook_action(rec, getattr(window, "_act_recognize_handwriting", None))
+        stamps = getattr(window, "_ink_stamp_actions", None) or {}
+        for key, btn in self._stamp_btns.items():
+            self._hook_action(btn, stamps.get(key))
         session = getattr(window, "_ink_session", None)
         if session is not None:
             self.sync_from_session(session)

@@ -1882,9 +1882,18 @@ class PdfCanvas(QLabel):
                 painter.restore()
                 painter.setOpacity(1.0)
                 return
-            stamp_color = QColor(ann.color if ann.color != "#FFFF00" else "#C0392B")
-            painter.setPen(QPen(stamp_color, 3))
-            painter.drawRect(x, y, box_w, box_h)
+            from instantlensdoc.ui.ink_input import stamp_paint_flags
+
+            flags = stamp_paint_flags(ann)
+            stamp_color = QColor(flags["color"])
+            if flags["shadow"]:
+                painter.setPen(Qt.NoPen)
+                painter.setBrush(QColor(0, 0, 0, _a(90)))
+                painter.drawRect(x + 4, y + 4, box_w, box_h)
+            painter.setBrush(Qt.NoBrush)
+            if flags["frame"] or flags["outline"]:
+                painter.setPen(QPen(stamp_color, float(flags["pen_width"])))
+                painter.drawRect(x, y, box_w, box_h)
             painter.setPen(stamp_color)
             lines = (ann.text or "STEMPEL").splitlines()[:3]
             ty = y + 16

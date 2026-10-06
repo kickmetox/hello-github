@@ -3023,6 +3023,25 @@ class MainWindow(QMainWindow):
         )
         self._act_right_toolbox.toggled.connect(self._toggle_right_toolbox)
         m_view.addAction(self._act_right_toolbox)
+        from instantlensdoc.ui.ink_input import STAMP_TOOL_LABELS, STAMP_TOOLS
+
+        self._ink_stamp_actions: dict[str, QAction] = {}
+        _stamp_obj = {
+            "place": "actInkStampPlace",
+            "frame": "actInkStampFrame",
+            "color": "actInkStampColor",
+            "text_only": "actInkStampTextOnly",
+            "shadow": "actInkStampShadow",
+            "outline": "actInkStampOutline",
+            "edit": "actInkStampEdit",
+        }
+        for key in STAMP_TOOLS:
+            act = QAction(STAMP_TOOL_LABELS[key], self)
+            act.setObjectName(_stamp_obj.get(key, f"actInkStamp_{key}"))
+            act.setToolTip(STAMP_TOOL_LABELS[key])
+            act.triggered.connect(lambda _=False, k=key: self._ink_stamp_action(k))
+            m_view.addAction(act)
+            self._ink_stamp_actions[key] = act
         self._current_line_hl_action = QAction("Aktuelle Zeile hervorheben", self)
         self._current_line_hl_action.setCheckable(True)
         self._current_line_hl_action.setChecked(get_editor_current_line_highlight())
@@ -9306,6 +9325,13 @@ class MainWindow(QMainWindow):
         "ink_fill_closed": "actInkFillClosed",
         "ink_fill_flood": "actInkFillFlood",
         "right_toolbox": "actRightToolbox",
+        "stamp_place": "actInkStampPlace",
+        "stamp_frame": "actInkStampFrame",
+        "stamp_color": "actInkStampColor",
+        "stamp_text_only": "actInkStampTextOnly",
+        "stamp_shadow": "actInkStampShadow",
+        "stamp_outline": "actInkStampOutline",
+        "stamp_edit": "actInkStampEdit",
         "ki_assistant": "actKiAssistant",
         "varfonts": "actVariableFonts",
         "pades_sign": "actPadesSign",
@@ -9378,6 +9404,10 @@ class MainWindow(QMainWindow):
                 "flood": "ink_fill_flood",
             }.get(key)
             if aid and act is not None:
+                mapping[aid] = act
+        for key, act in (getattr(self, "_ink_stamp_actions", None) or {}).items():
+            aid = f"stamp_{key}"
+            if act is not None:
                 mapping[aid] = act
         self._ribbon_qactions = mapping
         rb = getattr(self, "ribbon_bar", None)
@@ -14898,6 +14928,8 @@ class MainWindow(QMainWindow):
                     act.blockSignals(False)
                 except Exception:
                     pass
+        for act in (getattr(self, "_ink_stamp_actions", None) or {}).values():
+            self._set_action_available(act, not locked, reason)
 
     def _toggle_ink_input(self, checked=None) -> None:
         from instantlensdoc.ui.ink_input import is_schreibschutz
@@ -15204,88 +15236,171 @@ class MainWindow(QMainWindow):
             pdf.arm_quick_stamp()
             self._set_status("Stempel: klicken zum Setzen")
             return
-        if key == "edit" and pdf is not None:
-            fn = getattr(pdf, "edit_selected_annotation_text", None) or getattr(
-                pdf, "object_edit_dialog", None
-            )
-            if callable(fn):
-                fn()
+        if key == "edit":
+            if self._edit_selected_stamp():
+                return
+            if pdf is not None:
+                fn = getattr(pdf, "edit_selected_annotation_text", None) or getattr(
+                    pdf, "object_edit_dialog", None
+                )
+                if callable(fn):
+                    fn()
             return
         self._apply_stamp_style(key)
 
-    def _apply_stamp_style(self, kind: str) -> None:
+    def _edit_selected_stamp(self) -> bool:
         pdf = getattr(self, "pdf_view", None)
-        if pdf is None or not hasattr(pdf, "store"):
-            return
-        ids = []
-        try:
-            ids = list(pdf._selected_annotation_ids())
-        except Exception:
-            ids = []
-        from ild_pdf.annotate import AnnotationType
-
-        anns = []
-        for i in ids:
-            ann = pdf.store.get(i)
-            if ann is not None and getattr(ann, "type", None) == AnnotationType.STAMP:
-                anns.append(ann)
-        if not anns:
-            self._set_status("Kein Stempel ausgewählt")
-            return
-        for ann in anns:
-            if kind == "color":
-                from PySide6.QtWidgets import QColorDialog
-
-                cur = QColor(ann.color or "#C0392B")
-                color = QColorDialog.getColor(cur, self, "Stempelfarbe")
-                if color.isValid():
-                    ann.color = color.name()
-            elif kind == "frame":
-                cur = float(getattr(ann, "stroke_width", 3.0) or 0.0)
-                ann.stroke_width = 0.0 if cur > 0.5 else 3.0
-                if hasattr(ann, "stamp_frame"):
-                    ann.stamp_frame = ann.stroke_width > 0.5
-            elif kind == "text_only":
-                ann.stroke_width = 0.0
-                ann.fill_color = ""
-                if hasattr(ann, "stamp_text_only"):
-                    ann.stamp_text_only = True
-            elif kind == "shadow":
-                tags = list(getattr(ann, "tags", None) or [])
-                if "ild-stamp-shadow" in tags:
-                    tags = [t for t in tags if t != "ild-stamp-shadow"]
-                else:
-                    tags.append("ild-stamp-shadow")
-                ann.tags = tags
-                if hasattr(ann, "stamp_shadow"):
-                    ann.stamp_shadow = "ild-stamp-shadow" in tags
-            elif kind == "outline":
-                ann.stroke_width = max(2.0, float(getattr(ann, "stroke_width", 0) or 0) or 2.0)
-                if hasattr(ann, "stamp_outline"):
-                    ann.stamp_outline = True
-            if hasattr(ann, "touch"):
-                ann.touch()
-            kw = {
-                "color": ann.color,
-                "fill_color": getattr(ann, "fill_color", ""),
-                "tags": list(getattr(ann, "tags", None) or []),
-            }
-            sw = float(getattr(ann, "stroke_width", 3.0) or 0.0)
-            if sw >= 1.0:
-                kw["stroke_width"] = sw
-            else:
-                ann.stroke_width = 0.0
-                try:
-                    pdf.store.dirty = True
-                except Exception:
-                    pass
+        if pdf is not None and callable(getattr(pdf, "edit_selected_annotation_text", None)):
             try:
-                pdf.store.update(ann.id, **kw)
+                if pdf.edit_selected_annotation_text():
+                    return True
             except Exception:
                 pass
-        if hasattr(pdf, "refresh"):
-            pdf.refresh()
+        pane = getattr(self, "dtp_pane", None)
+        if pane is not None and hasattr(pane, "scene"):
+            frames = []
+            try:
+                frames = list(pane.scene.selected_frames() or [])
+            except Exception:
+                frames = []
+            if frames:
+                item = None
+                try:
+                    item = pane.scene._items.get(frames[0].id)
+                except Exception:
+                    item = None
+                if item is not None and callable(getattr(item, "begin_edit", None)):
+                    item.begin_edit()
+                    return True
+        return False
+
+    def _apply_stamp_style_dtp(self, kind: str, *, color: str | None = None) -> bool:
+        """Stempel-Werkzeuge auf Sibling-DtpFrame: fill/stroke/shadow/outlines."""
+        pane = getattr(self, "dtp_pane", None)
+        if pane is None or getattr(pane, "doc", None) is None:
+            return False
+        frames = []
+        try:
+            frames = list(pane.scene.selected_frames() or [])
+        except Exception:
+            return False
+        if not frames:
+            return False
+        doc = pane.doc
+        for fr in frames:
+            try:
+                if kind == "color":
+                    hexc = str(color or "").strip()
+                    if not hexc:
+                        continue
+                    if not hexc.startswith("#"):
+                        hexc = "#" + hexc
+                    if callable(getattr(doc, "apply_stroke_color", None)):
+                        doc.apply_stroke_color(fr.id, hexc)
+                    else:
+                        fr.stroke = hexc
+                elif kind == "frame":
+                    cur = float(getattr(fr, "stroke_width", 1.0) or 0.0)
+                    if cur > 0.4:
+                        fr.stroke_width = 0.0
+                    elif callable(getattr(doc, "apply_stroke_color", None)):
+                        doc.apply_stroke_color(fr.id, getattr(fr, "stroke", None) or "#333333", width=1.5)
+                    else:
+                        fr.stroke_width = 1.5
+                elif kind == "text_only":
+                    fr.stroke_width = 0.0
+                    fr.fill = ""
+                elif kind == "shadow":
+                    if bool(getattr(fr, "shadow", False)):
+                        fr.shadow = False
+                    elif callable(getattr(doc, "apply_drop_shadow", None)):
+                        doc.apply_drop_shadow(fr.id)
+                    else:
+                        fr.shadow = True
+                elif kind == "outline":
+                    if callable(getattr(doc, "convert_text_to_outlines", None)) and fr.kind == "text":
+                        doc.convert_text_to_outlines(fr.id)
+                    else:
+                        fr.fill = ""
+                        if callable(getattr(doc, "apply_stroke_color", None)):
+                            doc.apply_stroke_color(
+                                fr.id,
+                                getattr(fr, "stroke", None) or "#333333",
+                                width=max(1.5, float(getattr(fr, "stroke_width", 1.5) or 1.5)),
+                            )
+            except Exception:
+                continue
+        try:
+            pane.scene.rebuild()
+        except Exception:
+            pass
         self._set_status(f"Stempel: {kind}")
+        return True
+
+    def _apply_stamp_style(self, kind: str, *, color: str | None = None) -> None:
+        from instantlensdoc.ui.ink_input import apply_stamp_style_to_annotation, stamp_paint_flags
+
+        key = str(kind or "")
+        hex_color = str(color or "").strip() or None
+        if key == "color" and hex_color is None:
+            from PySide6.QtGui import QColor
+            from PySide6.QtWidgets import QColorDialog
+
+            cur = QColor("#C0392B")
+            picked = QColorDialog.getColor(cur, self, "Stempelfarbe")
+            if not picked.isValid():
+                return
+            hex_color = picked.name()
+        pdf = getattr(self, "pdf_view", None)
+        store = getattr(pdf, "store", None) if pdf is not None else None
+        anns = []
+        if pdf is not None and store is not None:
+            ids = []
+            try:
+                ids = list(pdf._selected_annotation_ids())
+            except Exception:
+                ids = []
+            if not ids:
+                extra = list(getattr(pdf, "_selected_ann_ids", None) or [])
+                sid = getattr(pdf, "_selected_ann_id", None)
+                if sid:
+                    extra.append(sid)
+                ids = extra
+            from ild_pdf.annotate import AnnotationType
+
+            for i in ids:
+                ann = store.get(i)
+                if ann is not None and getattr(ann, "type", None) == AnnotationType.STAMP:
+                    anns.append(ann)
+        if anns:
+            for ann in anns:
+                kw = apply_stamp_style_to_annotation(ann, key, color=hex_color)
+                try:
+                    store.update(ann.id, **kw)
+                except Exception:
+                    try:
+                        store.dirty = True
+                    except Exception:
+                        pass
+            try:
+                if callable(getattr(pdf, "schedule_sidecar_save", None)):
+                    pdf.schedule_sidecar_save()
+            except Exception:
+                pass
+            if hasattr(pdf, "refresh"):
+                try:
+                    pdf.refresh()
+                except Exception:
+                    pass
+            flags = stamp_paint_flags(anns[0])
+            self._set_status(
+                f"Stempel: {key}"
+                + (f" {flags['color']}" if key == "color" else "")
+            )
+            return
+        if self._apply_stamp_style_dtp(key, color=hex_color):
+            return
+        self._set_status("Kein Stempel ausgewählt")
 
     def _show_hooks_info(self) -> None:
         from instantlensdoc.core.plugin_hooks import list_hooks, write_hook_example

@@ -1195,3 +1195,140 @@ def _insert_pdf_overlay(window, plain: str, bbox) -> str:
     except Exception:
         pass
     return "frame"
+
+
+STAMP_TAG_NO_FRAME = "ild-stamp-no-frame"
+STAMP_TAG_TEXT_ONLY = "ild-stamp-text-only"
+STAMP_TAG_SHADOW = "ild-stamp-shadow"
+STAMP_TAG_OUTLINE = "ild-stamp-outline"
+STAMP_TOOL_LABELS = {
+    "place": "Stempel setzen",
+    "frame": "Rahmen ein/aus",
+    "color": "Stempelfarbe",
+    "text_only": "Nur Text",
+    "shadow": "Schatten",
+    "outline": "Kontur",
+    "edit": "Stempel bearbeiten",
+}
+STAMP_TOOLS: tuple[str, ...] = tuple(STAMP_TOOL_LABELS)
+
+
+def _stamp_tag_list(ann) -> list[str]:
+    out: list[str] = []
+    seen: set[str] = set()
+    for raw in getattr(ann, "tags", None) or []:
+        tag = str(raw).strip()
+        if not tag:
+            continue
+        key = tag.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(tag)
+    return out
+
+
+def _stamp_has_tag(tags: Sequence[str], tag: str) -> bool:
+    needle = str(tag).casefold()
+    return any(str(item).casefold() == needle for item in tags)
+
+
+def _stamp_set_tag(tags: Sequence[str], tag: str, on: bool) -> list[str]:
+    needle = str(tag).casefold()
+    out = [item for item in tags if str(item).casefold() != needle]
+    if on:
+        out.append(str(tag))
+    return out
+
+
+def stamp_paint_flags(ann) -> dict:
+    """Rahmen/Farbe/Nur-Text/Schatten/Kontur aus Sibling-Annotation (Tags + color)."""
+    tags = _stamp_tag_list(ann)
+    text_only = _stamp_has_tag(tags, STAMP_TAG_TEXT_ONLY)
+    no_frame = _stamp_has_tag(tags, STAMP_TAG_NO_FRAME) or text_only
+    shadow = _stamp_has_tag(tags, STAMP_TAG_SHADOW)
+    outline = _stamp_has_tag(tags, STAMP_TAG_OUTLINE) and not text_only
+    frame = (not no_frame) or outline
+    if text_only:
+        frame = False
+        outline = False
+    color = str(getattr(ann, "color", "") or "").strip() or "#C0392B"
+    if color.upper() == "#FFFF00":
+        color = "#C0392B"
+    return {
+        "frame": bool(frame),
+        "text_only": bool(text_only),
+        "shadow": bool(shadow),
+        "outline": bool(outline),
+        "color": color,
+        "pen_width": 5.0 if outline else 3.0,
+    }
+
+
+def _sync_optional_stamp_attrs(ann, flags: dict) -> None:
+    mapping = {
+        "stamp_frame": flags.get("frame"),
+        "stamp_text_only": flags.get("text_only"),
+        "stamp_shadow": flags.get("shadow"),
+        "stamp_outline": flags.get("outline"),
+    }
+    for name, value in mapping.items():
+        if hasattr(ann, name):
+            try:
+                setattr(ann, name, bool(value))
+            except Exception:
+                pass
+
+
+def apply_stamp_style_to_annotation(ann, kind: str, *, color: str | None = None) -> dict:
+    """Stempelstil über vorhandene Felder (color/tags/fill_color). Kein neues Stempel-Objekt."""
+    key = str(kind or "").strip().lower()
+    tags = _stamp_tag_list(ann)
+    flags = stamp_paint_flags(ann)
+    if key == "color":
+        hexc = str(color or "").strip()
+        if hexc:
+            if not hexc.startswith("#"):
+                hexc = "#" + hexc
+            ann.color = hexc.upper()
+    elif key == "frame":
+        on = not flags["frame"]
+        tags = _stamp_set_tag(tags, STAMP_TAG_NO_FRAME, not on)
+        if on:
+            tags = _stamp_set_tag(tags, STAMP_TAG_TEXT_ONLY, False)
+        else:
+            tags = _stamp_set_tag(tags, STAMP_TAG_OUTLINE, False)
+    elif key == "text_only":
+        on = not flags["text_only"]
+        tags = _stamp_set_tag(tags, STAMP_TAG_TEXT_ONLY, on)
+        tags = _stamp_set_tag(tags, STAMP_TAG_NO_FRAME, on)
+        if on:
+            tags = _stamp_set_tag(tags, STAMP_TAG_OUTLINE, False)
+            try:
+                ann.fill_color = ""
+            except Exception:
+                pass
+    elif key == "shadow":
+        tags = _stamp_set_tag(tags, STAMP_TAG_SHADOW, not flags["shadow"])
+    elif key == "outline":
+        on = not flags["outline"]
+        tags = _stamp_set_tag(tags, STAMP_TAG_OUTLINE, on)
+        if on:
+            tags = _stamp_set_tag(tags, STAMP_TAG_NO_FRAME, False)
+            tags = _stamp_set_tag(tags, STAMP_TAG_TEXT_ONLY, False)
+    try:
+        ann.tags = tags
+    except Exception:
+        pass
+    flags = stamp_paint_flags(ann)
+    _sync_optional_stamp_attrs(ann, flags)
+    if hasattr(ann, "touch"):
+        try:
+            ann.touch()
+        except Exception:
+            pass
+    return {
+        "color": getattr(ann, "color", None),
+        "fill_color": getattr(ann, "fill_color", ""),
+        "tags": list(getattr(ann, "tags", None) or []),
+    }

@@ -382,3 +382,124 @@ def test_mouse_left_drag_draws_same_tools_as_stylus() -> None:
     _WIN._set_ink_tool("ballpoint")
     _WIN._toggle_ink_input(False)
 
+
+def test_stamp_tools_right_column_edit_sibling_stamps() -> None:
+    from ild_pdf.annotate import Annotation, AnnotationStore, AnnotationType
+    from instantlensdoc.ui.ink_input import (
+        STAMP_TAG_NO_FRAME,
+        STAMP_TAG_OUTLINE,
+        STAMP_TAG_SHADOW,
+        STAMP_TAG_TEXT_ONLY,
+        STAMP_TOOLS,
+        apply_stamp_style_to_annotation,
+        stamp_paint_flags,
+    )
+
+    pane = _WIN.ink_tools_pane
+    names = {w.objectName() for w in pane.findChildren(QWidget) if w.objectName()}
+    for aid in STAMP_TOOLS:
+        assert f"inkStamp_{aid}" in names
+    stamps = getattr(_WIN, "_ink_stamp_actions", None) or {}
+    for aid in STAMP_TOOLS:
+        act = stamps.get(aid)
+        assert act is not None
+        assert act.objectName().startswith("actInkStamp")
+    assert pane._stamp_btns["frame"] is not None
+
+    ann = Annotation(
+        0,
+        AnnotationType.STAMP,
+        10,
+        10,
+        text="GEPRÜFT",
+        color="#C0392B",
+        width=120,
+        height=40,
+    )
+    flags = stamp_paint_flags(ann)
+    assert flags["frame"] is True
+    assert flags["text_only"] is False
+    apply_stamp_style_to_annotation(ann, "frame")
+    flags = stamp_paint_flags(ann)
+    assert flags["frame"] is False
+    assert STAMP_TAG_NO_FRAME in (ann.tags or [])
+    apply_stamp_style_to_annotation(ann, "frame")
+    assert stamp_paint_flags(ann)["frame"] is True
+    apply_stamp_style_to_annotation(ann, "color", color="#1A5276")
+    assert str(ann.color).upper() == "#1A5276"
+    apply_stamp_style_to_annotation(ann, "text_only")
+    flags = stamp_paint_flags(ann)
+    assert flags["text_only"] is True
+    assert flags["frame"] is False
+    assert STAMP_TAG_TEXT_ONLY in (ann.tags or [])
+    apply_stamp_style_to_annotation(ann, "shadow")
+    assert stamp_paint_flags(ann)["shadow"] is True
+    assert STAMP_TAG_SHADOW in (ann.tags or [])
+    apply_stamp_style_to_annotation(ann, "outline")
+    flags = stamp_paint_flags(ann)
+    assert flags["outline"] is True
+    assert flags["frame"] is True
+    assert flags["text_only"] is False
+    assert STAMP_TAG_OUTLINE in (ann.tags or [])
+
+    pdf = _WIN.pdf_view
+    prev_store = pdf.store
+    prev_ids = set(getattr(pdf, "_selected_ann_ids", None) or set())
+    prev_id = getattr(pdf, "_selected_ann_id", None)
+    store = AnnotationStore()
+    stamp = store.add(
+        Annotation(
+            0,
+            AnnotationType.STAMP,
+            20,
+            30,
+            text="OK",
+            color="#C0392B",
+            width=100,
+            height=36,
+        )
+    )
+    pdf.store = store
+    pdf._selected_ann_id = stamp.id
+    pdf._selected_ann_ids = {stamp.id}
+    _WIN.editor.setReadOnly(False)
+    _WIN._sync_ink_input_actions()
+    pump(_APP, 0.02)
+    _WIN._apply_stamp_style("frame")
+    got = store.get(stamp.id)
+    assert got is not None
+    assert stamp_paint_flags(got)["frame"] is False
+    _WIN._apply_stamp_style("color", color="#148F77")
+    got = store.get(stamp.id)
+    assert str(got.color).upper() == "#148F77"
+    pane._stamp_btns["shadow"].click()
+    pump(_APP, 0.02)
+    got = store.get(stamp.id)
+    assert stamp_paint_flags(got)["shadow"] is True
+    pane._stamp_btns["outline"].click()
+    pump(_APP, 0.02)
+    got = store.get(stamp.id)
+    assert stamp_paint_flags(got)["outline"] is True
+    pane._stamp_btns["text_only"].click()
+    pump(_APP, 0.02)
+    got = store.get(stamp.id)
+    flags = stamp_paint_flags(got)
+    assert flags["text_only"] is True
+    assert flags["frame"] is False
+    _WIN._ink_stamp_actions["frame"].trigger()
+    pump(_APP, 0.02)
+    got = store.get(stamp.id)
+    assert stamp_paint_flags(got)["frame"] is True
+    _WIN.editor.setReadOnly(True)
+    _WIN._sync_ink_input_actions()
+    pump(_APP, 0.02)
+    assert not pane._stamp_btns["frame"].isEnabled()
+    assert not _WIN._ink_stamp_actions["color"].isEnabled()
+    _WIN.editor.setReadOnly(False)
+    _WIN._sync_ink_input_actions()
+    pump(_APP, 0.02)
+    assert pane._stamp_btns["frame"].isEnabled()
+    pdf.store = prev_store
+    pdf._selected_ann_ids = prev_ids
+    pdf._selected_ann_id = prev_id
+
