@@ -258,6 +258,7 @@ class RibbonBar(QWidget):
             "ink_fill_closed",
             "ink_fill_flood",
             "right_toolbox",
+            "write_protect",
         }
 
         def _icon_for(aid: str) -> QIcon | None:
@@ -487,6 +488,8 @@ class RibbonBar(QWidget):
                     ("save", "Speichern"),
                     ("save_as", "Speichern unter"),
                     ("print", "Drucken"),
+                    ("doc_info", "Informationen"),
+                    ("write_protect", "Schreibschutz"),
                     ("settings", "Einstellungen"),
                 ),
                 False,

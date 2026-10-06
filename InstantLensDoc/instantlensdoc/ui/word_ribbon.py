@@ -287,6 +287,10 @@ WORD_TAB_GROUPS: dict[str, tuple[tuple[str, tuple], ...]] = {
             ),
         ),
         (
+            "Schützen",
+            (("write_protect", "Schreibschutz"),),
+        ),
+        (
             "Nicht lokal",
             (
                 ("copilot", "Copilot", "off", OFF_COPILOT),
@@ -384,6 +388,7 @@ REASON_MAIL = "Seriendruck nur bei Textdokument (txt, doc, docx, odt)"
 REASON_TABLE = "Tabellenwerkzeuge nur in einer Tabelle"
 REASON_ARRANGE = "Anordnen nur bei ausgewähltem DTP-Rahmen"
 REASON_RICH = "Nur in txt, doc, docx, odt, DTP-Textrahmen oder nach OCR verfügbar"
+REASON_WRITE_PROTECT = "Dokument ist schreibgeschützt"
 
 FONT_ACTION_IDS = frozenset(
     {
@@ -494,8 +499,45 @@ ALWAYS_ACTION_IDS = frozenset(
         "chrome_kombiniert",
         "print",
         "dtp_layout",
+        "write_protect",
+        "doc_info",
+        "copy",
+        "save",
+        "save_as",
     }
 )
+VIEW_ACTION_IDS = frozenset(
+    {
+        "view_print",
+        "view_draft",
+        "view_web",
+        "view_outline",
+        "toggle_rulers",
+        "toggle_grid",
+        "toggle_navigation",
+        "toggle_minimap",
+        "zoom_100",
+        "zoom_one_page",
+        "zoom_page_width",
+        "zoom_multi",
+        "book_layout",
+        "page_by_page",
+        "continuous_scroll",
+        "doc_split",
+        "detach_window",
+        "width_marks",
+        "print_marks",
+        "header_footer_marks",
+        "layout_marks",
+        "dtp_grid",
+        "select_all",
+        "show_special_chars",
+        "word_count",
+        "find_replace",
+        "right_toolbox",
+    }
+)
+PROTECT_ALLOWED_ACTION_IDS = ALWAYS_ACTION_IDS | VIEW_ACTION_IDS
 TABLE_ACTION_IDS = frozenset(
     {
         "table_add_row",

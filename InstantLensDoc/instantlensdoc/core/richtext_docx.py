@@ -838,6 +838,7 @@ def html_to_docx(
     title: Optional[str] = None,
     header: Optional[str] = None,
     footer: Optional[str] = None,
+    author: Optional[str] = None,
 ) -> Path:
     """HTML (inkl. Qt-Spans) → DOCX mit Bold/Italic/Underline."""
     try:
@@ -851,6 +852,11 @@ def html_to_docx(
     if title:
         try:
             d.core_properties.title = title
+        except Exception:
+            pass
+    if author:
+        try:
+            d.core_properties.author = str(author)
         except Exception:
             pass
     try:

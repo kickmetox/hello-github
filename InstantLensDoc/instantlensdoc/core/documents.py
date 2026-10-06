@@ -461,6 +461,24 @@ def open_document(path: str | Path, *, encoding: str | None = None) -> Document:
             doc.meta["field_tokens"] = serialize_field_specs(merged)
     except Exception:
         pass
+    try:
+        from instantlensdoc.core.document_author import ensure_author, load_author
+
+        kind_name = str(getattr(kind, "name", kind) or "")
+        author = load_author(path, kind=kind_name, meta=doc.meta)
+        doc.meta["author"] = ensure_author({"author": author})
+    except Exception:
+        pass
+    try:
+        from instantlensdoc.core.write_protect import detect_protection
+
+        info = detect_protection(path)
+        if info.protected:
+            doc.meta["write_protect"] = True
+            if info.password_hash:
+                doc.meta["write_protect_hash"] = info.password_hash
+    except Exception:
+        pass
     return doc
 
 
@@ -571,11 +589,12 @@ def save_document(
                 title=doc.title,
                 header=str((doc.meta or {}).get("header") or ""),
                 footer=str((doc.meta or {}).get("footer") or ""),
+                author=str((doc.meta or {}).get("author") or ""),
             )
         else:
             from instantlensdoc.core.export import export_docx
 
-            export_docx(doc.text, target, title=doc.title)
+            export_docx(doc.text, target, title=doc.title, author=str((doc.meta or {}).get("author") or ""))
         try:
             from instantlensdoc.core.field_tokens import persist_document_field_tokens
 
@@ -701,6 +720,27 @@ def save_document(
                 (doc.meta or {}).get("field_tokens"),
                 kind=kind.name if hasattr(kind, "name") else str(kind),
             )
+    except Exception:
+        pass
+    kind_name = kind.name if hasattr(kind, "name") else str(kind)
+    try:
+        from instantlensdoc.core.document_author import ensure_author, persist_author
+
+        author = ensure_author(doc.meta)
+        doc.meta["author"] = author
+        persist_author(target, author, kind=kind_name)
+    except Exception:
+        pass
+    try:
+        from instantlensdoc.core.write_protect import persist_protection
+
+        persist_protection(
+            target,
+            kind=kind_name,
+            protected=bool((doc.meta or {}).get("write_protect")),
+            password_hash_value=str((doc.meta or {}).get("write_protect_hash") or ""),
+            password=(doc.meta or {}).get("write_protect_password"),
+        )
     except Exception:
         pass
     return target

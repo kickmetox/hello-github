@@ -4632,7 +4632,10 @@ class EditorPane(QWidget):
                 if aid in font_ids:
                     btn.setEnabled(on)
                     if not on:
-                        btn.setToolTip((btn.toolTip() or "").split(" — Schreibschutz")[0] + " — Schreibschutz")
+                        btn.setToolTip(
+                            (btn.toolTip() or "").split(" — ")[0]
+                            + " — Dokument ist schreibgeschützt"
+                        )
             except Exception:
                 pass
         picker = getattr(self, "layout_picker", None)
