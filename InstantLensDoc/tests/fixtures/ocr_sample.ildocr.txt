@@ -1,0 +1,19 @@
+# InstantLens Doc OCR (Layout)
+# lang=deu+eng
+# mode=layout_preserve
+# blocks=3
+# page=2
+# source=scan-demo.pdf
+
+# --- Blöcke (Lesereihenfolge) ---
+# block#0 id=1 bbox=40,20,400,36 conf=92.0 lines=1
+# block#1 id=2 bbox=40,70,480,80 conf=88.5 lines=3
+# block#2 id=3 bbox=40,170,200,22 conf=90.0 lines=1
+
+EINLEITUNG
+
+Dies ist der OCR-Fixture-Fließtext der zweiten Spalte.
+Er muss im Word-Suite-Editor fett formatiert, durchsuchbar
+und als DOCX speicherbar sein.
+
+Fazit

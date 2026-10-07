@@ -1,0 +1,250 @@
+"""Word/SoftMaker-Oberfläche: Klassisch / Ribbon / Kombiniert.
+
+Default: Kombiniert (Pull-down-Menüs + Ribbon). Umschalten verwirft
+kein offenes Dokument — nur Sichtbarkeit von Menüleiste und Ribbon.
+
+Layout (diese Datei): Menü/Ribbon schrumpfen mit dem Fenster. Zu schmal:
+horizontale Scrollbar, keine verlorenen Einträge. Pulldowns bleiben
+eine Spalte (SH_Menu_Scrollable).
+"""
+
+from __future__ import annotations
+
+from typing import Literal
+
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import (
+    QFrame,
+    QMenuBar,
+    QScrollArea,
+    QSizePolicy,
+    QWidget,
+)
+
+ChromeMode = Literal["klassisch", "ribbon", "kombiniert"]
+
+CHROME_KLASSISCH: ChromeMode = "klassisch"
+CHROME_RIBBON: ChromeMode = "ribbon"
+CHROME_KOMBINIERT: ChromeMode = "kombiniert"
+
+CHROME_MODES: tuple[ChromeMode, ...] = (
+    CHROME_KLASSISCH,
+    CHROME_RIBBON,
+    CHROME_KOMBINIERT,
+)
+
+CHROME_LABELS: dict[str, str] = {
+    CHROME_KLASSISCH: "Klassisch (Pull-down)",
+    CHROME_RIBBON: "Ribbon",
+    CHROME_KOMBINIERT: "Kombiniert",
+}
+
+DEFAULT_CHROME_MODE: ChromeMode = CHROME_KOMBINIERT
+
+
+def menubar_unwrapped_size(mb: QMenuBar) -> tuple[int, int]:
+    """Einzeilige Breite/Höhe — Wrap würde Titel-Geometrien überlappen."""
+    total_w = 8
+    row_h = 24
+    try:
+        fm = mb.fontMetrics()
+        row_h = max(row_h, int(fm.height() + 10))
+        for act in mb.actions():
+            text = (act.text() or "").replace("&", "")
+            g = mb.actionGeometry(act)
+            w_geo = int(g.width()) if g.isValid() and g.width() > 0 else 0
+            w_txt = max(36, int(fm.horizontalAdvance(text) + 20))
+            total_w += max(w_geo, w_txt)
+            if g.isValid() and g.height() > 0:
+                row_h = max(row_h, int(g.height()))
+    except Exception:
+        try:
+            total_w = max(total_w, int(mb.sizeHint().width() or 1))
+        except Exception:
+            total_w = max(total_w, 1)
+    try:
+        hint_w = int(mb.sizeHint().width() or 1)
+    except Exception:
+        hint_w = 1
+    return max(total_w, hint_w, 1), max(row_h, 24)
+
+
+def normalize_chrome_mode(value: object) -> ChromeMode:
+    raw = str(value or "").strip().lower()
+    aliases = {
+        "classic": CHROME_KLASSISCH,
+        "klassisch": CHROME_KLASSISCH,
+        "pulldown": CHROME_KLASSISCH,
+        "pull-down": CHROME_KLASSISCH,
+        "menu": CHROME_KLASSISCH,
+        "menus": CHROME_KLASSISCH,
+        "ribbon": CHROME_RIBBON,
+        "office": CHROME_RIBBON,
+        "kombiniert": CHROME_KOMBINIERT,
+        "combined": CHROME_KOMBINIERT,
+        "both": CHROME_KOMBINIERT,
+    }
+    return aliases.get(raw, DEFAULT_CHROME_MODE)  # type: ignore[return-value]
+
+
+def get_chrome_mode() -> ChromeMode:
+    from instantlensdoc.core.app_settings import load_settings
+
+    return normalize_chrome_mode(load_settings().get("chrome_mode", DEFAULT_CHROME_MODE))
+
+
+def set_chrome_mode(mode: str) -> ChromeMode:
+    from instantlensdoc.core.app_settings import save_settings
+
+    resolved = normalize_chrome_mode(mode)
+    save_settings(
+        {
+            "chrome_mode": resolved,
+            "ribbon_visible": resolved != CHROME_KLASSISCH,
+        }
+    )
+    return resolved
+
+
+class HScrollHost(QScrollArea):
+    """Chrome-Streifen: Inhalt behält Größe, bei zu schmalem Fenster Scrollbar."""
+
+    def __init__(
+        self,
+        inner: QWidget,
+        *,
+        object_name: str = "ildChromeHScroll",
+        widget_resizable: bool = False,
+    ) -> None:
+        super().__init__()
+        self.setObjectName(object_name)
+        self.setFrameShape(QFrame.NoFrame)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.setWidgetResizable(bool(widget_resizable))
+        self.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
+        self.setFocusPolicy(Qt.NoFocus)
+        inner.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)
+        self.setWidget(inner)
+        self._inner = inner
+        self._fit()
+
+    def resizeEvent(self, event) -> None:  # noqa: N802
+        super().resizeEvent(event)
+        self._fit()
+
+    def showEvent(self, event) -> None:  # noqa: N802
+        super().showEvent(event)
+        self._fit()
+
+    def _fit(self) -> None:
+        inner = getattr(self, "_inner", None)
+        if inner is None:
+            return
+        hint = inner.sizeHint()
+        min_h = max(hint.height(), inner.minimumSizeHint().height(), 24)
+        vw = max(1, self.viewport().width())
+        hint_w = max(
+            int(hint.width()),
+            int(inner.minimumSizeHint().width()),
+            int(inner.minimumWidth() or 0),
+            1,
+        )
+        if isinstance(inner, QMenuBar):
+            mb_w, mb_h = menubar_unwrapped_size(inner)
+            hint_w = max(hint_w, mb_w)
+            min_h = max(min_h, mb_h)
+            inner.setMinimumWidth(hint_w)
+            inner.setMaximumHeight(mb_h + 4)
+        need = hint_w > int(vw)
+        inner.setMinimumWidth(hint_w)
+        if not self.widgetResizable():
+            inner.resize(max(hint_w, vw), min_h)
+        sbh = self.horizontalScrollBar().sizeHint().height() if need else 0
+        self.setFixedHeight(min_h + sbh)
+
+
+def wrap_hscroll(
+    inner: QWidget,
+    *,
+    object_name: str,
+    widget_resizable: bool = False,
+) -> HScrollHost:
+    return HScrollHost(
+        inner, object_name=object_name, widget_resizable=widget_resizable
+    )
+
+
+def install_chrome_shrink_layout(window) -> None:
+    """Eigene Menüleiste im Central-Layout, horizontal scrollbar.
+
+    ``QMainWindow.menuBar()`` (C++) darf die Leiste nicht ersetzen.
+    """
+    if getattr(window, "_ild_menubar_host", None) is not None:
+        return
+    from PySide6.QtWidgets import QMainWindow, QMenuBar
+
+    central = window.centralWidget() if hasattr(window, "centralWidget") else None
+    lay = central.layout() if central is not None else None
+    if lay is None or not hasattr(lay, "insertWidget"):
+        return
+    mb = QMenuBar()
+    mb.setObjectName("ildScrollMenuBar")
+    mb.setNativeMenuBar(False)
+    mb.setMouseTracking(True)
+    mb.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)
+    host = wrap_hscroll(mb, object_name="ildMenuBarScroll")
+    window._ild_chrome_menubar = mb
+    window._ild_menubar_host = host
+    lay.insertWidget(0, host)
+    try:
+        native = QMainWindow.menuBar(window)
+        if native is not None and native is not mb:
+            native.setNativeMenuBar(False)
+            native.setVisible(False)
+            native.setMaximumHeight(0)
+    except Exception:
+        pass
+
+
+def apply_chrome(window, mode: str | None = None) -> ChromeMode:
+    """Menüleiste/Ribbon laut Modus — Dokument bleibt unangetastet."""
+    resolved = normalize_chrome_mode(mode if mode is not None else get_chrome_mode())
+    presentation = bool(getattr(window, "_presentation_active", False))
+    menubar = window.menuBar() if hasattr(window, "menuBar") else None
+    ribbon = getattr(window, "ribbon_bar", None)
+    show_menu = (not presentation) and resolved in (CHROME_KLASSISCH, CHROME_KOMBINIERT)
+    show_ribbon = (not presentation) and resolved in (CHROME_RIBBON, CHROME_KOMBINIERT)
+    host = getattr(window, "_ild_menubar_host", None)
+    if host is not None:
+        host.setVisible(bool(show_menu))
+    if menubar is not None:
+        menubar.setVisible(bool(show_menu))
+    try:
+        from PySide6.QtWidgets import QMainWindow as _QMW
+
+        native = _QMW.menuBar(window)
+        if native is not None and native is not menubar:
+            native.setVisible(False)
+            native.setMaximumHeight(0)
+    except Exception:
+        pass
+    if ribbon is not None:
+        ribbon.setVisible(bool(show_ribbon))
+    act = getattr(window, "_ribbon_action", None)
+    if act is not None:
+        try:
+            act.blockSignals(True)
+            act.setChecked(bool(show_ribbon))
+            act.blockSignals(False)
+        except Exception:
+            pass
+    group = getattr(window, "_chrome_mode_actions", None) or {}
+    for key, action in group.items():
+        try:
+            action.blockSignals(True)
+            action.setChecked(str(key) == resolved)
+            action.blockSignals(False)
+        except Exception:
+            pass
+    return resolved

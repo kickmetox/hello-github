@@ -1,0 +1,236 @@
+"""Annotation-Volltextsuche über Sidecar-Notizen/Highlights geöffneter Docs — 1.4.5."""
+
+from __future__ import annotations
+
+import csv
+import re
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Callable, List, Sequence
+
+# Spalten Doc,Seite,Typ,Text,Snippet — UTF-8 BOM — 1.4.3
+ANN_SEARCH_CSV_FIELDS = (
+    "Doc",
+    "Seite",
+    "Typ",
+    "Text",
+    "Snippet",
+)
+
+
+@dataclass(frozen=True)
+class AnnSearchHit:
+    """Ein Treffer in Sidecar-Annotationen."""
+
+    path: str
+    page: int  # 0-based
+    ann_type: str
+    text: str
+    tags: str
+    snippet: str
+    ann_id: str = ""
+
+
+def _sidecar_for_pdf(pdf_path: Path) -> Path:
+    return pdf_path.with_suffix(pdf_path.suffix + ".ildann.json")
+
+
+def _match_blob(
+    blob: str,
+    query: str,
+    *,
+    case_sensitive: bool,
+    use_regex: bool,
+) -> bool:
+    if use_regex:
+        flags = 0 if case_sensitive else re.IGNORECASE
+        try:
+            return re.search(query, blob, flags) is not None
+        except re.error:
+            return False
+    if case_sensitive:
+        return query in blob
+    return query.casefold() in blob.casefold()
+
+
+def _make_snippet(
+    text: str,
+    tags_s: str,
+    typ: str,
+    query: str,
+    *,
+    case_sensitive: bool,
+    use_regex: bool,
+) -> str:
+    """Snippet um den Match herum."""
+    candidates = [text, tags_s, typ]
+    src = text or tags_s or typ
+    for cand in candidates:
+        if cand and _match_blob(
+            cand, query, case_sensitive=case_sensitive, use_regex=use_regex
+        ):
+            src = cand
+            break
+    snip = src.replace("\n", " ").strip()
+    if len(snip) <= 100:
+        return snip or query
+    # Fenster um Match
+    pos = -1
+    if use_regex:
+        flags = 0 if case_sensitive else re.IGNORECASE
+        try:
+            m = re.search(query, snip, flags)
+            if m:
+                pos = m.start()
+        except re.error:
+            pos = -1
+    else:
+        hay = snip if case_sensitive else snip.casefold()
+        needle = query if case_sensitive else query.casefold()
+        pos = hay.find(needle)
+    if pos >= 0:
+        start = max(0, pos - 30)
+        snip = ("…" if start else "") + snip[start : start + 90]
+        if start + 90 < len(src):
+            snip += "…"
+    else:
+        snip = snip[:97] + "…"
+    return snip
+
+
+def search_annotations_in_paths(
+    paths: Sequence[str],
+    query: str,
+    *,
+    max_hits: int = 300,
+    case_sensitive: bool = False,
+    use_regex: bool = False,
+    on_progress: Callable[[int, int, str], bool] | None = None,
+) -> List[AnnSearchHit]:
+    """
+    Volltext über *.ildann.json Sidecars (Notizen, Highlights, Tags, Typ)
+    quer durch die gelisteten Dokumente (typisch: offene Tabs).
+    case_sensitive / use_regex — 1.4.1.
+    on_progress(i, total, name) → False bricht ab (CSV-Neu-Scan) — 1.4.5.
+    Bei Abbruch: bisherige Treffer (UI wertet Cancel selbst aus).
+    """
+    q = (query or "").strip()
+    if not q:
+        return []
+    if use_regex:
+        flags = 0 if case_sensitive else re.IGNORECASE
+        try:
+            re.compile(q, flags)
+        except re.error:
+            return []  # ungültiges Regex → keine Treffer (UI zeigt Hinweis)
+    hits: List[AnnSearchHit] = []
+    seen_pdf: set[str] = set()
+    # Fortschritt über eindeutige Docs (nicht Roh-Pfadliste)
+    work: list[tuple[Path, Path]] = []
+    for raw in paths:
+        p = Path(raw)
+        if not p.is_file():
+            continue
+        if p.suffix.lower() == ".json" and p.name.endswith(".ildann.json"):
+            pdf = Path(str(p)[: -len(".ildann.json")])
+            sidecar = p
+        elif p.suffix.lower() == ".pdf":
+            pdf = p
+            sidecar = _sidecar_for_pdf(p)
+        else:
+            continue
+        key = str(pdf.resolve()) if pdf.exists() else str(pdf)
+        if key in seen_pdf:
+            continue
+        seen_pdf.add(key)
+        work.append((pdf, sidecar))
+
+    total = len(work)
+    for idx, (pdf, sidecar) in enumerate(work):
+        if on_progress is not None:
+            try:
+                cont = on_progress(idx, total, pdf.name)
+            except Exception:
+                cont = True
+            if cont is False:
+                break
+        if not sidecar.is_file():
+            continue
+        try:
+            from ild_pdf.annotate import AnnotationStore
+
+            if not pdf.exists():
+                continue
+            store = AnnotationStore(pdf)
+            anns = list(store.annotations or [])
+        except Exception:
+            continue
+
+        for a in anns:
+            text = str(getattr(a, "text", "") or "")
+            tags = getattr(a, "tags", None) or []
+            tags_s = ", ".join(str(t) for t in tags)
+            typ = getattr(getattr(a, "type", None), "value", None) or str(
+                getattr(a, "type", "") or ""
+            )
+            blob = f"{text}\n{tags_s}\n{typ}"
+            if not _match_blob(
+                blob, q, case_sensitive=case_sensitive, use_regex=use_regex
+            ):
+                continue
+            snip = _make_snippet(
+                text,
+                tags_s,
+                typ,
+                q,
+                case_sensitive=case_sensitive,
+                use_regex=use_regex,
+            )
+            hits.append(
+                AnnSearchHit(
+                    path=str(pdf),
+                    page=int(getattr(a, "page", 0) or 0),
+                    ann_type=str(typ),
+                    text=text,
+                    tags=tags_s,
+                    snippet=snip or q,
+                    ann_id=str(getattr(a, "id", "") or ""),
+                )
+            )
+            if len(hits) >= max_hits:
+                return hits
+    return hits
+
+
+def export_ann_search_hits_csv(
+    path: str | Path,
+    hits: Sequence[AnnSearchHit],
+    *,
+    query: str = "",
+) -> Path:
+    """
+    Treffer der Annotation-Suche als CSV.
+    Spalten Doc,Seite,Typ,Text,Snippet; Encoding UTF-8 mit BOM — 1.4.3.
+    ``query`` bleibt API-kompatibel (nicht in CSV geschrieben).
+    """
+    dest = Path(path)
+    if dest.suffix.lower() != ".csv":
+        dest = dest.with_suffix(".csv")
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    with dest.open("w", encoding="utf-8-sig", newline="") as fh:
+        writer = csv.DictWriter(
+            fh, fieldnames=list(ANN_SEARCH_CSV_FIELDS), extrasaction="ignore"
+        )
+        writer.writeheader()
+        for h in hits or []:
+            doc = Path(h.path).name if h.path else ""
+            writer.writerow(
+                {
+                    "Doc": doc,
+                    "Seite": int(h.page) + 1,  # 1-basiert für CSV
+                    "Typ": h.ann_type,
+                    "Text": h.text,
+                    "Snippet": h.snippet,
+                }
+            )
+    return dest

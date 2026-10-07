@@ -1,0 +1,505 @@
+"""Stifteingabe / Touch-Handschrift auf der unified View — Offscreen."""
+
+from __future__ import annotations
+
+import os
+import sys
+from pathlib import Path
+
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+os.environ["ILD_SMOKE_QT"] = "1"
+os.environ.setdefault("ILD_SKIP_DEPS_CHECK", "1")
+os.environ.setdefault("ILD_NO_SESSION", "1")
+os.environ.setdefault("ILD_NO_SPLASH", "1")
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / "tests"))
+
+from PySide6.QtCore import Qt  # noqa: E402
+from PySide6.QtWidgets import QWidget  # noqa: E402
+
+from menu_smoke_lib import create_main_window, install_headless_env, pump  # noqa: E402
+
+
+_APP = None
+_WIN = None
+
+
+def setup_module() -> None:
+    global _APP, _WIN
+    install_headless_env()
+    _APP, _WIN = create_main_window()
+
+
+def teardown_module() -> None:
+    global _WIN
+    try:
+        if _WIN is not None:
+            _WIN.hide()
+    except Exception:
+        pass
+    _WIN = None
+
+
+def test_stifteingabe_toggle_exists() -> None:
+    act = getattr(_WIN, "_act_ink_input", None)
+    assert act is not None
+    assert act.objectName() == "actInkInput"
+    assert "Stifteingabe" in (act.text() or "")
+    assert act.isCheckable()
+    rec = getattr(_WIN, "_act_recognize_handwriting", None)
+    assert rec is not None
+    assert rec.objectName() == "actRecognizeHandwriting"
+    rb = _WIN.ribbon_bar
+    rb.select_tab("Ansicht")
+    pump(_APP, 0.05)
+    assert "ink_input" in rb._actions
+    assert "recognize_handwriting" in rb._actions
+    btn = rb._actions["ink_input"]
+    assert "Stifteingabe" in (btn.text() or "")
+    canvas = _WIN.pdf_view.canvas
+    assert bool(canvas.testAttribute(Qt.WA_AcceptTouchEvents))
+    session = getattr(_WIN, "_ink_session", None)
+    assert session is not None
+
+
+def test_synthetic_strokes_ocr_stub_or_skip_tessdata() -> None:
+    from instantlensdoc.ui.ink_input import (
+        recognize_ink_strokes,
+        recognized_text_to_html,
+        synthetic_stroke_list,
+        tessdata_ready,
+    )
+
+    strokes = synthetic_stroke_list()
+    assert len(strokes) >= 2
+    live = recognize_ink_strokes(strokes)
+    if live.get("skipped") or not str(live.get("text") or "").strip():
+        if live.get("skipped"):
+            assert live.get("reason") in (
+                "ocr_unavailable",
+                "ocr_error",
+                "empty",
+            ) or not tessdata_ready()[0]
+        result = recognize_ink_strokes(strokes, stub=True)
+    else:
+        result = live
+    text = result.get("text") or ""
+    html = result.get("html") or recognized_text_to_html(text)
+    assert "\u00b6" not in text
+    assert "\x0c" not in text
+    assert "\u00b6" not in html
+    assert "\x0c" not in html
+    assert result.get("stub") or result.get("ok") or text
+
+
+def test_recognized_text_inserts_rich_not_pilcrow(qapp) -> None:
+    from instantlensdoc.ui.editor import TextEditor
+    from instantlensdoc.ui.ink_input import recognized_text_to_html
+
+    from PySide6.QtGui import QTextCursor  # noqa: E402
+
+    dirty = "Hallo\x0cWelt\u00b6Test"
+    html = recognized_text_to_html(dirty)
+    assert "\u00b6" not in html
+    assert "\x0c" not in html
+    ed = TextEditor()
+    ed.setPlainText("Caret ")
+    cur = ed.textCursor()
+    cur.movePosition(QTextCursor.MoveOperation.End)
+    ed.setTextCursor(cur)
+    assert ed.insert_recognized_rich_text(html, dirty)
+    plain = ed.toPlainText()
+    assert "Hallo" in plain
+    assert "\u00b6" not in plain
+    assert "\x0c" not in plain
+    ed.deleteLater()
+
+
+def test_schreibschutz_grays_out_ink_actions() -> None:
+    act = _WIN._act_ink_input
+    rec = _WIN._act_recognize_handwriting
+    _WIN.editor.setReadOnly(False)
+    _WIN._sync_ink_input_actions()
+    pump(_APP, 0.02)
+    assert act.isEnabled()
+    assert rec.isEnabled()
+    _WIN.editor.setReadOnly(True)
+    _WIN._sync_ink_input_actions()
+    pump(_APP, 0.02)
+    assert not act.isEnabled()
+    assert not rec.isEnabled()
+    _WIN.editor.setReadOnly(False)
+    _WIN._sync_ink_input_actions()
+    pump(_APP, 0.02)
+    assert act.isEnabled()
+
+
+def test_toggle_stifteingabe_enables_session() -> None:
+    session = _WIN._ink_session
+    _WIN.editor.setReadOnly(False)
+    _WIN._sync_ink_input_actions()
+    _WIN._act_ink_input.setChecked(False)
+    _WIN._toggle_ink_input(True)
+    pump(_APP, 0.02)
+    assert session.enabled is True
+    session.begin(10, 10, 0.5)
+    session.move(20, 12, 0.6)
+    session.end()
+    assert len(session.strokes) == 1
+    _WIN._toggle_ink_input(False)
+    assert session.enabled is False
+    session.clear()
+
+
+def test_pens_brush_fill_and_mouse_draw() -> None:
+    from instantlensdoc.ui.ink_input import (
+        FILL_CLOSED,
+        TOOL_BRUSH,
+        TOOL_FELT,
+        TOOL_HIGHLIGHTER,
+        InkSession,
+    )
+
+    session = _WIN._ink_session
+    _WIN.editor.setReadOnly(False)
+    _WIN._set_ink_tool("felt")
+    assert session.tool == TOOL_FELT
+    assert session.enabled is True
+    _WIN._set_ink_tool("highlighter")
+    assert session.tool == TOOL_HIGHLIGHTER
+    _WIN._set_ink_tool("brush")
+    assert session.tool == TOOL_BRUSH
+    _WIN._set_ink_fill("closed")
+    assert session.fill_mode == FILL_CLOSED
+    session.clear()
+    session.set_enabled(True)
+    session.begin(20, 20, 0.4)
+    session.move(80, 20, 0.7)
+    session.move(80, 70, 0.6)
+    session.move(20, 70, 0.5)
+    session.move(20, 22, 0.4)
+    st = session.end()
+    assert st is not None
+    assert st.filled is True
+    session.clear()
+    _WIN._set_ink_fill("flood")
+    session.begin(30, 30, 0.5)
+    session.move(90, 30, 0.5)
+    session.move(90, 90, 0.5)
+    session.move(30, 90, 0.5)
+    session.move(30, 32, 0.5)
+    flooded = session.end()
+    assert flooded is not None
+    assert flooded.filled is True
+    assert flooded.flood_image is not None
+    session.clear()
+    _WIN._set_ink_fill("none")
+    _WIN._set_ink_tool("ballpoint")
+    _WIN._toggle_ink_input(True)
+    filt = _WIN._ink_filter
+    p0 = filt._dynamic_pressure(0, 0)
+    p1 = filt._dynamic_pressure(400, 0)
+    assert 0.08 <= p0 <= 1.0
+    assert 0.08 <= p1 <= 1.0
+    session.begin(5, 5, p0)
+    session.move(40, 8, p1)
+    session.end()
+    assert len(session.strokes) == 1
+    session.clear()
+    _WIN._toggle_ink_input(False)
+
+
+def test_right_toolbox_and_schreibschutz_tools() -> None:
+    pane = getattr(_WIN, "ink_tools_pane", None)
+    assert pane is not None
+    assert pane.objectName() == "ildRightToolbox"
+    names = {w.objectName() for w in pane.findChildren(QWidget) if w.objectName()}
+    assert "inkTool_ballpoint" in names
+    assert "inkTool_brush" in names
+    assert "inkFill_closed" in names
+    assert "inkStamp_place" in names
+    act = _WIN._act_right_toolbox
+    assert act is not None
+    assert "Werkzeugkasten" in (act.text() or "")
+    _WIN._toggle_right_toolbox(True)
+    pump(_APP, 0.02)
+    assert pane.isVisible()
+    _WIN.editor.setReadOnly(True)
+    _WIN._sync_ink_input_actions()
+    pump(_APP, 0.02)
+    assert not _WIN._act_ink_input.isEnabled()
+    assert not pane._tool_btns["brush"].isEnabled()
+    _WIN.editor.setReadOnly(False)
+    _WIN._sync_ink_input_actions()
+    pump(_APP, 0.02)
+    assert pane._tool_btns["brush"].isEnabled()
+    rb = _WIN.ribbon_bar
+    rb.select_tab("Ansicht")
+    pump(_APP, 0.02)
+    assert "ink_brush" in rb._actions
+    assert "right_toolbox" in rb._actions
+    from instantlensdoc.core.app_settings import get_right_toolbox_width
+
+    w = get_right_toolbox_width()
+    assert 160 <= w <= 360
+    pane._tool_btns["brush"].click()
+    pump(_APP, 0.02)
+    assert _WIN._ink_session.tool == "brush"
+    assert _WIN._ink_pen_actions["brush"].isChecked()
+    _WIN._ink_pen_actions["felt"].trigger()
+    pump(_APP, 0.02)
+    assert _WIN._ink_session.tool == "felt"
+    assert pane._tool_btns["felt"].isChecked()
+    pane._fill_btns["closed"].click()
+    pump(_APP, 0.02)
+    assert _WIN._ink_session.fill_mode == "closed"
+
+
+def test_ocr_stroke_apis_used_by_recognize() -> None:
+    from instantlensdoc.core.ocr_word_suite import (
+        open_ocr_stroke_image,
+        ocr_stroke_image_to_word_suite,
+    )
+    from instantlensdoc.ui.ink_input import strokes_to_pil, synthetic_stroke_list
+
+    assert callable(open_ocr_stroke_image)
+    assert callable(ocr_stroke_image_to_word_suite)
+    assert callable(getattr(_WIN, "open_ocr_result", None))
+    img = strokes_to_pil(synthetic_stroke_list())
+    assert img is not None
+    assert img.size[0] >= 32
+
+
+def test_recognize_ink_calls_sibling_stroke_apis(monkeypatch) -> None:
+    from instantlensdoc.ui.ink_input import recognize_ink_strokes, synthetic_stroke_list
+
+    calls: list[str] = []
+
+    class _WS:
+        text = "Hallo"
+        html = "<p>Hallo</p>"
+
+    def _suite(image, **kwargs):
+        calls.append("ocr_stroke_image_to_word_suite")
+        assert image is not None
+        assert kwargs.get("handwriting") is True
+        return _WS()
+
+    def _open_stroke(image, **kwargs):
+        calls.append("open_ocr_stroke_image")
+        assert image is not None
+        assert kwargs.get("result") is not None
+        return _WS()
+
+    monkeypatch.setattr(
+        "instantlensdoc.ui.ink_input.tessdata_ready", lambda: (True, "ok")
+    )
+    monkeypatch.setattr(
+        "instantlensdoc.core.ocr_word_suite.ocr_stroke_image_to_word_suite", _suite
+    )
+    monkeypatch.setattr(
+        "instantlensdoc.core.ocr_word_suite.open_ocr_stroke_image", _open_stroke
+    )
+    result = recognize_ink_strokes(synthetic_stroke_list())
+    assert "ocr_stroke_image_to_word_suite" in calls
+    assert "open_ocr_stroke_image" in calls
+    assert "Hallo" in (result.get("text") or "")
+    assert "\u00b6" not in (result.get("text") or "")
+    assert "\x0c" not in (result.get("html") or "")
+
+    opened: dict = {}
+
+    def _open_result(*_a, **kwargs):
+        opened["image"] = kwargs.get("image")
+        opened["handwriting"] = kwargs.get("handwriting")
+        return True
+
+    session = _WIN._ink_session
+    session.clear()
+    session.begin(10, 10, 0.5)
+    session.move(40, 12, 0.6)
+    session.end()
+    monkeypatch.setattr(
+        "instantlensdoc.ui.ink_input.recognize_ink_strokes",
+        lambda *_a, **_k: {"ok": False, "skipped": False, "text": "", "html": ""},
+    )
+    monkeypatch.setattr(_WIN, "open_ocr_result", _open_result)
+    _WIN.editor.setReadOnly(False)
+    _WIN._recognize_ink_handwriting()
+    assert opened.get("image") is not None
+    assert opened.get("handwriting") is True
+
+
+def test_mouse_left_drag_draws_same_tools_as_stylus() -> None:
+    from PySide6.QtCore import QEvent, QPoint, QPointF
+    from PySide6.QtGui import QMouseEvent
+    from PySide6.QtWidgets import QApplication
+
+    from instantlensdoc.ui.ink_input import TOOL_BRUSH
+
+    session = _WIN._ink_session
+    _WIN.editor.setReadOnly(False)
+    _WIN._set_ink_tool("brush")
+    _WIN._set_ink_fill("none")
+    session.set_color("#C0392B")
+    session.width = 5.0
+    session.clear()
+    assert session.enabled is True
+    vp = _WIN.editor.viewport()
+    vp.resize(400, 300)
+    pump(_APP, 0.02)
+
+    def _send(etype, x, y, button, buttons):
+        local = QPointF(x, y)
+        glob = QPointF(vp.mapToGlobal(QPoint(int(x), int(y))))
+        ev = QMouseEvent(etype, local, glob, button, buttons, Qt.NoModifier)
+        QApplication.sendEvent(vp, ev)
+
+    _send(QEvent.Type.MouseButtonPress, 30, 40, Qt.LeftButton, Qt.LeftButton)
+    _send(QEvent.Type.MouseMove, 70, 48, Qt.NoButton, Qt.LeftButton)
+    _send(QEvent.Type.MouseMove, 110, 56, Qt.NoButton, Qt.LeftButton)
+    _send(QEvent.Type.MouseButtonRelease, 110, 56, Qt.LeftButton, Qt.NoButton)
+    pump(_APP, 0.05)
+    assert len(session.strokes) == 1
+    st = session.strokes[0]
+    assert st.tool == TOOL_BRUSH
+    assert st.color.upper() == "#C0392B"
+    assert abs(st.width - 5.0) < 0.01
+    assert len(st.points) >= 2
+    html = _WIN._act_recognize_handwriting is not None
+    assert html
+    session.clear()
+    _WIN._toggle_ink_input(False)
+    n = len(session.strokes)
+    _send(QEvent.Type.MouseButtonPress, 40, 40, Qt.LeftButton, Qt.LeftButton)
+    _send(QEvent.Type.MouseMove, 90, 50, Qt.NoButton, Qt.LeftButton)
+    _send(QEvent.Type.MouseButtonRelease, 90, 50, Qt.LeftButton, Qt.NoButton)
+    pump(_APP, 0.02)
+    assert len(session.strokes) == n
+    _WIN._set_ink_tool("ballpoint")
+    _WIN._toggle_ink_input(False)
+
+
+def test_stamp_tools_right_column_edit_sibling_stamps() -> None:
+    from ild_pdf.annotate import Annotation, AnnotationStore, AnnotationType
+    from instantlensdoc.ui.ink_input import (
+        STAMP_TAG_NO_FRAME,
+        STAMP_TAG_OUTLINE,
+        STAMP_TAG_SHADOW,
+        STAMP_TAG_TEXT_ONLY,
+        STAMP_TOOLS,
+        apply_stamp_style_to_annotation,
+        stamp_paint_flags,
+    )
+
+    pane = _WIN.ink_tools_pane
+    names = {w.objectName() for w in pane.findChildren(QWidget) if w.objectName()}
+    for aid in STAMP_TOOLS:
+        assert f"inkStamp_{aid}" in names
+    stamps = getattr(_WIN, "_ink_stamp_actions", None) or {}
+    for aid in STAMP_TOOLS:
+        act = stamps.get(aid)
+        assert act is not None
+        assert act.objectName().startswith("actInkStamp")
+    assert pane._stamp_btns["frame"] is not None
+
+    ann = Annotation(
+        0,
+        AnnotationType.STAMP,
+        10,
+        10,
+        text="GEPRÜFT",
+        color="#C0392B",
+        width=120,
+        height=40,
+    )
+    flags = stamp_paint_flags(ann)
+    assert flags["frame"] is True
+    assert flags["text_only"] is False
+    apply_stamp_style_to_annotation(ann, "frame")
+    flags = stamp_paint_flags(ann)
+    assert flags["frame"] is False
+    assert STAMP_TAG_NO_FRAME in (ann.tags or [])
+    apply_stamp_style_to_annotation(ann, "frame")
+    assert stamp_paint_flags(ann)["frame"] is True
+    apply_stamp_style_to_annotation(ann, "color", color="#1A5276")
+    assert str(ann.color).upper() == "#1A5276"
+    apply_stamp_style_to_annotation(ann, "text_only")
+    flags = stamp_paint_flags(ann)
+    assert flags["text_only"] is True
+    assert flags["frame"] is False
+    assert STAMP_TAG_TEXT_ONLY in (ann.tags or [])
+    apply_stamp_style_to_annotation(ann, "shadow")
+    assert stamp_paint_flags(ann)["shadow"] is True
+    assert STAMP_TAG_SHADOW in (ann.tags or [])
+    apply_stamp_style_to_annotation(ann, "outline")
+    flags = stamp_paint_flags(ann)
+    assert flags["outline"] is True
+    assert flags["frame"] is True
+    assert flags["text_only"] is False
+    assert STAMP_TAG_OUTLINE in (ann.tags or [])
+
+    pdf = _WIN.pdf_view
+    prev_store = pdf.store
+    prev_ids = set(getattr(pdf, "_selected_ann_ids", None) or set())
+    prev_id = getattr(pdf, "_selected_ann_id", None)
+    store = AnnotationStore()
+    stamp = store.add(
+        Annotation(
+            0,
+            AnnotationType.STAMP,
+            20,
+            30,
+            text="OK",
+            color="#C0392B",
+            width=100,
+            height=36,
+        )
+    )
+    pdf.store = store
+    pdf._selected_ann_id = stamp.id
+    pdf._selected_ann_ids = {stamp.id}
+    _WIN.editor.setReadOnly(False)
+    _WIN._sync_ink_input_actions()
+    pump(_APP, 0.02)
+    _WIN._apply_stamp_style("frame")
+    got = store.get(stamp.id)
+    assert got is not None
+    assert stamp_paint_flags(got)["frame"] is False
+    _WIN._apply_stamp_style("color", color="#148F77")
+    got = store.get(stamp.id)
+    assert str(got.color).upper() == "#148F77"
+    pane._stamp_btns["shadow"].click()
+    pump(_APP, 0.02)
+    got = store.get(stamp.id)
+    assert stamp_paint_flags(got)["shadow"] is True
+    pane._stamp_btns["outline"].click()
+    pump(_APP, 0.02)
+    got = store.get(stamp.id)
+    assert stamp_paint_flags(got)["outline"] is True
+    pane._stamp_btns["text_only"].click()
+    pump(_APP, 0.02)
+    got = store.get(stamp.id)
+    flags = stamp_paint_flags(got)
+    assert flags["text_only"] is True
+    assert flags["frame"] is False
+    _WIN._ink_stamp_actions["frame"].trigger()
+    pump(_APP, 0.02)
+    got = store.get(stamp.id)
+    assert stamp_paint_flags(got)["frame"] is True
+    _WIN.editor.setReadOnly(True)
+    _WIN._sync_ink_input_actions()
+    pump(_APP, 0.02)
+    assert not pane._stamp_btns["frame"].isEnabled()
+    assert not _WIN._ink_stamp_actions["color"].isEnabled()
+    _WIN.editor.setReadOnly(False)
+    _WIN._sync_ink_input_actions()
+    pump(_APP, 0.02)
+    assert pane._stamp_btns["frame"].isEnabled()
+    pdf.store = prev_store
+    pdf._selected_ann_ids = prev_ids
+    pdf._selected_ann_id = prev_id
+

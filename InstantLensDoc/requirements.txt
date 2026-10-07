@@ -1,0 +1,20 @@
+# InstantLens Doc — Abhängigkeiten
+PySide6>=6.6.0
+# Fest gepinnt: Dev/Test/Windows-Build identisch (pypdfium2 5.14 = PDFium 8076) — 2.6.53
+pypdfium2==5.14.0
+Pillow>=10.0.0
+pikepdf>=9.0.0
+cryptography>=41.0.0
+python-docx>=1.1.0
+# Optional für Excel: openpyxl>=3.1.0  — sonst Stdlib-OOXML für einfache .xlsx
+pytesseract>=0.3.10
+# OCR-Runtime: ScanTuxio-Bundle bevorzugt (nicht pip)
+#   {app}\vendor\tesseract\tesseract.exe + tessdata\
+#   D:\AI_Temp\ScanTuxio Win\tesseract\tesseract.exe
+#   Fallback: winget install UB-Mannheim.TesseractOCR  (deu+eng)
+#            C:\Program Files\Tesseract-OCR\tesseract.exe
+#   Scan: WIA-Treiber (Windows) bzw. SANE scanimage (Linux); sonst Bildimport
+# Optional DTP/Features 2.6.54 (Windows-Build sollte mitpacken)
+fonttools>=4.50.0
+pyhanko>=0.25.0
+pytest>=8.0.0
