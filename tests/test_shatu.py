@@ -687,6 +687,30 @@ class ScriptEditTests(unittest.TestCase):
             self.assertEqual(analyzed["problems"][0]["code"], "JSON")
             self.assertEqual(analyzed["outline"], [])
 
+    def test_script_outline_not_python_lint(self) -> None:
+        from shatuide.scripting import script_outline
+        from shatuide.server import App
+
+        source = "function Get-Wert {\n    param($Name)\n    return $Name\n}\nfunction Set-Wert {\n    $global:x = 1\n}\n"
+        items = script_outline(source, "tool.ps1")
+        self.assertEqual([item["name"] for item in items], ["Get-Wert", "Set-Wert"])
+        self.assertEqual(items[0]["line"], 1)
+        self.assertEqual(items[0]["end_line"], 4)
+        self.assertEqual(items[0]["kind"], "function")
+        self.assertIn("Name", items[0]["params"])
+        shell = script_outline("hallo() {\n  echo hi\n}\n", "a.sh")
+        self.assertEqual(shell[0]["name"], "hallo")
+        self.assertEqual(shell[0]["end_line"], 3)
+        labels = script_outline("@echo off\n:start\necho hi\n", "a.bat")
+        self.assertEqual(labels[0]["name"], "start")
+        self.assertEqual(labels[0]["kind"], "label")
+        with tempfile.TemporaryDirectory() as tmp:
+            app = App(tmp)
+            analyzed = app.analyze("function Get-Wert {\n  1 +\n}\n", str(Path(tmp) / "a.ps1"))
+            self.assertEqual(analyzed["outline"][0]["name"], "Get-Wert")
+            self.assertEqual(analyzed["outline"][0]["line"], 1)
+            self.assertFalse(any(item.get("code") == "E999" for item in analyzed["problems"]))
+
     def _wait_line(self, session, line: int, timeout: float = 8):
         import time as time_mod
 

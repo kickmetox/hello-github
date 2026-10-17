@@ -14,6 +14,8 @@ Unter Windows: `ShatuIDE.bat` oder `py -3 shatuide.py`.
 
 **Datei → Öffnen** lädt vorhandene Python-Skripte und andere Textdateien aus dem Workspace, aus darüberliegenden Ordnern oder vom Home-Verzeichnis. Dateien außerhalb des Workspace sind nur lesbar. **Datei laden** übernimmt Dateien aus der Dateiauswahl; Speichern schreibt sie in den Workspace. **Bearbeiten** schneidet aus, kopiert die Markierung oder einen Zeilenbereich und fügt ein. **Fenster → Zweites Fenster** öffnet eine weitere IDE-Ansicht.
 
+Das Menüband hat die Reiter **Start**, **Entwurf**, **Erzeugen** und **Ansicht**. Darunter liegen Zwischenablage, Starten, Debug, Baukasten, GUI, EXE, MSI und die Fenster. Rechts listet **Funktionen** die Funktionen, Methoden, Shell-Funktionen oder Sprungmarken der offenen Datei. **Eigenschaften** zeigt Name, Art und Zeile. Ein Klick springt an die Stelle, **Im Fenster prüfen** startet die Funktion getrennt von der Datei. Die KI bleibt im selben Bereich als Reiter.
+
 **Strg+F** sucht in der offenen Datei, **Strg+H** ersetzt darin. Groß/Klein, ganzes Wort und reguläre Ausdrücke lassen sich umschalten. **Strg+Umschalt+H** ersetzt im Workspace, nach einer Vorschau und nur in Dateien dieses Ordners. Weitere Editorbefehle: Zeile kommentieren, duplizieren, verschieben, löschen und verbinden, Einrücken, Groß-/Kleinschreibung, nächstes Vorkommen, Gehe zu Zeile und Zeilenumbruch.
 
 Bash- und PowerShell-Skripte lassen sich laden und bearbeiten. **Ausführen** startet Bash beziehungsweise PowerShell (`pwsh` oder `powershell`, auch Windows PowerShell 32-bit und 64-bit, sobald beide vorhanden sind). **Syntax prüfen** nutzt `bash -n` oder den PowerShell-Parser. **Format** rückt Klammern und Shell-Blöcke ein. **Debug** hält an Haltepunkten an, auch in weiteren Dateien und Modulen im selben Ordner, zeigt Variablen und geht schrittweise weiter. Fehlt der Interpreter, meldet die IDE das, statt ein Ergebnis zu erfinden.
@@ -40,6 +42,7 @@ Liegt im Programmordner bereits `icon.png`, `icon.ico`, `logo.png` oder `grafik.
 
 ## Funktionen
 
+- Menüband mit Start, Entwurf, Erzeugen und Ansicht; rechts Funktionen und Eigenschaften der offenen Datei
 - Editor mit Syntaxfarben, SQL/HTML/JSON in Strings, Faltung, Snippets, Autovervollständigung (Jedi, sobald installiert)
 - Echtzeit-Linting, Type-Hints, ungenutzte Imports, optionales Ruff
 - Projektweites Umbenennen, Methode extrahieren, Dubletten

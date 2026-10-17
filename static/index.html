@@ -14,18 +14,115 @@
       <div id="menubar"></div>
       <div id="brand">ShatuIDE</div>
     </header>
-    <div id="toolbar">
-      <button type="button" id="btn-run" title="Ausführen (Strg+F5)">Ausführen</button>
-      <button type="button" id="btn-debug" title="Debuggen (F5)">Debug</button>
-      <button type="button" id="btn-stop" title="Stopp (Umschalt+F5)">Stopp</button>
-      <button type="button" id="btn-format" title="Formatieren">Format</button>
-      <label>Python <select id="py-select"></select></label>
-      <span id="ws-label"></span>
+    <div id="ribbon">
+      <div id="ribbon-tabs">
+        <button type="button" data-ribbon="start" class="on">Start</button>
+        <button type="button" data-ribbon="entwurf">Entwurf</button>
+        <button type="button" data-ribbon="erzeugen">Erzeugen</button>
+        <button type="button" data-ribbon="ansicht">Ansicht</button>
+      </div>
+      <div class="ribbon-page" data-ribbon-page="start">
+        <div class="ribbon-group">
+          <div class="ribbon-cmds">
+            <button type="button" id="btn-cut" title="Ausschneiden (Strg+X)">Ausschneiden</button>
+            <button type="button" id="btn-copy" title="Kopieren (Strg+C)">Kopieren</button>
+            <button type="button" id="btn-paste" title="Einfügen (Strg+V)">Einfügen</button>
+          </div>
+          <div class="ribbon-caption">Zwischenablage</div>
+        </div>
+        <div class="ribbon-group">
+          <div class="ribbon-cmds">
+            <button type="button" id="btn-open">Öffnen</button>
+            <button type="button" id="btn-save" title="Speichern (Strg+S)">Speichern</button>
+          </div>
+          <div class="ribbon-caption">Datei</div>
+        </div>
+        <div class="ribbon-group">
+          <div class="ribbon-cmds">
+            <button type="button" id="btn-run" title="Ausführen (Strg+F5)">Ausführen</button>
+            <button type="button" id="btn-debug" title="Debuggen (F5)">Debug</button>
+            <button type="button" id="btn-stop" title="Stopp">Stopp</button>
+          </div>
+          <div class="ribbon-caption">Starten</div>
+        </div>
+        <div class="ribbon-group">
+          <div class="ribbon-cmds">
+            <button type="button" id="btn-step-into" title="F11">Hinein</button>
+            <button type="button" id="btn-step" title="F10">Über</button>
+            <button type="button" id="btn-step-out">Hinaus</button>
+            <button type="button" id="btn-break" title="F9">Haltepunkt</button>
+          </div>
+          <div class="ribbon-caption">Debug</div>
+        </div>
+        <div class="ribbon-group">
+          <div class="ribbon-cmds">
+            <button type="button" id="btn-format" title="Formatieren">Format</button>
+            <button type="button" id="btn-function">Funktion</button>
+            <button type="button" id="btn-fold">Falten</button>
+            <button type="button" id="btn-unfold">Aufklappen</button>
+            <button type="button" id="btn-goto" title="Strg+G">Zeile</button>
+          </div>
+          <div class="ribbon-caption">Skript</div>
+        </div>
+      </div>
+      <div class="ribbon-page hidden" data-ribbon-page="entwurf">
+        <div class="ribbon-group">
+          <div class="ribbon-cmds">
+            <button type="button" id="btn-kit">Baukasten</button>
+          </div>
+          <div class="ribbon-caption">Module</div>
+        </div>
+        <div class="ribbon-group">
+          <div class="ribbon-cmds">
+            <button type="button" id="btn-gui">GUI</button>
+            <button type="button" id="btn-function-design">Funktion</button>
+            <button type="button" id="btn-module">Modul</button>
+          </div>
+          <div class="ribbon-caption">Entwurf</div>
+        </div>
+      </div>
+      <div class="ribbon-page hidden" data-ribbon-page="erzeugen">
+        <div class="ribbon-group">
+          <div class="ribbon-cmds">
+            <button type="button" id="btn-script">Skript</button>
+            <button type="button" id="btn-database">Datenbank</button>
+          </div>
+          <div class="ribbon-caption">Neu</div>
+        </div>
+        <div class="ribbon-group">
+          <div class="ribbon-cmds">
+            <button type="button" id="btn-exe">EXE</button>
+            <button type="button" id="btn-msi">MSI</button>
+            <button type="button" id="btn-service">Dienst</button>
+            <button type="button" id="btn-measure">Messen</button>
+          </div>
+          <div class="ribbon-caption">Paket</div>
+        </div>
+      </div>
+      <div class="ribbon-page hidden" data-ribbon-page="ansicht">
+        <div class="ribbon-group">
+          <div class="ribbon-cmds">
+            <button type="button" id="btn-view-tree">Projekt</button>
+            <button type="button" id="btn-view-outline">Gliederung</button>
+            <button type="button" id="btn-view-output">Ausgabe</button>
+            <button type="button" id="btn-view-terminal">Terminal</button>
+            <button type="button" id="btn-view-ai">KI</button>
+          </div>
+          <div class="ribbon-caption">Fenster</div>
+        </div>
+        <div class="ribbon-group">
+          <div class="ribbon-cmds">
+            <label>Python <select id="py-select"></select></label>
+            <span id="ws-label"></span>
+          </div>
+          <div class="ribbon-caption">Umgebung</div>
+        </div>
+      </div>
     </div>
     <div id="body">
       <aside id="left">
         <div class="side-tabs">
-          <button type="button" data-side="tree" class="on">Explorer</button>
+          <button type="button" data-side="tree" class="on">Projekt</button>
           <button type="button" data-side="outline">Gliederung</button>
         </div>
         <div id="tree" class="side-pane"></div>
@@ -57,15 +154,28 @@
       </section>
       <div id="right-resizer" class="resizer"></div>
       <aside id="right">
-        <div class="side-tabs"><span>KI</span></div>
-        <div id="ai-log"></div>
-        <label for="ai-input">Prompt</label>
-        <textarea id="ai-input" placeholder="@datei @ordner @terminal @git  – Frage oder Agenten-Auftrag"></textarea>
-        <div class="ai-actions">
-          <button type="button" id="ai-connect">Verbinden</button>
-          <button type="button" id="ai-send">Senden</button>
-          <button type="button" id="ai-agent">Agent</button>
-          <button type="button" id="ai-inline">Inline</button>
+        <div class="side-tabs">
+          <button type="button" data-dock="functions" class="on">Funktionen</button>
+          <button type="button" data-dock="ai">KI</button>
+        </div>
+        <div id="dock-functions" class="dock-pane">
+          <input id="fn-filter" placeholder="Funktion suchen" spellcheck="false" autocomplete="off">
+          <div id="fn-list"></div>
+          <div id="fn-props">
+            <div class="props-title">Eigenschaften</div>
+            <div id="fn-props-body"></div>
+          </div>
+        </div>
+        <div id="dock-ai" class="dock-pane hidden">
+          <div id="ai-log"></div>
+          <label for="ai-input">Prompt</label>
+          <textarea id="ai-input" placeholder="@datei @ordner @terminal @git  – Frage oder Agenten-Auftrag"></textarea>
+          <div class="ai-actions">
+            <button type="button" id="ai-connect">Verbinden</button>
+            <button type="button" id="ai-send">Senden</button>
+            <button type="button" id="ai-agent">Agent</button>
+            <button type="button" id="ai-inline">Inline</button>
+          </div>
         </div>
       </aside>
     </div>
@@ -76,6 +186,8 @@
     </section>
     <footer id="status">
       <span id="st-pos">Zeile 1, Spalte 1</span>
+      <span id="st-lang">Text</span>
+      <span id="st-eol">LF</span>
       <span id="st-mode">Bereit</span>
       <span id="st-py"></span>
     </footer>

@@ -22,6 +22,8 @@ const S = {
   watches: [],
   clip: "",
   wrap: false,
+  dock: "functions",
+  symbol: null,
 };
 
 const BOTTOM = [
@@ -350,7 +352,9 @@ function renderEditor() {
   highlightEl().innerHTML = highlightSource(text, errorLineSet(), lang) + "\n";
   renderGutter();
   renderTabs();
+  renderFunctions();
   syncScroll();
+  updateStatus();
 }
 
 function renderGutter() {
@@ -399,13 +403,20 @@ function cursorPos() {
 
 function updateStatus(extra) {
   const pos = cursorPos();
+  const current = tab();
   $("st-pos").textContent = `Zeile ${pos.line}, Spalte ${pos.col + 1}`;
-  if (extra) $("st-mode").textContent = extra + (tab() && tab().writable === false ? " · nur lesen" : "");
-  $("st-py").textContent = S.python || "";
+  const names = { python: "Python", powershell: "PowerShell", shell: "Shell", batch: "Batch", json: "JSON", js: "JavaScript", sql: "SQL", text: "Text" };
+  const lang = languageOf(current && current.path);
+  if ($("st-lang")) $("st-lang").textContent = names[lang] || "Text";
+  if ($("st-eol")) $("st-eol").textContent = current && current.content.includes("\r\n") ? "CRLF" : "LF";
+  if (extra) $("st-mode").textContent = extra + (current && current.writable === false ? " · nur lesen" : "");
+  const py = S.python || "";
+  $("st-py").textContent = py ? py.split(/[\\/]/).pop() : "";
 }
 
 function activate(index) {
   S.active = index;
+  S.symbol = null;
   const current = tab();
   codeEl().value = current ? current.content : "";
   renderEditor();
@@ -558,6 +569,179 @@ function renderOutline() {
     button.ondblclick = () => foldAt(item.line);
     host.appendChild(button);
   });
+}
+
+function kindLabel(kind) {
+  return {
+    function: "Funktion",
+    method: "Methode",
+    class: "Klasse",
+    filter: "Filter",
+    label: "Sprungmarke",
+    key: "Schlüssel",
+  }[kind] || "Symbol";
+}
+
+function localSymbols(text, lang) {
+  const items = [];
+  const lines = String(text || "").split("\n");
+  if (lang === "python") {
+    let parent = "";
+    let parentIndent = -1;
+    lines.forEach((line, index) => {
+      const match = line.match(/^(\s*)(async\s+def|def|class)\s+([A-Za-z_][\w]*)/);
+      if (!match) return;
+      const indent = match[1].length;
+      if (match[2] === "class") {
+        parent = match[3];
+        parentIndent = indent;
+        items.push({ name: match[3], kind: "class", line: index + 1, end_line: index + 1, parent: "" });
+        return;
+      }
+      if (parent && indent > parentIndent) {
+        items.push({ name: match[3], kind: "method", line: index + 1, end_line: index + 1, parent });
+        return;
+      }
+      parent = "";
+      parentIndent = -1;
+      items.push({ name: match[3], kind: "function", line: index + 1, end_line: index + 1, parent: "" });
+    });
+    return items;
+  }
+  if (lang === "powershell") {
+    lines.forEach((line, index) => {
+      const match = line.match(/^\s*(function|filter|class)\s+([A-Za-z_][\w-]*)/i);
+      if (!match) return;
+      const word = match[1].toLowerCase();
+      const kind = word === "class" ? "class" : (word === "filter" ? "filter" : "function");
+      items.push({ name: match[2], kind, line: index + 1, end_line: index + 1, parent: "" });
+    });
+    return items;
+  }
+  if (lang === "shell") {
+    const skip = new Set(["if", "elif", "else", "while", "for", "until", "case", "select", "time", "coproc"]);
+    lines.forEach((line, index) => {
+      const named = line.match(/^\s*function\s+([A-Za-z_][\w]*)\b/);
+      const classic = line.match(/^\s*([A-Za-z_][\w]*)\s*\(\s*\)/);
+      const name = named ? named[1] : (classic ? classic[1] : "");
+      if (!name || skip.has(name)) return;
+      items.push({ name, kind: "function", line: index + 1, end_line: index + 1, parent: "" });
+    });
+    return items;
+  }
+  if (lang === "batch") {
+    lines.forEach((line, index) => {
+      const match = line.match(/^\s*:([A-Za-z_][\w-]*)/);
+      if (match) items.push({ name: match[1], kind: "label", line: index + 1, end_line: index + 1, parent: "" });
+    });
+    return items;
+  }
+  if (lang === "json") {
+    lines.forEach((line, index) => {
+      const match = line.match(/^\s*"((?:\\.|[^"\\])*)"\s*:/);
+      if (match) items.push({ name: match[1], kind: "key", line: index + 1, end_line: index + 1, parent: "" });
+    });
+  }
+  return items;
+}
+
+function symbolList(current) {
+  const local = localSymbols(current.content, languageOf(current.path));
+  if (local.length) return local;
+  return current.outline || [];
+}
+
+function propRow(host, label, value) {
+  const row = document.createElement("div");
+  row.className = "prop-row";
+  const name = document.createElement("span");
+  name.textContent = label;
+  const text = document.createElement("div");
+  text.textContent = value;
+  row.appendChild(name);
+  row.appendChild(text);
+  host.appendChild(row);
+}
+
+function renderProperties(current, item) {
+  const host = $("fn-props-body");
+  if (!host) return;
+  host.innerHTML = "";
+  if (!current) {
+    propRow(host, "Datei", "keine");
+    return;
+  }
+  const lines = current.content ? current.content.split("\n").length : 1;
+  propRow(host, "Datei", current.path.split(/[\\/]/).pop());
+  propRow(host, "Sprache", $("st-lang") ? $("st-lang").textContent : languageOf(current.path));
+  propRow(host, "Zeilen", String(lines));
+  propRow(host, "Geändert", current.dirty ? "ja" : "nein");
+  if (!item) return;
+  propRow(host, "Name", item.name);
+  propRow(host, "Art", kindLabel(item.kind));
+  propRow(host, "Zeile", String(item.line));
+  if (item.params) propRow(host, "Parameter", item.params);
+  if (item.kind === "key" || item.kind === "label") return;
+  const button = document.createElement("button");
+  button.type = "button";
+  button.textContent = "Im Fenster prüfen";
+  button.onclick = () => {
+    revealLine(item.line);
+    probeWindow("function").catch((err) => toast(err.message));
+  };
+  host.appendChild(button);
+}
+
+function renderFunctions() {
+  const host = $("fn-list");
+  if (!host) return;
+  const current = tab();
+  host.innerHTML = "";
+  if (!current) {
+    renderProperties(null, null);
+    return;
+  }
+  const query = (($("fn-filter") && $("fn-filter").value) || "").toLowerCase();
+  const items = symbolList(current).filter((item) => !query || String(item.name).toLowerCase().includes(query));
+  if (!items.length) {
+    const empty = document.createElement("div");
+    empty.className = "fn-empty";
+    empty.textContent = "Keine Funktion in dieser Datei";
+    host.appendChild(empty);
+  }
+  const selected = items.find((item) => S.symbol && S.symbol.name === item.name && S.symbol.line === item.line) || null;
+  items.forEach((item) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "outline-item fn-item" + (selected === item ? " on" : "");
+    button.textContent = (item.parent ? item.parent + "." : "") + item.name;
+    button.title = kindLabel(item.kind) + ", Zeile " + item.line;
+    button.onclick = () => {
+      S.symbol = item;
+      revealLine(item.line);
+      renderFunctions();
+    };
+    host.appendChild(button);
+  });
+  renderProperties(current, selected);
+}
+
+function showRibbon(name) {
+  document.querySelectorAll("[data-ribbon-page]").forEach((page) => {
+    page.classList.toggle("hidden", page.dataset.ribbonPage !== name);
+  });
+  document.querySelectorAll("#ribbon-tabs [data-ribbon]").forEach((button) => {
+    button.classList.toggle("on", button.dataset.ribbon === name);
+  });
+}
+
+function showDock(name) {
+  S.dock = name;
+  const functions = $("dock-functions");
+  const ai = $("dock-ai");
+  if (functions) functions.classList.toggle("hidden", name !== "functions");
+  if (ai) ai.classList.toggle("hidden", name !== "ai");
+  document.querySelectorAll("[data-dock]").forEach((button) => button.classList.toggle("on", button.dataset.dock === name));
 }
 
 function setBottom(name) {
@@ -3498,11 +3682,50 @@ async function boot() {
   document.querySelectorAll("[data-side]").forEach((button) => {
     button.onclick = () => showSide(button.dataset.side);
   });
+  document.querySelectorAll("#ribbon-tabs [data-ribbon]").forEach((button) => {
+    button.onclick = () => showRibbon(button.dataset.ribbon);
+  });
+  document.querySelectorAll("[data-dock]").forEach((button) => {
+    button.onclick = () => showDock(button.dataset.dock);
+  });
+  const bindClick = (id, fn) => {
+    const node = $(id);
+    if (node) node.onclick = () => Promise.resolve(fn()).catch((err) => toast(err.message));
+  };
   bindFindbar();
+  bindClick("btn-cut", cutSelection);
+  bindClick("btn-copy", () => copySelection(false));
+  bindClick("btn-paste", pasteClip);
+  bindClick("btn-open", () => openFileDialog());
+  bindClick("btn-save", saveTab);
   $("btn-run").onclick = () => runFile(false);
   $("btn-debug").onclick = () => runFile(true);
   $("btn-stop").onclick = () => stopAll();
+  bindClick("btn-step-into", () => debugCmd("step_into"));
+  bindClick("btn-step", () => debugCmd("step"));
+  bindClick("btn-step-out", () => debugCmd("step_out"));
+  bindClick("btn-break", () => toggleBreak(cursorPos().line));
   $("btn-format").onclick = () => formatCurrent();
+  bindClick("btn-function", buildFunction);
+  bindClick("btn-function-design", buildFunction);
+  bindClick("btn-fold", () => foldAt(cursorPos().line));
+  bindClick("btn-unfold", () => { unfoldAll(); renderEditor(); });
+  bindClick("btn-goto", goToLine);
+  bindClick("btn-kit", openKit);
+  bindClick("btn-gui", openGuiDesigner);
+  bindClick("btn-module", buildModule);
+  bindClick("btn-script", openScriptCreator);
+  bindClick("btn-database", openDatabaseCreator);
+  bindClick("btn-exe", buildExe);
+  bindClick("btn-msi", buildMsi);
+  bindClick("btn-service", buildService);
+  bindClick("btn-measure", measureFile);
+  bindClick("btn-view-tree", () => showSide("tree"));
+  bindClick("btn-view-outline", () => showSide("outline"));
+  bindClick("btn-view-output", () => setBottom("output"));
+  bindClick("btn-view-terminal", () => setBottom("terminal"));
+  bindClick("btn-view-ai", () => showDock("ai"));
+  if ($("fn-filter")) $("fn-filter").addEventListener("input", () => renderFunctions());
   $("ai-connect").onclick = () => aiSettings($("ai-input").value).catch((err) => toast(err.message));
   $("ai-send").onclick = () => sendAi(false).catch((err) => toast(err.message));
   $("ai-input").addEventListener("keydown", (event) => {
@@ -3527,6 +3750,7 @@ async function boot() {
     highlightEl().innerHTML = highlightSource(current.content, errorLineSet(), languageOf(current.path)) + "\n";
     renderGutter();
     renderTabs();
+    renderFunctions();
     scheduleAnalyze();
     scheduleRecovery();
     if (/[A-Za-z0-9_.]$/.test(area.value.slice(0, area.selectionStart))) completeAt().catch(() => {});

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -218,3 +219,177 @@ def format_json(content: str) -> dict:
 def selection_suffix(path: str) -> str:
     lang = language_of(path) if path else "python"
     return {"shell": ".sh", "powershell": ".ps1", "batch": ".bat"}.get(lang, ".py")
+
+
+_PS_DECL = re.compile(r"(?im)^[ \t]*(function|filter|class)[ \t]+([A-Za-z_][\w-]*)")
+_SH_DECL = re.compile(
+    r"(?m)^[ \t]*(?:function[ \t]+([A-Za-z_][\w]*)(?:[ \t]*\(\))?|([A-Za-z_][\w]*)[ \t]*\(\))"
+)
+_SH_SKIP = {"if", "elif", "else", "while", "for", "until", "case", "select", "time", "coproc", "function"}
+_BAT_LABEL = re.compile(r"(?m)^[ \t]*:([A-Za-z_][\w-]*)")
+_PS_SKIP_VAR = {"true", "false", "null", "this", "_"}
+
+
+def script_outline(source: str, path: str = "") -> list[dict]:
+    lang = language_of(path or "")
+    if lang == "powershell":
+        return _powershell_outline(source)
+    if lang == "shell":
+        return _shell_outline(source)
+    if lang == "batch":
+        return _batch_outline(source)
+    return []
+
+
+def _line_at(source: str, index: int) -> int:
+    return source.count("\n", 0, max(0, index)) + 1
+
+
+def _brace_end(source: str, open_at: int) -> int:
+    depth = 0
+    i = open_at
+    quote = ""
+    while i < len(source):
+        if quote:
+            if source[i] == "\\":
+                i += 2
+                continue
+            if source[i] == quote:
+                quote = ""
+            i += 1
+            continue
+        if source.startswith("<#", i):
+            stop = source.find("#>", i + 2)
+            i = len(source) if stop < 0 else stop + 2
+            continue
+        ch = source[i]
+        if ch in "\"'":
+            quote = ch
+            i += 1
+            continue
+        if ch == "#":
+            stop = source.find("\n", i)
+            i = len(source) if stop < 0 else stop
+            continue
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                return _line_at(source, i)
+        i += 1
+    return _line_at(source, max(0, len(source) - 1))
+
+
+def _span(source: str, start: int, end: int) -> tuple[int, int]:
+    nxt = end
+    brace = source.find("{", start, nxt if nxt > start else start)
+    line = _line_at(source, start)
+    if brace < 0:
+        return line, line
+    return line, _brace_end(source, brace)
+
+
+def _ps_params(chunk: str) -> str:
+    names: list[str] = []
+    for name in re.findall(r"\$([A-Za-z_][\w]*)", chunk):
+        if name.lower() in _PS_SKIP_VAR or name in names:
+            continue
+        names.append(name)
+        if len(names) >= 12:
+            break
+    return ", ".join(names)
+
+
+def _param_block(source: str, brace: int) -> str:
+    if brace < 0 or brace >= len(source) or source[brace] != "{":
+        return ""
+    body = source[brace:brace + 700]
+    found = re.search(r"(?is)\bparam\s*\(", body)
+    if not found:
+        return ""
+    start = brace + found.end() - 1
+    depth = 0
+    i = start
+    while i < len(source) and i < start + 800:
+        if source[i] == "(":
+            depth += 1
+        elif source[i] == ")":
+            depth -= 1
+            if depth == 0:
+                return _ps_params(source[start:i])
+        i += 1
+    return ""
+
+
+def _powershell_outline(source: str) -> list[dict]:
+    matches = list(_PS_DECL.finditer(source))
+    items: list[dict] = []
+    for index, match in enumerate(matches):
+        window = matches[index + 1].start() if index + 1 < len(matches) else len(source)
+        line, end_line = _span(source, match.end(), window)
+        kind_word = match.group(1).lower()
+        kind = "class" if kind_word == "class" else ("filter" if kind_word == "filter" else "function")
+        brace = source.find("{", match.end(), window)
+        params = _ps_params(source[match.end(): brace if brace >= 0 else window])
+        if not params:
+            params = _param_block(source, brace)
+        items.append(
+            {
+                "name": match.group(2),
+                "kind": kind,
+                "line": line,
+                "end_line": end_line,
+                "parent": "",
+                "params": params,
+            }
+        )
+    for item in items:
+        if item["kind"] == "class":
+            continue
+        for cls in items:
+            if cls["kind"] == "class" and cls["line"] < item["line"] <= cls["end_line"]:
+                item["parent"] = cls["name"]
+                break
+    return items
+
+
+def _shell_outline(source: str) -> list[dict]:
+    matches = []
+    for match in _SH_DECL.finditer(source):
+        name = match.group(1) or match.group(2)
+        if not name or name in _SH_SKIP:
+            continue
+        matches.append((match, name))
+    items: list[dict] = []
+    for index, (match, name) in enumerate(matches):
+        window = matches[index + 1][0].start() if index + 1 < len(matches) else len(source)
+        line, end_line = _span(source, match.end(), window)
+        items.append(
+            {
+                "name": name,
+                "kind": "function",
+                "line": line,
+                "end_line": end_line,
+                "parent": "",
+                "params": "",
+            }
+        )
+    return items
+
+
+def _batch_outline(source: str) -> list[dict]:
+    items = []
+    for match in _BAT_LABEL.finditer(source):
+        line = _line_at(source, match.start())
+        items.append(
+            {
+                "name": match.group(1),
+                "kind": "label",
+                "line": line,
+                "end_line": line,
+                "parent": "",
+                "params": "",
+            }
+        )
+    return items

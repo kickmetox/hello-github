@@ -476,12 +476,20 @@ class App:
         return problems
 
     def analyze(self, source: str, path: str) -> dict:
-        if scripting.language_of(path or "") == "json":
+        lang = scripting.language_of(path or "")
+        if lang == "json":
             return {
                 "ok": True,
                 "problems": scripting.json_problems(source),
                 "outline": scripting.json_outline(source),
                 "todos": [],
+            }
+        if lang in {"powershell", "shell", "batch"}:
+            return {
+                "ok": True,
+                "problems": [],
+                "outline": scripting.script_outline(source, path or ""),
+                "todos": analysis.todos_in_source(source, path),
             }
         problems = analysis.lint_source(source, path or "<memory>")
         problems.extend(self.ruff_problems(source, path or "datei.py"))
