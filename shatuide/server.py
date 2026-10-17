@@ -28,7 +28,7 @@ from shatuide.formatter import format_source
 from shatuide.icon_util import load_icon_bytes
 from shatuide.paths import SKIP_DIRS, STATIC, default_workspace, inside, meta_dir
 from shatuide.probe import prepare as prepare_probe
-from shatuide import creator, studio
+from shatuide import creator, kit, studio
 
 MAX_READ = 2_000_000
 
@@ -1042,6 +1042,8 @@ class Handler(BaseHTTPRequestHandler):
             return studio.powershell_help(self._q(query, "topic") or "Get-Help")
         if action == "compilers":
             return studio.compiler_status()
+        if action == "kit":
+            return kit.catalog_view(workspace)
         return {"ok": False, "error": "Unbekannte Studio-Abfrage."}
 
     def _studio_dir(self, path: str) -> Path:
@@ -1248,7 +1250,37 @@ class Handler(BaseHTTPRequestHandler):
             return self._create_script(payload)
         if action == "database":
             return creator.create_database(workspace, payload)
+        if action == "kit":
+            return self._kit(payload)
         return {"ok": False, "error": "Unbekannte Studio-Aktion."}
+
+    def _kit(self, payload: dict) -> dict:
+        op = str(payload.get("op") or "build")
+        workspace = Path(self.app.workspace)
+        if op == "load":
+            return kit.load_kit(workspace, str(payload.get("name") or ""))
+        if op == "save":
+            return kit.save_kit(workspace, payload)
+        if op != "build":
+            return {"ok": False, "error": "Unbekannte Baukasten-Aktion."}
+        built = kit.build_kit(payload)
+        if not built.get("ok"):
+            return built
+        saved = kit.save_kit(workspace, payload)
+        if not saved.get("ok"):
+            return saved
+        target = studio.output_dir(workspace) / f"{built['name']}{built['suffix']}"
+        target.write_text(built["content"], encoding="utf-8")
+        if built["suffix"] == ".sh":
+            target.chmod(target.stat().st_mode | 0o111)
+        return {
+            "ok": True,
+            "path": str(target),
+            "kit": saved["path"],
+            "content": built["content"],
+            "language": built["language"],
+            "message": built["message"] + " Datei " + target.name + ".",
+        }
 
     def _create_script(self, payload: dict) -> dict:
         if payload.get("use_model"):

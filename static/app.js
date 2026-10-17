@@ -2465,11 +2465,162 @@ function openDatabaseCreator() {
   ]);
 }
 
+function openKit() {
+  apiGet("/api/studio?action=kit").then((data) => {
+    const modules = data.modules || [];
+    const byId = Object.fromEntries(modules.map((item) => [item.id, item]));
+    const blocks = [];
+    const body = document.createElement("div");
+    const name = document.createElement("input");
+    name.id = "kit-name";
+    name.value = "Baukasten";
+    const lang = document.createElement("select");
+    lang.id = "kit-lang";
+    [["python", "Python"], ["powershell", "PowerShell"], ["shell", "Bash"], ["batch", "Batch"]].forEach(([value, label]) => {
+      const option = document.createElement("option");
+      option.value = value;
+      option.textContent = label;
+      lang.appendChild(option);
+    });
+    const saved = document.createElement("select");
+    saved.id = "kit-saved";
+    const empty = document.createElement("option");
+    empty.value = "";
+    empty.textContent = "Gespeicherter Kasten";
+    saved.appendChild(empty);
+    (data.kits || []).forEach((item) => {
+      const option = document.createElement("option");
+      option.value = item.name;
+      option.textContent = item.name;
+      saved.appendChild(option);
+    });
+    const kit = document.createElement("div");
+    kit.className = "kit";
+    const palette = document.createElement("div");
+    palette.id = "kit-modules";
+    palette.className = "kit-modules";
+    const stack = document.createElement("div");
+    stack.id = "kit-stack";
+    stack.className = "kit-stack";
+    function blank(module) {
+      const block = { id: module.id };
+      module.fields.forEach((field) => { block[field.name] = field.default || ""; });
+      return block;
+    }
+    function draw() {
+      stack.textContent = "";
+      if (!blocks.length) {
+        const hint = document.createElement("div");
+        hint.className = "hint";
+        hint.textContent = "Module links anklicken. Sie laufen von oben nach unten. {Variable} setzt einen früheren Wert ein.";
+        stack.appendChild(hint);
+      }
+      blocks.forEach((block, index) => {
+        const module = byId[block.id];
+        const card = document.createElement("div");
+        card.className = "kit-card";
+        const heading = document.createElement("h3");
+        heading.textContent = (index + 1) + ". " + (module ? module.title : block.id);
+        card.appendChild(heading);
+        (module ? module.fields : []).forEach((field) => {
+          let input;
+          if (field.kind === "choice") {
+            input = document.createElement("select");
+            (field.choices || []).forEach((choice) => {
+              const option = document.createElement("option");
+              option.value = choice;
+              option.textContent = choice;
+              input.appendChild(option);
+            });
+          } else {
+            input = document.createElement("input");
+          }
+          input.value = block[field.name] || "";
+          input.oninput = () => { block[field.name] = input.value; };
+          labeled(card, field.label, input);
+        });
+        const row = document.createElement("div");
+        row.className = "row";
+        [["Hoch", -1], ["Runter", 1]].forEach(([label, step]) => {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.textContent = label;
+          button.onclick = () => {
+            const next = index + step;
+            if (next < 0 || next >= blocks.length) return;
+            const moved = blocks[index];
+            blocks[index] = blocks[next];
+            blocks[next] = moved;
+            draw();
+          };
+          row.appendChild(button);
+        });
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.textContent = "Entfernen";
+        remove.onclick = () => { blocks.splice(index, 1); draw(); };
+        row.appendChild(remove);
+        card.appendChild(row);
+        stack.appendChild(card);
+      });
+    }
+    modules.forEach((module) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = module.title;
+      button.title = module.text;
+      button.onclick = () => { blocks.push(blank(module)); draw(); };
+      palette.appendChild(button);
+    });
+    saved.onchange = () => {
+      if (!saved.value) return;
+      api("/api/studio", { action: "kit", op: "load", name: saved.value }).then((loaded) => {
+        name.value = loaded.name;
+        if ([...lang.options].some((option) => option.value === loaded.language)) lang.value = loaded.language;
+        blocks.splice(0, blocks.length, ...(loaded.blocks || []));
+        draw();
+      }).catch((err) => toast(err.message));
+    };
+    labeled(body, "Name", name);
+    labeled(body, "Sprache", lang);
+    labeled(body, "Gespeichert", saved);
+    kit.append(palette, stack);
+    body.appendChild(kit);
+    const hint = document.createElement("div");
+    hint.className = "hint";
+    hint.textContent = "Der Kasten wird unter baukasten/ gespeichert. Das Skript landet in ausgabe/. Batch kennt nur Eingabe, Ausgabe, Rechnen, Text, Datei schreiben, Ordner, Bedingung und Pause.";
+    body.appendChild(hint);
+    modal("Baukasten", body, [
+      { label: "Abbrechen", run: () => {} },
+      { label: "Merken", run: () => {
+        api("/api/studio", { action: "kit", op: "save", name: name.value, language: lang.value, blocks })
+          .then((savedKit) => { toast("Baukasten " + savedKit.name + " gemerkt"); })
+          .catch((err) => toast(err.message));
+        return false;
+      } },
+      { label: "Erzeugen", run: () => {
+        api("/api/studio", { action: "kit", op: "build", name: name.value, language: lang.value, blocks })
+          .then(async (built) => {
+            await openGenerated(built.path, built.content);
+            $("modal").classList.add("hidden");
+            toast(built.message);
+          })
+          .catch((err) => toast(err.message));
+        return false;
+      } },
+    ]);
+    const box = $("modal").querySelector(".box");
+    if (box) box.classList.add("wide");
+    draw();
+  }).catch((err) => toast(err.message));
+}
+
 function renderStudio(host) {
   const row = document.createElement("div");
   row.className = "row";
   const actions = [
     ["Skript", openScriptCreator],
+    ["Baukasten", openKit],
     ["Datenbank", openDatabaseCreator],
     ["EXE", buildExe],
     ["MSI", buildMsi],
@@ -2563,6 +2714,7 @@ function buildMenus() {
     ]],
     ["Erzeugen", [
       ["Skript aus Abfrage…", openScriptCreator],
+      ["Baukasten…", openKit],
       ["Datenbank erzeugen…", openDatabaseCreator],
       ["EXE erzeugen", buildExe],
       ["MSI-Installer…", buildMsi],
@@ -3263,7 +3415,7 @@ async function startCollab() {
 
 function showKeys() {
   const body = document.createElement("pre");
-  body.textContent = "Strg+S Speichern\nStrg+Z Rückgängig\nStrg+Y Wiederholen\nStrg+X Ausschneiden\nStrg+C Kopieren\nStrg+V Einfügen\nStrg+F Suchen\nStrg+H Ersetzen\nStrg+/ Zeile kommentieren\nStrg+D Nächstes Vorkommen\nAlt+↑/↓ Zeile verschieben\nUmschalt+Alt+↓ Zeile duplizieren\nStrg+Umschalt+K Zeile löschen\nStrg+G Gehe zu Zeile\nStrg+F5 Ausführen\nAlt+F5 Markierung im Fenster\nUmschalt+Alt+F5 Funktion im Fenster\nF5 Debug/Weiter\nF9 Haltepunkt\nF10 Schritt über\nF11 Schritt hinein\nF12 Definition\nStrg+K Inline-KI\nStrg+Eingabe Prompt senden\nStrg+Leertaste Vervollständigen\nStrg+Umschalt+F Suche\nStrg+Umschalt+H In Dateien ersetzen\nStudio Skript, Datenbank, EXE, MSI, Modul, GUI, Dienst, Messen, PS-Hilfe";
+  body.textContent = "Strg+S Speichern\nStrg+Z Rückgängig\nStrg+Y Wiederholen\nStrg+X Ausschneiden\nStrg+C Kopieren\nStrg+V Einfügen\nStrg+F Suchen\nStrg+H Ersetzen\nStrg+/ Zeile kommentieren\nStrg+D Nächstes Vorkommen\nAlt+↑/↓ Zeile verschieben\nUmschalt+Alt+↓ Zeile duplizieren\nStrg+Umschalt+K Zeile löschen\nStrg+G Gehe zu Zeile\nStrg+F5 Ausführen\nAlt+F5 Markierung im Fenster\nUmschalt+Alt+F5 Funktion im Fenster\nF5 Debug/Weiter\nF9 Haltepunkt\nF10 Schritt über\nF11 Schritt hinein\nF12 Definition\nStrg+K Inline-KI\nStrg+Eingabe Prompt senden\nStrg+Leertaste Vervollständigen\nStrg+Umschalt+F Suche\nStrg+Umschalt+H In Dateien ersetzen\nStudio Baukasten, Skript, Datenbank, EXE, MSI, Modul, GUI, Dienst, Messen, PS-Hilfe";
   modal("Tastatur", body, [{ label: "Schließen", run: () => {} }]);
 }
 

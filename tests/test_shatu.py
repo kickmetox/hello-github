@@ -1026,5 +1026,140 @@ class CreatorTests(unittest.TestCase):
             tmp.cleanup()
 
 
+class KitTests(unittest.TestCase):
+    def test_modules_build_a_running_script(self) -> None:
+        import sqlite3
+        import subprocess
+
+        from shatuide.kit import build_kit, load_kit, save_kit
+
+        greeted = build_kit({
+            "language": "python",
+            "name": "Gruss",
+            "blocks": [
+                {"id": "eingabe", "ziel": "Name", "frage": "Wie heißt du", "art": "text"},
+                {"id": "ausgabe", "text": "Hallo {Name}"},
+                {"id": "rechnen", "ziel": "Summe", "links": "2", "operator": "+", "rechts": "3"},
+                {"id": "ausgabe", "text": "{Summe}"},
+            ],
+        })
+        self.assertTrue(greeted["ok"], greeted)
+        proc = subprocess.run([sys.executable, "-c", greeted["content"]], input="Ada\n", text=True, capture_output=True, timeout=10)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertIn("Hallo Ada", proc.stdout)
+        self.assertIn("5", proc.stdout)
+        self.assertFalse(build_kit({"language": "python", "name": "Leer", "blocks": [{"id": "ausgabe", "text": "{Fehlt}"}]})["ok"])
+        self.assertFalse(build_kit({"language": "batch", "name": "Netz", "blocks": [{"id": "web", "adresse": "https://example.com", "ziel": "Seite"}]})["ok"])
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            note = root / "notiz.txt"
+            note.write_text("zeile\n", encoding="utf-8")
+            (root / "a.txt").write_text("x", encoding="utf-8")
+            data = root / "daten.json"
+            data.write_text('{"name": "Ada"}', encoding="utf-8")
+            base = root / "app.sqlite"
+            with sqlite3.connect(base) as con:
+                con.execute("CREATE TABLE person (name TEXT)")
+                con.execute("INSERT INTO person (name) VALUES ('Ada')")
+            built = build_kit({
+                "language": "python",
+                "name": "Werk",
+                "blocks": [
+                    {"id": "datei_lesen", "quelle": str(note), "ziel": "Inhalt"},
+                    {"id": "ausgabe", "text": "{Inhalt}"},
+                    {"id": "datei_schreiben", "datei": str(root / "raus.txt"), "inhalt": "hallo-kit"},
+                    {"id": "ordner", "pfad": str(root)},
+                    {"id": "csv_zeile", "datei": str(root / "daten.csv"), "werte": "Ada;1"},
+                    {"id": "json_lesen", "datei": str(data), "schluessel": "name", "ziel": "Daten"},
+                    {"id": "ausgabe", "text": "{Daten}"},
+                    {"id": "sqlite", "datei": str(base), "sql": "SELECT name FROM person"},
+                    {"id": "text_bauen", "ziel": "Text", "teile": "A;B", "trenner": "-"},
+                    {"id": "bedingung", "variable": "Daten", "vergleich": "gleich", "wert": "Ada", "text": "bekannt"},
+                    {"id": "pause", "sekunden": "0"},
+                ],
+            })
+            self.assertTrue(built["ok"], built)
+            proc = subprocess.run([sys.executable, "-c", built["content"]], text=True, capture_output=True, timeout=10)
+            self.assertEqual(proc.returncode, 0, proc.stderr + built["content"])
+            self.assertIn("zeile", proc.stdout)
+            self.assertIn("a.txt", proc.stdout)
+            self.assertIn("Ada", proc.stdout)
+            self.assertIn("bekannt", proc.stdout)
+            self.assertEqual((root / "raus.txt").read_text(encoding="utf-8"), "hallo-kit\n")
+            self.assertIn("Ada,1", (root / "daten.csv").read_text(encoding="utf-8"))
+            for language in ("python", "powershell", "shell", "batch"):
+                item = build_kit({
+                    "language": language,
+                    "name": "Mini",
+                    "blocks": [
+                        {"id": "eingabe", "ziel": "Name", "frage": "Name", "art": "text"},
+                        {"id": "ausgabe", "text": "Hallo {Name}"},
+                    ],
+                })
+                self.assertTrue(item["ok"], (language, item))
+                if language == "python":
+                    compile(item["content"], "mini.py", "exec")
+                if language == "shell":
+                    checked = subprocess.run(["bash", "-n"], input=item["content"], text=True, capture_output=True, timeout=10)
+                    self.assertEqual(checked.returncode, 0, checked.stderr + item["content"])
+            shell = build_kit({
+                "language": "shell",
+                "name": "Liste",
+                "blocks": [{"id": "ordner", "pfad": str(root)}],
+            })
+            checked = subprocess.run(["bash", "-n"], input=shell["content"], text=True, capture_output=True, timeout=10)
+            self.assertEqual(checked.returncode, 0, checked.stderr + shell["content"])
+            proc = subprocess.run(["bash", "-c", shell["content"]], text=True, capture_output=True, timeout=10)
+            self.assertIn("a.txt", proc.stdout, proc.stderr)
+            saved = save_kit(root, {"name": "Gruss", "language": "python", "blocks": greeted["blocks"]})
+            self.assertTrue(saved["ok"], saved)
+            loaded = load_kit(root, "Gruss")
+            self.assertEqual(loaded["blocks"][0]["ziel"], "Name")
+            outside = save_kit(root, {"name": "../fremd", "language": "python", "blocks": greeted["blocks"]})
+            self.assertFalse(outside["ok"])
+
+    def test_api_kit_stays_in_workspace(self) -> None:
+        tmp = tempfile.TemporaryDirectory()
+        httpd, app = create_server("127.0.0.1", 0, tmp.name)
+        thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+        thread.start()
+        host, port = httpd.server_address[:2]
+        base = f"http://{host}:{port}"
+
+        def request(path: str, payload: dict | None = None) -> dict:
+            data = None if payload is None else json.dumps(payload).encode("utf-8")
+            req = urllib.request.Request(base + path, data=data, method="POST" if payload is not None else "GET")
+            req.add_header("X-Shatu-Token", app.token)
+            req.add_header("Host", "127.0.0.1")
+            if payload is not None:
+                req.add_header("Content-Type", "application/json")
+            with urllib.request.urlopen(req, timeout=20) as response:
+                return json.loads(response.read().decode("utf-8"))
+
+        try:
+            catalog = request("/api/studio?action=kit")
+            self.assertTrue(catalog["ok"], catalog)
+            self.assertIn("eingabe", {item["id"] for item in catalog["modules"]})
+            built = request("/api/studio", {
+                "action": "kit",
+                "op": "build",
+                "name": "Gruss",
+                "language": "python",
+                "blocks": [
+                    {"id": "eingabe", "ziel": "Name", "frage": "Wie heißt du", "art": "text"},
+                    {"id": "ausgabe", "text": "Hallo {Name}"},
+                ],
+            })
+            self.assertTrue(built["ok"], built)
+            self.assertIn("Hallo ", Path(built["path"]).read_text(encoding="utf-8"))
+            self.assertTrue((Path(tmp.name) / "baukasten" / "Gruss.json").is_file())
+            loaded = request("/api/studio", {"action": "kit", "op": "load", "name": "Gruss"})
+            self.assertEqual(loaded["blocks"][1]["text"], "Hallo {Name}")
+        finally:
+            httpd.shutdown()
+            httpd.server_close()
+            tmp.cleanup()
+
+
 if __name__ == "__main__":
     unittest.main()
