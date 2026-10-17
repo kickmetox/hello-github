@@ -27,6 +27,7 @@ from shatuide.shell_debug import PowerShellDebugSession, ShellDebugSession
 from shatuide.formatter import format_source
 from shatuide.icon_util import load_icon_bytes
 from shatuide.paths import SKIP_DIRS, STATIC, default_workspace, inside, meta_dir
+from shatuide.probe import prepare as prepare_probe
 
 MAX_READ = 2_000_000
 
@@ -723,6 +724,9 @@ class Handler(BaseHTTPRequestHandler):
         if path in {"/", "/index.html"}:
             self._page()
             return
+        if path == "/probe":
+            self._html("probe.html")
+            return
         if path.startswith("/static/"):
             self._static(path[len("/static/") :])
             return
@@ -756,7 +760,10 @@ class Handler(BaseHTTPRequestHandler):
             self._json({"ok": False, "error": str(exc), "trace": traceback.format_exc()[-1500:]}, 500)
 
     def _page(self) -> None:
-        page = (STATIC / "index.html").read_bytes()
+        self._html("index.html")
+
+    def _html(self, name: str) -> None:
+        page = (STATIC / name).read_bytes()
         self.send_response(200)
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Content-Length", str(len(page)))
@@ -922,6 +929,8 @@ class Handler(BaseHTTPRequestHandler):
                 if len(items) > 300:
                     break
             self._json({"ok": True, "items": items})
+        elif path == "/api/probe":
+            self._json(self._probe(payload))
         elif path == "/api/run":
             self._json(self._run(payload))
         elif path == "/api/session/stop":
@@ -1074,6 +1083,16 @@ class Handler(BaseHTTPRequestHandler):
             word=bool(payload.get("word")),
             regex=bool(payload.get("regex")),
             preview=bool(payload.get("preview", True)),
+        )
+
+    def _probe(self, payload: dict) -> dict:
+        return prepare_probe(
+            str(payload.get("content") or ""),
+            str(payload.get("path") or ""),
+            int(payload.get("start") or 1),
+            int(payload.get("end") or payload.get("start") or 1),
+            str(payload.get("selected") or ""),
+            str(payload.get("scope") or "mark"),
         )
 
     def _run(self, payload: dict) -> dict:

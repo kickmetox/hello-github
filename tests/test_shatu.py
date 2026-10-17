@@ -577,6 +577,88 @@ class ScriptEditTests(unittest.TestCase):
             finally:
                 session.close()
 
+    def test_probe_symbol_and_section(self) -> None:
+        import subprocess
+
+        from shatuide.probe import prepare
+
+        source = "\n".join(
+            [
+                "def wert():",
+                "    return 41 + 1",
+                "",
+                "def add(a, b=1):",
+                '    """',
+                "    >>> add(2)",
+                "    3",
+                '    """',
+                "    return a + b",
+                "",
+                "def test_add():",
+                "    assert add(2) == 3",
+                "",
+                "import unittest",
+                "class Suite(unittest.TestCase):",
+                "    def test_one(self):",
+                "        self.assertEqual(add(2, 2), 4)",
+                "",
+            ]
+        )
+
+        def line_of(snippet: str) -> int:
+            return source.splitlines().index(snippet) + 1
+
+        def execute(code: str) -> subprocess.CompletedProcess[str]:
+            return subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)
+
+        wert = prepare(source, "t.py", line_of("    return 41 + 1"), line_of("    return 41 + 1"), "", "function")
+        self.assertEqual(wert["title"], "Funktion wert")
+        self.assertIn("42", execute(wert["code"]).stdout)
+        documented = prepare(source, "t.py", line_of("    return a + b"), line_of("    return a + b"), "", "function")
+        self.assertIn("Doctest", documented["detail"])
+        self.assertEqual(execute(documented["code"]).returncode, 0)
+        tested = prepare(source, "t.py", line_of("    assert add(2) == 3"), line_of("    assert add(2) == 3"), "", "function")
+        self.assertIn("test_add", tested["code"])
+        self.assertEqual(execute(tested["code"]).returncode, 0)
+        method = prepare(source, "t.py", line_of("        self.assertEqual(add(2, 2), 4)"), 1, "", "function")
+        self.assertEqual(method["title"], "Methode Suite.test_one")
+        self.assertEqual(execute(method["code"]).returncode, 0)
+        marked = prepare("print(1)\n", "t.py", 1, 1, "print('zeile-ok')\n", "mark")
+        self.assertEqual(marked["kind"], "line")
+        self.assertIn("zeile-ok", execute(marked["code"]).stdout)
+        shell = prepare("greet() {\n  echo hi\n}\n", "a.sh", 2, 2, "", "function")
+        self.assertEqual(shell["title"], "Funktion greet")
+        shell_run = subprocess.run(["bash", "-c", shell["code"]], capture_output=True, text=True)
+        self.assertIn("hi", shell_run.stdout)
+        broken = prepare('{"a": 1,}\n', "a.json", 1, 1, "", "mark")
+        self.assertEqual(broken["mode"], "check")
+        with tempfile.TemporaryDirectory() as tmp:
+            httpd, app = create_server("127.0.0.1", 0, tmp)
+            thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+            thread.start()
+            host, port = httpd.server_address[:2]
+            base = f"http://{host}:{port}"
+            try:
+                page = urllib.request.Request(base + "/probe")
+                page.add_header("Host", "127.0.0.1")
+                with urllib.request.urlopen(page, timeout=10) as response:
+                    html = response.read().decode("utf-8")
+                self.assertIn("Testfenster", html)
+                payload = json.dumps(
+                    {"content": source, "path": "t.py", "start": line_of("    return 41 + 1"), "end": 2, "selected": "", "scope": "function"}
+                ).encode("utf-8")
+                req = urllib.request.Request(base + "/api/probe", data=payload, method="POST")
+                req.add_header("X-Shatu-Token", app.token)
+                req.add_header("Host", "127.0.0.1")
+                req.add_header("Content-Type", "application/json")
+                with urllib.request.urlopen(req, timeout=10) as response:
+                    body = json.loads(response.read().decode("utf-8"))
+                self.assertTrue(body["ok"], body)
+                self.assertEqual(body["title"], "Funktion wert")
+            finally:
+                httpd.shutdown()
+                httpd.server_close()
+
     def test_json_check_format_and_outline(self) -> None:
         from shatuide.scripting import format_json, json_outline, json_problems, language_of, run_argv, syntax_check
         from shatuide.server import App

@@ -20,6 +20,8 @@ Unter Windows: `ShatuIDE.bat` oder `py -3 shatuide.py`.
 
 `.json` wird mit Schlüsseln, Zeichenketten, Zahlen und `true`/`false`/`null` gefärbt. **Syntax prüfen** und die Problemleiste nennen die Fehlerzeile. **Format** rückt das JSON ein. Ausführen und Debuggen gibt es für JSON nicht.
 
+**Alt+F5** prüft die markierte Zeile oder den Abschnitt in einem eigenen Fenster. **Umschalt+Alt+F5** nimmt die Funktion, Methode oder Klasse an der Schreibmarke, ruft sie ohne Argumente auf, spielt ihren Doctest oder genau diesen Test. Die geöffnete Datei bleibt unverändert. Im Fenster kann der Ausschnitt vor einem erneuten Lauf geändert werden.
+
 Installation in das Zielverzeichnis, ohne vorhandene Icons zu überschreiben:
 
 ```bash
@@ -41,6 +43,7 @@ Liegt im Programmordner bereits `icon.png`, `icon.ico`, `logo.png` oder `grafik.
 - Ausführen, Bytecode kompilieren, PyInstaller, grafischer Debugger (Haltepunkte, Bedingungen, Schritt, Watches)
 - Bash- und PowerShell-Skripte laden, prüfen, ausführen und an Haltepunkten debuggen
 - JSON-Dateien laden, färben, auf Fehlerzeilen prüfen und formatieren
+- Markierte Zeile, Abschnitt oder Funktion in einem eigenen Testfenster ausführen
 - unittest, pytest, doctest, Coverage-Markierung
 - venv, pip, conda, Poetry, Pipenv, Download einer eigenständigen CPython-Distribution
 - Terminal, REPL-Kernel, Notebooks, Variablen, Matplotlib-Plots

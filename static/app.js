@@ -1969,6 +1969,8 @@ function buildMenus() {
     ["Ausführen", [
       ["Datei ausführen", () => runFile(false), "Strg+F5"],
       ["Auswahl ausführen", runSelection],
+      ["Markierung im Fenster", () => probeWindow("mark"), "Alt+F5"],
+      ["Funktion im Fenster", () => probeWindow("function"), "Umschalt+Alt+F5"],
       ["Syntax prüfen", checkSyntax],
       ["Bytecode kompilieren", () => compileCurrent("file")],
       ["Projekt kompilieren", () => compileCurrent("project")],
@@ -2015,6 +2017,7 @@ function buildMenus() {
     ]],
     ["Fenster", [
       ["Zweites Fenster", secondWindow],
+      ["Testfenster", () => probeWindow("mark")],
     ]],
     ["Hilfe", [
       ["Tastatur", showKeys],
@@ -2256,6 +2259,51 @@ function addBookmark() {
   if (!current) return;
   api("/api/bookmarks", { action: "add", path: current.path, line: cursorPos().line, note: "Lesezeichen" })
     .then(() => toast("Lesezeichen gespeichert"));
+}
+
+function selectionLines() {
+  const area = codeEl();
+  const text = area.value;
+  const start = area.selectionStart;
+  const end = area.selectionEnd;
+  const startLine = text.slice(0, start).split("\n").length;
+  let endLine = text.slice(0, Math.max(start, end)).split("\n").length;
+  if (end > start && text[end - 1] === "\n") endLine -= 1;
+  return { startLine, endLine, selected: text.slice(start, end) };
+}
+
+async function probeWindow(scope) {
+  const current = tab();
+  if (!current) return toast("Keine Datei");
+  const lines = selectionLines();
+  const data = await api("/api/probe", {
+    content: current.content,
+    path: current.path,
+    start: scope === "function" ? cursorPos().line : lines.startLine,
+    end: lines.endLine,
+    selected: scope === "function" ? "" : lines.selected,
+    scope,
+  });
+  const opened = window.open("/probe", "shatu-probe-" + Date.now(), "popup=yes,width=920,height=720,left=100,top=40");
+  if (!opened) return toast("Testfenster wurde blockiert");
+  const message = { type: "shatu-probe", ...data };
+  const send = (event) => {
+    if (event.source !== opened || !event.data || event.data.type !== "shatu-probe-ready") return;
+    opened.postMessage(message, location.origin);
+  };
+  window.addEventListener("message", send);
+  const timer = setInterval(() => {
+    if (opened.closed) {
+      clearInterval(timer);
+      window.removeEventListener("message", send);
+      return;
+    }
+    opened.postMessage(message, location.origin);
+  }, 250);
+  setTimeout(() => {
+    clearInterval(timer);
+    window.removeEventListener("message", send);
+  }, 4000);
 }
 
 async function runSelection() {
@@ -2618,7 +2666,7 @@ async function startCollab() {
 
 function showKeys() {
   const body = document.createElement("pre");
-  body.textContent = "Strg+S Speichern\nStrg+Z Rückgängig\nStrg+Y Wiederholen\nStrg+X Ausschneiden\nStrg+C Kopieren\nStrg+V Einfügen\nStrg+F Suchen\nStrg+H Ersetzen\nStrg+/ Zeile kommentieren\nStrg+D Nächstes Vorkommen\nAlt+↑/↓ Zeile verschieben\nUmschalt+Alt+↓ Zeile duplizieren\nStrg+Umschalt+K Zeile löschen\nStrg+G Gehe zu Zeile\nStrg+F5 Ausführen\nF5 Debug/Weiter\nF9 Haltepunkt\nF10 Schritt über\nF11 Schritt hinein\nF12 Definition\nStrg+K Inline-KI\nStrg+Eingabe Prompt senden\nStrg+Leertaste Vervollständigen\nStrg+Umschalt+F Suche\nStrg+Umschalt+H In Dateien ersetzen";
+  body.textContent = "Strg+S Speichern\nStrg+Z Rückgängig\nStrg+Y Wiederholen\nStrg+X Ausschneiden\nStrg+C Kopieren\nStrg+V Einfügen\nStrg+F Suchen\nStrg+H Ersetzen\nStrg+/ Zeile kommentieren\nStrg+D Nächstes Vorkommen\nAlt+↑/↓ Zeile verschieben\nUmschalt+Alt+↓ Zeile duplizieren\nStrg+Umschalt+K Zeile löschen\nStrg+G Gehe zu Zeile\nStrg+F5 Ausführen\nAlt+F5 Markierung im Fenster\nUmschalt+Alt+F5 Funktion im Fenster\nF5 Debug/Weiter\nF9 Haltepunkt\nF10 Schritt über\nF11 Schritt hinein\nF12 Definition\nStrg+K Inline-KI\nStrg+Eingabe Prompt senden\nStrg+Leertaste Vervollständigen\nStrg+Umschalt+F Suche\nStrg+Umschalt+H In Dateien ersetzen";
   modal("Tastatur", body, [{ label: "Schließen", run: () => {} }]);
 }
 
@@ -2639,6 +2687,7 @@ function onKey(event) {
   const key = event.key.toLowerCase();
   if (event.ctrlKey && key === "s") { event.preventDefault(); saveTab().catch((err) => toast(err.message)); }
   else if (event.ctrlKey && key === "f5") { event.preventDefault(); runFile(false); }
+  else if (event.altKey && event.key === "F5") { event.preventDefault(); probeWindow(event.shiftKey ? "function" : "mark").catch((err) => toast(err.message)); }
   else if (event.key === "F5") { event.preventDefault(); S.debugLine ? debugCmd("continue") : runFile(true); }
   else if (event.key === "F9") { event.preventDefault(); toggleBreak(cursorPos().line); }
   else if (event.key === "F10") { event.preventDefault(); debugCmd("step"); }
