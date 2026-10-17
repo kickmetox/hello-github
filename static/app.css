@@ -109,6 +109,8 @@ button:hover, button.on { border-color: var(--amber); color: var(--amber-2); }
 #modal .box { width: min(860px, 92vw); max-height: 86vh; overflow: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 16px; }
 #modal h2 { margin: 0 0 8px; font-size: 18px; }
 #modal label { display: block; margin: 8px 0 4px; color: var(--muted); }
+#modal label.inline { display: flex; gap: 8px; align-items: center; color: var(--text); }
+#modal label.inline input { width: auto; }
 #modal input, #modal textarea, #modal select { width: 100%; background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 6px; }
 #modal .hint { color: var(--muted); font-size: 12px; margin: 4px 0 8px; }
 #modal .checks { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; margin: 4px 0 8px; }

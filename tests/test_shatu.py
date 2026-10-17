@@ -852,5 +852,171 @@ class StudioTests(unittest.TestCase):
                 ps.close()
 
 
+class CreatorTests(unittest.TestCase):
+    def test_script_from_questions_and_prompt(self) -> None:
+        import subprocess
+
+        from shatuide.creator import build_script, extract_script, infer_action, model_messages, script_from_model
+
+        self.assertEqual(infer_action("Bitte addiere zwei Zahlen"), "sum")
+        self.assertEqual(infer_action("Zeige den Ordner"), "list")
+        self.assertEqual(infer_action("Beschreibung der Lage"), "print")
+        greeted = build_script({
+            "language": "python",
+            "name": "Gruss",
+            "action": "print",
+            "purpose": "Begrüßt eine Person",
+            "questions": "Name: Wie heißt du",
+        })
+        self.assertTrue(greeted["ok"], greeted)
+        proc = subprocess.run([sys.executable, "-c", greeted["content"]], input="Ada\n", text=True, capture_output=True, timeout=10)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertIn("Ada", proc.stdout)
+        summed = build_script({"language": "python", "name": "Plus", "purpose": "Addiere zwei Zahlen"})
+        self.assertEqual(summed["action"], "sum")
+        proc = subprocess.run([sys.executable, "-c", summed["content"]], input="2\n3\n", text=True, capture_output=True, timeout=10)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertIn("5", proc.stdout)
+        with tempfile.TemporaryDirectory() as tmp:
+            (Path(tmp) / "a.txt").write_text("x", encoding="utf-8")
+            listed = build_script({"language": "python", "name": "Ordner", "action": "list", "questions": "Pfad: Ordner"})
+            proc = subprocess.run([sys.executable, "-c", listed["content"]], input=tmp + "\n", text=True, capture_output=True, timeout=10)
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            self.assertIn("a.txt", proc.stdout)
+            shell = build_script({"prompt": "Sprache: shell\nName: Liste\nAktion: list\nFrage: Pfad: Welcher Ordner?\nZeige den Ordner"})
+            self.assertEqual(shell["language"], "shell")
+            self.assertIn("read -r", shell["content"])
+            script = Path(tmp) / "liste.sh"
+            script.write_text(shell["content"], encoding="utf-8")
+            proc = subprocess.run(["bash", str(script)], input=tmp + "\n", text=True, capture_output=True, timeout=10)
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            self.assertIn("a.txt", proc.stdout)
+        for language in ("python", "powershell", "shell", "batch"):
+            for action in ("print", "sum", "list", "fetch", "csv", "json", "write"):
+                item = build_script({"language": language, "name": "Werk", "action": action, "purpose": "Test"})
+                self.assertTrue(item["ok"], (language, action, item))
+                if language == "python":
+                    compile(item["content"], "werk.py", "exec")
+                if language == "shell":
+                    checked = subprocess.run(["bash", "-n"], input=item["content"], text=True, capture_output=True, timeout=10)
+                    self.assertEqual(checked.returncode, 0, (action, checked.stderr, item["content"]))
+        self.assertFalse(build_script({"language": "python", "name": "../geheim", "action": "print"})["ok"])
+        messages = model_messages({
+            "language": "powershell",
+            "name": "Hinweis",
+            "purpose": "Zeige den Text",
+            "questions": "Text: Was",
+        })
+        self.assertTrue(messages["ok"], messages)
+        self.assertEqual(messages["messages"][0]["role"], "system")
+        self.assertIn("Text", messages["messages"][1]["content"])
+        taken = script_from_model(
+            {"language": "python", "name": "AusModell", "action": "print"},
+            "```python\nprint('modell')\n```",
+        )
+        self.assertEqual(extract_script("```python\nprint(1)\n```").strip(), "print(1)")
+        self.assertIn("print('modell')", taken["content"])
+        self.assertEqual(taken["source"], "model")
+        self.assertFalse(script_from_model({"language": "python", "name": "Leer", "action": "print"}, "   ")["ok"])
+
+    def test_database_files_stay_in_workspace(self) -> None:
+        import sqlite3
+
+        from shatuide.creator import create_database, parse_schema
+
+        parsed = parse_schema("person: id int pk, name text pflicht")
+        self.assertTrue(parsed[0]["columns"][0]["primary"])
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            missing = create_database(root, {"engine": "sqlite", "name": "Lager", "schema": "name text"})
+            self.assertFalse(missing["ok"])
+            outside = create_database(root, {
+                "engine": "sqlite",
+                "name": "Lager",
+                "path": "../ausserhalb.sqlite",
+                "schema": "person\n  id int pk\n  name text\n",
+            })
+            self.assertFalse(outside["ok"])
+            self.assertIn("Workspace", outside["error"])
+            created = create_database(root, {
+                "engine": "sqlite",
+                "name": "Lager",
+                "schema": "person\n  id int pk\n  name text pflicht\n  email text unique\n",
+            })
+            self.assertTrue(created["ok"], created)
+            database = Path(created["database"])
+            self.assertTrue(database.is_file())
+            self.assertTrue(str(database).startswith(str(root.resolve())))
+            sql = Path(created["path"]).read_text(encoding="utf-8")
+            self.assertIn("CREATE TABLE person", sql)
+            self.assertIn("email TEXT UNIQUE", sql)
+            with sqlite3.connect(database) as con:
+                con.execute("INSERT INTO person (name, email) VALUES ('Ada', 'a@b.c')")
+                con.commit()
+                row = con.execute("SELECT name FROM person").fetchone()
+            self.assertEqual(row[0], "Ada")
+            again = create_database(root, {"engine": "sqlite", "name": "Lager", "schema": "person\n  id int pk\n  name text\n"})
+            self.assertFalse(again["ok"])
+            self.assertIn("existiert", again["error"])
+            postgres = create_database(root, {
+                "engine": "postgresql",
+                "name": "Lager",
+                "schema": "artikel\n  id int pk\n  preis real pflicht\n",
+                "apply": True,
+            })
+            self.assertTrue(postgres["ok"], postgres)
+            self.assertFalse(postgres["applied"])
+            self.assertIn("Verbindungszeichenkette fehlt", postgres["message"])
+            self.assertIn("DOUBLE PRECISION", Path(postgres["path"]).read_text(encoding="utf-8"))
+            mongo = create_database(root, {"engine": "mongodb", "name": "Lager", "schema": "person\n  name text pflicht\n"})
+            self.assertTrue(mongo["ok"], mongo)
+            self.assertIn("collections", Path(mongo["path"]).read_text(encoding="utf-8"))
+            compile(Path(mongo["script"]).read_text(encoding="utf-8"), "mongo.py", "exec")
+            injected = create_database(root, {"engine": "sqlite", "name": "Boese", "schema": "person\n  name);drop text\n"})
+            self.assertFalse(injected["ok"])
+
+    def test_api_script_and_database(self) -> None:
+        tmp = tempfile.TemporaryDirectory()
+        httpd, app = create_server("127.0.0.1", 0, tmp.name)
+        thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+        thread.start()
+        host, port = httpd.server_address[:2]
+        base = f"http://{host}:{port}"
+
+        def request(payload: dict) -> dict:
+            req = urllib.request.Request(base + "/api/studio", data=json.dumps(payload).encode("utf-8"), method="POST")
+            req.add_header("X-Shatu-Token", app.token)
+            req.add_header("Host", "127.0.0.1")
+            req.add_header("Content-Type", "application/json")
+            with urllib.request.urlopen(req, timeout=20) as response:
+                return json.loads(response.read().decode("utf-8"))
+
+        try:
+            script = request({
+                "action": "script",
+                "language": "python",
+                "name": "Gruss",
+                "action_name": "print",
+                "purpose": "Begrüßt",
+                "questions": "Name: Wie heißt du",
+            })
+            self.assertTrue(script["ok"], script)
+            self.assertIn("input(", Path(script["path"]).read_text(encoding="utf-8"))
+            self.assertTrue(str(Path(script["path"]).resolve()).startswith(str(Path(tmp.name).resolve())))
+            database = request({
+                "action": "database",
+                "engine": "sqlite",
+                "name": "Lager",
+                "schema": "person\n  id int pk\n  name text pflicht\n",
+            })
+            self.assertTrue(database["ok"], database)
+            self.assertTrue(Path(database["database"]).is_file())
+            self.assertIn("CREATE TABLE person", Path(database["path"]).read_text(encoding="utf-8"))
+        finally:
+            httpd.shutdown()
+            httpd.server_close()
+            tmp.cleanup()
+
+
 if __name__ == "__main__":
     unittest.main()

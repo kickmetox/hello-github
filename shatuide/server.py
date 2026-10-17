@@ -28,7 +28,7 @@ from shatuide.formatter import format_source
 from shatuide.icon_util import load_icon_bytes
 from shatuide.paths import SKIP_DIRS, STATIC, default_workspace, inside, meta_dir
 from shatuide.probe import prepare as prepare_probe
-from shatuide import studio
+from shatuide import creator, studio
 
 MAX_READ = 2_000_000
 
@@ -1244,7 +1244,43 @@ class Handler(BaseHTTPRequestHandler):
                 started["message"] = "Ablaufverfolgung läuft."
                 return started
             return plan
+        if action == "script":
+            return self._create_script(payload)
+        if action == "database":
+            return creator.create_database(workspace, payload)
         return {"ok": False, "error": "Unbekannte Studio-Aktion."}
+
+    def _create_script(self, payload: dict) -> dict:
+        if payload.get("use_model"):
+            prepared = creator.model_messages(payload)
+            if not prepared.get("ok"):
+                return prepared
+            cfg = config.load()
+            result = ai.chat_completion(
+                str(cfg.get("base_url") or ""),
+                str(cfg.get("api_key") or ""),
+                str(cfg.get("model") or ""),
+                prepared["messages"],
+            )
+            if not result.get("ok"):
+                return result
+            built = creator.script_from_model(payload, str(result.get("content") or ""))
+        else:
+            built = creator.build_script(payload)
+        if not built.get("ok"):
+            return built
+        target = studio.output_dir(Path(self.app.workspace)) / f"{built['name']}{built['suffix']}"
+        target.write_text(built["content"], encoding="utf-8")
+        if built["suffix"] == ".sh":
+            target.chmod(target.stat().st_mode | 0o111)
+        return {
+            "ok": True,
+            "path": str(target),
+            "content": built["content"],
+            "language": built["language"],
+            "source": built["source"],
+            "message": built["message"] + " Datei " + target.name + ".",
+        }
 
     def _search(self, query: str) -> list[dict]:
         query = query.strip()

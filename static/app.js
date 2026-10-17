@@ -1084,21 +1084,28 @@ function renderHttp(host) {
 function renderDb(host) {
   const path = document.createElement("input");
   path.placeholder = "datei.sqlite oder absolut";
-  path.value = "beispiele/demo.sqlite";
+  path.value = S.dbPath || "beispiele/demo.sqlite";
   const sql = document.createElement("textarea");
   sql.style.width = "100%";
-  sql.value = "CREATE TABLE IF NOT EXISTS person (id INTEGER PRIMARY KEY, name TEXT);\nSELECT name FROM sqlite_master;";
+  sql.value = S.dbSql || "CREATE TABLE IF NOT EXISTS person (id INTEGER PRIMARY KEY, name TEXT);\nSELECT name FROM sqlite_master;";
   const run = document.createElement("button");
   run.type = "button";
   run.textContent = "SQL ausführen";
+  const create = document.createElement("button");
+  create.type = "button";
+  create.textContent = "Datenbank anlegen";
   const out = document.createElement("div");
   run.onclick = async () => {
     const result = await api("/api/db", { engine: "sqlite", path: path.value, sql: sql.value });
     out.textContent = JSON.stringify(result.rows || result, null, 2).slice(0, 5000);
   };
+  create.onclick = () => openDatabaseCreator();
   host.appendChild(path);
   host.appendChild(sql);
-  host.appendChild(run);
+  const row = document.createElement("div");
+  row.className = "row";
+  row.append(run, create);
+  host.appendChild(row);
   host.appendChild(out);
 }
 
@@ -2310,10 +2317,160 @@ function restoreRecovery() {
   }).catch((err) => toast(err.message));
 }
 
+function labeled(host, caption, node) {
+  const label = document.createElement("label");
+  label.textContent = caption;
+  host.appendChild(label);
+  host.appendChild(node);
+}
+
+function openScriptCreator() {
+  const body = document.createElement("div");
+  const lang = document.createElement("select");
+  lang.id = "script-lang";
+  [["python", "Python"], ["powershell", "PowerShell"], ["shell", "Bash"], ["batch", "Batch"]].forEach(([value, label]) => {
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = label;
+    lang.appendChild(option);
+  });
+  const name = document.createElement("input");
+  name.id = "script-name";
+  name.value = "Skript";
+  const action = document.createElement("select");
+  action.id = "script-action";
+  [
+    ["auto", "Aus der Aufgabe erkennen"],
+    ["print", "Antworten ausgeben"],
+    ["sum", "Zahlen addieren"],
+    ["list", "Ordner auflisten"],
+    ["fetch", "Webseite holen"],
+    ["csv", "CSV-Zeile anhängen"],
+    ["json", "JSON anzeigen"],
+    ["write", "Text speichern"],
+  ].forEach(([value, label]) => {
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = label;
+    action.appendChild(option);
+  });
+  const purpose = document.createElement("textarea");
+  purpose.id = "script-purpose";
+  purpose.placeholder = "Was das Skript tun soll";
+  const questions = document.createElement("textarea");
+  questions.id = "script-questions";
+  questions.placeholder = "Eine Zeile je Abfrage: Name: Frage an den Benutzer\nName: Wie heißt du";
+  const prompt = document.createElement("textarea");
+  prompt.id = "script-prompt";
+  prompt.placeholder = "Freier Prompt. Leer lassen, wenn die Felder oben gelten.\nSprache: python\nName: Gruss\nFrage: Name: Wie heißt du\nBegrüße die Person";
+  const modelLabel = document.createElement("label");
+  modelLabel.className = "inline";
+  const model = document.createElement("input");
+  model.id = "script-model";
+  model.type = "checkbox";
+  modelLabel.append(model, document.createTextNode(" Prompt an das verbundene Sprachmodell senden"));
+  const hint = document.createElement("div");
+  hint.className = "hint";
+  hint.textContent = "Ohne Modell entsteht ein lauffähiges Skript aus den Antworten. Mit Modell wird derselbe Auftrag geschickt; dafür muss unter KI eine Verbindung stehen. Bei CSV und Text speichern ist die erste Abfrage die Datei.";
+  labeled(body, "Sprache", lang);
+  labeled(body, "Name", name);
+  labeled(body, "Aktion", action);
+  labeled(body, "Aufgabe", purpose);
+  labeled(body, "Abfragen", questions);
+  labeled(body, "Prompt", prompt);
+  body.appendChild(modelLabel);
+  body.appendChild(hint);
+  modal("Skript erzeugen", body, [
+    { label: "Abbrechen", run: () => {} },
+    { label: "Erzeugen", run: () => {
+      api("/api/studio", {
+        action: "script",
+        language: lang.value,
+        name: name.value,
+        action_name: action.value,
+        purpose: purpose.value,
+        questions: questions.value,
+        prompt: prompt.value,
+        use_model: model.checked,
+      }).then(async (data) => {
+        await openGenerated(data.path, data.content);
+        $("modal").classList.add("hidden");
+        toast(data.message);
+      }).catch((err) => toast(err.message));
+      return false;
+    } },
+  ]);
+}
+
+function openDatabaseCreator() {
+  const body = document.createElement("div");
+  const engine = document.createElement("select");
+  engine.id = "db-engine";
+  [["sqlite", "SQLite"], ["postgresql", "PostgreSQL"], ["mysql", "MySQL"], ["mongodb", "MongoDB"]].forEach(([value, label]) => {
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = label;
+    engine.appendChild(option);
+  });
+  const name = document.createElement("input");
+  name.id = "db-name";
+  name.value = "Lager";
+  const path = document.createElement("input");
+  path.id = "db-path";
+  path.placeholder = "leer = datenbanken/Name.sqlite";
+  const schema = document.createElement("textarea");
+  schema.id = "db-schema";
+  schema.style.height = "140px";
+  schema.value = "person\n  id int pk\n  name text pflicht\n  email text unique\n";
+  const dsn = document.createElement("input");
+  dsn.id = "db-dsn";
+  dsn.placeholder = "DSN oder mongodb://host, nur zum Anlegen auf dem Server";
+  const applyLabel = document.createElement("label");
+  applyLabel.className = "inline";
+  const apply = document.createElement("input");
+  apply.id = "db-apply";
+  apply.type = "checkbox";
+  applyLabel.append(apply, document.createTextNode(" Auf dem Server anlegen (PostgreSQL, MySQL, MongoDB)"));
+  const hint = document.createElement("div");
+  hint.className = "hint";
+  hint.textContent = "SQLite wird als Datei im Workspace angelegt. PostgreSQL und MySQL bekommen ein SQL-Skript, MongoDB ein Schema und ein Python-Skript. Anlegen auf einem Server braucht den Treiber und eine Verbindung. Zeile je Spalte: Name Typ pk pflicht unique.";
+  labeled(body, "Engine", engine);
+  labeled(body, "Name", name);
+  labeled(body, "Datei", path);
+  labeled(body, "Tabellen", schema);
+  labeled(body, "Verbindung", dsn);
+  body.appendChild(applyLabel);
+  body.appendChild(hint);
+  modal("Datenbank erzeugen", body, [
+    { label: "Abbrechen", run: () => {} },
+    { label: "Anlegen", run: () => {
+      api("/api/studio", {
+        action: "database",
+        engine: engine.value,
+        name: name.value,
+        path: path.value,
+        schema: schema.value,
+        dsn: dsn.value,
+        apply: apply.checked,
+      }).then(async (data) => {
+        if (data.database) S.dbPath = data.database;
+        if (data.sample) S.dbSql = data.sample;
+        await refreshTree();
+        if (data.path) await openPath(data.path);
+        $("modal").classList.add("hidden");
+        toast(data.message);
+      }).catch((err) => toast(err.message));
+      return false;
+    } },
+  ]);
+}
+
 function renderStudio(host) {
   const row = document.createElement("div");
   row.className = "row";
   const actions = [
+    ["Skript", openScriptCreator],
+    ["Datenbank", openDatabaseCreator],
     ["EXE", buildExe],
     ["MSI", buildMsi],
     ["Modul", buildModule],
@@ -2405,6 +2562,8 @@ function buildMenus() {
       ["Framework starten", runFramework],
     ]],
     ["Erzeugen", [
+      ["Skript aus Abfrage…", openScriptCreator],
+      ["Datenbank erzeugen…", openDatabaseCreator],
       ["EXE erzeugen", buildExe],
       ["MSI-Installer…", buildMsi],
       ["Modul aus Funktionen…", buildModule],
@@ -3104,7 +3263,7 @@ async function startCollab() {
 
 function showKeys() {
   const body = document.createElement("pre");
-  body.textContent = "Strg+S Speichern\nStrg+Z Rückgängig\nStrg+Y Wiederholen\nStrg+X Ausschneiden\nStrg+C Kopieren\nStrg+V Einfügen\nStrg+F Suchen\nStrg+H Ersetzen\nStrg+/ Zeile kommentieren\nStrg+D Nächstes Vorkommen\nAlt+↑/↓ Zeile verschieben\nUmschalt+Alt+↓ Zeile duplizieren\nStrg+Umschalt+K Zeile löschen\nStrg+G Gehe zu Zeile\nStrg+F5 Ausführen\nAlt+F5 Markierung im Fenster\nUmschalt+Alt+F5 Funktion im Fenster\nF5 Debug/Weiter\nF9 Haltepunkt\nF10 Schritt über\nF11 Schritt hinein\nF12 Definition\nStrg+K Inline-KI\nStrg+Eingabe Prompt senden\nStrg+Leertaste Vervollständigen\nStrg+Umschalt+F Suche\nStrg+Umschalt+H In Dateien ersetzen\nStudio EXE, MSI, Modul, GUI, Dienst, Messen, PS-Hilfe";
+  body.textContent = "Strg+S Speichern\nStrg+Z Rückgängig\nStrg+Y Wiederholen\nStrg+X Ausschneiden\nStrg+C Kopieren\nStrg+V Einfügen\nStrg+F Suchen\nStrg+H Ersetzen\nStrg+/ Zeile kommentieren\nStrg+D Nächstes Vorkommen\nAlt+↑/↓ Zeile verschieben\nUmschalt+Alt+↓ Zeile duplizieren\nStrg+Umschalt+K Zeile löschen\nStrg+G Gehe zu Zeile\nStrg+F5 Ausführen\nAlt+F5 Markierung im Fenster\nUmschalt+Alt+F5 Funktion im Fenster\nF5 Debug/Weiter\nF9 Haltepunkt\nF10 Schritt über\nF11 Schritt hinein\nF12 Definition\nStrg+K Inline-KI\nStrg+Eingabe Prompt senden\nStrg+Leertaste Vervollständigen\nStrg+Umschalt+F Suche\nStrg+Umschalt+H In Dateien ersetzen\nStudio Skript, Datenbank, EXE, MSI, Modul, GUI, Dienst, Messen, PS-Hilfe";
   modal("Tastatur", body, [{ label: "Schließen", run: () => {} }]);
 }
 
