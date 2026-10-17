@@ -1358,6 +1358,7 @@ function buildMenus() {
       ["Branch…", gitBranch],
       ["Klonen…", gitClone],
       ["Konflikte", gitConflicts],
+      ["GitHub und Visual Studio…", () => aiSettings()],
     ]],
     ["KI", [
       ["Sprachmodell verbinden…", () => aiSettings()],
@@ -1576,10 +1577,28 @@ function aiField(body, label, node) {
 
 async function aiSettings(prefill) {
   const cfg = await apiGet("/api/ai/config");
+  const providers = cfg.providers || [];
   const body = document.createElement("div");
+  const provider = document.createElement("select");
+  providers.forEach((item) => {
+    const option = document.createElement("option");
+    option.value = item.id;
+    option.textContent = item.name;
+    provider.appendChild(option);
+  });
+  if ([...provider.options].some((option) => option.value === cfg.provider)) provider.value = cfg.provider;
+  else {
+    const match = providers.find((item) => item.base_url && item.base_url === (cfg.base_url || ""));
+    if (match) provider.value = match.id;
+    else if (cfg.base_url) provider.value = "custom";
+  }
+  const note = document.createElement("p");
+  note.className = "hint";
   const url = document.createElement("input");
+  url.id = "ai-base-url";
   url.value = cfg.base_url || "http://127.0.0.1:11434/v1";
   const model = document.createElement("input");
+  model.id = "ai-model";
   model.setAttribute("list", "ai-models");
   model.value = cfg.model || "llama3.1";
   const list = document.createElement("datalist");
@@ -1588,29 +1607,126 @@ async function aiSettings(prefill) {
   key.type = "password";
   key.placeholder = cfg.has_api_key ? "gesetzt, leer lassen zum Behalten" : "API-Schlüssel, bei Ollama leer";
   const system = document.createElement("textarea");
-  system.rows = 4;
+  system.rows = 3;
   system.value = cfg.system_prompt || "";
   system.placeholder = "Leer lassen für den Standardassistenten";
   const prompt = document.createElement("textarea");
-  prompt.rows = 4;
+  prompt.id = "ai-connect-prompt";
+  prompt.rows = 3;
   prompt.placeholder = "Prompt, der beim Verbinden an das Modell geht";
   prompt.value = prefill || "";
+  const github = document.createElement("input");
+  github.type = "password";
+  github.id = "ai-github-token";
+  github.placeholder = cfg.has_github_token ? "gesetzt, leer lassen zum Behalten" : "Personal Access Token für github.com";
+  const checks = document.createElement("div");
+  checks.className = "checks";
+  checks.id = "ai-extensions";
+  const selected = new Set(Array.isArray(cfg.extensions) ? cfg.extensions : []);
+  (cfg.extension_catalog || []).forEach((item) => {
+    const label = document.createElement("label");
+    const box = document.createElement("input");
+    box.type = "checkbox";
+    box.value = item.id;
+    box.checked = selected.has(item.id);
+    box.title = item.note || "";
+    label.append(box, document.createTextNode(item.name));
+    checks.appendChild(label);
+  });
+  const vscodePath = document.createElement("input");
+  vscodePath.placeholder = (cfg.editors && cfg.editors.vscode && cfg.editors.vscode.path) || "Pfad zu code, leer = automatisch";
+  vscodePath.value = (cfg.editors && cfg.editors.vscode && cfg.editors.vscode.configured) || "";
+  const visualPath = document.createElement("input");
+  visualPath.placeholder = "Pfad zu devenv.exe, leer = automatisch";
+  visualPath.value = (cfg.editors && cfg.editors.visualstudio && cfg.editors.visualstudio.configured) || "";
+  const windPath = document.createElement("input");
+  windPath.placeholder = "Pfad zu windsurf, leer = automatisch";
+  windPath.value = (cfg.editors && cfg.editors.windsurf && cfg.editors.windsurf.configured) || "";
   const result = document.createElement("pre");
   result.id = "ai-connect-result";
+  function applyProvider(force) {
+    const item = providers.find((entry) => entry.id === provider.value);
+    note.textContent = item ? item.note : "";
+    if (!item || item.id === "custom" || !force) return;
+    url.value = item.base_url;
+    model.value = item.model;
+    key.placeholder = item.key_hint || key.placeholder;
+  }
+  provider.addEventListener("change", () => applyProvider(true));
+  applyProvider(false);
+  aiField(body, "Anbieter", provider);
+  body.appendChild(note);
   aiField(body, "Basis-URL", url);
   aiField(body, "Modell", model);
   body.appendChild(list);
   aiField(body, "API-Schlüssel", key);
   aiField(body, "System-Prompt", system);
   aiField(body, "Prompt", prompt);
+  aiField(body, "GitHub-Token", github);
+  const ghHint = document.createElement("p");
+  ghHint.className = "hint";
+  ghHint.textContent = "Das Token gilt nur für HTTPS gegen github.com (Klonen, Push, Pull). Copilot selbst meldet man in VS Code oder Visual Studio an.";
+  body.appendChild(ghHint);
+  aiField(body, "VS-Code-Erweiterungen", checks);
+  aiField(body, "Visual Studio Code", vscodePath);
+  aiField(body, "Visual Studio", visualPath);
+  aiField(body, "Windsurf", windPath);
+  const actions = document.createElement("div");
+  actions.className = "editor-actions";
+  function editorButton(label, run) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = label;
+    button.onclick = () => run().catch((err) => { result.textContent = err.message; });
+    actions.appendChild(button);
+  }
+  function chosenExtensions() {
+    return [...checks.querySelectorAll("input:checked")].map((box) => box.value);
+  }
+  editorButton("GitHub prüfen", async () => {
+    result.textContent = "Prüfe GitHub…";
+    const saved = await api("/api/ai/config", payload(false));
+    remember(saved);
+    const who = await api("/api/editors", { action: "github", github_token: github.value });
+    result.textContent = "GitHub: " + (who.login || "") + (who.name ? " (" + who.name + ")" : "");
+  });
+  editorButton("Editor-Konfiguration schreiben", async () => {
+    const saved = await api("/api/ai/config", payload(false));
+    remember(saved);
+    const written = await api("/api/editors", { action: "write", extensions: chosenExtensions() });
+    result.textContent = written.message || "Geschrieben.";
+  });
+  editorButton("VS Code öffnen", async () => {
+    await api("/api/ai/config", payload(false));
+    const opened = await api("/api/editors", { action: "open", kind: "vscode" });
+    result.textContent = "VS Code: " + opened.path;
+  });
+  editorButton("Visual Studio öffnen", async () => {
+    await api("/api/ai/config", payload(false));
+    const opened = await api("/api/editors", { action: "open", kind: "visualstudio" });
+    result.textContent = "Visual Studio: " + opened.path;
+  });
+  editorButton("Erweiterungen installieren", async () => {
+    await api("/api/ai/config", payload(false));
+    result.textContent = "Installiere…";
+    const installed = await api("/api/editors", { action: "install", extensions: chosenExtensions() });
+    result.textContent = installed.log || installed.error || "Fertig.";
+  });
+  body.appendChild(actions);
   body.appendChild(result);
 
   function payload(send) {
     const data = {
+      provider: provider.value,
       base_url: url.value,
       model: model.value,
       api_key: key.value,
       system_prompt: system.value,
+      github_token: github.value,
+      extensions: chosenExtensions(),
+      editor_vscode: vscodePath.value,
+      editor_visualstudio: visualPath.value,
+      editor_windsurf: windPath.value,
     };
     const current = tab();
     if (current) {

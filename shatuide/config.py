@@ -40,7 +40,8 @@ def save(data: dict[str, Any]) -> None:
 
 def public_view(data: dict[str, Any]) -> dict[str, Any]:
     view = dict(data)
-    key = str(view.get("api_key") or "")
-    view["has_api_key"] = bool(key)
-    view["api_key"] = "••••••••" if key else ""
+    for field, flag in (("api_key", "has_api_key"), ("github_token", "has_github_token")):
+        secret = str(view.get(field) or "")
+        view[flag] = bool(secret)
+        view[field] = "••••••••" if secret else ""
     return view

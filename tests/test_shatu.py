@@ -17,7 +17,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from shatuide import analysis, ai, history, http_client, notebook, refactor, tools
+from shatuide import analysis, ai, history, http_client, integrations, notebook, refactor, tools
 from shatuide.debug_session import DebugSession
 from shatuide.formatter import fallback_format
 from shatuide.icon_util import crop_center_square, decode_png, encode_png, generated_icon_png
@@ -351,6 +351,70 @@ class ApiTests(unittest.TestCase):
         finally:
             model.shutdown()
             model.server_close()
+            if backup is None:
+                cfg_path.unlink(missing_ok=True)
+            else:
+                cfg_path.write_bytes(backup)
+                os.chmod(cfg_path, 0o600)
+
+    def test_github_editor_profile(self) -> None:
+        self.assertEqual(integrations.provider_by_id("kimi")["base_url"], "https://api.moonshot.ai/v1")
+        names = [item["name"] for item in integrations.EXTENSIONS]
+        for expected in (
+            "Kimi Code",
+            "GitHub Copilot",
+            "Tabnine",
+            "Bito AI",
+            "Mintlify Doc Writer",
+            "Code GPT",
+            "Windsurf (Codeium)",
+            "Qodo Gen",
+            "Google Gemini Code Assist",
+        ):
+            self.assertIn(expected, names)
+        self.assertIn("moonshot-ai.kimi-code", integrations.marketplace_ids(["kimi", "copilot"]))
+        self.assertTrue(integrations.github_host("https://github.com/kickmetox/hello-github.git"))
+        self.assertFalse(integrations.github_host("https://gitlab.com/gruppe/projekt.git"))
+        env = integrations.with_github_auth({"A": "1"}, "ghp_testtoken", ["https://github.com/a/b.git"])
+        self.assertIn("AUTHORIZATION: bearer ghp_testtoken", env["GIT_CONFIG_VALUE_0"])
+        untouched = integrations.with_github_auth({}, "ghp_testtoken", ["https://gitlab.com/a/b.git"])
+        self.assertNotIn("GIT_CONFIG_VALUE_0", untouched)
+        cfg_path = Path.home() / ".shatuide" / "config.json"
+        backup = cfg_path.read_bytes() if cfg_path.is_file() else None
+        try:
+            rejected = self.request("/api/ai/config", {"github_token": "nicht gültig"})
+            self.assertFalse(rejected["ok"])
+            saved = self.request(
+                "/api/ai/config",
+                {
+                    "provider": "kimi",
+                    "base_url": "",
+                    "model": "",
+                    "system_prompt": "Antworte knapp.",
+                    "github_token": "ghp_testtoken",
+                    "extensions": ["kimi", "copilot", "unbekannt"],
+                    "editor_visualstudio": r"C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\devenv.exe",
+                },
+            )
+            self.assertTrue(saved["ok"], saved)
+            self.assertEqual(saved["base_url"], "https://api.moonshot.ai/v1")
+            self.assertEqual(saved["model"], "kimi-k3")
+            self.assertEqual(saved["github_token"], "••••••••")
+            self.assertEqual(saved["extensions"], ["kimi", "copilot"])
+            self.assertNotIn("ghp_testtoken", json.dumps(saved))
+            written = self.request("/api/editors", {"action": "write", "extensions": ["kimi", "copilot"]})
+            self.assertTrue(written["ok"], written)
+            folder = Path(self.tmp.name) / ".vscode"
+            text = (folder / "extensions.json").read_text(encoding="utf-8")
+            profile = (folder / "shatuide.ai.json").read_text(encoding="utf-8")
+            self.assertIn("moonshot-ai.kimi-code", text)
+            self.assertIn("GitHub.copilot-chat", text)
+            self.assertIn("Antworte knapp.", profile)
+            self.assertNotIn("ghp_testtoken", text + profile)
+            loaded = self.request("/api/ai/config")
+            self.assertEqual(loaded["extension_catalog"][0]["id"], "kimi")
+            self.assertTrue(loaded["editors"]["visualstudio"]["configured"].endswith("devenv.exe"))
+        finally:
             if backup is None:
                 cfg_path.unlink(missing_ok=True)
             else:

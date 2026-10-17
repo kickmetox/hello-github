@@ -15,10 +15,18 @@ def git_available() -> bool:
     return shutil.which("git") is not None
 
 
-def run_git(cwd: Path, args: list[str], timeout: int = 30) -> dict:
+def run_git(
+    cwd: Path,
+    args: list[str],
+    timeout: int = 30,
+    github_token: str = "",
+    auth_urls: list[str] | None = None,
+) -> dict:
     if not git_available():
         return {"ok": False, "error": "Git ist nicht installiert.", "stdout": "", "stderr": ""}
-    env = os.environ.copy()
+    from shatuide.integrations import with_github_auth
+
+    env = with_github_auth(os.environ.copy(), github_token, auth_urls or [])
     env["GIT_TERMINAL_PROMPT"] = "0"
     try:
         proc = subprocess.run(
@@ -79,11 +87,18 @@ def branches(cwd: Path) -> dict:
     return run_git(cwd, ["branch", "--list"])
 
 
-def clone(url: str, dest: Path) -> dict:
+def origin_url(cwd: Path) -> str:
+    result = run_git(cwd, ["remote", "get-url", "origin"])
+    if not result.get("ok"):
+        return ""
+    return (result.get("stdout") or "").strip()
+
+
+def clone(url: str, dest: Path, github_token: str = "") -> dict:
     if not _URL.match(url) or ".." in url:
         return {"ok": False, "error": "Ungültige Git-URL."}
     dest.parent.mkdir(parents=True, exist_ok=True)
-    return run_git(dest.parent, ["clone", "--", url, dest.name], timeout=120)
+    return run_git(dest.parent, ["clone", "--", url, dest.name], timeout=120, github_token=github_token, auth_urls=[url])
 
 
 def conflicts(cwd: Path) -> list[str]:

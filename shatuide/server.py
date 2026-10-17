@@ -18,7 +18,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
 
 from shatuide import __author__, __email__, __version__
-from shatuide import ai, analysis, config, database, frameworks, history, http_client, notebook
+from shatuide import ai, analysis, config, database, frameworks, history, http_client, integrations, notebook
 from shatuide import refactor, remote, runner, snippets, testing, tools, vcs
 from shatuide.complete import completions
 from shatuide.debug_session import DebugSession
@@ -769,7 +769,16 @@ class Handler(BaseHTTPRequestHandler):
             self._json({"ok": True, "items": frameworks.detect(Path(app.workspace), app.python_exe())})
         elif path == "/api/ai/config":
             cfg = config.load()
-            self._json({"ok": True, **config.public_view(cfg), "python": app.python_exe()})
+            self._json(
+                {
+                    "ok": True,
+                    **config.public_view(cfg),
+                    "python": app.python_exe(),
+                    "providers": integrations.PROVIDERS,
+                    "extension_catalog": integrations.EXTENSIONS,
+                    "editors": integrations.editor_status(cfg),
+                }
+            )
         elif path == "/api/bookmarks":
             self._json(app.bookmarks("list", {}))
         elif path == "/api/notebook":
@@ -925,6 +934,8 @@ class Handler(BaseHTTPRequestHandler):
             self._json(self._save_ai(payload))
         elif path == "/api/ai/models":
             self._json(self._list_models(payload))
+        elif path == "/api/editors":
+            self._json(self._editors(payload))
         elif path == "/api/ai/chat":
             self._json(self._chat(payload))
         elif path == "/api/ai/inline":
@@ -1131,15 +1142,15 @@ class Handler(BaseHTTPRequestHandler):
                 return {"ok": False, "error": "Ungültiger Branchname."}
             return vcs.run_git(cwd, ["branch", name])
         if action == "push":
-            return vcs.run_git(cwd, ["push"], timeout=40)
+            return self._git_remote(cwd, ["push"])
         if action == "pull":
-            return vcs.run_git(cwd, ["pull"], timeout=40)
+            return self._git_remote(cwd, ["pull"])
         if action == "clone":
             url = str(payload.get("url") or "")
             dest_name = str(payload.get("dest") or "repo")
             if not re.match(r"^[\w.\-]+$", dest_name):
                 return {"ok": False, "error": "Ungültiger Zielname."}
-            return vcs.clone(url, cwd / dest_name)
+            return vcs.clone(url, cwd / dest_name, github_token=self._github_token())
         if action == "conflicts":
             return {"ok": True, "files": vcs.conflicts(cwd)}
         if action == "resolve":
@@ -1148,6 +1159,13 @@ class Handler(BaseHTTPRequestHandler):
             target.write_text(vcs.take_side(text, str(payload.get("side") or "ours")), encoding="utf-8")
             return {"ok": True, "path": str(target)}
         return {"ok": False, "error": "Unbekannte Git-Aktion."}
+
+    def _github_token(self) -> str:
+        return str(config.load().get("github_token") or "")
+
+    def _git_remote(self, cwd: Path, args: list[str]) -> dict:
+        url = vcs.origin_url(cwd)
+        return vcs.run_git(cwd, args, timeout=40, github_token=self._github_token(), auth_urls=[url])
 
     def _terminal(self, payload: dict) -> dict:
         action = str(payload.get("action") or "read")
@@ -1248,19 +1266,87 @@ class Handler(BaseHTTPRequestHandler):
         base = str(payload.get("base_url") or cfg.get("base_url") or "").strip()
         return ai.list_models(base, self._ai_key(payload, cfg))
 
+    def _editors(self, payload: dict) -> dict:
+        cfg = config.load()
+        action = str(payload.get("action") or "")
+        if action == "github":
+            token = self._secret_value(payload.get("github_token"))
+            if token is None:
+                token = str(cfg.get("github_token") or "")
+            if token == "":
+                return {"ok": False, "error": "GitHub-Token ist ungültig."}
+            return integrations.github_user(token)
+        extension_ids = integrations.known_extension_ids(payload.get("extensions") or cfg.get("extensions") or [])
+        if action == "write":
+            profile = {
+                "provider": cfg.get("provider") or "",
+                "base_url": cfg.get("base_url") or "",
+                "model": cfg.get("model") or "",
+                "system_prompt": cfg.get("system_prompt") or "",
+                "has_github_token": bool(cfg.get("github_token")),
+            }
+            written = integrations.write_editor_config(Path(self.app.workspace), extension_ids, profile)
+            written["message"] = "VS-Code-Konfiguration geschrieben. Schlüssel bleiben in der Nutzerdatei."
+            return written
+        if action == "open":
+            kind = str(payload.get("kind") or "vscode")
+            key = {"vscode": "editor_vscode", "visualstudio": "editor_visualstudio", "windsurf": "editor_windsurf"}.get(kind)
+            if not key:
+                return {"ok": False, "error": "Unbekannter Editor."}
+            return integrations.open_editor(kind, Path(self.app.workspace), str(cfg.get(key) or ""))
+        if action == "install":
+            binary = integrations.editor_binary("vscode", str(cfg.get("editor_vscode") or ""))
+            return integrations.install_extensions(binary, extension_ids)
+        return {"ok": False, "error": "Unbekannte Editor-Aktion."}
+
+    def _secret_value(self, value: object) -> str | None:
+        if not isinstance(value, str) or not value or set(value) <= {"•"}:
+            return None
+        if any(char.isspace() for char in value) or len(value) > 400:
+            return ""
+        return value
+
     def _save_ai(self, payload: dict) -> dict:
         cfg = config.load()
+        provider_id = str(payload.get("provider") or cfg.get("provider") or "")
+        preset = integrations.provider_by_id(provider_id) if provider_id else None
+        if "provider" in payload:
+            if provider_id and preset is None:
+                return {"ok": False, "error": "Unbekannter Anbieter."}
+            cfg["provider"] = provider_id
         if "base_url" in payload:
-            cfg["base_url"] = str(payload.get("base_url") or "").strip()
+            entered = str(payload.get("base_url") or "").strip()
+            cfg["base_url"] = entered or (preset["base_url"] if preset else "")
+        elif preset and not cfg.get("base_url"):
+            cfg["base_url"] = preset["base_url"]
         if "model" in payload:
-            cfg["model"] = str(payload.get("model") or "").strip() or "llama3.1"
+            entered_model = str(payload.get("model") or "").strip()
+            cfg["model"] = entered_model or (preset["model"] if preset and preset.get("model") else "") or "llama3.1"
+        elif preset and not cfg.get("model"):
+            cfg["model"] = preset["model"] or "llama3.1"
         if "system_prompt" in payload:
             cfg["system_prompt"] = str(payload.get("system_prompt") or "")
-        key = payload.get("api_key")
-        if isinstance(key, str) and key and not set(key) <= {"•"}:
+        if "extensions" in payload:
+            cfg["extensions"] = integrations.known_extension_ids(payload.get("extensions"))
+        for source, target in (
+            ("editor_vscode", "editor_vscode"),
+            ("editor_visualstudio", "editor_visualstudio"),
+            ("editor_windsurf", "editor_windsurf"),
+        ):
+            if source in payload:
+                cfg[target] = integrations.safe_editor_path(str(payload.get(source) or ""))
+        key = self._secret_value(payload.get("api_key"))
+        if key == "":
+            return {"ok": False, "error": "API-Schlüssel ist ungültig."}
+        if key:
             cfg["api_key"] = key
+        github = self._secret_value(payload.get("github_token"))
+        if github == "":
+            return {"ok": False, "error": "GitHub-Token ist ungültig."}
+        if github:
+            cfg["github_token"] = github
         config.save(cfg)
-        result = {"ok": True, **config.public_view(cfg)}
+        result = {"ok": True, **config.public_view(cfg), "editors": integrations.editor_status(cfg)}
         prompt = str(payload.get("prompt") or "").strip()
         if prompt:
             result["reply"] = self._chat(

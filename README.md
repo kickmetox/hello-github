@@ -41,7 +41,9 @@ Liegt im Programmordner bereits `icon.png`, `icon.ico`, `logo.png` oder `grafik.
 - KI-Chat mit `@datei`, `@terminal`, `@git`, Inline-Edit, Traceback-Reparatur und Agent (OpenAI-kompatibel, auch Ollama)
 - SSH, Docker, WSL und eine lokale Live-Sitzung für ein Dokument
 
-KI-Zugang: Menü **KI → Sprachmodell verbinden**. Dort stehen Basis-URL, Modell, API-Schlüssel, System-Prompt und ein Prompt; **Verbinden und senden** speichert die Verbindung und schickt den Prompt sofort. Für Ollama zum Beispiel `http://127.0.0.1:11434/v1`. Chat, Inline-Edit und Reparatur verwenden den gespeicherten System-Prompt. Der Agent behält sein Werkzeugprotokoll und hängt den System-Prompt als zusätzliche Anweisung an. Der Schlüssel liegt nur in `~/.shatuide/config.json`.
+KI-Zugang: Menü **KI → Sprachmodell verbinden**. Dort stehen Anbieter, Basis-URL, Modell, API-Schlüssel, System-Prompt und ein Prompt; **Verbinden und senden** speichert die Verbindung und schickt den Prompt sofort. Für Ollama zum Beispiel `http://127.0.0.1:11434/v1`. Voreingestellt sind außerdem Kimi (`https://api.moonshot.ai/v1`), Gemini und OpenAI. Chat, Inline-Edit und Reparatur verwenden den gespeicherten System-Prompt. Der Agent behält sein Werkzeugprotokoll und hängt den System-Prompt als zusätzliche Anweisung an. Schlüssel liegen nur in `~/.shatuide/config.json`.
+
+GitHub und Editoren: Im selben Dialog lässt sich ein GitHub-Token für HTTPS gegen `github.com` prüfen. Es gilt für Klonen, Push und Pull, nicht als Modell-API. Die neun VS-Code-Erweiterungen Kimi Code, GitHub Copilot, Tabnine, Bito, Mintlify Doc Writer, Code GPT, Windsurf, Qodo Gen und Gemini Code Assist können angekreuzt werden. **Editor-Konfiguration schreiben** legt `.vscode/extensions.json` und `.vscode/shatuide.ai.json` ohne Schlüssel an. **VS Code öffnen** und **Visual Studio öffnen** starten den gefundenen oder eingetragenen Editor mit dem Workspace. Copilot, Tabnine, Bito, Mintlify, Windsurf und Qodo meldet man in dem jeweiligen Editor an.
 
 ## Tests
 
