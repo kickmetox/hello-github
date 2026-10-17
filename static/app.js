@@ -458,6 +458,7 @@ function revealLine(line) {
   const lineHeight = 18;
   area.scrollTop = Math.max(0, (line - 3) * lineHeight);
   syncScroll();
+  updateStatus();
 }
 
 async function saveTab() {
