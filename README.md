@@ -18,6 +18,8 @@ Unter Windows: `ShatuIDE.bat` oder `py -3 shatuide.py`.
 
 `.sh`, `.bash` und `.ps1` lassen sich laden und bearbeiten. **Ausführen** startet Bash beziehungsweise PowerShell (`pwsh` oder `powershell`). **Syntax prüfen** nutzt `bash -n` oder den PowerShell-Parser. **Debug** hält an Haltepunkten an, zeigt Variablen und geht schrittweise weiter. Fehlt der Interpreter, meldet die IDE das, statt ein Ergebnis zu erfinden.
 
+`.json` wird mit Schlüsseln, Zeichenketten, Zahlen und `true`/`false`/`null` gefärbt. **Syntax prüfen** und die Problemleiste nennen die Fehlerzeile. **Format** rückt das JSON ein. Ausführen und Debuggen gibt es für JSON nicht.
+
 Installation in das Zielverzeichnis, ohne vorhandene Icons zu überschreiben:
 
 ```bash
@@ -38,6 +40,7 @@ Liegt im Programmordner bereits `icon.png`, `icon.ico`, `logo.png` oder `grafik.
 - Suche, Ersetzen in der Datei und im Workspace, Gliederung, Gehe-zu-Definition inklusive Bibliotheken, TODO, Lesezeichen
 - Ausführen, Bytecode kompilieren, PyInstaller, grafischer Debugger (Haltepunkte, Bedingungen, Schritt, Watches)
 - Bash- und PowerShell-Skripte laden, prüfen, ausführen und an Haltepunkten debuggen
+- JSON-Dateien laden, färben, auf Fehlerzeilen prüfen und formatieren
 - unittest, pytest, doctest, Coverage-Markierung
 - venv, pip, conda, Poetry, Pipenv, Download einer eigenständigen CPython-Distribution
 - Terminal, REPL-Kernel, Notebooks, Variablen, Matplotlib-Plots

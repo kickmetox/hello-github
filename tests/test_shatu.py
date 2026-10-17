@@ -577,6 +577,34 @@ class ScriptEditTests(unittest.TestCase):
             finally:
                 session.close()
 
+    def test_json_check_format_and_outline(self) -> None:
+        from shatuide.scripting import format_json, json_outline, json_problems, language_of, run_argv, syntax_check
+        from shatuide.server import App
+
+        self.assertEqual(language_of("daten.json"), "json")
+        self.assertTrue(syntax_check("daten.json", '{"name": "Shatu", "ok": true}\n')["ok"])
+        broken = syntax_check("daten.json", '{\n  "name":\n}\n')
+        self.assertFalse(broken["ok"])
+        self.assertIn("Zeile", broken["error"])
+        self.assertEqual(json_problems('{"a": 1}\n'), [])
+        problems = json_problems("{")
+        self.assertEqual(problems[0]["code"], "JSON")
+        self.assertGreaterEqual(problems[0]["line"], 1)
+        outline = json_outline('{\n  "titel": 1,\n  "werte": [1]\n}\n')
+        self.assertEqual([item["name"] for item in outline], ["titel", "werte"])
+        self.assertEqual(outline[0]["line"], 2)
+        pretty = format_json('{"b":1,"a":[true,null]}')
+        self.assertEqual(pretty["tool"], "json")
+        self.assertIn('"a": [\n    true,\n    null\n  ]', pretty["content"])
+        self.assertTrue(pretty["content"].endswith("\n"))
+        with self.assertRaises(RuntimeError):
+            run_argv("daten.json", sys.executable)
+        with tempfile.TemporaryDirectory() as tmp:
+            app = App(tmp)
+            analyzed = app.analyze("{", str(Path(tmp) / "daten.json"))
+            self.assertEqual(analyzed["problems"][0]["code"], "JSON")
+            self.assertEqual(analyzed["outline"], [])
+
     def _wait_line(self, session, line: int, timeout: float = 8):
         import time as time_mod
 

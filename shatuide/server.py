@@ -474,6 +474,13 @@ class App:
         return problems
 
     def analyze(self, source: str, path: str) -> dict:
+        if scripting.language_of(path or "") == "json":
+            return {
+                "ok": True,
+                "problems": scripting.json_problems(source),
+                "outline": scripting.json_outline(source),
+                "todos": [],
+            }
         problems = analysis.lint_source(source, path or "<memory>")
         problems.extend(self.ruff_problems(source, path or "datei.py"))
         return {
@@ -867,7 +874,12 @@ class Handler(BaseHTTPRequestHandler):
             )
             self._json({"ok": True, "items": items})
         elif path == "/api/format":
-            self._json(format_source(str(payload.get("content") or ""), app.python_exe()))
+            content = str(payload.get("content") or "")
+            file_path = str(payload.get("path") or "")
+            if scripting.language_of(file_path) == "json":
+                self._json(scripting.format_json(content))
+            else:
+                self._json(format_source(content, app.python_exe()))
         elif path == "/api/goto":
             project = app.project_sources(400)
             content = str(payload.get("content") or "")
@@ -1104,7 +1116,7 @@ class Handler(BaseHTTPRequestHandler):
         if mode == "project":
             return runner.compile_tree(self.app.workspace)
         path = str(payload.get("path") or "")
-        if mode == "check" or (path and scripting.language_of(path) in {"shell", "powershell", "batch"}):
+        if mode == "check" or (path and scripting.language_of(path) in {"shell", "powershell", "batch", "json"}):
             if mode != "check" and path and scripting.language_of(path) == "python":
                 return runner.compile_file(str(self.app.resolve_any(path)))
             content = payload.get("content")
@@ -1138,6 +1150,8 @@ class Handler(BaseHTTPRequestHandler):
             elif lang == "powershell":
                 session = PowerShellDebugSession()
                 session.start(str(script), str(script.parent), points, bp_file)
+            elif lang == "json":
+                return {"ok": False, "error": "JSON-Dateien haben keinen Debugger. Syntax prüfen nennt die Fehlerzeile."}
             elif lang == "python":
                 session = DebugSession()
                 session.start(self.app.python_exe(), str(script), str(script.parent), points, bp_file)

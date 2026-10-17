@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import subprocess
@@ -12,6 +13,7 @@ from shatuide.runner import run_args
 SHELL_SUFFIXES = {".sh", ".bash", ".ksh", ".zsh"}
 POWERSHELL_SUFFIXES = {".ps1", ".psm1", ".psd1"}
 PYTHON_SUFFIXES = {".py", ".pyw", ".pyi"}
+JSON_SUFFIXES = {".json", ".jsonc"}
 SHELL_NAMES = {".bashrc", ".bash_profile", ".bash_login", ".profile", ".zshrc"}
 
 
@@ -22,6 +24,8 @@ def language_of(path: str) -> str:
         return "python"
     if suffix in SHELL_SUFFIXES or name in SHELL_NAMES:
         return "shell"
+    if suffix in JSON_SUFFIXES:
+        return "json"
     if suffix in POWERSHELL_SUFFIXES:
         return "powershell"
     if suffix in {".bat", ".cmd"}:
@@ -53,6 +57,8 @@ def powershell_binary() -> str | None:
 def run_argv(path: str, python: str, args: list[str] | None = None) -> list[str]:
     extra = [str(item) for item in (args or [])]
     lang = language_of(path)
+    if lang == "json":
+        raise RuntimeError("JSON-Dateien werden geprüft und formatiert, nicht ausgeführt.")
     if lang == "shell":
         binary = shell_binary()
         if not binary:
@@ -76,6 +82,8 @@ def _ps_quote(value: str) -> str:
 
 def syntax_check(path: str, content: str | None = None) -> dict:
     lang = language_of(path)
+    if lang == "json":
+        return _json_syntax(path, content)
     if lang == "shell":
         binary = shell_binary()
         if not binary:
@@ -126,6 +134,75 @@ def syntax_check(path: str, content: str | None = None) -> dict:
     except SyntaxError as exc:
         return {"ok": False, "error": f"Zeile {exc.lineno}: {exc.msg}"}
     return {"ok": True, "message": "Syntax in Ordnung."}
+
+
+def _json_text(path: str, content: str | None) -> str:
+    if content is not None:
+        source = content
+    else:
+        source = Path(path).read_text(encoding="utf-8")
+    if source.startswith("\ufeff"):
+        source = source[1:]
+    return source
+
+
+def _json_syntax(path: str, content: str | None) -> dict:
+    try:
+        source = _json_text(path, content)
+        json.loads(source)
+    except json.JSONDecodeError as exc:
+        return {"ok": False, "error": f"Zeile {exc.lineno}, Spalte {exc.colno}: {exc.msg}"}
+    except OSError as exc:
+        return {"ok": False, "error": str(exc)}
+    return {"ok": True, "message": "JSON in Ordnung."}
+
+
+def json_problems(source: str) -> list[dict]:
+    if not source.strip():
+        return []
+    try:
+        json.loads(source[1:] if source.startswith("\ufeff") else source)
+    except json.JSONDecodeError as exc:
+        line = exc.lineno or 1
+        return [
+            {
+                "line": line,
+                "col": exc.colno or 1,
+                "end_line": line,
+                "end_col": exc.colno or 1,
+                "severity": "error",
+                "message": exc.msg,
+                "code": "JSON",
+            }
+        ]
+    return []
+
+
+def json_outline(source: str) -> list[dict]:
+    try:
+        data = json.loads(source[1:] if source.startswith("\ufeff") else source)
+    except json.JSONDecodeError:
+        return []
+    if not isinstance(data, dict):
+        return []
+    items = []
+    for key in data:
+        needle = json.dumps(key, ensure_ascii=False)
+        pos = source.find(needle)
+        line = source.count("\n", 0, pos) + 1 if pos >= 0 else 1
+        items.append({"name": str(key), "kind": "key", "line": line, "end_line": line, "parent": ""})
+    return items
+
+
+def format_json(content: str) -> dict:
+    try:
+        data = json.loads(content[1:] if content.startswith("\ufeff") else content)
+    except json.JSONDecodeError as exc:
+        return {"ok": False, "error": f"Zeile {exc.lineno}, Spalte {exc.colno}: {exc.msg}"}
+    text = json.dumps(data, indent=2, ensure_ascii=False)
+    if not text.endswith("\n"):
+        text += "\n"
+    return {"ok": True, "content": text, "tool": "json"}
 
 
 def selection_suffix(path: str) -> str:

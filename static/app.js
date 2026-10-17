@@ -197,6 +197,7 @@ function languageOf(path) {
   const ext = name.includes(".") ? name.slice(name.lastIndexOf(".")) : "";
   if ([".py", ".pyw", ".pyi"].includes(ext)) return "python";
   if ([".sh", ".bash", ".zsh", ".ksh"].includes(ext) || [".bashrc", ".bash_profile", ".profile", ".zshrc"].includes(name)) return "shell";
+  if (ext === ".json" || ext === ".jsonc") return "json";
   if ([".ps1", ".psm1", ".psd1"].includes(ext)) return "powershell";
   if ([".bat", ".cmd"].includes(ext)) return "batch";
   if ([".js", ".ts", ".jsx", ".tsx"].includes(ext)) return "js";
@@ -206,7 +207,63 @@ function languageOf(path) {
 
 function highlightSource(src, errorLines, lang) {
   if (lang === "python") return highlightPython(src, errorLines);
+  if (lang === "json") return highlightJson(src, errorLines);
   return highlightSimple(src, errorLines, lang);
+}
+
+function highlightJson(src, errorLines) {
+  let html = "";
+  let lineBuf = "";
+  let line = 1;
+  let i = 0;
+  function pushToken(text, cls) {
+    const parts = text.split("\n");
+    parts.forEach((part, index) => {
+      const chunk = cls ? `<span class="${cls}">${esc(part)}</span>` : esc(part);
+      lineBuf += chunk;
+      if (index < parts.length - 1) {
+        html += errorLines.has(line) ? `<span class="errline">${lineBuf}</span>\n` : lineBuf + "\n";
+        lineBuf = "";
+        line += 1;
+      }
+    });
+  }
+  while (i < src.length) {
+    const ch = src[i];
+    if (ch === '"') {
+      let j = i + 1;
+      while (j < src.length && src[j] !== '"') j += src[j] === "\\" ? 2 : 1;
+      j = Math.min(src.length, j + 1);
+      let k = j;
+      while (k < src.length && /[ \t\r\n]/.test(src[k])) k += 1;
+      pushToken(src.slice(i, j), src[k] === ":" ? "fn" : "str");
+      i = j;
+      continue;
+    }
+    if (ch === "-" || /[0-9]/.test(ch)) {
+      const match = src.slice(i).match(/^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?/);
+      if (match && match[0] !== "-") {
+        pushToken(match[0], "num");
+        i += match[0].length;
+        continue;
+      }
+    }
+    const word = src.slice(i).match(/^(?:true|false|null)(?![A-Za-z0-9_])/);
+    if (word) {
+      pushToken(word[0], "kw");
+      i += word[0].length;
+      continue;
+    }
+    if ("{}[]:,".includes(ch)) {
+      pushToken(ch, "op");
+      i += 1;
+      continue;
+    }
+    pushToken(ch, "");
+    i += 1;
+  }
+  html += errorLines.has(line) ? `<span class="errline">${lineBuf}</span>` : lineBuf;
+  return html;
 }
 
 function highlightSimple(src, errorLines, lang) {
@@ -1136,7 +1193,7 @@ async function runTests(framework, coverage) {
 async function formatCurrent() {
   const current = tab();
   if (!current) return;
-  const data = await api("/api/format", { content: current.content });
+  const data = await api("/api/format", { content: current.content, path: current.path });
   current.content = data.content;
   current.dirty = true;
   renderEditor();
@@ -1480,6 +1537,7 @@ function lineIndexes(text, start, end) {
 
 function commentMark(path) {
   const lang = languageOf(path);
+  if (lang === "json") return null;
   if (lang === "js") return { line: "//" };
   if (lang === "sql") return { line: "--" };
   if (lang === "batch") return { line: "REM" };
@@ -1493,7 +1551,9 @@ function toggleComment() {
   const text = area.value;
   const { bounds, startLine, endLine } = lineIndexes(text, area.selectionStart, area.selectionEnd);
   const lines = text.split("\n");
-  const mark = commentMark(current.path).line;
+  const spec = commentMark(current.path);
+  if (!spec) return toast("JSON-Kommentare sind kein gültiges JSON.");
+  const mark = spec.line;
   const body = lines.slice(startLine, endLine + 1);
   const commented = body.every((line) => !line.trim() || new RegExp("^\\s*" + mark.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\s?").test(line));
   const next = body.map((line) => {
@@ -2113,7 +2173,7 @@ async function openFileDialog(start) {
   list.className = "browse-list";
   list.id = "browse-list";
   const filter = document.createElement("input");
-  filter.placeholder = "Name filtern, zum Beispiel .py oder .sh";
+  filter.placeholder = "Name filtern, zum Beispiel .py, .json oder .sh";
   body.appendChild(pathInput);
   body.appendChild(filter);
   body.appendChild(list);
