@@ -1,0 +1,2 @@
+GET https://pypi.org/pypi/pip/json
+Accept: application/json

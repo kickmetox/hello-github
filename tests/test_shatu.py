@@ -1,0 +1,278 @@
+"""Prüfungen für Analyse, Refactoring, Debugger und die lokale API."""
+
+from __future__ import annotations
+
+import json
+import os
+import sys
+import tempfile
+import threading
+import unittest
+import urllib.error
+import urllib.parse
+import urllib.request
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+
+from shatuide import analysis, ai, history, http_client, notebook, refactor, tools
+from shatuide.debug_session import DebugSession
+from shatuide.formatter import fallback_format
+from shatuide.icon_util import crop_center_square, decode_png, encode_png, generated_icon_png
+from shatuide.kernel_worker import main as kernel_main  # noqa: F401  (Importpfad)
+from shatuide.runner import compile_file
+from shatuide.server import KernelSession, create_server
+
+
+class AnalysisTests(unittest.TestCase):
+    def test_syntax_error(self) -> None:
+        problems = analysis.lint_source("def f(\n")
+        self.assertTrue(any(item["severity"] == "error" for item in problems))
+
+    def test_unused_import_and_types(self) -> None:
+        source = "import sys\nimport os\n\ndef add(x: int) -> int:\n    return 'nein'\n\nn: int = 'abc'\nprint(os.name)\n"
+        problems = analysis.lint_source(source)
+        codes = {item["code"] for item in problems}
+        self.assertIn("F401", codes)
+        self.assertIn("TYPE", codes)
+        self.assertTrue(any("sys" in item["message"] for item in problems))
+
+    def test_undefined_name(self) -> None:
+        problems = analysis.lint_source("def f():\n    return fehlt\n")
+        self.assertTrue(any(item["code"] == "F821" for item in problems))
+
+    def test_defined_name_is_clean(self) -> None:
+        source = "def f(wert: int) -> int:\n    return wert\n"
+        codes = {item["code"] for item in analysis.lint_source(source)}
+        self.assertNotIn("F821", codes)
+        self.assertNotIn("TYPE", codes)
+
+    def test_outline_and_todo(self) -> None:
+        source = "class Kiste:\n    def offen(self):\n        pass\n\n# TODO: Deckel\n"
+        items = analysis.outline(source)
+        self.assertEqual([item["name"] for item in items], ["Kiste", "offen"])
+        todos = analysis.todos_in_source(source, "a.py")
+        self.assertEqual(todos[0]["tag"], "TODO")
+
+    def test_goto_and_external(self) -> None:
+        source = "import pathlib\n\ndef f():\n    return pathlib.Path\n"
+        hits = analysis.goto_definition(source, 1, 8, {}, "a.py")
+        self.assertTrue(hits)
+        origin = analysis.external_file(source, "pathlib")
+        self.assertTrue(origin and origin.endswith(".py"))
+
+    def test_duplicates(self) -> None:
+        block = "\n".join(f"wert_{i} = {i} * 2 + 3" for i in range(8))
+        groups = analysis.duplicates({"a.py": block, "b.py": block})
+        self.assertTrue(groups)
+        self.assertGreaterEqual(groups[0]["count"], 2)
+
+
+class RefactorTests(unittest.TestCase):
+    def test_rename_skips_strings(self) -> None:
+        source = 'def add(x):\n    return x\nprint("add")\n'
+        result = refactor.rename_source(source, "add", "plus")
+        self.assertTrue(result["ok"])
+        self.assertIn("def plus", result["content"])
+        self.assertIn('"add"', result["content"])
+        self.assertEqual(result["count"], 1)
+
+    def test_extract(self) -> None:
+        source = "x = 1\ny = x + 2\nprint(y)\n"
+        result = refactor.extract_method(source, 1, 2, "rechnen")
+        self.assertTrue(result["ok"], result)
+        self.assertIn("def rechnen", result["content"])
+
+    def test_format_fallback(self) -> None:
+        self.assertEqual(fallback_format("a = 1   \n"), "a = 1\n")
+
+
+class ToolTests(unittest.TestCase):
+    def test_pick_asset(self) -> None:
+        names = [
+            "cpython-3.11.0+20260101-x86_64-unknown-linux-gnu-install_only.tar.gz",
+            "cpython-3.12.1+20260101-x86_64_v3-unknown-linux-gnu-install_only.tar.gz",
+            "cpython-3.12.8+20260101-x86_64-unknown-linux-gnu-install_only.tar.gz",
+            "cpython-3.16.0a1+20260101-x86_64-unknown-linux-gnu-install_only.tar.gz",
+            "cpython-3.13.1+20260101-x86_64-pc-windows-msvc-install_only.tar.gz",
+        ]
+        assets = [{"name": name, "browser_download_url": "https://example.invalid/" + name} for name in names]
+        picked = tools.pick_asset(assets, "x86_64-unknown-linux-gnu")
+        self.assertIsNotNone(picked)
+        assert picked is not None
+        self.assertIn("3.12.8", picked["name"])
+
+    def test_package_validation(self) -> None:
+        self.assertEqual(tools.validate_package("pandas>=2"), "pandas>=2")
+        self.assertIsNone(tools.validate_package("pandas; rm -rf /"))
+
+    def test_icon_center_crop(self) -> None:
+        width, height = 30, 10
+        rows = []
+        for y in range(height):
+            row = bytearray()
+            for x in range(width):
+                color = (255, 0, 0, 255) if x == 15 and y == 5 else (0, 0, 255, 255)
+                row.extend(color)
+            rows.append(bytes(row))
+        decoded = decode_png(encode_png(width, height, rows))
+        self.assertIsNotNone(decoded)
+        assert decoded is not None
+        cropped = decode_png(crop_center_square(*decoded, out_size=8))
+        self.assertIsNotNone(cropped)
+        assert cropped is not None
+        side_w, side_h, rgba = cropped
+        self.assertEqual((side_w, side_h), (8, 8))
+        center = ((4 * side_w) + 4) * 4
+        self.assertGreater(rgba[center], 200)
+        self.assertLess(rgba[center + 2], 40)
+        self.assertTrue(generated_icon_png().startswith(b"\x89PNG"))
+
+
+class HistoryHttpNotebookTests(unittest.TestCase):
+    def test_history_roundtrip(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            history.snapshot(root, "a.py", "eins\n")
+            history.snapshot(root, "a.py", "zwei\n")
+            items = history.list_snapshots(root, "a.py")
+            self.assertEqual(len(items), 2)
+            self.assertIn("eins", history.read_snapshot(root, "a.py", items[1]["id"]))
+
+    def test_http_file(self) -> None:
+        parsed = http_client.parse_http_file("POST https://example.test/graphql\nContent-Type: application/json\n\n{\"query\": \"{ a }\"}\n")
+        self.assertTrue(parsed["ok"])
+        self.assertEqual(parsed["method"], "POST")
+        self.assertIn("query", parsed["body"])
+
+    def test_notebook(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "n.ipynb"
+            notebook.save_notebook(path, [{"type": "code", "source": "print(1)\n"}])
+            loaded = notebook.load_notebook(path)
+            self.assertEqual(loaded["cells"][0]["source"], "print(1)\n")
+
+    def test_agent_parser(self) -> None:
+        parsed = ai.parse_agent_message('```json\n{"done": true, "message": "fertig"}\n```')
+        self.assertTrue(parsed["ok"])
+        self.assertTrue(parsed["done"])
+        self.assertTrue(ai.extract_code("```python\nprint(1)\n```").startswith("print(1)"))
+
+
+class RuntimeTests(unittest.TestCase):
+    def test_compile_and_debug(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            script = Path(tmp) / "t.py"
+            script.write_text("x = 1\ny = x + 41\nprint(y)\n", encoding="utf-8")
+            compiled = compile_file(str(script))
+            self.assertTrue(compiled["ok"], compiled)
+            session = DebugSession()
+            try:
+                session.start(
+                    sys.executable,
+                    str(script),
+                    tmp,
+                    [{"file": str(script.resolve()), "line": 2}],
+                    Path(tmp) / "bp.json",
+                )
+                event = session.wait_event("stopped", timeout=8)
+                self.assertEqual(event["line"], 2)
+                self.assertIn("x", event["locals"])
+                session.command({"cmd": "continue"})
+                session.wait_event("terminated", timeout=8)
+            finally:
+                session.close()
+
+    def test_kernel(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            kernel = KernelSession(sys.executable, tmp, Path(tmp) / "plots")
+            try:
+                result = kernel.execute("1 + 41")
+                self.assertEqual(result.get("result"), "42", result)
+                assigned = kernel.execute("wert = [1, 2, 3]\nwert")
+                self.assertFalse(assigned.get("error"))
+                names = {item["name"] for item in assigned.get("variables", [])}
+                self.assertIn("wert", names)
+            finally:
+                kernel.close()
+
+
+class ApiTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.tmp = tempfile.TemporaryDirectory()
+        self.httpd, self.app = create_server("127.0.0.1", 0, self.tmp.name)
+        self.thread = threading.Thread(target=self.httpd.serve_forever, daemon=True)
+        self.thread.start()
+        host, port = self.httpd.server_address[:2]
+        self.base = f"http://{host}:{port}"
+
+    def tearDown(self) -> None:
+        self.httpd.shutdown()
+        self.httpd.server_close()
+        self.tmp.cleanup()
+
+    def request(self, path: str, payload: dict | None = None, method: str | None = None) -> dict:
+        data = None if payload is None else json.dumps(payload).encode("utf-8")
+        req = urllib.request.Request(self.base + path, data=data, method=method or ("POST" if payload is not None else "GET"))
+        req.add_header("X-Shatu-Token", self.app.token)
+        req.add_header("Host", "127.0.0.1")
+        if payload is not None:
+            req.add_header("Content-Type", "application/json")
+        with urllib.request.urlopen(req, timeout=20) as response:
+            body = response.read()
+            content_type = response.headers.get("Content-Type", "")
+        if "json" not in content_type:
+            return {"raw": body}
+        return json.loads(body.decode("utf-8"))
+
+    def test_page_icon_and_run(self) -> None:
+        page = urllib.request.urlopen(self.base + "/", timeout=10)
+        html = page.read().decode("utf-8")
+        self.assertIn("ShatuIDE", html)
+        self.assertIn("shatu_session=", page.headers.get("Set-Cookie", ""))
+        icon = self.request("/api/icon")
+        self.assertTrue(icon["raw"].startswith(b"\x89PNG"))
+        script = Path(self.tmp.name) / "hallo.py"
+        written = self.request("/api/file", {"path": str(script), "content": "print(12345)\n"})
+        self.assertTrue(written["ok"])
+        read = self.request("/api/file?path=" + urllib.parse.quote(str(script)))
+        self.assertIn("12345", read["content"])
+        outside = Path(self.tmp.name).parent / ("shatu-ausserhalb-" + os.path.basename(self.tmp.name))
+        outside_req = self._raw_post("/api/file", {"path": str(outside), "content": "nein"})
+        self.assertEqual(outside_req.status, 403)
+        started = self.request("/api/run", {"mode": "file", "path": str(script)})
+        seen = ""
+        code = None
+        for _ in range(40):
+            state = self.request(f"/api/session?id={started['id']}&from=0")
+            seen = "".join(state["lines"])
+            if not state["running"]:
+                code = state["code"]
+                break
+            import time
+            time.sleep(0.1)
+        self.assertEqual(code, 0)
+        self.assertIn("12345", seen)
+        analyzed = self.request("/api/analyze", {"path": str(script), "content": "import sys\nprint(sys.version)\n"})
+        self.assertTrue(analyzed["ok"])
+        renamed = self.request("/api/rename", {"content": "def add(x):\n    return add(x)\n", "old": "add", "new": "plus"})
+        self.assertIn("def plus", renamed["content"])
+
+    def _raw_post(self, path: str, payload: dict):
+        req = urllib.request.Request(
+            self.base + path,
+            data=json.dumps(payload).encode("utf-8"),
+            method="POST",
+        )
+        req.add_header("X-Shatu-Token", self.app.token)
+        req.add_header("Content-Type", "application/json")
+        try:
+            with urllib.request.urlopen(req, timeout=10) as response:
+                return response
+        except urllib.error.HTTPError as exc:
+            return exc
+
+
+if __name__ == "__main__":
+    unittest.main()

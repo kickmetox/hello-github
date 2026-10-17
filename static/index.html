@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ShatuIDE</title>
+  <link rel="icon" href="/api/icon">
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+  <div id="app">
+    <header id="top">
+      <img id="logo" src="/api/icon" alt="ShatuIDE">
+      <div id="menubar"></div>
+      <div id="brand">ShatuIDE</div>
+    </header>
+    <div id="toolbar">
+      <button type="button" id="btn-run" title="Ausführen (Strg+F5)">Ausführen</button>
+      <button type="button" id="btn-debug" title="Debuggen (F5)">Debug</button>
+      <button type="button" id="btn-stop" title="Stopp (Umschalt+F5)">Stopp</button>
+      <button type="button" id="btn-format" title="Formatieren">Format</button>
+      <label>Python <select id="py-select"></select></label>
+      <span id="ws-label"></span>
+    </div>
+    <div id="body">
+      <aside id="left">
+        <div class="side-tabs">
+          <button type="button" data-side="tree" class="on">Explorer</button>
+          <button type="button" data-side="outline">Gliederung</button>
+        </div>
+        <div id="tree" class="side-pane"></div>
+        <div id="outline" class="side-pane hidden"></div>
+      </aside>
+      <div id="left-resizer" class="resizer"></div>
+      <section id="center">
+        <div id="tabs"></div>
+        <div id="editor-row">
+          <div id="gutter"></div>
+          <div id="editor">
+            <pre id="highlight" aria-hidden="true"></pre>
+            <textarea id="code" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off" wrap="off"></textarea>
+          </div>
+        </div>
+      </section>
+      <div id="right-resizer" class="resizer"></div>
+      <aside id="right">
+        <div class="side-tabs"><span>KI</span></div>
+        <div id="ai-log"></div>
+        <textarea id="ai-input" placeholder="@datei @ordner @terminal @git  – Frage oder Agenten-Auftrag"></textarea>
+        <div class="ai-actions">
+          <button type="button" id="ai-send">Senden</button>
+          <button type="button" id="ai-agent">Agent</button>
+          <button type="button" id="ai-inline">Inline</button>
+        </div>
+      </aside>
+    </div>
+    <div id="bottom-resizer" class="resizer horizontal"></div>
+    <section id="bottom">
+      <div id="bottom-tabs"></div>
+      <div id="panel"></div>
+    </section>
+    <footer id="status">
+      <span id="st-pos">Zeile 1, Spalte 1</span>
+      <span id="st-mode">Bereit</span>
+      <span id="st-py"></span>
+    </footer>
+  </div>
+  <div id="popup" class="hidden"></div>
+  <div id="modal" class="hidden"></div>
+  <script src="/static/app.js"></script>
+</body>
+</html>
