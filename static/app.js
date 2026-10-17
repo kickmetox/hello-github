@@ -20,6 +20,7 @@ const S = {
   terminalFrom: 0,
   coverage: {},
   watches: [],
+  clip: "",
 };
 
 const BOTTOM = [
@@ -252,7 +253,7 @@ function cursorPos() {
 function updateStatus(extra) {
   const pos = cursorPos();
   $("st-pos").textContent = `Zeile ${pos.line}, Spalte ${pos.col + 1}`;
-  if (extra) $("st-mode").textContent = extra;
+  if (extra) $("st-mode").textContent = extra + (tab() && tab().writable === false ? " · nur lesen" : "");
   $("st-py").textContent = S.python || "";
 }
 
@@ -275,7 +276,15 @@ async function openPath(path, line) {
       toast("Binärdatei");
       return;
     }
-    S.tabs.push({ path: data.path, content: data.content, saved: data.content, dirty: false, problems: [], outline: [] });
+    S.tabs.push({
+      path: data.path,
+      content: data.content,
+      saved: data.content,
+      dirty: false,
+      writable: data.writable !== false,
+      problems: [],
+      outline: [],
+    });
     activate(S.tabs.length - 1);
   }
   if (line) revealLine(line);
@@ -296,6 +305,10 @@ function revealLine(line) {
 async function saveTab() {
   const current = tab();
   if (!current) return;
+  if (current.writable === false) {
+    toast("Außerhalb des Workspace nur lesbar");
+    return;
+  }
   unfoldAll();
   await api("/api/file", { path: current.path, content: current.content });
   current.saved = current.content;
@@ -1303,12 +1316,18 @@ async function loadPythons() {
 function buildMenus() {
   const menus = [
     ["Datei", [
+      ["Öffnen…", () => openFileDialog()],
+      ["Datei laden…", loadPickedFiles],
       ["Neue Datei", newFile],
       ["Ordner öffnen…", openFolder],
       ["Speichern", saveTab, "Strg+S"],
       ["Alles speichern", saveTab],
     ]],
     ["Bearbeiten", [
+      ["Ausschneiden", cutSelection, "Strg+X"],
+      ["Kopieren", () => copySelection(false), "Strg+C"],
+      ["Bereich kopieren…", copyRange],
+      ["Einfügen", pasteClip, "Strg+V"],
       ["Formatieren", formatCurrent, "Umschalt+Alt+F"],
       ["Snippet einfügen", pickSnippet],
       ["Falten", () => foldAt(cursorPos().line)],
@@ -1368,6 +1387,9 @@ function buildMenus() {
       ["Mit KI reparieren", fixWithAi],
       ["Live-Sitzung", startCollab],
     ]],
+    ["Fenster", [
+      ["Zweites Fenster", secondWindow],
+    ]],
     ["Hilfe", [
       ["Tastatur", showKeys],
       ["Über ShatuIDE", about],
@@ -1399,6 +1421,174 @@ function buildMenus() {
     bar.appendChild(wrap);
   });
   document.addEventListener("click", () => document.querySelectorAll(".menu").forEach((menu) => menu.classList.remove("open")));
+}
+
+function copyText(text) {
+  S.clip = text;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).catch(() => {});
+  }
+  toast("Kopiert (" + text.length + " Zeichen)");
+}
+
+function copySelection(lineIfEmpty) {
+  const current = tab();
+  if (!current) return;
+  const area = codeEl();
+  let text = area.value.slice(area.selectionStart, area.selectionEnd);
+  if (!text && lineIfEmpty !== false) {
+    const lines = area.value.split("\n");
+    text = lines[cursorPos().line - 1] || "";
+  }
+  if (!text) return toast("Nichts markiert");
+  copyText(text);
+}
+
+function cutSelection() {
+  const current = tab();
+  if (!current) return;
+  if (current.writable === false) return toast("Nur lesen");
+  const area = codeEl();
+  let start = area.selectionStart;
+  let end = area.selectionEnd;
+  if (start === end) {
+    const lines = area.value.split("\n");
+    const line = cursorPos().line;
+    let offset = 0;
+    for (let index = 0; index < line - 1; index += 1) offset += lines[index].length + 1;
+    start = offset;
+    end = offset + lines[line - 1].length;
+    if (line < lines.length) end += 1;
+  }
+  const text = area.value.slice(start, end);
+  if (!text) return toast("Nichts markiert");
+  copyText(text);
+  area.selectionStart = start;
+  area.selectionEnd = end;
+  replaceSelection("");
+}
+
+function readClipboard() {
+  if (!navigator.clipboard || !navigator.clipboard.readText) return Promise.resolve("");
+  return Promise.race([
+    navigator.clipboard.readText().catch(() => ""),
+    new Promise((resolve) => setTimeout(() => resolve(""), 400)),
+  ]);
+}
+
+async function pasteClip() {
+  const current = tab();
+  if (!current) return;
+  if (current.writable === false) return toast("Nur lesen");
+  const remote = await readClipboard();
+  const text = remote || S.clip || "";
+  if (!text) return toast("Zwischenablage leer");
+  replaceSelection(text);
+}
+
+function copyRange() {
+  const current = tab();
+  if (!current) return;
+  const body = document.createElement("div");
+  const from = document.createElement("input");
+  from.type = "number";
+  from.min = "1";
+  from.value = String(cursorPos().line);
+  const to = document.createElement("input");
+  to.type = "number";
+  to.min = "1";
+  to.value = from.value;
+  aiField(body, "Von Zeile", from);
+  aiField(body, "Bis Zeile", to);
+  modal("Bereich kopieren", body, [
+    { label: "Abbrechen", run: () => {} },
+    { label: "Kopieren", run: () => {
+      const lines = current.content.split("\n");
+      const start = Math.max(1, Number(from.value) || 1);
+      const end = Math.min(lines.length, Math.max(start, Number(to.value) || start));
+      copyText(lines.slice(start - 1, end).join("\n"));
+    } },
+  ]);
+}
+
+function secondWindow() {
+  const opened = window.open(location.href, "shatu-" + Date.now(), "popup=yes,width=1280,height=860,left=80,top=40");
+  if (!opened) toast("Zweites Fenster wurde blockiert");
+}
+
+function loadPickedFiles() {
+  const input = document.createElement("input");
+  input.type = "file";
+  input.multiple = true;
+  input.onchange = async () => {
+    for (const file of input.files || []) {
+      if (file.size > 2000000) {
+        toast(file.name + " ist zu groß");
+        continue;
+      }
+      const text = await file.text();
+      if (text.includes("\0")) {
+        toast(file.name + " ist binär");
+        continue;
+      }
+      S.tabs.push({ path: file.name, content: text, saved: "", dirty: true, writable: true, problems: [], outline: [] });
+      activate(S.tabs.length - 1);
+    }
+    toast("Geladen, Speichern schreibt in den Workspace");
+  };
+  input.click();
+}
+
+async function openFileDialog(start) {
+  const body = document.createElement("div");
+  const pathInput = document.createElement("input");
+  pathInput.id = "browse-path";
+  const list = document.createElement("div");
+  list.className = "browse-list";
+  list.id = "browse-list";
+  const filter = document.createElement("input");
+  filter.placeholder = "Name filtern, zum Beispiel .py oder .sh";
+  body.appendChild(pathInput);
+  body.appendChild(filter);
+  body.appendChild(list);
+  let current = "";
+  let ticket = 0;
+  async function load(path) {
+    const id = ++ticket;
+    const data = await apiGet("/api/browse?path=" + encodeURIComponent(path || ""));
+    if (id !== ticket) return;
+    current = data.path;
+    pathInput.value = data.path;
+    list.replaceChildren();
+    function row(label, action, className) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = className || "";
+      button.textContent = label;
+      button.onclick = action;
+      list.appendChild(button);
+    }
+    row("Workspace", () => load(data.workspace).catch((err) => toast(err.message)));
+    row("Home", () => load(data.home).catch((err) => toast(err.message)));
+    if (data.parent) row("..", () => load(data.parent).catch((err) => toast(err.message)), "dir");
+    const needle = filter.value.trim().toLowerCase();
+    data.entries.forEach((entry) => {
+      if (needle && !entry.name.toLowerCase().includes(needle)) return;
+      row((entry.dir ? "▸ " : "") + entry.name, () => {
+        if (entry.dir) load(entry.path).catch((err) => toast(err.message));
+        else {
+          $("modal").classList.add("hidden");
+          openPath(entry.path).catch((err) => toast(err.message));
+        }
+      }, entry.dir ? "dir" : "");
+    });
+  }
+  pathInput.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") load(pathInput.value).catch((err) => toast(err.message));
+  });
+  filter.addEventListener("input", () => load(current || pathInput.value).catch(() => {}));
+  modal("Datei öffnen", body, [{ label: "Schließen", run: () => {} }]);
+  await load(start || S.workspace || "");
 }
 
 function newFile() {
@@ -1801,7 +1991,7 @@ async function startCollab() {
 
 function showKeys() {
   const body = document.createElement("pre");
-  body.textContent = "Strg+S Speichern\nStrg+F5 Ausführen\nF5 Debug/Weiter\nF9 Haltepunkt\nF10 Schritt über\nF11 Schritt hinein\nF12 Definition\nStrg+K Inline-KI\nStrg+Eingabe Prompt senden\nStrg+Leertaste Vervollständigen\nStrg+Umschalt+F Suche";
+  body.textContent = "Strg+S Speichern\nStrg+X Ausschneiden\nStrg+C Kopieren\nStrg+V Einfügen\nStrg+F5 Ausführen\nF5 Debug/Weiter\nF9 Haltepunkt\nF10 Schritt über\nF11 Schritt hinein\nF12 Definition\nStrg+K Inline-KI\nStrg+Eingabe Prompt senden\nStrg+Leertaste Vervollständigen\nStrg+Umschalt+F Suche";
   modal("Tastatur", body, [{ label: "Schließen", run: () => {} }]);
 }
 

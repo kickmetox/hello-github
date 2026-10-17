@@ -94,6 +94,9 @@ button:hover, button.on { border-color: var(--amber); color: var(--amber-2); }
 #ai-connect-result { white-space: pre-wrap; max-height: 180px; overflow: auto; margin-top: 8px; }
 .resizer { width: 4px; cursor: col-resize; background: #141311; }
 .resizer.horizontal { height: 4px; width: auto; cursor: row-resize; }
+.browse-list { max-height: 360px; overflow: auto; margin-top: 8px; border: 1px solid var(--line); }
+.browse-list button { display: block; width: 100%; text-align: left; background: transparent; border: 0; border-radius: 0; }
+.browse-list button.dir { color: var(--amber-2); }
 #popup { position: fixed; z-index: 30; background: var(--panel); border: 1px solid var(--amber); min-width: 220px; max-height: 220px; overflow: auto; }
 #popup button { display: block; width: 100%; text-align: left; border: 0; background: transparent; }
 #popup button.on { background: #3a3126; }

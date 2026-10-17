@@ -315,16 +315,54 @@ class App:
             entries.append({"name": child.name, "path": str(child), "dir": child.is_dir()})
         return {"ok": True, "path": str(folder), "entries": entries}
 
+    def browse(self, path: str) -> dict:
+        folder = self.resolve_any(path) if path else Path(self.workspace).resolve()
+        if not folder.exists():
+            return {"ok": False, "error": "Pfad nicht gefunden."}
+        if not folder.is_dir():
+            return {"ok": False, "error": "Kein Ordner."}
+        parent = "" if folder.parent == folder else str(folder.parent)
+        entries = []
+        try:
+            children = sorted(folder.iterdir(), key=lambda item: (not item.is_dir(), item.name.lower()))
+        except OSError as exc:
+            return {"ok": False, "error": str(exc)}
+        for child in children:
+            if child.name in SKIP_DIRS:
+                continue
+            try:
+                is_dir = child.is_dir()
+            except OSError:
+                continue
+            entries.append({"name": child.name, "path": str(child), "dir": is_dir})
+            if len(entries) >= 800:
+                break
+        return {
+            "ok": True,
+            "path": str(folder),
+            "parent": parent,
+            "workspace": self.workspace,
+            "home": str(Path.home()),
+            "entries": entries,
+        }
+
     def read_file(self, path: str) -> dict:
         target = self.resolve_any(path)
         if not target.is_file():
             return {"ok": False, "error": "Datei nicht gefunden."}
         if target.stat().st_size > 20_000_000:
             return {"ok": False, "error": "Datei ist größer als 20 MB."}
+        writable = inside(Path(self.workspace), target)
         data = target.read_bytes()
         if b"\x00" in data[:1024]:
-            return {"ok": True, "path": str(target), "binary": True, "content": ""}
-        return {"ok": True, "path": str(target), "binary": False, "content": data.decode("utf-8", "replace")}
+            return {"ok": True, "path": str(target), "binary": True, "content": "", "writable": writable}
+        return {
+            "ok": True,
+            "path": str(target),
+            "binary": False,
+            "content": data.decode("utf-8", "replace"),
+            "writable": writable,
+        }
 
     def write_file(self, path: str, content: str) -> dict:
         target = self.resolve_write(path)
@@ -740,6 +778,8 @@ class Handler(BaseHTTPRequestHandler):
             self._json(app.state())
         elif path == "/api/tree":
             self._json(app.list_tree(self._q(query, "path")))
+        elif path == "/api/browse":
+            self._json(app.browse(self._q(query, "path")))
         elif path == "/api/file":
             self._json(app.read_file(self._q(query, "path")))
         elif path == "/api/snippets":

@@ -231,6 +231,30 @@ class ApiTests(unittest.TestCase):
             return {"raw": body}
         return json.loads(body.decode("utf-8"))
 
+    def test_browse_existing_files(self) -> None:
+        folder = Path(self.tmp.name)
+        (folder / "skript.py").write_text("print(1)\n", encoding="utf-8")
+        (folder / "tool.sh").write_text("echo hi\n", encoding="utf-8")
+        (folder / "daten.txt").write_text("hallo\n", encoding="utf-8")
+        listed = self.request("/api/browse?path=" + urllib.parse.quote(str(folder)))
+        names = {entry["name"] for entry in listed["entries"]}
+        self.assertTrue({"skript.py", "tool.sh", "daten.txt"} <= names)
+        self.assertEqual(listed["parent"], str(folder.resolve().parent))
+        inside = self.request("/api/file?path=" + urllib.parse.quote(str(folder / "skript.py")))
+        self.assertTrue(inside["writable"])
+        other = Path(tempfile.mkdtemp())
+        try:
+            script = other / "fremd.py"
+            script.write_text("wert = 7\n", encoding="utf-8")
+            read = self.request("/api/file?path=" + urllib.parse.quote(str(script)))
+            self.assertFalse(read["writable"])
+            self.assertIn("wert = 7", read["content"])
+        finally:
+            script = other / "fremd.py"
+            if script.exists():
+                script.unlink()
+            other.rmdir()
+
     def test_page_icon_and_run(self) -> None:
         page = urllib.request.urlopen(self.base + "/", timeout=10)
         html = page.read().decode("utf-8")

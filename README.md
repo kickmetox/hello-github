@@ -12,6 +12,8 @@ python3 shatuide.py
 
 Unter Windows: `ShatuIDE.bat` oder `py -3 shatuide.py`.
 
+**Datei → Öffnen** lädt vorhandene Python-Skripte und andere Textdateien aus dem Workspace, aus darüberliegenden Ordnern oder vom Home-Verzeichnis. Dateien außerhalb des Workspace sind nur lesbar. **Datei laden** übernimmt Dateien aus der Dateiauswahl; Speichern schreibt sie in den Workspace. **Bearbeiten** schneidet aus, kopiert die Markierung oder einen Zeilenbereich und fügt ein. **Fenster → Zweites Fenster** öffnet eine weitere IDE-Ansicht.
+
 Installation in das Zielverzeichnis, ohne vorhandene Icons zu überschreiben:
 
 ```bash
