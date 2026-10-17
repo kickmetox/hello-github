@@ -535,11 +535,15 @@ class App:
         steps = []
         for step in range(12):
             log(f"Schritt {step + 1}")
+            system = ai.AGENT_SYSTEM
+            extra = str(cfg.get("system_prompt") or "").strip()
+            if extra:
+                system += "\n\nZusätzliche Anweisung:\n" + extra
             reply = ai.chat_completion(
                 str(cfg.get("base_url") or ""),
                 str(cfg.get("api_key") or ""),
                 str(cfg.get("model") or "llama3.1"),
-                ai.build_messages(ai.AGENT_SYSTEM, messages),
+                ai.build_messages(system, messages),
                 timeout=120,
             )
             if not reply.get("ok"):
@@ -919,6 +923,8 @@ class Handler(BaseHTTPRequestHandler):
             self._json(self._http(payload))
         elif path == "/api/ai/config":
             self._json(self._save_ai(payload))
+        elif path == "/api/ai/models":
+            self._json(self._list_models(payload))
         elif path == "/api/ai/chat":
             self._json(self._chat(payload))
         elif path == "/api/ai/inline":
@@ -1231,17 +1237,41 @@ class Handler(BaseHTTPRequestHandler):
             result["body"] = http_client.pretty_body(result["body"])
         return result
 
+    def _ai_key(self, payload: dict, cfg: dict) -> str:
+        key = payload.get("api_key")
+        if isinstance(key, str) and key and not set(key) <= {"•"}:
+            return key
+        return str(cfg.get("api_key") or "")
+
+    def _list_models(self, payload: dict) -> dict:
+        cfg = config.load()
+        base = str(payload.get("base_url") or cfg.get("base_url") or "").strip()
+        return ai.list_models(base, self._ai_key(payload, cfg))
+
     def _save_ai(self, payload: dict) -> dict:
         cfg = config.load()
         if "base_url" in payload:
             cfg["base_url"] = str(payload.get("base_url") or "").strip()
         if "model" in payload:
             cfg["model"] = str(payload.get("model") or "").strip() or "llama3.1"
+        if "system_prompt" in payload:
+            cfg["system_prompt"] = str(payload.get("system_prompt") or "")
         key = payload.get("api_key")
         if isinstance(key, str) and key and not set(key) <= {"•"}:
             cfg["api_key"] = key
         config.save(cfg)
-        return {"ok": True, **config.public_view(cfg)}
+        result = {"ok": True, **config.public_view(cfg)}
+        prompt = str(payload.get("prompt") or "").strip()
+        if prompt:
+            result["reply"] = self._chat(
+                {
+                    "messages": [{"role": "user", "content": prompt}],
+                    "text": prompt,
+                    "path": str(payload.get("path") or ""),
+                    "content": str(payload.get("content") or ""),
+                }
+            )
+        return result
 
     def _chat(self, payload: dict) -> dict:
         cfg = config.load()
@@ -1251,7 +1281,8 @@ class Handler(BaseHTTPRequestHandler):
             str(payload.get("path") or ""),
             str(payload.get("content") or ""),
         )
-        messages = ai.build_messages(ai.CHAT_SYSTEM, history_items, context)
+        system = ai.resolve_system_prompt(str(cfg.get("system_prompt") or ""))
+        messages = ai.build_messages(system, history_items, context)
         return ai.chat_completion(
             str(cfg.get("base_url") or ""),
             str(cfg.get("api_key") or ""),
@@ -1268,11 +1299,12 @@ class Handler(BaseHTTPRequestHandler):
             "Gib nur den neuen Code in einem python-Fence zurück.\n\n"
             f"Anweisung: {instruction}\n\nCode:\n```python\n{selection}\n```"
         )
+        system = ai.resolve_system_prompt(str(cfg.get("system_prompt") or ""))
         reply = ai.chat_completion(
             str(cfg.get("base_url") or ""),
             str(cfg.get("api_key") or ""),
             str(cfg.get("model") or "llama3.1"),
-            ai.build_messages(ai.CHAT_SYSTEM, [{"role": "user", "content": prompt}]),
+            ai.build_messages(system, [{"role": "user", "content": prompt}]),
         )
         if not reply.get("ok"):
             return reply
@@ -1286,11 +1318,12 @@ class Handler(BaseHTTPRequestHandler):
             f"Traceback:\n{str(payload.get('traceback') or '')[:8000]}\n\n"
             f"Code:\n```python\n{str(payload.get('content') or '')[:20000]}\n```"
         )
+        system = ai.resolve_system_prompt(str(cfg.get("system_prompt") or ""))
         reply = ai.chat_completion(
             str(cfg.get("base_url") or ""),
             str(cfg.get("api_key") or ""),
             str(cfg.get("model") or "llama3.1"),
-            ai.build_messages(ai.CHAT_SYSTEM, [{"role": "user", "content": prompt}]),
+            ai.build_messages(system, [{"role": "user", "content": prompt}]),
         )
         if not reply.get("ok"):
             return reply

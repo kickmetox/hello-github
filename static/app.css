@@ -88,8 +88,10 @@ button:hover, button.on { border-color: var(--amber); color: var(--amber-2); }
 #panel { flex: 1; overflow: auto; padding: 8px; font-family: var(--mono); font-size: 12.5px; white-space: pre-wrap; }
 #status { display: flex; gap: 16px; padding: 3px 8px; background: #141311; color: var(--muted); font-size: 12px; border-top: 1px solid var(--line); }
 #ai-log { flex: 1; overflow: auto; padding: 8px; font-size: 13px; white-space: pre-wrap; }
+#right > label { margin: 6px 6px 0; color: var(--muted); font-size: 12px; }
 #ai-input { height: 76px; margin: 6px; resize: none; background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 6px; }
-.ai-actions { display: flex; gap: 6px; padding: 0 6px 6px; }
+.ai-actions { display: flex; gap: 6px; padding: 0 6px 6px; flex-wrap: wrap; }
+#ai-connect-result { white-space: pre-wrap; max-height: 180px; overflow: auto; margin-top: 8px; }
 .resizer { width: 4px; cursor: col-resize; background: #141311; }
 .resizer.horizontal { height: 4px; width: auto; cursor: row-resize; }
 #popup { position: fixed; z-index: 30; background: var(--panel); border: 1px solid var(--amber); min-width: 220px; max-height: 220px; overflow: auto; }

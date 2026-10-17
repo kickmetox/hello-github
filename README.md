@@ -41,7 +41,7 @@ Liegt im Programmordner bereits `icon.png`, `icon.ico`, `logo.png` oder `grafik.
 - KI-Chat mit `@datei`, `@terminal`, `@git`, Inline-Edit, Traceback-Reparatur und Agent (OpenAI-kompatibel, auch Ollama)
 - SSH, Docker, WSL und eine lokale Live-Sitzung für ein Dokument
 
-KI-Zugang: Menü **KI → Einstellungen**. Für Ollama zum Beispiel `http://127.0.0.1:11434/v1` und ein Modellname. Der Schlüssel liegt nur in `~/.shatuide/config.json`.
+KI-Zugang: Menü **KI → Sprachmodell verbinden**. Dort stehen Basis-URL, Modell, API-Schlüssel, System-Prompt und ein Prompt; **Verbinden und senden** speichert die Verbindung und schickt den Prompt sofort. Für Ollama zum Beispiel `http://127.0.0.1:11434/v1`. Chat, Inline-Edit und Reparatur verwenden den gespeicherten System-Prompt. Der Agent behält sein Werkzeugprotokoll und hängt den System-Prompt als zusätzliche Anweisung an. Der Schlüssel liegt nur in `~/.shatuide/config.json`.
 
 ## Tests
 

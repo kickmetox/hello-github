@@ -14,6 +14,8 @@ const S = {
   complete: [],
   completeIndex: 0,
   ai: [],
+  baseUrl: "",
+  model: "",
   terminalId: "",
   terminalFrom: 0,
   coverage: {},
@@ -1192,6 +1194,10 @@ async function fixWithAi() {
 async function sendAi(agent) {
   const text = $("ai-input").value.trim();
   if (!text) return;
+  if (!S.baseUrl) {
+    aiSettings(text);
+    return;
+  }
   const current = tab();
   if (agent) {
     const started = await api("/api/ai/agent", { prompt: text });
@@ -1354,7 +1360,7 @@ function buildMenus() {
       ["Konflikte", gitConflicts],
     ]],
     ["KI", [
-      ["Einstellungen", aiSettings],
+      ["Sprachmodell verbinden…", () => aiSettings()],
       ["Inline-Edit", inlineEdit, "Strg+K"],
       ["Chat", () => $("ai-input").focus()],
       ["Agent", () => sendAi(true)],
@@ -1561,22 +1567,109 @@ async function gitConflicts() {
   modal("Merge-Konflikte", body, [{ label: "Schließen", run: () => {} }]);
 }
 
-async function aiSettings() {
+function aiField(body, label, node) {
+  const caption = document.createElement("label");
+  caption.textContent = label;
+  body.appendChild(caption);
+  body.appendChild(node);
+}
+
+async function aiSettings(prefill) {
   const cfg = await apiGet("/api/ai/config");
   const body = document.createElement("div");
   const url = document.createElement("input");
   url.value = cfg.base_url || "http://127.0.0.1:11434/v1";
   const model = document.createElement("input");
+  model.setAttribute("list", "ai-models");
   model.value = cfg.model || "llama3.1";
+  const list = document.createElement("datalist");
+  list.id = "ai-models";
   const key = document.createElement("input");
   key.type = "password";
   key.placeholder = cfg.has_api_key ? "gesetzt, leer lassen zum Behalten" : "API-Schlüssel, bei Ollama leer";
-  body.append("Basis-URL", url, "Modell", model, "API-Schlüssel", key);
-  modal("KI", body, [
+  const system = document.createElement("textarea");
+  system.rows = 4;
+  system.value = cfg.system_prompt || "";
+  system.placeholder = "Leer lassen für den Standardassistenten";
+  const prompt = document.createElement("textarea");
+  prompt.rows = 4;
+  prompt.placeholder = "Prompt, der beim Verbinden an das Modell geht";
+  prompt.value = prefill || "";
+  const result = document.createElement("pre");
+  result.id = "ai-connect-result";
+  aiField(body, "Basis-URL", url);
+  aiField(body, "Modell", model);
+  body.appendChild(list);
+  aiField(body, "API-Schlüssel", key);
+  aiField(body, "System-Prompt", system);
+  aiField(body, "Prompt", prompt);
+  body.appendChild(result);
+
+  function payload(send) {
+    const data = {
+      base_url: url.value,
+      model: model.value,
+      api_key: key.value,
+      system_prompt: system.value,
+    };
+    const current = tab();
+    if (current) {
+      data.path = current.path;
+      data.content = current.content;
+    }
+    if (send) data.prompt = prompt.value;
+    return data;
+  }
+
+  function remember(saved) {
+    S.baseUrl = saved.base_url || "";
+    S.model = saved.model || "";
+  }
+
+  modal("Sprachmodell verbinden", body, [
     { label: "Abbrechen", run: () => {} },
-    { label: "Speichern", run: async () => {
-      await api("/api/ai/config", { base_url: url.value, model: model.value, api_key: key.value });
-      toast("Gespeichert");
+    { label: "Modelle laden", run: () => {
+      result.textContent = "Lade Modelle…";
+      api("/api/ai/models", { base_url: url.value, api_key: key.value }).then((data) => {
+        list.replaceChildren();
+        (data.models || []).forEach((name) => {
+          const option = document.createElement("option");
+          option.value = name;
+          list.appendChild(option);
+        });
+        if ((data.models || []).length) {
+          if (!model.value.trim()) model.value = data.models[0];
+          result.textContent = data.models.length + " Modelle geladen.";
+        } else result.textContent = "Keine Modelle gemeldet.";
+      }).catch((err) => { result.textContent = err.message; });
+      return false;
+    } },
+    { label: "Speichern", run: () => {
+      api("/api/ai/config", payload(false)).then((saved) => {
+        remember(saved);
+        result.textContent = "Verbindung gespeichert.";
+        toast("Gespeichert");
+      }).catch((err) => { result.textContent = err.message; });
+      return false;
+    } },
+    { label: "Verbinden und senden", run: () => {
+      const text = prompt.value.trim();
+      if (!text) {
+        result.textContent = "Prompt eingeben.";
+        return false;
+      }
+      result.textContent = "Sende Prompt…";
+      api("/api/ai/config", payload(true)).then((saved) => {
+        remember(saved);
+        const reply = saved.reply || {};
+        result.textContent = reply.content || reply.error || "Keine Antwort.";
+        if (reply.ok && reply.content) {
+          S.ai.push({ role: "user", content: text });
+          S.ai.push({ role: "assistant", content: reply.content });
+          $("ai-log").textContent = S.ai.map((item) => item.role + ": " + item.content).join("\n\n");
+        }
+      }).catch((err) => { result.textContent = err.message; });
+      return false;
     } },
   ]);
 }
@@ -1590,7 +1683,7 @@ async function startCollab() {
 
 function showKeys() {
   const body = document.createElement("pre");
-  body.textContent = "Strg+S Speichern\nStrg+F5 Ausführen\nF5 Debug/Weiter\nF9 Haltepunkt\nF10 Schritt über\nF11 Schritt hinein\nF12 Definition\nStrg+K Inline-KI\nStrg+Leertaste Vervollständigen\nStrg+Umschalt+F Suche";
+  body.textContent = "Strg+S Speichern\nStrg+F5 Ausführen\nF5 Debug/Weiter\nF9 Haltepunkt\nF10 Schritt über\nF11 Schritt hinein\nF12 Definition\nStrg+K Inline-KI\nStrg+Eingabe Prompt senden\nStrg+Leertaste Vervollständigen\nStrg+Umschalt+F Suche";
   modal("Tastatur", body, [{ label: "Schließen", run: () => {} }]);
 }
 
@@ -1657,7 +1750,14 @@ async function boot() {
   $("btn-debug").onclick = () => runFile(true);
   $("btn-stop").onclick = () => stopAll();
   $("btn-format").onclick = () => formatCurrent();
+  $("ai-connect").onclick = () => aiSettings($("ai-input").value).catch((err) => toast(err.message));
   $("ai-send").onclick = () => sendAi(false).catch((err) => toast(err.message));
+  $("ai-input").addEventListener("keydown", (event) => {
+    if (event.ctrlKey && event.key === "Enter") {
+      event.preventDefault();
+      sendAi(false).catch((err) => toast(err.message));
+    }
+  });
   $("ai-agent").onclick = () => sendAi(true).catch((err) => toast(err.message));
   $("ai-inline").onclick = () => inlineEdit();
   $("py-select").onchange = async (event) => {
@@ -1696,6 +1796,8 @@ async function boot() {
   const state = await apiGet("/api/state");
   S.workspace = state.workspace;
   S.python = state.python;
+  S.baseUrl = state.base_url || "";
+  S.model = state.model || "";
   $("ws-label").textContent = state.workspace;
   document.title = "ShatuIDE – " + state.author;
   await refreshTree();

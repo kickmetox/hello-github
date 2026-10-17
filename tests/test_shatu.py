@@ -11,6 +11,7 @@ import unittest
 import urllib.error
 import urllib.parse
 import urllib.request
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -158,6 +159,10 @@ class HistoryHttpNotebookTests(unittest.TestCase):
         self.assertTrue(parsed["ok"])
         self.assertTrue(parsed["done"])
         self.assertTrue(ai.extract_code("```python\nprint(1)\n```").startswith("print(1)"))
+        self.assertEqual(ai.resolve_system_prompt("  Hallo  "), "Hallo")
+        self.assertEqual(ai.resolve_system_prompt("   "), ai.CHAT_SYSTEM)
+        self.assertEqual(ai.parse_models({"data": [{"id": "llama3.1"}, {"id": "llama3.1"}, "mistral"]}), ["llama3.1", "mistral"])
+        self.assertEqual(ai.parse_models({"models": [{"name": "phi"}]}), ["phi"])
 
 
 class RuntimeTests(unittest.TestCase):
@@ -272,6 +277,85 @@ class ApiTests(unittest.TestCase):
                 return response
         except urllib.error.HTTPError as exc:
             return exc
+
+    def test_ai_connect_prompt(self) -> None:
+        cfg_path = Path.home() / ".shatuide" / "config.json"
+        backup = cfg_path.read_bytes() if cfg_path.is_file() else None
+        seen: dict = {}
+
+        class ModelHandler(BaseHTTPRequestHandler):
+            def do_GET(self) -> None:  # noqa: N802
+                seen["auth"] = self.headers.get("Authorization")
+                self._write({"data": [{"id": "demo"}, {"id": "anderes"}]})
+
+            def do_POST(self) -> None:  # noqa: N802
+                length = int(self.headers.get("Content-Length", "0") or 0)
+                seen["body"] = json.loads(self.rfile.read(length).decode("utf-8"))
+                self._write({"choices": [{"message": {"content": "pong"}}]})
+
+            def _write(self, payload: dict) -> None:
+                raw = json.dumps(payload).encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(raw)))
+                self.end_headers()
+                self.wfile.write(raw)
+
+            def log_message(self, format: str, *args) -> None:  # noqa: A003
+                return
+
+        model = ThreadingHTTPServer(("127.0.0.1", 0), ModelHandler)
+        thread = threading.Thread(target=model.serve_forever, daemon=True)
+        thread.start()
+        port = model.server_address[1]
+        try:
+            saved = self.request(
+                "/api/ai/config",
+                {
+                    "base_url": f"http://127.0.0.1:{port}/v1",
+                    "model": "demo",
+                    "system_prompt": "Systemtext speziell",
+                    "prompt": "Hallo Modell",
+                    "api_key": "geheim",
+                },
+            )
+            self.assertTrue(saved["ok"])
+            self.assertEqual(saved["system_prompt"], "Systemtext speziell")
+            self.assertEqual(saved["api_key"], "••••••••")
+            self.assertTrue(saved["reply"]["ok"])
+            self.assertEqual(saved["reply"]["content"], "pong")
+            messages = seen["body"]["messages"]
+            self.assertEqual(messages[0]["content"], "Systemtext speziell")
+            self.assertEqual(messages[-1]["content"], "Hallo Modell")
+            self.assertEqual(seen["body"]["model"], "demo")
+            self.assertEqual(seen["body"].get("model"), "demo")
+            loaded = self.request("/api/ai/config")
+            self.assertEqual(loaded["system_prompt"], "Systemtext speziell")
+            self.assertNotIn("geheim", json.dumps(loaded))
+            listed = self.request("/api/ai/models", {"base_url": f"http://127.0.0.1:{port}/v1", "api_key": "••••••••"})
+            self.assertEqual(listed["models"], ["demo", "anderes"])
+            self.assertEqual(seen.get("auth"), "Bearer geheim")
+            agent = self.app.run_agent("mach etwas", lambda _message: None)
+            self.assertFalse(agent["ok"])
+            system = seen["body"]["messages"][0]["content"]
+            self.assertIn("Zusätzliche Anweisung", system)
+            self.assertIn("Systemtext speziell", system)
+            self.assertIn("JSON", system)
+            refused = self.request(
+                "/api/ai/config",
+                {"base_url": "http://127.0.0.1:9/v1", "model": "keins", "system_prompt": "", "prompt": "Hallo Modell"},
+            )
+            self.assertTrue(refused["ok"])
+            self.assertFalse(refused["reply"]["ok"])
+            self.assertTrue(refused["reply"]["error"])
+        finally:
+            model.shutdown()
+            model.server_close()
+            if backup is None:
+                cfg_path.unlink(missing_ok=True)
+            else:
+                cfg_path.write_bytes(backup)
+                os.chmod(cfg_path, 0o600)
 
 
 if __name__ == "__main__":
