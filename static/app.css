@@ -68,7 +68,7 @@ button:hover, button.on { border-color: var(--amber); color: var(--amber-2); }
   white-space: pre; overflow: auto; letter-spacing: 0;
 }
 #highlight { color: var(--text); pointer-events: none; }
-#code { color: transparent; caret-color: var(--amber-2); background: transparent; resize: none; }
+#code { color: transparent; caret-color: var(--amber-2); background: transparent; resize: none; outline: none; }
 #code::selection { background: rgba(224, 164, 90, 0.35); }
 .kw { color: var(--kw); }
 .str { color: var(--string); }
