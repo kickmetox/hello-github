@@ -27,7 +27,7 @@ from spheredrive.commands import (
 from spheredrive.host import PreviewHost
 from spheredrive.models import LinkSpec, MountSpec, NetSpec, PsSpec, ShareSpec, SubstSpec
 from spheredrive.parsers import parse_mountvol, parse_net_share, parse_net_use, parse_subst
-from spheredrive.paths import choose_icon
+from spheredrive.paths import bundled_restore, choose_icon, format_launch, restore_launch
 from spheredrive.service import SphereService
 
 
@@ -288,6 +288,25 @@ class ServiceTests(unittest.TestCase):
         self.assertTrue(mounted["E"].real_fixed)
         self.assertTrue(mounted["E"].can_disconnect)
         self.assertEqual(mounted["E"].origin, "mount")
+
+    def test_installer_restore_uses_the_bundled_launcher(self) -> None:
+        root = Path("tests") / "_runtime" / "install"
+        if root.exists():
+            shutil.rmtree(root)
+        python_dir = root / "Python"
+        python_dir.mkdir(parents=True)
+        (python_dir / "pythonw.exe").write_bytes(b"")
+        (root / "pkgs").mkdir()
+        launcher = root / "bin" / "SphereDrive.exe"
+        launcher.parent.mkdir()
+        launcher.write_bytes(b"")
+        executable, arguments = bundled_restore(python_dir / "pythonw.exe")
+        self.assertEqual(executable, str(launcher))
+        self.assertEqual(arguments, "--restore")
+        self.assertEqual(format_launch(executable, arguments), f'"{launcher}" --restore')
+        command, args = restore_launch()
+        self.assertIn("--restore", args)
+        self.assertTrue(command)
 
     def test_icon_choice_prefers_a_custom_file(self) -> None:
         root = Path("tests") / "_runtime" / "icons"

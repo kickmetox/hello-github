@@ -23,7 +23,7 @@ from spheredrive.parsers import (
     format_subst,
     tokenize_cmd,
 )
-from spheredrive.paths import entry_script, pythonw_executable
+from spheredrive.paths import entry_script, gui_launch, pythonw_executable
 from spheredrive.registry import MemoryRegistry, WindowsRegistry
 
 CREATE_NO_WINDOW = 0x08000000
@@ -616,9 +616,8 @@ class WindowsHost:
             return
 
     def elevate(self) -> None:
-        script = self.script_path()
-        executable = self.pythonw()
-        ctypes.windll.shell32.ShellExecuteW(None, "runas", executable, f'"{script}"', None, 1)
+        executable, arguments = gui_launch()
+        ctypes.windll.shell32.ShellExecuteW(None, "runas", executable, arguments, None, 1)
 
     def documents_dir(self) -> Path:
         result = self.run_powershell("[Environment]::GetFolderPath('MyDocuments')", timeout=20)

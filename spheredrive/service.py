@@ -16,7 +16,6 @@ from spheredrive.commands import (
     FOLDER_DESC_WOW,
     POLICIES_SYSTEM,
     RUN_KEY,
-    autostart_command,
     build_unc,
     del_command,
     dos_device_value,
@@ -72,7 +71,7 @@ from spheredrive.models import (
     VolumeEntry,
 )
 from spheredrive.parsers import as_int, parse_json_list, parse_mountvol, parse_net_share, parse_net_use, parse_subst
-from spheredrive.paths import default_store_path
+from spheredrive.paths import default_store_path, format_launch, restore_launch
 from spheredrive.store import Store
 
 log = logging.getLogger("spheredrive")
@@ -669,10 +668,8 @@ class SphereService:
         self.write_autostart(autostart)
         if elevated_task != self.host.task_exists():
             if elevated_task:
-                created = self.host.create_logon_task(
-                    self.host.pythonw(),
-                    f'"{self.host.script_path()}" --restore',
-                )
+                command, arguments = restore_launch()
+                created = self.host.create_logon_task(command, arguments)
                 if not created.ok:
                     return self._from_run(
                         created,
@@ -694,8 +691,8 @@ class SphereService:
 
     def write_autostart(self, enabled: bool) -> None:
         if enabled:
-            command = autostart_command(self.host.pythonw(), self.host.script_path())
-            self.host.registry.set_sz("HKCU", RUN_KEY, AUTOSTART_NAME, command)
+            command, arguments = restore_launch()
+            self.host.registry.set_sz("HKCU", RUN_KEY, AUTOSTART_NAME, format_launch(command, arguments))
         else:
             try:
                 self.host.registry.delete_value("HKCU", RUN_KEY, AUTOSTART_NAME)
@@ -1078,7 +1075,8 @@ class SphereService:
             )
         task_note = ""
         if not self.host.task_exists() and self.host.is_admin():
-            created = self.host.create_logon_task(self.host.pythonw(), f'"{self.host.script_path()}" --restore')
+            command, arguments = restore_launch()
+            created = self.host.create_logon_task(command, arguments)
             if created.ok:
                 self.store.data["settings"]["elevated_task"] = True
                 task_note = " Die Anmeldungsaufgabe mit höchsten Rechten wurde eingerichtet."

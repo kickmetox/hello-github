@@ -21,7 +21,19 @@ SphereDrive gleicht die bekannten Lücken von `subst` aus:
 
 Der vorgesehene Arbeitsordner ist `D:\AI_Temp\SphereDrive`. Ein Symbol in diesem Ordner hat Vorrang vor dem mitgelieferten `assets\SphereDrive.ico`. Liegt dort eine andere `.ico`-Datei, wird sie verwendet.
 
-## Start unter Windows
+## Installation
+
+`SphereDrive-Setup-1.0.0.exe` installiert das Programm und ein eingebettetes Windows-Python. Eine eigene Python-Installation ist dafür nicht nötig. Der Installer legt eine Verknüpfung im Startmenü an und `bin\SphereDrive.exe` für den Start ohne Konsole. Die Wiederherstellung beim Anmelden ruft diese Datei mit `--restore` auf.
+
+Gebaut wird der Installer auf einem Rechner mit NSIS und pynsist:
+
+```bash
+python3 tools/build_installer.py
+```
+
+Das Skript lädt Python 3.12.10 für Windows und die dazu passenden Tcl/Tk-Dateien, packt SphereDrive dazu und schreibt `build/nsis/SphereDrive-Setup-1.0.0.exe`.
+
+## Start aus dem Quelltext
 
 Python 3.10 oder neuer, keine zusätzlichen Pakete.
 

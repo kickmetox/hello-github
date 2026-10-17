@@ -54,11 +54,20 @@ def _icons_in(directory: Path) -> list[Path]:
     return [path for path in directory.iterdir() if path.is_file() and path.suffix.lower() == ".ico"]
 
 
+def _icon_directories() -> list[Path]:
+    module_assets = Path(__file__).resolve().parent / "assets"
+    directories = [WORK_DIR, module_assets, package_root(), package_root() / "assets"]
+    installed = install_root()
+    if installed is not None:
+        directories.extend((installed / "assets", installed))
+    return directories
+
+
 def find_icon() -> Path | None:
     env = os.environ.get("SPHEREDRIVE_ICON")
     if env and Path(env).is_file():
         return Path(env)
-    for directory in (WORK_DIR, package_root(), package_root() / "assets"):
+    for directory in _icon_directories():
         chosen = choose_icon(_icons_in(directory))
         if chosen is not None:
             return chosen
@@ -89,3 +98,61 @@ def pythonw_executable() -> str:
     if candidate.is_file():
         return str(candidate)
     return str(executable)
+
+
+def install_root() -> Path | None:
+    """Installationsordner des Windows-Installers, falls das Programm von dort läuft."""
+    if getattr(sys, "frozen", False):
+        return Path(getattr(sys, "_MEIPASS", Path(sys.executable).parent))
+    executable = Path(sys.executable)
+    if executable.parent.name.lower() != "python":
+        return None
+    root = executable.parent.parent
+    if (root / "pkgs").is_dir():
+        return root
+    return None
+
+
+def bundled_restore(executable: Path) -> tuple[str, str] | None:
+    """Startzeile für --restore, wenn SphereDrive aus dem Installer heraus läuft."""
+    if executable.parent.name.lower() != "python":
+        return None
+    root = executable.parent.parent
+    launcher = root / "bin" / "SphereDrive.exe"
+    if launcher.is_file():
+        return str(launcher), "--restore"
+    for name in ("SphereDrive.launch.pyw", "SphereDrive.launch.py"):
+        script = root / name
+        if script.is_file():
+            pythonw = executable.parent / "pythonw.exe"
+            if not pythonw.is_file():
+                pythonw = executable
+            return str(pythonw), f'"{script}" --restore'
+    return None
+
+
+def restore_launch() -> tuple[str, str]:
+    """Programm und Argumente, mit denen die Anmeldung die Zuordnungen wiederherstellt."""
+    if getattr(sys, "frozen", False):
+        return str(Path(sys.executable)), "--restore"
+    bundled = bundled_restore(Path(sys.executable))
+    if bundled is not None:
+        return bundled
+    return pythonw_executable(), f'"{entry_script()}" --restore'
+
+
+def gui_launch() -> tuple[str, str]:
+    """Dieselbe Zeile ohne --restore, für den normalen Start und die Erhöhung."""
+    executable, arguments = restore_launch()
+    if arguments == "--restore":
+        return executable, ""
+    suffix = " --restore"
+    if arguments.endswith(suffix):
+        return executable, arguments[: -len(suffix)]
+    return executable, arguments
+
+
+def format_launch(executable: str, arguments: str) -> str:
+    if arguments:
+        return f'"{executable}" {arguments}'
+    return f'"{executable}"'

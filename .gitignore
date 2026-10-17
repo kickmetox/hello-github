@@ -5,3 +5,4 @@ __pycache__/
 *.log
 spheredrive/preview/
 tests/_runtime/
+build/
