@@ -31,7 +31,7 @@ Gebaut wird der Installer auf einem Rechner mit NSIS und pynsist:
 python3 tools/build_installer.py
 ```
 
-Das Skript lädt Python 3.12.10 für Windows und die dazu passenden Tcl/Tk-Dateien, packt SphereDrive dazu und schreibt `build/nsis/SphereDrive-Setup-1.0.0.exe`.
+Das Skript lädt Python 3.12.10 für Windows und die dazu passenden Tcl/Tk-Dateien, packt SphereDrive dazu und schreibt `build/nsis/SphereDrive-Setup-1.0.0.exe`. Dieselbe Datei liegt im Projektordner, neben `SphereDrive.pyw` und `assets\SphereDrive.ico`.
 
 ## Start aus dem Quelltext
 
