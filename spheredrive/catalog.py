@@ -96,6 +96,79 @@ GUIDE: list[tuple[str, str]] = [
     ),
 ]
 
+DESCRIPTION = (
+    "SphereDrive ist die Windows-Oberfläche für virtuelle Laufwerke und Ordnerverknüpfungen. "
+    "Sie fasst subst, net use, mklink, New-PSDrive und mountvol in einem Fenster zusammen. "
+    "Ein Ordner, ein Unterordner oder eine Freigabe erscheint damit wie ein eigenes Laufwerk, "
+    "ohne dass die Dateien verschoben werden. Auf Windows 11 steht der Systemname in der Seitenleiste."
+)
+
+FEATURES: list[tuple[str, list[str]]] = [
+    (
+        "Laufwerkszuordnungen",
+        [
+            "Kacheln oder Liste, Filter „Alle Laufwerke anzeigen“",
+            "Klick auf eine Kachel oder auf ··· öffnet die Aktionen dieses Buchstabens",
+            "Bezeichnung, Symbol, Explorer und Trennen",
+            "Echte Datenträger werden nicht durch subst oder net use verdeckt",
+        ],
+    ),
+    (
+        "Ordner und Unterordner",
+        [
+            "Baum der Ordner eines Laufwerks, weitere Ebenen beim Aufklappen",
+            "Ein Unterordner wird als eigenes Laufwerk eingehängt",
+            "Dieselbe Auswahl unter Subst und als Ziel einer Ordner-Bereitstellung",
+        ],
+    ),
+    (
+        "subst",
+        [
+            "Lokale Ordner, auch tief in OneDrive, Google Drive oder Dropbox",
+            "Dauerhaft über den Autostart und, mit Administratorrechten, über DOS Devices",
+            "Papierkorb über die Known-Folder-Registrierung",
+            "Sichtbarkeit für erhöhte Programme über EnableLinkedConnections und eine Anmeldungsaufgabe",
+        ],
+    ),
+    (
+        "net use",
+        [
+            "UNC-Freigaben, dauerhaft mit /persistent:yes",
+            "Freigaben anlegen und entfernen",
+            "Kennwörter werden für den Aufruf verwendet und nicht gespeichert",
+        ],
+    ),
+    (
+        "Verknüpfungen",
+        [
+            "mklink /J für Junctions, /D für Ordnerlinks, dazu Dateisymlinks und Hardlinks",
+            "Entfernen löscht nur die Verknüpfung, nicht den Zielordner",
+        ],
+    ),
+    (
+        "PowerShell",
+        [
+            "New-PSDrive für Dateisystem, Registrierung, Zertifikate und weitere Anbieter",
+            "Optional im PowerShell-Profil; -Persist nur für UNC-Pfade",
+        ],
+    ),
+    (
+        "Bereitstellung",
+        [
+            "Partition oder VHD/VHDX auf einen Buchstaben oder in einen leeren NTFS-Ordner",
+            "Aufruf der Datenträgerverwaltung (diskmgmt.msc)",
+        ],
+    ),
+    (
+        "Programm",
+        [
+            "Vergleich, welcher Befehl wofür gedacht ist",
+            "Arbeitsordner D:\\AI_Temp\\SphereDrive, Logo aus diesem Ordner hat Vorrang",
+            "Installer mit eingebettetem Python, Wiederherstellung beim Anmelden mit --restore",
+        ],
+    ),
+]
+
 NAV_ITEMS: list[tuple[str, str]] = [
     ("overview", "Laufwerkszuordnungen"),
     ("subst", "Subst"),

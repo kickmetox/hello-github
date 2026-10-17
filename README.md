@@ -1,14 +1,59 @@
 # SphereDrive
 
-Grafische Oberfläche für die Windows-Werkzeuge, mit denen Ordner wie Laufwerke oder wie echte Pfade erscheinen.
+## Beschreibung
 
-- **subst** für lokale Ordner, auch tief in OneDrive, Google Drive oder Dropbox
-- **net use** für Netzwerkfreigaben, dauerhaft mit `/persistent:yes`, plus Freigaben anlegen
-- **mklink** für symbolische Links, Junctions und Hardlinks
-- **New-PSDrive** für Ordner, Registrierung und Zertifikatspeicher
-- **mountvol** und der Aufruf von `diskmgmt.msc` für Buchstaben und leere NTFS-Ordner
+SphereDrive ist die Windows-Oberfläche für virtuelle Laufwerke und Ordnerverknüpfungen. Sie fasst subst, net use, mklink, New-PSDrive und mountvol in einem Fenster zusammen. Ein Ordner, ein Unterordner oder eine Freigabe erscheint damit wie ein eigenes Laufwerk, ohne dass die Dateien verschoben werden.
 
-Die Startseite zeigt die Laufwerke als Kacheln, angelehnt an SUBSTitute. Im Laufwerk lassen sich Ordner und Unterordner aufklappen und als eigenes Laufwerk einhängen. „Alle Laufwerke anzeigen“ blendet die echten Datenträger ein; ohne Haken bleiben Subst, net use und von SphereDrive gesetzte Bereitstellungen. Ein Klick auf eine Kachel oder auf „···“ öffnet die Möglichkeiten für genau diesen Buchstaben: Bezeichnung, Symbol, Subst, net use, Dauerhaftigkeit, Sichtbarkeit für Administratoren, Papierkorb, Explorer und Trennen. Auf einem echten Datenträger sind Subst und net use gesperrt, damit der Buchstabe nicht verdeckt wird. Ein Ordner auf diesem Datenträger kann einen neuen Buchstaben bekommen.
+Die Startseite zeigt die Laufwerke als Kacheln. Ein Klick öffnet die Aktionen für genau diesen Buchstaben. Echte Datenträger bleiben unangetastet: subst und net use legen sich nicht über einen vorhandenen Buchstaben. Ordner und Unterordner eines Laufwerks lassen sich aufklappen und als neuer Buchstabe einhängen. Auf Windows 11 steht der Systemname in der Seitenleiste. Dieselbe Beschreibung und die Feature-Liste stehen im Programm unter Hilfe, Info.
+
+## Feature-Liste
+
+### Laufwerkszuordnungen
+
+- Kacheln oder Liste, Filter „Alle Laufwerke anzeigen“
+- Klick auf eine Kachel oder auf ··· öffnet die Aktionen dieses Buchstabens
+- Bezeichnung, Symbol, Explorer und Trennen
+- Echte Datenträger werden nicht durch subst oder net use verdeckt
+
+### Ordner und Unterordner
+
+- Baum der Ordner eines Laufwerks, weitere Ebenen beim Aufklappen
+- Ein Unterordner wird als eigenes Laufwerk eingehängt
+- Dieselbe Auswahl unter Subst und als Ziel einer Ordner-Bereitstellung
+
+### subst
+
+- Lokale Ordner, auch tief in OneDrive, Google Drive oder Dropbox
+- Dauerhaft über den Autostart und, mit Administratorrechten, über DOS Devices
+- Papierkorb über die Known-Folder-Registrierung
+- Sichtbarkeit für erhöhte Programme über EnableLinkedConnections und eine Anmeldungsaufgabe
+
+### net use
+
+- UNC-Freigaben, dauerhaft mit `/persistent:yes`
+- Freigaben anlegen und entfernen
+- Kennwörter werden für den Aufruf verwendet und nicht gespeichert
+
+### Verknüpfungen
+
+- `mklink /J` für Junctions, `/D` für Ordnerlinks, dazu Dateisymlinks und Hardlinks
+- Entfernen löscht nur die Verknüpfung, nicht den Zielordner
+
+### PowerShell
+
+- New-PSDrive für Dateisystem, Registrierung, Zertifikate und weitere Anbieter
+- Optional im PowerShell-Profil; `-Persist` nur für UNC-Pfade
+
+### Bereitstellung
+
+- Partition oder VHD/VHDX auf einen Buchstaben oder in einen leeren NTFS-Ordner
+- Aufruf der Datenträgerverwaltung (`diskmgmt.msc`)
+
+### Programm
+
+- Vergleich, welcher Befehl wofür gedacht ist
+- Arbeitsordner `D:\AI_Temp\SphereDrive`, ein Logo in diesem Ordner hat Vorrang
+- Installer mit eingebettetem Python, Wiederherstellung beim Anmelden mit `--restore`
 
 SphereDrive gleicht die bekannten Lücken von `subst` aus:
 

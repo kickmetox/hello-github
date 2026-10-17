@@ -27,6 +27,7 @@ from spheredrive.commands import (
     replace_marked_block,
     subst_create,
 )
+from spheredrive.catalog import DESCRIPTION, FEATURES
 from spheredrive.host import PreviewHost, system_caption
 from spheredrive.models import LinkSpec, MountSpec, NetSpec, PsSpec, ShareSpec, SubstSpec
 from spheredrive.parsers import parse_mountvol, parse_net_share, parse_net_use, parse_subst
@@ -361,6 +362,24 @@ class ServiceTests(unittest.TestCase):
         self.assertEqual(system_caption(19045), "Windows 10")
         if sys.platform != "win32":
             self.assertEqual(system_caption(), "Vorschau")
+
+    def test_feature_list_names_the_windows_tools(self) -> None:
+        self.assertIn("subst", DESCRIPTION)
+        titles = [title for title, _lines in FEATURES]
+        self.assertEqual(
+            titles,
+            [
+                "Laufwerkszuordnungen",
+                "Ordner und Unterordner",
+                "subst",
+                "net use",
+                "Verknüpfungen",
+                "PowerShell",
+                "Bereitstellung",
+                "Programm",
+            ],
+        )
+        self.assertTrue(all(lines for _title, lines in FEATURES))
 
     def test_folder_tree_includes_subfolders_and_follows_subst(self) -> None:
         svc, host = service(Path("tests") / "_runtime" / "folders")

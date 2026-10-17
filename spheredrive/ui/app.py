@@ -8,7 +8,7 @@ import tkinter as tk
 from tkinter import ttk
 
 from spheredrive import __version__
-from spheredrive.catalog import NAV_ITEMS
+from spheredrive.catalog import DESCRIPTION, FEATURES, NAV_ITEMS
 from spheredrive.models import OpResult, Snapshot
 from spheredrive.paths import WORK_DIR, ensure_work_dir, find_icon, find_window_png
 from spheredrive.host import system_caption
@@ -336,18 +336,84 @@ class SphereApp(tk.Tk):
         dialog.title("Info")
         dialog.configure(bg=P.panel)
         dialog.transient(self)
-        dialog.resizable(False, False)
-        body = tk.Frame(dialog, bg=P.panel)
-        body.pack(padx=18, pady=16)
+        dialog.resizable(True, True)
+        dialog.minsize(520, 420)
+        dialog.geometry("640x720")
         dialog.logo = self._load_logo(64)
+        header = tk.Frame(dialog, bg=P.panel)
+        header.pack(fill="x", padx=18, pady=(16, 8))
         if dialog.logo is not None:
-            tk.Label(body, image=dialog.logo, bg=P.panel, bd=0, highlightthickness=0).pack(anchor="w", pady=(0, 12))
-        text = (
-            f"SphereDrive {__version__} für {system_caption()}\n\n"
-            "Grafische Oberfläche für subst, net use, mklink, New-PSDrive und Bereitstellungspunkte.\n\n"
-            f"Arbeitsordner: {WORK_DIR}\n"
-            f"Symbol: {icon or 'keins gefunden'}\n"
-            f"Konfiguration: {self.service.store.path}"
-        )
-        tk.Label(body, text=text, bg=P.panel, fg=P.text, justify="left", font=(P.font, 10)).pack(anchor="w")
-        Button(dialog, "Schließen", dialog.destroy, "primary").pack(pady=(0, 16))
+            tk.Label(header, image=dialog.logo, bg=P.panel, bd=0, highlightthickness=0).pack(side="left", padx=(0, 12))
+        titles = tk.Frame(header, bg=P.panel)
+        titles.pack(side="left", fill="x", expand=True)
+        tk.Label(
+            titles,
+            text=f"SphereDrive {__version__}",
+            bg=P.panel,
+            fg=P.text,
+            font=(P.font, 16, "bold"),
+            anchor="w",
+        ).pack(anchor="w")
+        tk.Label(titles, text=system_caption(), bg=P.panel, fg=P.muted, font=(P.font, 10), anchor="w").pack(anchor="w")
+        shell = tk.Frame(dialog, bg=P.panel)
+        shell.pack(fill="both", expand=True, padx=18)
+        canvas = tk.Canvas(shell, bg=P.panel, highlightthickness=0, bd=0)
+        scroll = ttk.Scrollbar(shell, orient="vertical", command=canvas.yview)
+        canvas.configure(yscrollcommand=scroll.set)
+        canvas.pack(side="left", fill="both", expand=True)
+        scroll.pack(side="right", fill="y")
+        body = tk.Frame(canvas, bg=P.panel)
+        window = canvas.create_window((0, 0), window=body, anchor="nw")
+
+        def fit(_event=None) -> None:
+            canvas.configure(scrollregion=canvas.bbox("all"))
+
+        def stretch(event: tk.Event) -> None:
+            canvas.itemconfigure(window, width=event.width)
+
+        body.bind("<Configure>", fit)
+        canvas.bind("<Configure>", stretch)
+        tk.Label(
+            body,
+            text="Beschreibung",
+            bg=P.panel,
+            fg=P.text,
+            font=(P.font, 12, "bold"),
+            anchor="w",
+        ).pack(anchor="w", pady=(0, 4))
+        tk.Label(
+            body,
+            text=DESCRIPTION,
+            bg=P.panel,
+            fg=P.muted,
+            font=(P.font, 10),
+            justify="left",
+            anchor="w",
+            wraplength=560,
+        ).pack(anchor="w", pady=(0, 12))
+        tk.Label(body, text="Feature-Liste", bg=P.panel, fg=P.text, font=(P.font, 12, "bold"), anchor="w").pack(anchor="w")
+        for title, lines in FEATURES:
+            tk.Label(body, text=title, bg=P.panel, fg=P.text, font=(P.font, 11, "bold"), anchor="w").pack(
+                anchor="w", pady=(10, 2)
+            )
+            for line in lines:
+                tk.Label(
+                    body,
+                    text="•  " + line,
+                    bg=P.panel,
+                    fg=P.muted,
+                    font=(P.font, 10),
+                    justify="left",
+                    anchor="w",
+                    wraplength=560,
+                ).pack(anchor="w")
+        tk.Label(
+            body,
+            text=f"Arbeitsordner: {WORK_DIR}\nSymbol: {icon or 'keins gefunden'}\nKonfiguration: {self.service.store.path}",
+            bg=P.panel,
+            fg=P.faint,
+            font=(P.font, 9),
+            justify="left",
+            anchor="w",
+        ).pack(anchor="w", pady=(16, 8))
+        Button(dialog, "Schließen", dialog.destroy, "primary").pack(pady=(8, 16))

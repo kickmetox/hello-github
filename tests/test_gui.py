@@ -184,6 +184,11 @@ class GuiTests(unittest.TestCase):
         app.update_idletasks()
         self.assertIn("P", overview.tree.get_children())
         overview._set_view("grid")
+        app.show_about()
+        app.update_idletasks()
+        about = next(child for child in app.winfo_children() if isinstance(child, tk.Toplevel))
+        self.assertEqual(about.title(), "Info")
+        about.destroy()
         # Das Fenster muss gemappt sein, sonst bleibt ein späterer Screenshot leer.
         app.deiconify()
         app.update()
