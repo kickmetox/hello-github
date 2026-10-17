@@ -1607,10 +1607,12 @@ async function aiSettings(prefill) {
   key.type = "password";
   key.placeholder = cfg.has_api_key ? "gesetzt, leer lassen zum Behalten" : "API-Schlüssel, bei Ollama leer";
   const system = document.createElement("textarea");
+  system.spellcheck = false;
   system.rows = 3;
   system.value = cfg.system_prompt || "";
   system.placeholder = "Leer lassen für den Standardassistenten";
   const prompt = document.createElement("textarea");
+  prompt.spellcheck = false;
   prompt.id = "ai-connect-prompt";
   prompt.rows = 3;
   prompt.placeholder = "Prompt, der beim Verbinden an das Modell geht";
