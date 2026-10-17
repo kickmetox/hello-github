@@ -644,7 +644,7 @@ class WindowsHost:
         file_path.write_text(text, encoding="utf-8")
 
     def open_path(self, path: str) -> None:
-        subprocess.Popen(["explorer", path])
+        os.startfile(path)  # noqa: S606  Windows-Shell öffnet den Ordner.
 
     def open_msc(self, name: str) -> None:
         subprocess.Popen(["cmd", "/c", "start", "", name], creationflags=CREATE_NO_WINDOW)
@@ -676,6 +676,22 @@ class WindowsHost:
 
     def script_path(self) -> str:
         return str(entry_script())
+
+
+def system_caption(build: int | None = None) -> str:
+    """Name des laufenden Systems. Windows 11 beginnt bei Build 22000."""
+    if build is None:
+        if sys.platform != "win32":
+            return "Vorschau"
+        try:
+            build = int(sys.getwindowsversion().build)
+        except (AttributeError, OSError, ValueError):
+            return "Windows"
+    if build >= 22000:
+        return "Windows 11"
+    if build >= 10240:
+        return "Windows 10"
+    return "Windows"
 
 
 def make_host() -> PreviewHost | WindowsHost:

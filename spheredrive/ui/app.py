@@ -11,6 +11,7 @@ from spheredrive import __version__
 from spheredrive.catalog import NAV_ITEMS
 from spheredrive.models import OpResult, Snapshot
 from spheredrive.paths import WORK_DIR, ensure_work_dir, find_icon, find_window_png
+from spheredrive.host import system_caption
 from spheredrive.service import SphereService
 from spheredrive.ui.pages import ComparePage, LinkPage, MountPage, NetPage, OverviewPage, PsPage, SettingsPage, SubstPage
 from spheredrive.ui.widgets import Button, L, P, apply_theme, ask_yes_no, load_font
@@ -263,7 +264,7 @@ class SphereApp(tk.Tk):
         self.run_bg(work, done)
 
     def _update_chrome(self, snap: Snapshot) -> None:
-        self.mode_label.configure(text="Vorschau" if snap.preview else "Windows")
+        self.mode_label.configure(text="Vorschau" if snap.preview else system_caption())
         self.admin_label.configure(
             text="Administrator" if snap.admin else "Standardbenutzer",
             fg=P.teal if snap.admin else P.muted,
@@ -342,7 +343,7 @@ class SphereApp(tk.Tk):
         if dialog.logo is not None:
             tk.Label(body, image=dialog.logo, bg=P.panel, bd=0, highlightthickness=0).pack(anchor="w", pady=(0, 12))
         text = (
-            f"SphereDrive {__version__}\n\n"
+            f"SphereDrive {__version__} für {system_caption()}\n\n"
             "Grafische Oberfläche für subst, net use, mklink, New-PSDrive und Bereitstellungspunkte.\n\n"
             f"Arbeitsordner: {WORK_DIR}\n"
             f"Symbol: {icon or 'keins gefunden'}\n"

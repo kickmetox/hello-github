@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import sys
 import unittest
 from pathlib import Path
 
@@ -24,7 +25,7 @@ from spheredrive.commands import (
     replace_marked_block,
     subst_create,
 )
-from spheredrive.host import PreviewHost
+from spheredrive.host import PreviewHost, system_caption
 from spheredrive.models import LinkSpec, MountSpec, NetSpec, PsSpec, ShareSpec, SubstSpec
 from spheredrive.parsers import parse_mountvol, parse_net_share, parse_net_use, parse_subst
 from spheredrive.paths import (
@@ -354,6 +355,10 @@ class ServiceTests(unittest.TestCase):
         place_logo(target, source)
         self.assertEqual((target / "SphereDrive.ico").read_bytes(), b"ICO")
         self.assertIsNone(ensure_work_dir())
+        self.assertEqual(system_caption(22631), "Windows 11")
+        self.assertEqual(system_caption(19045), "Windows 10")
+        if sys.platform != "win32":
+            self.assertEqual(system_caption(), "Vorschau")
 
 
 class CliTests(unittest.TestCase):
