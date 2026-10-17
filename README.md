@@ -14,6 +14,10 @@ Unter Windows: `ShatuIDE.bat` oder `py -3 shatuide.py`.
 
 **Datei → Öffnen** lädt vorhandene Python-Skripte und andere Textdateien aus dem Workspace, aus darüberliegenden Ordnern oder vom Home-Verzeichnis. Dateien außerhalb des Workspace sind nur lesbar. **Datei laden** übernimmt Dateien aus der Dateiauswahl; Speichern schreibt sie in den Workspace. **Bearbeiten** schneidet aus, kopiert die Markierung oder einen Zeilenbereich und fügt ein. **Fenster → Zweites Fenster** öffnet eine weitere IDE-Ansicht.
 
+**Strg+F** sucht in der offenen Datei, **Strg+H** ersetzt darin. Groß/Klein, ganzes Wort und reguläre Ausdrücke lassen sich umschalten. **Strg+Umschalt+H** ersetzt im Workspace, nach einer Vorschau und nur in Dateien dieses Ordners. Weitere Editorbefehle: Zeile kommentieren, duplizieren, verschieben, löschen und verbinden, Einrücken, Groß-/Kleinschreibung, nächstes Vorkommen, Gehe zu Zeile und Zeilenumbruch.
+
+`.sh`, `.bash` und `.ps1` lassen sich laden und bearbeiten. **Ausführen** startet Bash beziehungsweise PowerShell (`pwsh` oder `powershell`). **Syntax prüfen** nutzt `bash -n` oder den PowerShell-Parser. **Debug** hält an Haltepunkten an, zeigt Variablen und geht schrittweise weiter. Fehlt der Interpreter, meldet die IDE das, statt ein Ergebnis zu erfinden.
+
 Installation in das Zielverzeichnis, ohne vorhandene Icons zu überschreiben:
 
 ```bash
@@ -31,8 +35,9 @@ Liegt im Programmordner bereits `icon.png`, `icon.ico`, `logo.png` oder `grafik.
 - Editor mit Syntaxfarben, SQL/HTML/JSON in Strings, Faltung, Snippets, Autovervollständigung (Jedi, sobald installiert)
 - Echtzeit-Linting, Type-Hints, ungenutzte Imports, optionales Ruff
 - Projektweites Umbenennen, Methode extrahieren, Dubletten
-- Suche, Gliederung, Gehe-zu-Definition inklusive Bibliotheken, TODO, Lesezeichen
+- Suche, Ersetzen in der Datei und im Workspace, Gliederung, Gehe-zu-Definition inklusive Bibliotheken, TODO, Lesezeichen
 - Ausführen, Bytecode kompilieren, PyInstaller, grafischer Debugger (Haltepunkte, Bedingungen, Schritt, Watches)
+- Bash- und PowerShell-Skripte laden, prüfen, ausführen und an Haltepunkten debuggen
 - unittest, pytest, doctest, Coverage-Markierung
 - venv, pip, conda, Poetry, Pipenv, Download einer eigenständigen CPython-Distribution
 - Terminal, REPL-Kernel, Notebooks, Variablen, Matplotlib-Plots

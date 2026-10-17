@@ -55,7 +55,12 @@ button:hover, button.on { border-color: var(--amber); color: var(--amber-2); }
 #tabs { display: flex; gap: 2px; overflow: auto; background: #161513; min-height: 32px; }
 .tab { border: 0; border-right: 1px solid var(--line); background: transparent; border-radius: 0; padding: 6px 10px; color: var(--muted); }
 .tab.on { color: var(--text); background: var(--bg); box-shadow: inset 0 -2px 0 var(--amber); }
+#findbar { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; padding: 4px 8px; background: #1c1a17; border-bottom: 1px solid var(--line); }
+#findbar input { width: 180px; background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 3px 6px; }
+#findbar button.on { border-color: var(--amber); color: var(--amber-2); }
+#find-count { color: var(--muted); font-size: 12px; }
 #editor-row { flex: 1; display: flex; min-height: 0; }
+#editor.wrap #highlight, #editor.wrap #code { white-space: pre-wrap; overflow-wrap: anywhere; }
 #gutter { width: 58px; overflow: hidden; background: #161513; color: #6f6a62; text-align: right; padding: 8px 0; font-family: var(--mono); font-size: 13px; line-height: 1.45; user-select: none; }
 .gutter-line { height: 1.45em; padding-right: 8px; cursor: pointer; }
 .gutter-line.bp { color: var(--red); }

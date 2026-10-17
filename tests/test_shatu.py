@@ -7,6 +7,7 @@ import os
 import sys
 import tempfile
 import threading
+import time
 import unittest
 import urllib.error
 import urllib.parse
@@ -444,6 +445,159 @@ class ApiTests(unittest.TestCase):
             else:
                 cfg_path.write_bytes(backup)
                 os.chmod(cfg_path, 0o600)
+
+
+class ScriptEditTests(unittest.TestCase):
+    def test_replace_keeps_files_outside_the_workspace(self) -> None:
+        from shatuide.edit import replace_project
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "probe.py").write_text("wert = 1\nwertig = 2\n", encoding="utf-8")
+            (root / "tool.sh").write_text("echo wert\n", encoding="utf-8")
+            other = Path(tempfile.mkdtemp())
+            try:
+                outside = other / "fremd.py"
+                outside.write_text("wert = 1\n", encoding="utf-8")
+                preview = replace_project(root, "wert", "zahl", word=True, preview=True)
+                self.assertTrue(preview["ok"], preview)
+                self.assertEqual(preview["replacements"], 2)
+                self.assertEqual(outside.read_text(encoding="utf-8"), "wert = 1\n")
+                applied = replace_project(root, "wert", "zahl", word=True, preview=False)
+                self.assertEqual(applied["replacements"], 2)
+                self.assertEqual((root / "probe.py").read_text(encoding="utf-8"), "zahl = 1\nwertig = 2\n")
+                self.assertEqual((root / "tool.sh").read_text(encoding="utf-8"), "echo zahl\n")
+                self.assertEqual(outside.read_text(encoding="utf-8"), "wert = 1\n")
+                broken = replace_project(root, "(", "x", regex=True)
+                self.assertFalse(broken["ok"])
+            finally:
+                outside.unlink(missing_ok=True)
+                other.rmdir()
+
+    def test_shell_syntax_run_and_debug(self) -> None:
+        from shatuide.scripting import syntax_check
+        from shatuide.shell_debug import ShellDebugSession
+
+        self.assertTrue(syntax_check("a.sh", "echo ok\n")["ok"])
+        broken = syntax_check("a.sh", "if\n")
+        self.assertFalse(broken["ok"])
+        with tempfile.TemporaryDirectory() as tmp:
+            script = Path(tmp) / "tool.sh"
+            script.write_text("echo start\nx=7\necho mid\necho end\n", encoding="utf-8")
+            httpd, app = create_server("127.0.0.1", 0, tmp)
+            thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+            thread.start()
+            host, port = httpd.server_address[:2]
+            base = f"http://{host}:{port}"
+            try:
+                payload = json.dumps({"mode": "file", "path": str(script)}).encode("utf-8")
+                req = urllib.request.Request(base + "/api/run", data=payload, method="POST")
+                req.add_header("X-Shatu-Token", app.token)
+                req.add_header("Host", "127.0.0.1")
+                req.add_header("Content-Type", "application/json")
+                with urllib.request.urlopen(req, timeout=20) as response:
+                    started = json.loads(response.read().decode("utf-8"))
+                self.assertTrue(started["ok"], started)
+                text = ""
+                idle = 0
+                body = {}
+                for _ in range(40):
+                    poll = urllib.request.Request(base + f"/api/session?id={started['id']}&from=0")
+                    poll.add_header("X-Shatu-Token", app.token)
+                    poll.add_header("Host", "127.0.0.1")
+                    with urllib.request.urlopen(poll, timeout=20) as response:
+                        body = json.loads(response.read().decode("utf-8"))
+                    text = "".join(body.get("lines") or [])
+                    if body.get("running"):
+                        idle = 0
+                    else:
+                        idle += 1
+                        if text and idle >= 2:
+                            break
+                    time.sleep(0.05)
+                self.assertIn("start", text, body)
+                self.assertIn("mid", text)
+                session = ShellDebugSession()
+                try:
+                    session.start(str(script), tmp, [{"file": str(script), "line": 3}], Path(tmp) / "bp.json")
+                    stopped = session.wait_event("stopped", timeout=8)
+                    self.assertEqual(stopped["line"], 3)
+                    self.assertEqual(stopped["locals"].get("x"), "7")
+                    session.command({"cmd": "eval", "expr": "printf %s \"$x\""})
+                    evaluated = self._wait_eval(session)
+                    self.assertIn("7", evaluated.get("value", ""))
+                    session.command({"cmd": "step"})
+                    stepped = self._wait_line(session, 4)
+                    self.assertEqual(stepped["line"], 4)
+                    session.command({"cmd": "continue"})
+                    session.wait_event("terminated", timeout=8)
+                finally:
+                    session.close()
+            finally:
+                httpd.shutdown()
+                httpd.server_close()
+
+    def test_powershell_syntax_and_debug(self) -> None:
+        import shutil
+        from unittest.mock import patch
+
+        from shatuide.scripting import syntax_check
+        from shatuide.shell_debug import PowerShellDebugSession
+
+        with patch("shatuide.scripting.powershell_binary", return_value=None):
+            missing = syntax_check("a.ps1", "Write-Output 1\n")
+        self.assertFalse(missing["ok"])
+        self.assertIn("PowerShell", missing["error"])
+        portable = Path.home() / "pwsh" / "pwsh"
+        if not shutil.which("pwsh") and not shutil.which("powershell") and portable.is_file():
+            os.environ["PATH"] = str(portable.parent) + os.pathsep + os.environ.get("PATH", "")
+        if not shutil.which("pwsh") and not shutil.which("powershell"):
+            return
+        checked = syntax_check("a.ps1", "Write-Output 1\n")
+        self.assertTrue(checked["ok"], checked)
+        broken = syntax_check("a.ps1", "function {\n")
+        self.assertFalse(broken["ok"])
+        with tempfile.TemporaryDirectory() as tmp:
+            script = Path(tmp) / "tool.ps1"
+            script.write_text('$x = 7\nWrite-Output "start"\nWrite-Output "end"\n', encoding="utf-8")
+            session = PowerShellDebugSession()
+            try:
+                session.start(str(script), tmp, [{"file": str(script), "line": 2}], Path(tmp) / "bp.json")
+                stopped = session.wait_event("stopped", timeout=8)
+                self.assertEqual(stopped["line"], 2, session.snapshot())
+                self.assertEqual(stopped["locals"].get("x"), "7")
+                session.command({"cmd": "step"})
+                stepped = self._wait_line(session, 3)
+                self.assertEqual(stepped["line"], 3)
+                session.command({"cmd": "continue"})
+                session.wait_event("terminated", timeout=8)
+                output = "".join(session.snapshot()["output"])
+                self.assertIn("start", output)
+                self.assertIn("end", output)
+            finally:
+                session.close()
+
+    def _wait_line(self, session, line: int, timeout: float = 8):
+        import time as time_mod
+
+        deadline = time_mod.time() + timeout
+        while time_mod.time() < deadline:
+            paused = session.snapshot().get("paused")
+            if paused and paused.get("line") == line:
+                return paused
+            time_mod.sleep(0.05)
+        self.fail(session.snapshot())
+
+    def _wait_eval(self, session, timeout: float = 8):
+        import time as time_mod
+
+        deadline = time_mod.time() + timeout
+        while time_mod.time() < deadline:
+            for event in session.snapshot()["events"]:
+                if event.get("event") == "eval":
+                    return event
+            time_mod.sleep(0.05)
+        self.fail(session.snapshot())
 
 
 if __name__ == "__main__":

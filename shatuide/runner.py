@@ -40,6 +40,13 @@ class ProcessSession:
                 self.output.append(line)
                 if len(self.output) > 6000:
                     self.output = self.output[-5000:]
+        for stream in (self.proc.stdout, self.proc.stdin):
+            if stream is None:
+                continue
+            try:
+                stream.close()
+            except OSError:
+                pass
 
     def write(self, data: str) -> None:
         if self.proc.stdin is None:

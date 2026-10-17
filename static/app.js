@@ -21,6 +21,7 @@ const S = {
   coverage: {},
   watches: [],
   clip: "",
+  wrap: false,
 };
 
 const BOTTOM = [
@@ -191,6 +192,93 @@ function errorLineSet() {
   return lines;
 }
 
+function languageOf(path) {
+  const name = String(path || "").split(/[\\/]/).pop().toLowerCase();
+  const ext = name.includes(".") ? name.slice(name.lastIndexOf(".")) : "";
+  if ([".py", ".pyw", ".pyi"].includes(ext)) return "python";
+  if ([".sh", ".bash", ".zsh", ".ksh"].includes(ext) || [".bashrc", ".bash_profile", ".profile", ".zshrc"].includes(name)) return "shell";
+  if ([".ps1", ".psm1", ".psd1"].includes(ext)) return "powershell";
+  if ([".bat", ".cmd"].includes(ext)) return "batch";
+  if ([".js", ".ts", ".jsx", ".tsx"].includes(ext)) return "js";
+  if ([".sql"].includes(ext)) return "sql";
+  return "text";
+}
+
+function highlightSource(src, errorLines, lang) {
+  if (lang === "python") return highlightPython(src, errorLines);
+  return highlightSimple(src, errorLines, lang);
+}
+
+function highlightSimple(src, errorLines, lang) {
+  const table = {
+    shell: ["#", "if then else elif fi for while do done case esac function return select until in time local export unset readonly declare typeset trap source alias echo printf read cd pwd exit set shift eval exec let test"],
+    powershell: ["#", "function if else elseif foreach while do until switch return param filter try catch finally for break continue class enum throw begin process end in trap"],
+    js: ["//", "function return if else for while const let var class extends new this import export from async await try catch finally throw break continue switch case default typeof"],
+    sql: ["--", "select from where insert into update delete create table join left right inner on as and or not null group by order limit"],
+    batch: ["rem", "echo set if else goto call for in do exist not"],
+  };
+  const spec = table[lang] || ["#", ""];
+  const comment = spec[0];
+  const keywords = new Set(spec[1].split(" ").filter(Boolean));
+  return src.split("\n").map((line, index) => {
+    const html = highlightLine(line, comment, keywords);
+    return errorLines.has(index + 1) ? `<span class="errline">${html}</span>` : html;
+  }).join("\n");
+}
+
+function highlightLine(line, comment, keywords) {
+  let html = "";
+  let i = 0;
+  const commentAt = (pos) => {
+    if (comment === "rem") {
+      const head = line.slice(pos).match(/^\s*(?:rem\b|::)/i);
+      return head && pos === 0 ? head[0].length : 0;
+    }
+    return line.slice(pos, pos + comment.length) === comment ? comment.length : 0;
+  };
+  while (i < line.length) {
+    const mark = commentAt(i);
+    if (mark && (comment !== "rem" || /^\s*(?:rem\b|::)/i.test(line.slice(i)))) {
+      html += `<span class="comment">${esc(line.slice(i))}</span>`;
+      break;
+    }
+    const ch = line[i];
+    if (ch === '"' || ch === "'") {
+      let j = i + 1;
+      while (j < line.length && line[j] !== ch) j += line[j] === "\\" ? 2 : 1;
+      j = Math.min(line.length, j + 1);
+      html += `<span class="str">${esc(line.slice(i, j))}</span>`;
+      i = j;
+      continue;
+    }
+    if (ch === "$") {
+      const match = line.slice(i).match(/^\$\{[^}]+\}|^\$[A-Za-z_][A-Za-z0-9_]*/);
+      if (match) {
+        html += `<span class="fn">${esc(match[0])}</span>`;
+        i += match[0].length;
+        continue;
+      }
+    }
+    if (/[A-Za-z_]/.test(ch)) {
+      const match = line.slice(i).match(/^[A-Za-z_][A-Za-z0-9_]*/);
+      const word = match[0];
+      const cls = keywords.has(word.toLowerCase()) ? "kw" : "";
+      html += cls ? `<span class="${cls}">${esc(word)}</span>` : esc(word);
+      i += word.length;
+      continue;
+    }
+    if (/[0-9]/.test(ch)) {
+      const match = line.slice(i).match(/^\d+/);
+      html += `<span class="num">${esc(match[0])}</span>`;
+      i += match[0].length;
+      continue;
+    }
+    html += esc(ch);
+    i += 1;
+  }
+  return html;
+}
+
 function renderEditor() {
   const current = tab();
   const text = current ? current.content : "";
@@ -200,7 +288,8 @@ function renderEditor() {
     area.value = text;
     area.selectionStart = area.selectionEnd = Math.min(pos, text.length);
   }
-  highlightEl().innerHTML = highlightPython(text, errorLineSet()) + "\n";
+  const lang = languageOf(current && current.path);
+  highlightEl().innerHTML = highlightSource(text, errorLineSet(), lang) + "\n";
   renderGutter();
   renderTabs();
   syncScroll();
@@ -724,11 +813,44 @@ async function renderPackages(host) {
 
 function renderSearch(host) {
   const input = document.createElement("input");
+  input.id = "project-query";
   input.placeholder = "Suche in Dateien, Symbolen, Einstellungen";
-  input.onkeydown = async (event) => {
-    if (event.key !== "Enter") return;
+  const repl = document.createElement("input");
+  repl.id = "project-replace";
+  repl.placeholder = "Ersetzen durch, nur im Workspace";
+  const row = document.createElement("div");
+  const find = document.createElement("button");
+  find.type = "button";
+  find.textContent = "Suchen";
+  const preview = document.createElement("button");
+  preview.type = "button";
+  preview.textContent = "Vorschau";
+  const apply = document.createElement("button");
+  apply.type = "button";
+  apply.textContent = "Alle ersetzen";
+  const caseBox = document.createElement("label");
+  const caseInput = document.createElement("input");
+  caseInput.type = "checkbox";
+  caseInput.id = "project-case";
+  caseBox.appendChild(caseInput);
+  caseBox.append(" Groß/Klein");
+  const wordBox = document.createElement("label");
+  const wordInput = document.createElement("input");
+  wordInput.type = "checkbox";
+  wordInput.id = "project-word";
+  wordBox.appendChild(wordInput);
+  wordBox.append(" Ganzes Wort");
+  const regexBox = document.createElement("label");
+  const regexInput = document.createElement("input");
+  regexInput.type = "checkbox";
+  regexInput.id = "project-regex";
+  regexBox.appendChild(regexInput);
+  regexBox.append(" Regex");
+  const list = document.createElement("div");
+  list.id = "project-hits";
+  const runSearch = async () => {
     const data = await api("/api/search", { query: input.value });
-    const list = document.createElement("div");
+    list.textContent = "";
     data.hits.forEach((hit) => {
       const button = document.createElement("button");
       button.type = "button";
@@ -737,9 +859,21 @@ function renderSearch(host) {
       button.onclick = () => { if (hit.kind !== "setting") openPath(hit.path, hit.line); };
       list.appendChild(button);
     });
-    host.appendChild(list);
   };
+  input.onkeydown = (event) => { if (event.key === "Enter") runSearch().catch((err) => toast(err.message)); };
+  find.onclick = () => runSearch().catch((err) => toast(err.message));
+  preview.onclick = () => projectReplace(true).catch((err) => toast(err.message));
+  apply.onclick = () => projectReplace(false).catch((err) => toast(err.message));
+  row.appendChild(find);
+  row.appendChild(preview);
+  row.appendChild(apply);
+  row.appendChild(caseBox);
+  row.appendChild(wordBox);
+  row.appendChild(regexBox);
   host.appendChild(input);
+  host.appendChild(repl);
+  host.appendChild(row);
+  host.appendChild(list);
 }
 
 async function renderTodos(host) {
@@ -900,28 +1034,32 @@ function appendOutput(text) {
 }
 
 async function runFile(debug) {
-  const current = tab();
-  if (!current) return toast("Keine Datei");
-  unfoldAll();
-  await saveTab();
-  S.output = "";
-  setBottom("output");
-  if (!debug) {
-    const data = await api("/api/run", { mode: "file", path: current.path });
-    S.runId = data.id;
-    S.runFrom = 0;
-    pollRun();
-    updateStatus("Läuft");
-    return;
+  try {
+    const current = tab();
+    if (!current) return toast("Keine Datei");
+    unfoldAll();
+    await saveTab();
+    S.output = "";
+    if (!debug) {
+      setBottom("output");
+      const data = await api("/api/run", { mode: "file", path: current.path });
+      S.runId = data.id;
+      S.runFrom = 0;
+      pollRun();
+      updateStatus("Läuft");
+      return;
+    }
+    const points = Object.entries(S.breaks[current.path] || {}).map(([line, condition]) => ({
+      file: current.path, line: Number(line), condition: condition || null,
+    }));
+    await api("/api/debug/start", { path: current.path, breakpoints: points });
+    S.debugFrom = 0;
+    setBottom("debug");
+    pollDebug();
+    updateStatus("Debugger");
+  } catch (err) {
+    toast(err.message);
   }
-  const points = Object.entries(S.breaks[current.path] || {}).map(([line, condition]) => ({
-    file: current.path, line: Number(line), condition: condition || null,
-  }));
-  await api("/api/debug/start", { path: current.path, breakpoints: points });
-  S.debugFrom = 0;
-  setBottom("debug");
-  pollDebug();
-  updateStatus("Debugger");
 }
 
 async function pollRun() {
@@ -947,7 +1085,7 @@ async function pollDebug() {
     S.debugFile = data.paused.file;
     const locals = Object.entries(data.paused.locals || {}).map(([key, value]) => key + " = " + value).join("\n");
     S.debugText += `\nPause ${data.paused.reason} ${data.paused.file}:${data.paused.line}\n${locals}\n`;
-    if (data.paused.file && data.paused.file.endsWith(".py")) {
+    if (data.paused.file) {
       openPath(data.paused.file, data.paused.line).catch(() => {});
     }
     updateStatus("Pause Zeile " + data.paused.line);
@@ -1313,6 +1451,419 @@ async function loadPythons() {
   updateStatus();
 }
 
+function setBuffer(content, selStart, selEnd) {
+  const current = tab();
+  if (!current) return;
+  current.content = content;
+  current.dirty = content !== current.saved;
+  renderEditor();
+  const area = codeEl();
+  area.selectionStart = selStart;
+  area.selectionEnd = selEnd == null ? selStart : selEnd;
+  updateStatus();
+}
+
+function lineBounds(text, start, end) {
+  const from = text.lastIndexOf("\n", Math.max(0, start - 1)) + 1;
+  let to = text.indexOf("\n", Math.max(start, end));
+  if (to === -1) to = text.length;
+  if (end > start && text[end - 1] === "\n") to = end - 1;
+  return { start: from, end: to };
+}
+
+function lineIndexes(text, start, end) {
+  const bounds = lineBounds(text, start, end);
+  const startLine = text.slice(0, bounds.start).split("\n").length - 1;
+  const endLine = text.slice(0, bounds.end).split("\n").length - 1;
+  return { bounds, startLine, endLine };
+}
+
+function commentMark(path) {
+  const lang = languageOf(path);
+  if (lang === "js") return { line: "//" };
+  if (lang === "sql") return { line: "--" };
+  if (lang === "batch") return { line: "REM" };
+  return { line: "#" };
+}
+
+function toggleComment() {
+  const current = tab();
+  if (!current) return;
+  const area = codeEl();
+  const text = area.value;
+  const { bounds, startLine, endLine } = lineIndexes(text, area.selectionStart, area.selectionEnd);
+  const lines = text.split("\n");
+  const mark = commentMark(current.path).line;
+  const body = lines.slice(startLine, endLine + 1);
+  const commented = body.every((line) => !line.trim() || new RegExp("^\\s*" + mark.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\s?").test(line));
+  const next = body.map((line) => {
+    if (!line.trim()) return line;
+    if (commented) return line.replace(new RegExp("^(\\s*)" + mark.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\s?"), "$1");
+    return line.replace(/^(\s*)/, "$1" + mark + " ");
+  });
+  lines.splice(startLine, body.length, ...next);
+  const updated = lines.join("\n");
+  setBuffer(updated, bounds.start, bounds.start + next.join("\n").length);
+}
+
+function duplicateLines(dir) {
+  const current = tab();
+  if (!current) return;
+  const area = codeEl();
+  const text = area.value;
+  const info = lineIndexes(text, area.selectionStart, area.selectionEnd);
+  const lines = text.split("\n");
+  const block = lines.slice(info.startLine, info.endLine + 1);
+  const at = dir < 0 ? info.startLine : info.endLine + 1;
+  lines.splice(at, 0, ...block);
+  const updated = lines.join("\n");
+  const cursor = dir < 0 ? info.bounds.start : info.bounds.start + block.join("\n").length + 1;
+  setBuffer(updated, cursor, cursor);
+}
+
+function moveLines(dir) {
+  const current = tab();
+  if (!current) return;
+  const area = codeEl();
+  const text = area.value;
+  const info = lineIndexes(text, area.selectionStart, area.selectionEnd);
+  const lines = text.split("\n");
+  if (dir < 0 && info.startLine === 0) return;
+  if (dir > 0 && info.endLine >= lines.length - 1) return;
+  const block = lines.slice(info.startLine, info.endLine + 1);
+  if (dir > 0) {
+    const next = lines[info.endLine + 1];
+    lines.splice(info.startLine, block.length + 1, next, ...block);
+  } else {
+    const prev = lines[info.startLine - 1];
+    lines.splice(info.startLine - 1, block.length + 1, ...block, prev);
+  }
+  const updated = lines.join("\n");
+  const lineStart = updated.split("\n").slice(0, info.startLine + dir).join("\n");
+  const pos = lineStart.length ? lineStart.length + 1 : 0;
+  setBuffer(updated, pos, pos + block.join("\n").length);
+}
+
+function deleteLines() {
+  const current = tab();
+  if (!current) return;
+  const area = codeEl();
+  const text = area.value;
+  const info = lineIndexes(text, area.selectionStart, area.selectionEnd);
+  const lines = text.split("\n");
+  lines.splice(info.startLine, info.endLine - info.startLine + 1);
+  const updated = lines.join("\n");
+  const prefix = updated.split("\n").slice(0, info.startLine).join("\n");
+  const pos = prefix.length ? prefix.length + (info.startLine ? 1 : 0) : 0;
+  setBuffer(updated, pos, pos);
+}
+
+function joinLines() {
+  const current = tab();
+  if (!current) return;
+  const area = codeEl();
+  const text = area.value;
+  const info = lineIndexes(text, area.selectionStart, area.selectionEnd);
+  const lines = text.split("\n");
+  const target = info.startLine;
+  if (target >= lines.length - 1) return;
+  lines[target] = lines[target].replace(/\s*$/, "") + " " + lines[target + 1].replace(/^\s*/, "");
+  lines.splice(target + 1, 1);
+  const updated = lines.join("\n");
+  const pos = updated.split("\n").slice(0, target).join("\n").length + (target ? 1 : 0) + lines[target].length;
+  setBuffer(updated, pos, pos);
+}
+
+function shiftLines(out) {
+  const current = tab();
+  if (!current) return;
+  const area = codeEl();
+  const text = area.value;
+  const info = lineIndexes(text, area.selectionStart, area.selectionEnd);
+  const lines = text.split("\n");
+  for (let index = info.startLine; index <= info.endLine; index += 1) {
+    lines[index] = out ? lines[index].replace(/^(?:\t| {1,4})/, "") : "\t" + lines[index];
+  }
+  const updated = lines.join("\n");
+  setBuffer(updated, info.bounds.start, info.bounds.start);
+}
+
+function indentOrTab() {
+  const area = codeEl();
+  if (area.selectionStart !== area.selectionEnd && area.value.slice(area.selectionStart, area.selectionEnd).includes("\n")) {
+    shiftLines(false);
+    return;
+  }
+  const current = tab();
+  if (!current) return;
+  const start = area.selectionStart;
+  setBuffer(area.value.slice(0, start) + "\t" + area.value.slice(area.selectionEnd), start + 1, start + 1);
+}
+
+function toggleCase() {
+  const current = tab();
+  if (!current) return;
+  const area = codeEl();
+  let start = area.selectionStart;
+  let end = area.selectionEnd;
+  const text = area.value;
+  if (start === end) {
+    const left = text.slice(0, start).match(/[A-Za-z0-9_]*$/) || [""];
+    const right = text.slice(start).match(/^[A-Za-z0-9_]*/) || [""];
+    start -= left[0].length;
+    end += right[0].length;
+  }
+  if (start === end) return;
+  const raw = text.slice(start, end);
+  const next = raw === raw.toLowerCase() ? raw.toUpperCase() : raw.toLowerCase();
+  setBuffer(text.slice(0, start) + next + text.slice(end), start, start + next.length);
+}
+
+function toggleWrap() {
+  S.wrap = !S.wrap;
+  $("editor").classList.toggle("wrap", S.wrap);
+  toast(S.wrap ? "Zeilenumbruch an" : "Zeilenumbruch aus");
+}
+
+function editorHistory(redo) {
+  const area = codeEl();
+  area.focus();
+  document.execCommand(redo ? "redo" : "undo");
+  const current = tab();
+  if (!current) return;
+  current.content = area.value;
+  current.dirty = current.content !== current.saved;
+  renderEditor();
+}
+
+function goToLine() {
+  promptModal("Gehe zu Zeile", "Zeilennummer", String(cursorPos().line), (value) => {
+    const line = Number(value);
+    if (!line || line < 1) return;
+    revealLine(line);
+  });
+}
+
+function selectNextOccurrence() {
+  const current = tab();
+  if (!current) return;
+  const area = codeEl();
+  const text = area.value;
+  let needle = text.slice(area.selectionStart, area.selectionEnd);
+  let from = area.selectionEnd;
+  if (!needle) {
+    const left = text.slice(0, area.selectionStart).match(/[A-Za-z0-9_]*$/) || [""];
+    const right = text.slice(area.selectionStart).match(/^[A-Za-z0-9_]*/) || [""];
+    needle = left[0] + right[0];
+    from = area.selectionStart - left[0].length;
+    if (!needle) return;
+    area.selectionStart = from;
+    area.selectionEnd = from + needle.length;
+    return;
+  }
+  let at = text.indexOf(needle, from);
+  if (at < 0) at = text.indexOf(needle, 0);
+  if (at < 0) return;
+  area.selectionStart = at;
+  area.selectionEnd = at + needle.length;
+  area.focus();
+}
+
+function findOptions() {
+  return {
+    query: $("find-query").value,
+    replacement: $("find-replace").value,
+    case: $("find-case").classList.contains("on"),
+    word: $("find-word").classList.contains("on"),
+    regex: $("find-regex").classList.contains("on"),
+  };
+}
+
+function findPattern(options) {
+  if (!options.query) return null;
+  let source = options.regex ? options.query : options.query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  if (options.word) source = "\\b(?:" + source + ")\\b";
+  return new RegExp(source, options.case ? "g" : "gi");
+}
+
+function findMatches(text, options) {
+  const pattern = findPattern(options);
+  if (!pattern) return [];
+  const found = [];
+  let match;
+  while ((match = pattern.exec(text)) && found.length < 5000) {
+    if (!match[0]) pattern.lastIndex += 1;
+    found.push({ start: match.index, end: match.index + match[0].length, text: match[0] });
+  }
+  return found;
+}
+
+function refreshFindCount() {
+  const current = tab();
+  const node = $("find-count");
+  if (!current || !node) return;
+  try {
+    const count = findMatches(current.content, findOptions()).length;
+    node.textContent = count ? count + " Treffer" : "kein Treffer";
+  } catch (err) {
+    node.textContent = "Muster ungültig";
+  }
+}
+
+function openFind(replace) {
+  $("findbar").classList.remove("hidden");
+  const area = codeEl();
+  const selected = area.value.slice(area.selectionStart, area.selectionEnd);
+  if (selected && !selected.includes("\n")) $("find-query").value = selected;
+  (replace ? $("find-replace") : $("find-query")).focus();
+  if (!replace) $("find-query").select();
+  refreshFindCount();
+}
+
+function closeFind() {
+  $("findbar").classList.add("hidden");
+  codeEl().focus();
+}
+
+function findNext(dir) {
+  const current = tab();
+  if (!current) return;
+  if ($("findbar").classList.contains("hidden")) openFind(false);
+  let matches;
+  try {
+    matches = findMatches(current.content, findOptions());
+  } catch (err) {
+    $("find-count").textContent = "Muster ungültig";
+    return;
+  }
+  refreshFindCount();
+  if (!matches.length) return;
+  const area = codeEl();
+  const pos = dir < 0 ? area.selectionStart : area.selectionEnd;
+  let pick = dir < 0 ? matches[matches.length - 1] : matches[0];
+  if (dir < 0) {
+    for (let index = matches.length - 1; index >= 0; index -= 1) {
+      if (matches[index].end <= pos) { pick = matches[index]; break; }
+    }
+  } else {
+    for (const item of matches) {
+      if (item.start >= pos) { pick = item; break; }
+    }
+  }
+  area.focus();
+  area.selectionStart = pick.start;
+  area.selectionEnd = pick.end;
+}
+
+function replaceCurrent(all) {
+  const current = tab();
+  if (!current) return;
+  const options = findOptions();
+  let pattern;
+  try {
+    pattern = findPattern(options);
+  } catch (err) {
+    toast("Muster ungültig");
+    return;
+  }
+  if (!pattern) return;
+  const area = codeEl();
+  if (all) {
+    const before = findMatches(current.content, options).length;
+    const next = options.regex
+      ? current.content.replace(pattern, options.replacement)
+      : current.content.replace(pattern, () => options.replacement);
+    setBuffer(next, 0, 0);
+    toast(before + " ersetzt");
+    refreshFindCount();
+    return;
+  }
+  const matches = findMatches(current.content, options);
+  const selected = matches.find((item) => item.start === area.selectionStart && item.end === area.selectionEnd);
+  if (!selected) {
+    findNext(1);
+    return;
+  }
+  const next = current.content.slice(0, selected.start) + options.replacement + current.content.slice(selected.end);
+  const cursor = selected.start + options.replacement.length;
+  setBuffer(next, cursor, cursor);
+  refreshFindCount();
+  findNext(1);
+}
+
+function openProjectReplace() {
+  setBottom("search");
+  setTimeout(() => {
+    const node = $("project-replace");
+    if (node) node.focus();
+  }, 0);
+}
+
+async function projectReplace(preview) {
+  const query = ($("project-query") && $("project-query").value || "").trim();
+  if (query.length < 1) return toast("Suchtext fehlt");
+  if (!preview && !confirm("Treffer im Workspace ersetzen?")) return;
+  const data = await api("/api/replace", {
+    query,
+    replacement: ($("project-replace") && $("project-replace").value) || "",
+    case: $("project-case") && $("project-case").checked,
+    word: $("project-word") && $("project-word").checked,
+    regex: $("project-regex") && $("project-regex").checked,
+    preview,
+  });
+  const host = $("project-hits");
+  if (host) {
+    host.textContent = "";
+    const head = document.createElement("div");
+    head.textContent = data.replacements + " Treffer in " + data.files.length + " Dateien" + (data.truncated ? " (Liste gekürzt)" : "");
+    host.appendChild(head);
+    data.files.forEach((file) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "hit";
+      const sample = (file.lines[0] && file.lines[0].text) || "";
+      button.textContent = file.count + "  " + file.path + "  " + sample;
+      button.onclick = () => openPath(file.path, file.lines[0] ? file.lines[0].line : 1);
+      host.appendChild(button);
+    });
+  }
+  if (!preview) {
+    toast(data.replacements + " Stellen ersetzt");
+    const current = tab();
+    if (current && current.path) {
+      const fresh = await apiGet("/api/file?path=" + encodeURIComponent(current.path));
+      current.content = fresh.content;
+      current.saved = fresh.content;
+      current.dirty = false;
+      renderEditor();
+    }
+  }
+}
+
+function bindFindbar() {
+  const toggle = (id) => {
+    $(id).classList.toggle("on");
+    refreshFindCount();
+  };
+  $("find-case").onclick = () => toggle("find-case");
+  $("find-word").onclick = () => toggle("find-word");
+  $("find-regex").onclick = () => toggle("find-regex");
+  $("find-prev").onclick = () => findNext(-1);
+  $("find-next").onclick = () => findNext(1);
+  $("find-one").onclick = () => replaceCurrent(false);
+  $("find-all").onclick = () => replaceCurrent(true);
+  $("find-close").onclick = () => closeFind();
+  $("find-query").addEventListener("input", refreshFindCount);
+  $("find-query").addEventListener("keydown", (event) => {
+    if (event.key === "Enter") { event.preventDefault(); findNext(event.shiftKey ? -1 : 1); }
+    if (event.key === "Escape") { event.preventDefault(); closeFind(); }
+  });
+  $("find-replace").addEventListener("keydown", (event) => {
+    if (event.key === "Enter") { event.preventDefault(); replaceCurrent(event.ctrlKey || event.metaKey); }
+    if (event.key === "Escape") { event.preventDefault(); closeFind(); }
+  });
+}
+
 function buildMenus() {
   const menus = [
     ["Datei", [
@@ -1324,10 +1875,23 @@ function buildMenus() {
       ["Alles speichern", saveTab],
     ]],
     ["Bearbeiten", [
+      ["Rückgängig", () => editorHistory(false), "Strg+Z"],
+      ["Wiederholen", () => editorHistory(true), "Strg+Y"],
       ["Ausschneiden", cutSelection, "Strg+X"],
       ["Kopieren", () => copySelection(false), "Strg+C"],
       ["Bereich kopieren…", copyRange],
       ["Einfügen", pasteClip, "Strg+V"],
+      ["Suchen…", () => openFind(false), "Strg+F"],
+      ["Ersetzen…", () => openFind(true), "Strg+H"],
+      ["Zeile kommentieren", toggleComment, "Strg+/"],
+      ["Zeile duplizieren", () => duplicateLines(1), "Umschalt+Alt+↓"],
+      ["Zeile nach oben", () => moveLines(-1), "Alt+↑"],
+      ["Zeile nach unten", () => moveLines(1), "Alt+↓"],
+      ["Zeile löschen", deleteLines, "Strg+Umschalt+K"],
+      ["Zeilen verbinden", joinLines, "Strg+Umschalt+J"],
+      ["Groß-/Kleinschreibung", toggleCase, "Strg+Umschalt+U"],
+      ["Nächstes Vorkommen", selectNextOccurrence, "Strg+D"],
+      ["Zeilenumbruch", toggleWrap, "Alt+Z"],
       ["Formatieren", formatCurrent, "Umschalt+Alt+F"],
       ["Snippet einfügen", pickSnippet],
       ["Falten", () => foldAt(cursorPos().line)],
@@ -1335,7 +1899,9 @@ function buildMenus() {
     ]],
     ["Navigieren", [
       ["Gehe zu Definition", gotoDef, "F12"],
+      ["Gehe zu Zeile…", goToLine, "Strg+G"],
       ["Suche überall", () => setBottom("search"), "Strg+Umschalt+F"],
+      ["In Dateien ersetzen…", openProjectReplace, "Strg+Umschalt+H"],
       ["Gliederung", () => showSide("outline")],
       ["TODO", () => setBottom("todo")],
       ["Lesezeichen", addBookmark],
@@ -1634,8 +2200,9 @@ function addBookmark() {
 
 async function runSelection() {
   const text = selectedText();
+  const current = tab();
   if (!text) return toast("Nichts markiert");
-  const data = await api("/api/run", { mode: "selection", content: text });
+  const data = await api("/api/run", { mode: "selection", content: text, path: current ? current.path : "" });
   S.runId = data.id;
   S.runFrom = 0;
   S.output = "";
@@ -1991,7 +2558,7 @@ async function startCollab() {
 
 function showKeys() {
   const body = document.createElement("pre");
-  body.textContent = "Strg+S Speichern\nStrg+X Ausschneiden\nStrg+C Kopieren\nStrg+V Einfügen\nStrg+F5 Ausführen\nF5 Debug/Weiter\nF9 Haltepunkt\nF10 Schritt über\nF11 Schritt hinein\nF12 Definition\nStrg+K Inline-KI\nStrg+Eingabe Prompt senden\nStrg+Leertaste Vervollständigen\nStrg+Umschalt+F Suche";
+  body.textContent = "Strg+S Speichern\nStrg+Z Rückgängig\nStrg+Y Wiederholen\nStrg+X Ausschneiden\nStrg+C Kopieren\nStrg+V Einfügen\nStrg+F Suchen\nStrg+H Ersetzen\nStrg+/ Zeile kommentieren\nStrg+D Nächstes Vorkommen\nAlt+↑/↓ Zeile verschieben\nUmschalt+Alt+↓ Zeile duplizieren\nStrg+Umschalt+K Zeile löschen\nStrg+G Gehe zu Zeile\nStrg+F5 Ausführen\nF5 Debug/Weiter\nF9 Haltepunkt\nF10 Schritt über\nF11 Schritt hinein\nF12 Definition\nStrg+K Inline-KI\nStrg+Eingabe Prompt senden\nStrg+Leertaste Vervollständigen\nStrg+Umschalt+F Suche\nStrg+Umschalt+H In Dateien ersetzen";
   modal("Tastatur", body, [{ label: "Schließen", run: () => {} }]);
 }
 
@@ -2017,11 +2584,30 @@ function onKey(event) {
   else if (event.key === "F10") { event.preventDefault(); debugCmd("step"); }
   else if (event.key === "F11") { event.preventDefault(); debugCmd("step_into"); }
   else if (event.key === "F12") { event.preventDefault(); gotoDef(); }
-  else if (event.ctrlKey && key === "k") { event.preventDefault(); inlineEdit(); }
+  else if (event.ctrlKey && key === "k" && !event.shiftKey) { event.preventDefault(); inlineEdit(); }
   else if (event.ctrlKey && event.code === "Space") { event.preventDefault(); completeAt(); }
   else if (S.complete.length && event.key === "ArrowDown") { event.preventDefault(); moveComplete(1); }
   else if (S.complete.length && event.key === "ArrowUp") { event.preventDefault(); moveComplete(-1); }
   else if (S.complete.length && (event.key === "Enter" || event.key === "Tab")) { event.preventDefault(); acceptComplete(S.completeIndex); }
+  else if (event.key === "Tab") { event.preventDefault(); event.shiftKey ? shiftLines(true) : indentOrTab(); }
+  else if (event.ctrlKey && !event.altKey && key === "f") { event.preventDefault(); openFind(false); }
+  else if (event.ctrlKey && !event.altKey && key === "h") { event.preventDefault(); openFind(true); }
+  else if (event.key === "F3") { event.preventDefault(); findNext(event.shiftKey ? -1 : 1); }
+  else if (event.ctrlKey && (key === "/" || key === "#" || event.code === "Slash")) { event.preventDefault(); toggleComment(); }
+  else if (event.ctrlKey && !event.shiftKey && key === "d") { event.preventDefault(); selectNextOccurrence(); }
+  else if (event.ctrlKey && !event.shiftKey && key === "g") { event.preventDefault(); goToLine(); }
+  else if (event.ctrlKey && event.shiftKey && key === "k") { event.preventDefault(); deleteLines(); }
+  else if (event.ctrlKey && event.shiftKey && key === "j") { event.preventDefault(); joinLines(); }
+  else if (event.ctrlKey && event.shiftKey && key === "u") { event.preventDefault(); toggleCase(); }
+  else if (event.ctrlKey && event.shiftKey && key === "f") { event.preventDefault(); setBottom("search"); }
+  else if (event.ctrlKey && event.shiftKey && key === "h") { event.preventDefault(); openProjectReplace(); }
+  else if (event.altKey && event.shiftKey && event.key === "ArrowDown") { event.preventDefault(); duplicateLines(1); }
+  else if (event.altKey && event.shiftKey && event.key === "ArrowUp") { event.preventDefault(); duplicateLines(-1); }
+  else if (event.altKey && !event.shiftKey && !event.ctrlKey && event.key === "ArrowUp") { event.preventDefault(); moveLines(-1); }
+  else if (event.altKey && !event.shiftKey && !event.ctrlKey && event.key === "ArrowDown") { event.preventDefault(); moveLines(1); }
+  else if (event.altKey && !event.ctrlKey && key === "z") { event.preventDefault(); toggleWrap(); }
+  else if (event.ctrlKey && !event.shiftKey && key === "z") { event.preventDefault(); editorHistory(false); }
+  else if ((event.ctrlKey && key === "y") || (event.ctrlKey && event.shiftKey && key === "z")) { event.preventDefault(); editorHistory(true); }
   else if (event.key === "Escape") hidePopup();
 }
 
@@ -2054,6 +2640,7 @@ async function boot() {
   document.querySelectorAll("[data-side]").forEach((button) => {
     button.onclick = () => showSide(button.dataset.side);
   });
+  bindFindbar();
   $("btn-run").onclick = () => runFile(false);
   $("btn-debug").onclick = () => runFile(true);
   $("btn-stop").onclick = () => stopAll();
@@ -2079,7 +2666,7 @@ async function boot() {
     if (!current) return;
     current.content = area.value;
     current.dirty = current.content !== current.saved;
-    highlightEl().innerHTML = highlightPython(current.content, errorLineSet()) + "\n";
+    highlightEl().innerHTML = highlightSource(current.content, errorLineSet(), languageOf(current.path)) + "\n";
     renderGutter();
     renderTabs();
     scheduleAnalyze();

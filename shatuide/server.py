@@ -19,9 +19,11 @@ from urllib.parse import parse_qs, unquote, urlparse
 
 from shatuide import __author__, __email__, __version__
 from shatuide import ai, analysis, config, database, frameworks, history, http_client, integrations, notebook
-from shatuide import refactor, remote, runner, snippets, testing, tools, vcs
+from shatuide import refactor, remote, runner, scripting, snippets, testing, tools, vcs
 from shatuide.complete import completions
 from shatuide.debug_session import DebugSession
+from shatuide.edit import replace_project
+from shatuide.shell_debug import PowerShellDebugSession, ShellDebugSession
 from shatuide.formatter import format_source
 from shatuide.icon_util import load_icon_bytes
 from shatuide.paths import SKIP_DIRS, STATIC, default_workspace, inside, meta_dir
@@ -766,6 +768,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(data)))
+        self.send_header("Cache-Control", "no-store")
         self.end_headers()
         self.wfile.write(data)
 
@@ -879,6 +882,8 @@ class Handler(BaseHTTPRequestHandler):
             self._json({"ok": True, "hits": hits})
         elif path == "/api/search":
             self._json({"ok": True, "hits": self._search(str(payload.get("query") or ""))})
+        elif path == "/api/replace":
+            self._json(self._replace(payload))
         elif path == "/api/rename":
             self._json(self._rename(payload))
         elif path == "/api/extract":
@@ -1048,6 +1053,17 @@ class Handler(BaseHTTPRequestHandler):
         self.app.sessions[ident] = session
         return {"ok": True, "id": ident}
 
+    def _replace(self, payload: dict) -> dict:
+        return replace_project(
+            self.app.workspace,
+            str(payload.get("query") or ""),
+            str(payload.get("replacement") or ""),
+            case=bool(payload.get("case")),
+            word=bool(payload.get("word")),
+            regex=bool(payload.get("regex")),
+            preview=bool(payload.get("preview", True)),
+        )
+
     def _run(self, payload: dict) -> dict:
         mode = str(payload.get("mode") or "file")
         python = self.app.python_exe()
@@ -1055,9 +1071,14 @@ class Handler(BaseHTTPRequestHandler):
         if mode == "selection":
             folder = meta_dir(Path(self.app.workspace)) / "tmp"
             folder.mkdir(parents=True, exist_ok=True)
-            script = folder / "selection.py"
+            suffix = scripting.selection_suffix(path)
+            script = folder / f"selection{suffix}"
             script.write_text(runner.selection_code(str(payload.get("content") or "")), encoding="utf-8")
-            return self._session(runner.run_args(python, str(script), payload.get("args") or []), self.app.workspace)
+            try:
+                argv = scripting.run_argv(str(script), python, payload.get("args") or [])
+            except RuntimeError as exc:
+                return {"ok": False, "error": str(exc)}
+            return self._session(argv, self.app.workspace)
         if mode == "framework":
             argv = payload.get("argv") or []
             if not isinstance(argv, list) or not argv:
@@ -1069,14 +1090,28 @@ class Handler(BaseHTTPRequestHandler):
         script = self.app.resolve_any(path)
         cwd = str(script.parent if script.is_file() else Path(self.app.workspace))
         if mode == "pyinstaller":
+            if scripting.language_of(str(script)) != "python":
+                return {"ok": False, "error": "PyInstaller packt nur Python-Dateien."}
             return self._session(runner.pyinstaller_args(python, str(script)), cwd)
-        return self._session(runner.run_args(python, str(script), payload.get("args") or []), cwd)
+        try:
+            argv = scripting.run_argv(str(script), python, payload.get("args") or [])
+        except RuntimeError as exc:
+            return {"ok": False, "error": str(exc)}
+        return self._session(argv, cwd)
 
     def _compile(self, payload: dict) -> dict:
         mode = str(payload.get("mode") or "file")
         if mode == "project":
             return runner.compile_tree(self.app.workspace)
         path = str(payload.get("path") or "")
+        if mode == "check" or (path and scripting.language_of(path) in {"shell", "powershell", "batch"}):
+            if mode != "check" and path and scripting.language_of(path) == "python":
+                return runner.compile_file(str(self.app.resolve_any(path)))
+            content = payload.get("content")
+            target = str(self.app.resolve_any(path)) if path and content is None and mode != "check" else (path or "<memory>")
+            if path and content is None and mode != "check":
+                return scripting.syntax_check(target, None)
+            return scripting.syntax_check(path or "<memory>", None if content is None else str(content))
         if not path:
             source = str(payload.get("content") or "")
             try:
@@ -1089,14 +1124,25 @@ class Handler(BaseHTTPRequestHandler):
     def _debug_start(self, payload: dict) -> dict:
         if self.app.debug:
             self.app.debug.close()
+            self.app.debug = None
         script = self.app.resolve_any(str(payload.get("path") or ""))
         if not script.is_file():
             return {"ok": False, "error": "Datei nicht gefunden."}
         points = payload.get("breakpoints") or []
-        session = DebugSession()
         bp_file = meta_dir(Path(self.app.workspace)) / "breakpoints.json"
+        lang = scripting.language_of(str(script))
         try:
-            session.start(self.app.python_exe(), str(script), str(script.parent), points, bp_file)
+            if lang == "shell":
+                session = ShellDebugSession()
+                session.start(str(script), str(script.parent), points, bp_file)
+            elif lang == "powershell":
+                session = PowerShellDebugSession()
+                session.start(str(script), str(script.parent), points, bp_file)
+            elif lang == "python":
+                session = DebugSession()
+                session.start(self.app.python_exe(), str(script), str(script.parent), points, bp_file)
+            else:
+                return {"ok": False, "error": "Debuggen gibt es für Python, Bash und PowerShell."}
         except Exception as exc:
             return {"ok": False, "error": str(exc)}
         self.app.debug = session

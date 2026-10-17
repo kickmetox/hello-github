@@ -58,8 +58,14 @@ TEXT_SUFFIXES = {
     ".env",
     ".gitignore",
     ".bat",
+    ".cmd",
     ".ps1",
+    ".psm1",
+    ".psd1",
     ".sh",
+    ".bash",
+    ".zsh",
+    ".ksh",
 }
 
 
