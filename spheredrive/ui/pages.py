@@ -4,14 +4,16 @@ from __future__ import annotations
 
 import os
 import tkinter as tk
-from tkinter import filedialog
+from tkinter import filedialog, ttk
 
-from spheredrive.catalog import COMPARISON, GUIDE, LINK_KINDS, PERMISSIONS, PS_PROVIDERS
+from spheredrive.catalog import COMPARISON, LINK_KINDS, PERMISSIONS, PS_PROVIDERS
 from spheredrive.commands import build_unc, normalize_letter, suggest_letter
-from spheredrive.models import LinkSpec, MountSpec, NetSpec, OpResult, PsSpec, ShareSpec, Snapshot, SubstSpec
+from spheredrive.models import DriveCard, LinkSpec, MountSpec, NetSpec, OpResult, PsSpec, ShareSpec, Snapshot, SubstSpec
 from spheredrive.paths import WORK_DIR
+from spheredrive.ui.drive_dialog import DriveDialog, disconnect_card, explorer_target, paint_drive
 from spheredrive.ui.widgets import (
     Button,
+    L,
     P,
     Page,
     buttons,
@@ -44,81 +46,307 @@ def _used_letters(snap: Snapshot) -> set[str]:
 
 
 class OverviewPage(Page):
+    """Kachelansicht wie im Explorer: Klick öffnet alle zulässigen Aktionen des Laufwerks."""
+
     def __init__(self, master: tk.Misc, app: tk.Misc) -> None:
         super().__init__(
             master,
             app,
-            "Übersicht",
-            "Virtuelle Laufwerke, Netzwerkfreigaben, NTFS-Verknüpfungen und Bereitstellungspunkte.",
+            "Laufwerkszuordnungen",
+            "Kachel anklicken zeigt alle Möglichkeiten für dieses Laufwerk.",
+            surface="light",
+            show_heading=False,
         )
-        cards = tk.Frame(self.body, bg=P.bg)
-        cards.pack(fill="x", pady=(0, 10))
-        self.metrics: dict[str, tk.Label] = {}
-        for key, title in (("subst", "Subst"), ("net", "Netzlaufwerke"), ("links", "Verknüpfungen"), ("volumes", "Volumes")):
-            card = tk.Frame(cards, bg=P.card, highlightthickness=1, highlightbackground=P.line)
-            card.pack(side="left", fill="both", expand=True, padx=(0, 8))
-            value = tk.Label(card, text="0", bg=P.card, fg=P.text, font=(P.font, 22, "bold"))
-            value.pack(anchor="w", padx=14, pady=(10, 0))
-            tk.Label(card, text=title, bg=P.card, fg=P.muted, font=(P.font, 10)).pack(anchor="w", padx=14, pady=(0, 12))
-            self.metrics[key] = value
-        holder, self.tree = mount_tree(
+        self.cards: list[DriveCard] = []
+        self.view = tk.StringVar(value="grid")
+        self.show_all = tk.BooleanVar(value=True)
+        self.tile_widgets: list[tk.Frame] = []
+        self._by_letter: dict[str, DriveCard] = {}
+        self._cols = 0
+        self._dialog: DriveDialog | None = None
+        self.show_all.trace_add("write", lambda *_args: self._filter_changed())
+        self._build_toolbar()
+        self.empty = tk.Label(
             self.body,
-            [
-                ("typ", "Typ", 120),
-                ("name", "Name", 140),
-                ("ziel", "Ziel", 360),
-                ("status", "Status", 140),
-                ("dauer", "Dauerhaft", 100),
-            ],
-            height=9,
-        )
-        holder.pack(fill="both", expand=True)
-        self.tree.bind("<Double-1>", self.open_selected)
-        guide = "\n".join(f"• {title}: {text}" for title, text in GUIDE)
-        tk.Label(
-            self.body,
-            text=guide,
-            bg=P.bg,
-            fg=P.muted,
-            justify="left",
+            text="Keine virtuellen Laufwerke. „Hinzufügen“ legt ein Subst- oder Netzlaufwerk an.",
+            bg=L.bg,
+            fg=L.muted,
+            font=(P.font, 11),
             anchor="w",
+        )
+        self.gallery = tk.Frame(self.body, bg=L.bg)
+        self.gallery.bind("<Configure>", self._on_gallery_configure)
+        self._build_list()
+        style = ttk.Style(self)
+        style.configure(
+            "Drive.Treeview",
+            background=L.paper,
+            fieldbackground=L.paper,
+            foreground=L.text,
+            rowheight=32,
+            borderwidth=0,
             font=(P.font, 10),
-            wraplength=900,
-        ).pack(anchor="w", pady=(10, 0))
-        self._open: dict[str, str] = {}
+        )
+        style.configure(
+            "Drive.Treeview.Heading",
+            background="#eef1f5",
+            foreground=L.muted,
+            relief="flat",
+            font=(P.font, 10),
+        )
+        style.map("Drive.Treeview", background=[("selected", L.accent_soft)], foreground=[("selected", L.text)])
+
+    def _build_toolbar(self) -> None:
+        bar = tk.Frame(self.body, bg=L.bg)
+        bar.pack(fill="x", pady=(0, 8))
+        self._tool(bar, "+ Hinzufügen", self.open_add, primary=True).pack(side="left")
+        self._tool(bar, "Aktualisieren", self.app.refresh_all).pack(side="left", padx=(8, 14))
+        tk.Checkbutton(
+            bar,
+            text="Alle Laufwerke anzeigen",
+            variable=self.show_all,
+            bg=L.bg,
+            fg=L.text,
+            activebackground=L.bg,
+            activeforeground=L.text,
+            selectcolor=L.paper,
+            font=(P.font, 10),
+            highlightthickness=0,
+        ).pack(side="left")
+        views = tk.Frame(bar, bg=L.bg)
+        views.pack(side="right")
+        self.list_button = self._tool(views, "Liste", lambda: self._set_view("list"))
+        self.grid_button = self._tool(views, "Kacheln", lambda: self._set_view("grid"))
+        self.grid_button.pack(side="right")
+        self.list_button.pack(side="right", padx=(0, 6))
+        self._mark_view()
+
+    def _build_list(self) -> None:
+        self.list_holder = tk.Frame(self.body, bg=L.paper, highlightthickness=1, highlightbackground=L.line)
+        columns = ("title", "kind", "target", "status", "persistent")
+        self.tree = ttk.Treeview(
+            self.list_holder,
+            columns=columns,
+            show="headings",
+            selectmode="browse",
+            height=12,
+            style="Drive.Treeview",
+        )
+        headings = (
+            ("title", "Laufwerk", 220),
+            ("kind", "Art", 180),
+            ("target", "Ziel", 320),
+            ("status", "Status", 120),
+            ("persistent", "Dauerhaft", 100),
+        )
+        for index, (cid, heading, width) in enumerate(headings):
+            self.tree.heading(cid, text=heading, anchor="w")
+            self.tree.column(cid, width=width, minwidth=70, anchor="w", stretch=index == 2)
+        scroll = ttk.Scrollbar(self.list_holder, orient="vertical", command=self.tree.yview)
+        self.tree.configure(yscrollcommand=scroll.set)
+        self.tree.grid(row=0, column=0, sticky="nsew")
+        scroll.grid(row=0, column=1, sticky="ns")
+        self.list_holder.rowconfigure(0, weight=1)
+        self.list_holder.columnconfigure(0, weight=1)
+        self.tree.bind("<Double-1>", self._open_tree)
+        self.tree.tag_configure("good", foreground=P.ok)
+        self.tree.tag_configure("warn", foreground=P.warn)
+        self.tree.tag_configure("bad", foreground=P.danger)
+        self.tree.tag_configure("muted", foreground=L.muted)
+
+    def _tool(self, parent: tk.Misc, text: str, command, primary: bool = False) -> tk.Button:
+        return tk.Button(
+            parent,
+            text=text,
+            command=command,
+            bg=L.accent if primary else L.paper,
+            fg="#ffffff" if primary else L.text,
+            activebackground="#185d90" if primary else L.hover,
+            activeforeground="#ffffff" if primary else L.text,
+            relief="flat",
+            bd=0,
+            highlightthickness=1,
+            highlightbackground=L.accent if primary else L.line,
+            padx=10,
+            pady=5,
+            font=(P.font, 10),
+            cursor="hand2",
+        )
+
+    def _mark_view(self) -> None:
+        grid = self.view.get() == "grid"
+        self.grid_button.configure(bg=L.accent_soft if grid else L.paper)
+        self.list_button.configure(bg=L.paper if grid else L.accent_soft)
+
+    def _set_view(self, name: str) -> None:
+        self.view.set(name)
+        self._mark_view()
+        self._render()
+
+    def _filter_changed(self) -> None:
+        if self.app.snapshot is not None:
+            self.refresh(self.app.snapshot)
 
     def refresh(self, snap: Snapshot) -> None:
-        self.metrics["subst"].configure(text=str(len(snap.subst)))
-        self.metrics["net"].configure(text=str(len(snap.net)))
-        self.metrics["links"].configure(text=str(len(snap.links)))
-        self.metrics["volumes"].configure(text=str(len(snap.volumes)))
+        self.cards = list(self.app.service.drive_cards(bool(self.show_all.get()), snap))
+        self._render()
+        self.after_idle(self._fit_content)
+
+    def _render(self) -> None:
+        self._by_letter = {card.letter: card for card in self.cards}
+        if not self.cards:
+            self.gallery.pack_forget()
+            self.list_holder.pack_forget()
+            self.empty.pack(anchor="w", pady=28)
+            return
+        self.empty.pack_forget()
+        if self.view.get() == "list":
+            self.gallery.pack_forget()
+            self._fill_list()
+            self.list_holder.pack(fill="both", expand=True, pady=(4, 0))
+            return
+        self.list_holder.pack_forget()
+        self._fill_grid()
+        self.gallery.pack(fill="both", expand=True)
+
+    def _fill_list(self) -> None:
         clear_tree(self.tree)
-        self._open.clear()
-        for item in snap.subst:
-            self._put("Subst", f"{item.letter}:", item.path, item.status, yes_no(item.persistent), f"{item.letter}:\\")
-        for item in snap.net:
-            self._put("Netz", f"{item.letter}:", item.remote, item.status, yes_no(item.persistent), f"{item.letter}:\\")
-        for item in snap.links:
-            self._put("Link", item.kind, item.link, item.status, "Ja", item.link)
-        for item in snap.psdrives:
-            self._put("PowerShell", item.name, item.root, item.status, yes_no(item.profile), item.root)
-        for item in snap.volumes:
-            if not item.mounts:
-                continue
-            self._put("Volume", item.label or "Volume", ", ".join(item.mounts), "bereit", "Ja", item.mounts[0])
+        for card in self.cards:
+            self.tree.insert(
+                "",
+                "end",
+                iid=card.letter,
+                values=(card.title, card.kind_label, card.target, card.status, _durable(card)),
+                tags=(status_tag(card.status),),
+            )
 
-    def _put(self, typ: str, name: str, target: str, status: str, durable: str, open_path: str) -> None:
-        iid = f"row-{len(self._open)}"
-        self._open[iid] = open_path
-        self.tree.insert("", "end", iid=iid, values=(typ, name, target, status, durable), tags=(status_tag(status),))
+    def _fill_grid(self) -> None:
+        for child in self.gallery.winfo_children():
+            child.destroy()
+        self.tile_widgets = []
+        self._cols = 0
+        for card in self.cards:
+            self.tile_widgets.append(self._tile(card))
+        width = self.gallery.winfo_width()
+        self._reflow(width if width > 1 else 900)
 
-    def open_selected(self, _event=None) -> None:
+    def _tile(self, card: DriveCard) -> tk.Frame:
+        tile = tk.Frame(self.gallery, bg=L.paper, width=148, height=158, highlightthickness=1, highlightbackground=L.line)
+        tile.pack_propagate(False)
+        menu = tk.Button(
+            tile,
+            text="···",
+            command=lambda current=card, widget=None: None,
+            bg=L.paper,
+            fg=L.muted,
+            activebackground=L.hover,
+            activeforeground=L.text,
+            relief="flat",
+            bd=0,
+            padx=4,
+            pady=0,
+            font=(P.font, 11, "bold"),
+            cursor="hand2",
+            highlightthickness=0,
+        )
+        menu.configure(command=lambda current=card, button=menu: self._popup(current, button))
+        menu.place(relx=1, x=-4, y=2, anchor="ne")
+        glyph = tk.Canvas(tile, width=88, height=58, bg=L.paper, highlightthickness=0)
+        glyph.pack(pady=(18, 0))
+        paint_drive(glyph, card.kind, card.letter)
+        title = tk.Label(
+            tile,
+            text=_clip(card.title, 20),
+            bg=L.paper,
+            fg=L.text,
+            font=(P.font, 10, "bold"),
+        )
+        title.pack()
+        kind = tk.Label(tile, text=_clip(card.kind_label, 22), bg=L.paper, fg=L.muted, font=(P.font, 9))
+        kind.pack()
+
+        def open_card(_event=None, current=card) -> None:
+            self.open_detail(current)
+
+        for widget in (tile, glyph, title, kind):
+            widget.bind("<Button-1>", open_card)
+            widget.configure(cursor="hand2")
+        tile.bind("<Enter>", lambda _event, frame=tile: frame.configure(highlightbackground=L.accent))
+        tile.bind("<Leave>", lambda _event, frame=tile: frame.configure(highlightbackground=L.line))
+        return tile
+
+    def _popup(self, card: DriveCard, widget: tk.Widget) -> None:
+        menu = tk.Menu(
+            self,
+            tearoff=0,
+            bg=L.paper,
+            fg=L.text,
+            activebackground=L.accent_soft,
+            activeforeground=L.text,
+            relief="flat",
+            bd=1,
+        )
+        menu.add_command(label="Alle Möglichkeiten", command=lambda: self.open_detail(card))
+        menu.add_command(label="Im Explorer öffnen", command=lambda: self._explorer(card))
+        if card.can_disconnect:
+            menu.add_command(label="Trennen", command=lambda: self._disconnect(card))
+        menu.tk_popup(widget.winfo_rootx(), widget.winfo_rooty() + widget.winfo_height())
+
+    def _on_gallery_configure(self, event: tk.Event) -> None:
+        if self.view.get() == "grid":
+            self._reflow(event.width)
+
+    def _reflow(self, width: int) -> None:
+        cols = max(1, int(width) // 164)
+        if cols == self._cols:
+            return
+        self._cols = cols
+        for index, tile in enumerate(self.tile_widgets):
+            tile.grid(row=index // cols, column=index % cols, padx=6, pady=6, sticky="nw")
+
+    def _open_tree(self, _event=None) -> None:
         selected = self.tree.selection()
         if not selected:
             return
-        path = self._open.get(selected[0], "")
-        if path:
-            self.app.on_result(self.app.service.open_in_explorer(path))
+        card = self._by_letter.get(selected[0])
+        if card is not None:
+            self.open_detail(card)
+
+    def open_add(self) -> DriveDialog:
+        return self.open_detail(None)
+
+    def open_detail(self, card: DriveCard | None) -> DriveDialog:
+        if self._dialog is not None:
+            try:
+                if self._dialog.winfo_exists():
+                    self._dialog.destroy()
+            except tk.TclError:
+                pass
+        used: set[str] = set()
+        if self.app.snapshot is not None:
+            used = {item.letter for item in self.app.service.drive_cards(True, self.app.snapshot)}
+        self._dialog = DriveDialog(self.app, card, used)
+        return self._dialog
+
+    def _explorer(self, card: DriveCard) -> None:
+        self.app.on_result(self.app.service.open_in_explorer(explorer_target(card)))
+
+    def _disconnect(self, card: DriveCard) -> None:
+        if not self.app.confirm("Trennen", f"{card.letter}: wirklich trennen?"):
+            return
+        self.app.on_result(disconnect_card(self.app.service, card))
+
+
+def _durable(card: DriveCard) -> str:
+    if card.origin == "volume":
+        return "—"
+    return yes_no(card.persistent)
+
+
+def _clip(text: str, limit: int) -> str:
+    if len(text) <= limit:
+        return text
+    return text[: limit - 1] + "…"
 
 
 class SubstPage(Page):

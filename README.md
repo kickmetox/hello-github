@@ -8,6 +8,8 @@ Grafische Oberfläche für die Windows-Werkzeuge, mit denen Ordner wie Laufwerke
 - **New-PSDrive** für Ordner, Registrierung und Zertifikatspeicher
 - **mountvol** und der Aufruf von `diskmgmt.msc` für Buchstaben und leere NTFS-Ordner
 
+Die Startseite zeigt die Laufwerke als Kacheln, angelehnt an SUBSTitute. „Alle Laufwerke anzeigen“ blendet die echten Datenträger ein; ohne Haken bleiben Subst, net use und von SphereDrive gesetzte Bereitstellungen. Ein Klick auf eine Kachel oder auf „···“ öffnet die Möglichkeiten für genau diesen Buchstaben: Bezeichnung, Symbol, Subst, net use, Dauerhaftigkeit, Sichtbarkeit für Administratoren, Papierkorb, Explorer und Trennen. Auf einem echten Datenträger sind Subst und net use gesperrt, damit der Buchstabe nicht verdeckt wird. Ein Ordner auf diesem Datenträger kann einen neuen Buchstaben bekommen.
+
 SphereDrive gleicht die bekannten Lücken von `subst` aus:
 
 | Lücke | Was SphereDrive tut |

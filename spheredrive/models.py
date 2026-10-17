@@ -135,6 +135,32 @@ class VolumeEntry:
 
 
 @dataclass
+class DriveCard:
+    """Eine Kachel in der Laufwerksübersicht, unabhängig von der Herkunft des Buchstabens."""
+
+    letter: str
+    title: str
+    kind: str
+    kind_label: str
+    target: str
+    label: str = ""
+    icon: str = ""
+    persistent: bool = False
+    uac: bool = False
+    recycle: bool = False
+    recycle_mb: int = 10240
+    capacity: int = 0
+    free: int = 0
+    filesystem: str = ""
+    status: str = ""
+    origin: str = ""
+    managed: bool = False
+    real_fixed: bool = False
+    can_disconnect: bool = False
+    user: str = ""
+
+
+@dataclass
 class Snapshot:
     subst: list[SubstEntry]
     net: list[NetEntry]

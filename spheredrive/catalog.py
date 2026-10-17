@@ -97,7 +97,7 @@ GUIDE: list[tuple[str, str]] = [
 ]
 
 NAV_ITEMS: list[tuple[str, str]] = [
-    ("overview", "Übersicht"),
+    ("overview", "Laufwerkszuordnungen"),
     ("subst", "Subst"),
     ("net", "Netzlaufwerke"),
     ("links", "Verknüpfungen"),

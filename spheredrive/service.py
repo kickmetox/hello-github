@@ -55,6 +55,7 @@ from spheredrive.commands import (
 )
 from spheredrive.host import PreviewHost, RunResult, WindowsHost, make_host
 from spheredrive.models import (
+    DriveCard,
     LinkEntry,
     LinkSpec,
     MountSpec,
@@ -79,6 +80,28 @@ log = logging.getLogger("spheredrive")
 DIR_KINDS = {"junction", "symlink_dir"}
 FILE_KINDS = {"symlink_file", "hardlink"}
 AUTOSTART_NAME = "SphereDrive"
+
+_KIND_LABEL = {
+    "fixed": "Lokaler Datenträger",
+    "removable": "Wechselmedium",
+    "remote": "Netzlaufwerk",
+    "cdrom": "CD-Laufwerk",
+    "ramdisk": "RAM-Datenträger",
+    "subst": "Virtuelles Laufwerk",
+    "unknown": "Laufwerk",
+    "disconnected": "Nicht verbunden",
+}
+
+_KIND_FALLBACK = {
+    "fixed": "Lokaler Datenträger",
+    "removable": "USB-Laufwerk",
+    "remote": "Netzlaufwerk",
+    "cdrom": "CD-Laufwerk",
+    "ramdisk": "RAM-Datenträger",
+    "subst": "Subst",
+    "unknown": "Laufwerk",
+    "disconnected": "Laufwerk",
+}
 
 
 class SphereService:
@@ -562,6 +585,64 @@ class SphereService:
         self.host.open_path(target)
         return OpResult(True, f"Explorer: {target}")
 
+    def apply_appearance(self, letter: str, label: str, icon: str) -> OpResult:
+        """Nur Bezeichnung und Symbol. Legt kein subst und kein net use an."""
+        normalized = normalize_letter(letter)
+        if normalized is None:
+            return OpResult(False, "Der Laufwerksbuchstabe ist ungültig.")
+        known = normalized in self.host.logical_drives()
+        known = known or self._find("subst", "letter", normalized) is not None
+        known = known or self._find("net", "letter", normalized) is not None
+        if not known:
+            return OpResult(False, f"{normalized}: ist nicht vorhanden.")
+        if not label.strip() and not icon.strip():
+            return OpResult(False, "Bezeichnung oder Symbol angeben.")
+        warnings: list[str] = []
+        self._write_appearance(normalized, label, icon, warnings)
+        for section in ("subst", "net"):
+            current = self._find(section, "letter", normalized)
+            if current is not None:
+                current["label"] = label.strip()
+                current["icon"] = icon.strip()
+                self.store.save()
+        self.host.notify_shell()
+        return OpResult(True, f"Bezeichnung und Symbol für {normalized}: wurden gespeichert.", warnings)
+
+    def drive_cards(self, include_all: bool = True, snap: Snapshot | None = None) -> list[DriveCard]:
+        """Laufwerkskacheln. Ohne include_all nur Subst, net use und von SphereDrive bereitgestellte Buchstaben."""
+        if snap is None:
+            snap = self.snapshot()
+        subst = {item.letter: item for item in snap.subst}
+        net = {item.letter: item for item in snap.net}
+        volumes: dict[str, VolumeEntry] = {}
+        for volume in snap.volumes:
+            for mount in volume.mounts:
+                letter = _mount_letter(mount)
+                if letter and letter not in volumes:
+                    volumes[letter] = volume
+        managed = set()
+        for item in self.store.data.get("mounts", []):
+            letter = normalize_letter(str(item.get("target", "")))
+            if letter:
+                managed.add(letter)
+        online = self.host.logical_drives()
+        letters: set[str] = set(subst) | set(net) | set(managed)
+        if include_all:
+            letters |= set(online) | set(volumes)
+        cards: list[DriveCard] = []
+        for letter in sorted(letters):
+            card = self._drive_card(
+                letter,
+                subst.get(letter),
+                net.get(letter),
+                volumes.get(letter),
+                letter in managed,
+                letter in online,
+            )
+            if include_all or card.origin in {"subst", "net", "mount"}:
+                cards.append(card)
+        return cards
+
     # --- Einstellungen --------------------------------------------------
 
     def linked_connections_enabled(self) -> bool:
@@ -648,6 +729,99 @@ class SphereService:
         return OpResult(True, str(self.store.path))
 
     # --- intern ---------------------------------------------------------
+
+    def _drive_card(
+        self,
+        letter: str,
+        subst: SubstEntry | None,
+        net: NetEntry | None,
+        volume: VolumeEntry | None,
+        managed_mount: bool,
+        online: bool,
+    ) -> DriveCard:
+        reported = self.host.drive_type(letter)
+        if subst is not None:
+            origin = "subst"
+            kind = "subst"
+            label = subst.label
+            icon = subst.icon
+            target = subst.path
+            status = subst.status
+            persistent = subst.persistent
+            uac = subst.uac
+            recycle = subst.recycle
+            recycle_mb = subst.recycle_mb
+            user = ""
+            real_fixed = False
+            can_disconnect = True
+            fallback = _win_basename(target) or _KIND_FALLBACK["subst"]
+            capacity = 0
+            free = 0
+            filesystem = ""
+        elif net is not None:
+            origin = "net"
+            kind = "remote"
+            label = net.label
+            icon = net.icon
+            target = net.remote
+            status = net.status
+            persistent = net.persistent
+            uac = False
+            recycle = False
+            recycle_mb = 10240
+            user = net.user
+            real_fixed = False
+            can_disconnect = True
+            fallback = _win_basename(target) or _KIND_FALLBACK["remote"]
+            capacity = 0
+            free = 0
+            filesystem = ""
+        else:
+            kind = reported if reported not in {"unknown", "subst"} else "fixed"
+            if not online and managed_mount:
+                kind = "disconnected"
+            origin = "mount" if managed_mount else "volume"
+            label = self._read_label(letter) or (volume.label if volume else "")
+            icon = self._read_icon(letter)
+            target = f"{letter}:\\"
+            status = "bereit" if online else "getrennt"
+            persistent = bool(managed_mount)
+            uac = False
+            recycle = False
+            recycle_mb = 10240
+            user = ""
+            real_fixed = kind in {"fixed", "removable", "cdrom", "ramdisk"} or (
+                managed_mount and kind != "remote"
+            )
+            can_disconnect = bool(managed_mount) or kind == "remote"
+            fallback = _KIND_FALLBACK.get(kind, "Laufwerk")
+            capacity = volume.capacity if volume else 0
+            free = volume.free if volume else 0
+            filesystem = volume.filesystem if volume else ""
+        display = (label or "").strip() or fallback
+        kind_label = _KIND_LABEL["disconnected"] if status == "getrennt" else _KIND_LABEL.get(kind, "Laufwerk")
+        return DriveCard(
+            letter=letter,
+            title=f"{display} ({letter}:)",
+            kind=kind,
+            kind_label=kind_label,
+            target=target,
+            label=label or "",
+            icon=icon or "",
+            persistent=persistent,
+            uac=uac,
+            recycle=recycle,
+            recycle_mb=recycle_mb,
+            capacity=capacity,
+            free=free,
+            filesystem=filesystem,
+            status=status,
+            origin=origin,
+            managed=managed_mount or origin in {"subst", "net"},
+            real_fixed=real_fixed,
+            can_disconnect=can_disconnect,
+            user=user,
+        )
 
     def _collect_subst(self) -> list[SubstEntry]:
         live = {item.letter: item.path for item in parse_subst(self.host.run(subst_list()).stdout)}
@@ -975,6 +1149,20 @@ class SphereService:
             return OpResult(True, success or result.stdout.strip() or "Erledigt.")
         text = result.text or f"{fallback} (Code {result.code})."
         return OpResult(False, text)
+
+
+def _mount_letter(mount: str) -> str | None:
+    text = (mount or "").strip()
+    if len(text) >= 2 and text[0].isalpha() and text[1] == ":":
+        return text[0].upper()
+    return None
+
+
+def _win_basename(path: str) -> str:
+    text = (path or "").replace("/", "\\").rstrip("\\")
+    if not text:
+        return ""
+    return text.rsplit("\\", 1)[-1]
 
 
 def _volume_from(volume_id: str, mounts: list[str], row: dict) -> VolumeEntry:

@@ -14,6 +14,7 @@ from spheredrive.commands import (
     FOLDER_DESC,
     POLICIES_SYSTEM,
     dos_device_value,
+    drive_icon_key,
     mklink_command,
     net_use_connect,
     norm_path,
@@ -247,6 +248,46 @@ class ServiceTests(unittest.TestCase):
         restored = svc.restore_persistent()
         self.assertTrue(all(item.ok for item in restored), [item.text() for item in restored])
         self.assertEqual(host.subst["P"], r"C:\Projekte")
+
+    def test_drive_cards_keep_real_disks_and_virtual_mappings_apart(self) -> None:
+        root = Path("tests") / "_runtime" / "cards"
+        svc, host = service(root, admin=True)
+        host.dirs.add(norm_path(r"C:\Projekte"))
+        self.assertTrue(svc.apply_subst(SubstSpec("P", r"C:\Projekte", "Projekte", persistent=True, recycle=True)).ok)
+        self.assertTrue(svc.connect_net(NetSpec("Z", r"\\nas\archiv", label="Archiv", persistent=True)).ok)
+        snap = svc.snapshot()
+        cards = {item.letter: item for item in svc.drive_cards(True, snap)}
+        self.assertEqual(cards["C"].kind, "fixed")
+        self.assertEqual(cards["C"].kind_label, "Lokaler Datenträger")
+        self.assertEqual(cards["C"].title, "System (C:)")
+        self.assertTrue(cards["C"].real_fixed)
+        self.assertFalse(cards["C"].persistent)
+        self.assertFalse(cards["C"].can_disconnect)
+        self.assertTrue(cards["P"].persistent)
+        self.assertEqual(cards["P"].origin, "subst")
+        self.assertEqual(cards["P"].title, "Projekte (P:)")
+        self.assertEqual(cards["P"].kind_label, "Virtuelles Laufwerk")
+        self.assertFalse(cards["P"].real_fixed)
+        self.assertTrue(cards["P"].can_disconnect)
+        self.assertEqual(cards["Z"].kind_label, "Netzlaufwerk")
+        self.assertEqual(cards["Z"].target, r"\\nas\archiv")
+        self.assertEqual({item.letter for item in svc.drive_cards(False, snap)}, {"P", "Z"})
+        occupied = svc.apply_subst(SubstSpec("C", r"C:\Projekte"))
+        self.assertFalse(occupied.ok)
+        self.assertEqual(occupied.code, "occupied")
+        painted = svc.apply_appearance("C", "Windows", r"C:\icons\drive.ico")
+        self.assertTrue(painted.ok, painted.text())
+        self.assertEqual(host.registry.get_sz("HKCU", drive_icon_key("C", "DefaultLabel"), ""), "Windows")
+        self.assertNotIn("C", host.subst)
+        titled = {item.letter: item for item in svc.drive_cards(True)}
+        self.assertEqual(titled["C"].title, "Windows (C:)")
+        volume = "\\\\?\\Volume{22222222-2222-2222-2222-222222222222}\\"
+        self.assertTrue(svc.mount_volume(MountSpec(volume, "E")).ok)
+        mounted = {item.letter: item for item in svc.drive_cards(False)}
+        self.assertIn("E", mounted)
+        self.assertTrue(mounted["E"].real_fixed)
+        self.assertTrue(mounted["E"].can_disconnect)
+        self.assertEqual(mounted["E"].origin, "mount")
 
     def test_icon_choice_prefers_a_custom_file(self) -> None:
         root = Path("tests") / "_runtime" / "icons"

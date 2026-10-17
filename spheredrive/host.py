@@ -12,7 +12,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from spheredrive.commands import TASK_NAME, norm_path, parent_dir, task_xml
+from spheredrive.commands import TASK_NAME, norm_path, normalize_letter, parent_dir, task_xml
 from spheredrive.parsers import (
     LiveNet,
     LiveShare,
@@ -212,6 +212,21 @@ class PreviewHost:
                 if re.fullmatch(r"[A-Za-z]:\\?", mount):
                     letters.add(mount[0].upper())
         return letters
+
+    def drive_type(self, letter: str) -> str:
+        """subst, remote, fixed oder unknown. Echte Wechselmedien gibt die Vorschau nicht vor."""
+        normalized = normalize_letter(letter)
+        if normalized is None:
+            return "unknown"
+        if normalized in self.subst:
+            return "subst"
+        if normalized in self.net:
+            return "remote"
+        for volume in self.volumes:
+            for mount in volume["mounts"]:
+                if mount[:1].upper() == normalized and (len(mount) < 2 or mount[1] == ":"):
+                    return "fixed"
+        return "unknown"
 
     def notify_shell(self) -> None:
         return None
@@ -578,6 +593,20 @@ class WindowsHost:
             if mask & (1 << index):
                 letters.add(chr(ord("A") + index))
         return letters
+
+    def drive_type(self, letter: str) -> str:
+        """GetDriveTypeW: removable, fixed, remote, cdrom, ramdisk oder unknown."""
+        normalized = normalize_letter(letter)
+        if normalized is None:
+            return "unknown"
+        try:
+            kernel = ctypes.windll.kernel32
+            kernel.GetDriveTypeW.argtypes = [ctypes.c_wchar_p]
+            kernel.GetDriveTypeW.restype = ctypes.c_uint32
+            code = int(kernel.GetDriveTypeW(f"{normalized}:\\"))
+        except (AttributeError, OSError, ValueError):
+            return "unknown"
+        return {2: "removable", 3: "fixed", 4: "remote", 5: "cdrom", 6: "ramdisk"}.get(code, "unknown")
 
     def notify_shell(self) -> None:
         # SHCNE_ASSOCCHANGED | SHCNF_FLUSH, damit Explorer Bezeichnung und Symbol neu liest.

@@ -34,6 +34,25 @@ class Palette:
 P = Palette()
 
 
+class Light:
+    """Helle Fläche für die Laufwerkskacheln, angelehnt an die Explorer-Ansicht."""
+
+    bg = "#f5f7fa"
+    paper = "#ffffff"
+    line = "#e4e7ec"
+    text = "#1c2430"
+    muted = "#667085"
+    faint = "#98a2b3"
+    accent = "#1d6fa8"
+    accent_soft = "#e8f3fb"
+    danger = "#9f1239"
+    ok = "#067647"
+    hover = "#f0f6fb"
+
+
+L = Light()
+
+
 def load_font(root: tk.Misc) -> str:
     families = set(tkfont_families(root))
     for name in ("Segoe UI", "Liberation Sans", "DejaVu Sans", "Noto Sans"):
@@ -296,35 +315,50 @@ def ask_yes_no(parent: tk.Misc, title: str, text: str) -> bool:
 
 
 class Page(tk.Frame):
-    def __init__(self, master: tk.Misc, app: tk.Misc, title: str, subtitle: str) -> None:
-        super().__init__(master, bg=P.bg)
+    def __init__(
+        self,
+        master: tk.Misc,
+        app: tk.Misc,
+        title: str,
+        subtitle: str,
+        *,
+        surface: str = "dark",
+        show_heading: bool = True,
+    ) -> None:
+        self.surface = surface
+        bg = P.bg if surface == "dark" else L.bg
+        fg = P.text if surface == "dark" else L.text
+        muted = P.muted if surface == "dark" else L.muted
+        super().__init__(master, bg=bg)
         self.app = app
-        tk.Label(self, text=title, bg=P.bg, fg=P.text, font=(P.font, 20, "bold")).pack(anchor="w")
-        tk.Label(
-            self,
-            text=subtitle,
-            bg=P.bg,
-            fg=P.muted,
-            font=(P.font, 10),
-            wraplength=900,
-            justify="left",
-            anchor="w",
-        ).pack(anchor="w", pady=(2, 8))
-        shell = tk.Frame(self, bg=P.bg)
+        self.page_bg = bg
+        if show_heading:
+            tk.Label(self, text=title, bg=bg, fg=fg, font=(P.font, 20, "bold")).pack(anchor="w")
+            tk.Label(
+                self,
+                text=subtitle,
+                bg=bg,
+                fg=muted,
+                font=(P.font, 10),
+                wraplength=900,
+                justify="left",
+                anchor="w",
+            ).pack(anchor="w", pady=(2, 8))
+        shell = tk.Frame(self, bg=bg)
         shell.pack(fill="both", expand=True)
-        self.canvas = tk.Canvas(shell, bg=P.bg, highlightthickness=0, bd=0)
+        self.canvas = tk.Canvas(shell, bg=bg, highlightthickness=0, bd=0)
         self.vscroll = ttk.Scrollbar(shell, orient="vertical", command=self.canvas.yview)
         self.canvas.configure(yscrollcommand=self.vscroll.set)
         self.canvas.pack(side="left", fill="both", expand=True)
-        self.body = tk.Frame(self.canvas, bg=P.bg)
+        self.body = tk.Frame(self.canvas, bg=bg)
         self._window = self.canvas.create_window((0, 0), window=self.body, anchor="nw")
         self.body.bind("<Configure>", self._fit_content)
         self.canvas.bind("<Configure>", self._stretch_body)
         self.feedback = tk.Label(
             self,
             text="",
-            bg=P.bg,
-            fg=P.muted,
+            bg=bg,
+            fg=muted,
             font=(P.font, 10),
             wraplength=900,
             justify="left",

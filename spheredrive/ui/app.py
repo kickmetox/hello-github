@@ -13,7 +13,7 @@ from spheredrive.models import OpResult, Snapshot
 from spheredrive.paths import WORK_DIR, find_icon, find_window_png
 from spheredrive.service import SphereService
 from spheredrive.ui.pages import ComparePage, LinkPage, MountPage, NetPage, OverviewPage, PsPage, SettingsPage, SubstPage
-from spheredrive.ui.widgets import Button, P, apply_theme, ask_yes_no, load_font
+from spheredrive.ui.widgets import Button, L, P, apply_theme, ask_yes_no, load_font
 
 
 class SphereApp(tk.Tk):
@@ -140,7 +140,9 @@ class SphereApp(tk.Tk):
         content.grid(row=1, column=1, sticky="nsew")
         content.grid_rowconfigure(0, weight=1)
         content.grid_columnconfigure(0, weight=1)
+        self.content = content
         host = tk.Frame(content, bg=P.bg)
+        self.host_frame = host
         host.grid(row=0, column=0, sticky="nsew", padx=20, pady=(16, 8))
         host.grid_rowconfigure(0, weight=1)
         host.grid_columnconfigure(0, weight=1)
@@ -206,6 +208,10 @@ class SphereApp(tk.Tk):
 
     def select_page(self, page_id: str) -> None:
         self.current = page_id
+        canvas_bg = L.bg if page_id == "overview" else P.bg
+        if hasattr(self, "content"):
+            self.content.configure(bg=canvas_bg)
+            self.host_frame.configure(bg=canvas_bg)
         for pid, page in self.pages.items():
             if pid == page_id:
                 page.tkraise()
