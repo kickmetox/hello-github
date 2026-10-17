@@ -711,6 +711,54 @@ class ScriptEditTests(unittest.TestCase):
             self.assertEqual(analyzed["outline"][0]["line"], 1)
             self.assertFalse(any(item.get("code") == "E999" for item in analyzed["problems"]))
 
+    def test_html_outline_format_and_check(self) -> None:
+        from shatuide.probe import prepare
+        from shatuide.scripting import format_html, html_fragment, html_outline, html_problems, language_of, run_argv, syntax_check
+        from shatuide.server import App
+
+        self.assertEqual(language_of("seite.html"), "html")
+        self.assertEqual(language_of("seite.htm"), "html")
+        source = "<html><body><h1 id=\"titel\">Hallo</h1><div id=\"haupt\"><script>\nfunction hallo() {\n  return 1;\n}\n</script></div></body></html>\n"
+        names = [item["name"] for item in html_outline(source)]
+        self.assertEqual(names, ["h1#titel Hallo", "div#haupt", "hallo"])
+        self.assertEqual(html_outline(source)[2]["kind"], "function")
+        self.assertEqual(html_outline(source)[2]["line"], 2)
+        self.assertEqual(html_problems("<div><p>x</div>\n"), [])
+        broken = html_problems("<div><span></div>\n")
+        self.assertEqual(broken[0]["code"], "HTML")
+        self.assertEqual(broken[0]["line"], 1)
+        self.assertIn("span", broken[0]["message"])
+        unclosed = html_problems("<div>\n<p>x</p>\n")
+        self.assertEqual(unclosed[0]["line"], 1)
+        self.assertIn("div", unclosed[0]["message"])
+        self.assertTrue(syntax_check("seite.html", "<div></div>\n")["ok"])
+        failed = syntax_check("seite.html", "<div>")
+        self.assertFalse(failed["ok"])
+        self.assertIn("Zeile 1", failed["error"])
+        pretty = format_html("<html><body><h1>Titel</h1></body></html>")
+        self.assertTrue(pretty["ok"], pretty)
+        self.assertIn("\n    <h1>\n      Titel\n    </h1>\n", pretty["content"])
+        self.assertTrue(pretty["content"].endswith("\n"))
+        kept = format_html("<script>\nfunction hallo() {\n  return 1;\n}\n</script>\n")
+        self.assertIn("function hallo() {\n  return 1;\n}", kept["content"])
+        refused = format_html("<div></span>")
+        self.assertFalse(refused["ok"])
+        self.assertIn("Zeile", refused["error"])
+        with self.assertRaises(RuntimeError):
+            run_argv("seite.html", sys.executable)
+        fragment = html_fragment(source, 2)
+        self.assertTrue(fragment.startswith("<script>"), fragment)
+        self.assertIn("function hallo", fragment)
+        self.assertTrue(fragment.strip().endswith("</script>"))
+        probed = prepare(source, "seite.html", 2, 2, "", "function")
+        self.assertEqual(probed["mode"], "check")
+        self.assertEqual(probed["language"], "html")
+        with tempfile.TemporaryDirectory() as tmp:
+            app = App(tmp)
+            analyzed = app.analyze(source, str(Path(tmp) / "seite.html"))
+            self.assertEqual([item["name"] for item in analyzed["outline"]], names)
+            self.assertFalse(any(item.get("code") == "E999" for item in analyzed["problems"]))
+
     def _wait_line(self, session, line: int, timeout: float = 8):
         import time as time_mod
 

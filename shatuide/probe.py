@@ -6,7 +6,7 @@ import ast
 import re
 import textwrap
 
-from shatuide.scripting import language_of
+from shatuide.scripting import html_fragment, language_of
 
 
 def prepare(source: str, path: str, start: int, end: int, selected: str, scope: str) -> dict:
@@ -15,6 +15,8 @@ def prepare(source: str, path: str, start: int, end: int, selected: str, scope: 
     end = max(start, int(end or start))
     if lang == "json":
         return _prepare_json(source, path, selected)
+    if lang == "html":
+        return _prepare_html(source, path, start, selected, scope)
     if lang == "shell":
         return _prepare_braces(source, path, start, selected, scope, "shell", r"^\s*(?:function\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*(?:\(\))?\s*\{")
     if lang == "powershell":
@@ -37,6 +39,28 @@ def _prepare_json(source: str, path: str, selected: str) -> dict:
         "mode": "check",
         "path": path or "ausschnitt.json",
         "code": fragment if fragment.endswith("\n") else fragment + "\n",
+        "detail": "Der Ausschnitt wird geprüft und formatiert. Die Datei bleibt unverändert.",
+    }
+
+
+def _prepare_html(source: str, path: str, start: int, selected: str, scope: str) -> dict:
+    if scope == "function":
+        fragment = html_fragment(source, start)
+        title = "HTML-Element"
+    else:
+        fragment = selected.strip() or source
+        title = "HTML-Abschnitt" if selected.strip() else "HTML-Datei"
+    if not str(fragment).strip():
+        return {"ok": False, "error": "Nichts markiert."}
+    code = fragment if str(fragment).endswith("\n") else str(fragment) + "\n"
+    return {
+        "ok": True,
+        "title": title,
+        "kind": "html",
+        "language": "html",
+        "mode": "check",
+        "path": path or "ausschnitt.html",
+        "code": code,
         "detail": "Der Ausschnitt wird geprüft und formatiert. Die Datei bleibt unverändert.",
     }
 

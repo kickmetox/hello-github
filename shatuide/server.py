@@ -484,6 +484,13 @@ class App:
                 "outline": scripting.json_outline(source),
                 "todos": [],
             }
+        if lang == "html":
+            return {
+                "ok": True,
+                "problems": scripting.html_problems(source),
+                "outline": scripting.html_outline(source),
+                "todos": [],
+            }
         if lang in {"powershell", "shell", "batch"}:
             return {
                 "ok": True,
@@ -897,6 +904,8 @@ class Handler(BaseHTTPRequestHandler):
             language = scripting.language_of(file_path)
             if language == "json":
                 self._json(scripting.format_json(content))
+            elif language == "html":
+                self._json(scripting.format_html(content))
             elif language in {"powershell", "shell", "batch"}:
                 self._json(studio.format_script(language, content))
             else:
@@ -1434,7 +1443,7 @@ class Handler(BaseHTTPRequestHandler):
         if mode == "project":
             return runner.compile_tree(self.app.workspace)
         path = str(payload.get("path") or "")
-        if mode == "check" or (path and scripting.language_of(path) in {"shell", "powershell", "batch", "json"}):
+        if mode == "check" or (path and scripting.language_of(path) in {"shell", "powershell", "batch", "json", "html"}):
             if mode != "check" and path and scripting.language_of(path) == "python":
                 return runner.compile_file(str(self.app.resolve_any(path)))
             content = payload.get("content")
@@ -1470,6 +1479,8 @@ class Handler(BaseHTTPRequestHandler):
                 session.start(str(script), str(script.parent), points, bp_file)
             elif lang == "json":
                 return {"ok": False, "error": "JSON-Dateien haben keinen Debugger. Syntax prüfen nennt die Fehlerzeile."}
+            elif lang == "html":
+                return {"ok": False, "error": "HTML-Dateien haben keinen Debugger. Syntax prüfen nennt die Fehlerzeile."}
             elif lang == "python":
                 session = DebugSession()
                 session.start(self.app.python_exe(), str(script), str(script.parent), points, bp_file)

@@ -201,6 +201,7 @@ function languageOf(path) {
   if ([".py", ".pyw", ".pyi"].includes(ext)) return "python";
   if ([".sh", ".bash", ".zsh", ".ksh"].includes(ext) || [".bashrc", ".bash_profile", ".profile", ".zshrc"].includes(name)) return "shell";
   if (ext === ".json" || ext === ".jsonc") return "json";
+  if ([".html", ".htm", ".xhtml"].includes(ext)) return "html";
   if ([".ps1", ".psm1", ".psd1"].includes(ext)) return "powershell";
   if ([".bat", ".cmd"].includes(ext)) return "batch";
   if ([".js", ".ts", ".jsx", ".tsx"].includes(ext)) return "js";
@@ -211,6 +212,7 @@ function languageOf(path) {
 function highlightSource(src, errorLines, lang) {
   if (lang === "python") return highlightPython(src, errorLines);
   if (lang === "json") return highlightJson(src, errorLines);
+  if (lang === "html") return highlightHtml(src, errorLines);
   return highlightSimple(src, errorLines, lang);
 }
 
@@ -264,6 +266,112 @@ function highlightJson(src, errorLines) {
     }
     pushToken(ch, "");
     i += 1;
+  }
+  html += errorLines.has(line) ? `<span class="errline">${lineBuf}</span>` : lineBuf;
+  return html;
+}
+
+function highlightHtml(src, errorLines) {
+  let html = "";
+  let lineBuf = "";
+  let line = 1;
+  let i = 0;
+  let raw = "";
+  function pushToken(text, cls) {
+    const parts = text.split("\n");
+    parts.forEach((part, index) => {
+      const chunk = cls ? `<span class="${cls}">${esc(part)}</span>` : esc(part);
+      lineBuf += chunk;
+      if (index < parts.length - 1) {
+        html += errorLines.has(line) ? `<span class="errline">${lineBuf}</span>\n` : lineBuf + "\n";
+        lineBuf = "";
+        line += 1;
+      }
+    });
+  }
+  function paintTag(rawTag) {
+    const open = rawTag.match(/^<\/?/);
+    pushToken(open[0], "op");
+    let cursor = open[0].length;
+    const name = rawTag.slice(cursor).match(/^[A-Za-z][\w:-]*/);
+    if (name) {
+      pushToken(name[0], "fn");
+      cursor += name[0].length;
+    }
+    while (cursor < rawTag.length) {
+      const ch = rawTag[cursor];
+      if (ch === '"' || ch === "'") {
+        let end = cursor + 1;
+        while (end < rawTag.length && rawTag[end] !== ch) end += rawTag[end] === "\\" ? 2 : 1;
+        end = Math.min(rawTag.length, end + 1);
+        pushToken(rawTag.slice(cursor, end), "str");
+        cursor = end;
+        continue;
+      }
+      if (/[A-Za-z_:]/.test(ch)) {
+        const word = rawTag.slice(cursor).match(/^[A-Za-z_:][\w:.-]*/);
+        pushToken(word[0], "cls");
+        cursor += word[0].length;
+        continue;
+      }
+      pushToken(ch, "op");
+      cursor += 1;
+    }
+  }
+  while (i < src.length) {
+    if (raw) {
+      const close = new RegExp("</" + raw + "\\s*>", "i").exec(src.slice(i));
+      if (!close) {
+        pushToken(src.slice(i), "");
+        i = src.length;
+        break;
+      }
+      pushToken(src.slice(i, i + close.index), "");
+      i += close.index;
+      raw = "";
+      continue;
+    }
+    if (src.startsWith("<!--", i)) {
+      const end = src.indexOf("-->", i + 4);
+      const stop = end < 0 ? src.length : end + 3;
+      pushToken(src.slice(i, stop), "comment");
+      i = stop;
+      continue;
+    }
+    if (src[i] === "<" && /[A-Za-z!/?]/.test(src[i + 1] || "")) {
+      let end = i + 1;
+      let quote = "";
+      while (end < src.length) {
+        const ch = src[end];
+        if (quote) {
+          if (ch === quote) quote = "";
+          end += ch === "\\" ? 2 : 1;
+          continue;
+        }
+        if (ch === '"' || ch === "'") {
+          quote = ch;
+          end += 1;
+          continue;
+        }
+        if (ch === ">") {
+          end += 1;
+          break;
+        }
+        end += 1;
+      }
+      const rawTag = src.slice(i, end);
+      paintTag(rawTag);
+      const opened = rawTag.match(/^<([A-Za-z][\w:-]*)/);
+      if (opened && ["script", "style", "pre", "textarea"].includes(opened[1].toLowerCase()) && !/\/>\s*$/.test(rawTag)) {
+        raw = opened[1].toLowerCase();
+      }
+      i = end;
+      continue;
+    }
+    const next = src.indexOf("<", i + 1);
+    const stop = next < 0 ? src.length : next;
+    pushToken(src.slice(i, stop), "");
+    i = stop === i ? i + 1 : stop;
   }
   html += errorLines.has(line) ? `<span class="errline">${lineBuf}</span>` : lineBuf;
   return html;
@@ -405,7 +513,7 @@ function updateStatus(extra) {
   const pos = cursorPos();
   const current = tab();
   $("st-pos").textContent = `Zeile ${pos.line}, Spalte ${pos.col + 1}`;
-  const names = { python: "Python", powershell: "PowerShell", shell: "Shell", batch: "Batch", json: "JSON", js: "JavaScript", sql: "SQL", text: "Text" };
+  const names = { python: "Python", powershell: "PowerShell", shell: "Shell", batch: "Batch", json: "JSON", html: "HTML", js: "JavaScript", sql: "SQL", text: "Text" };
   const lang = languageOf(current && current.path);
   if ($("st-lang")) $("st-lang").textContent = names[lang] || "Text";
   if ($("st-eol")) $("st-eol").textContent = current && current.content.includes("\r\n") ? "CRLF" : "LF";
@@ -580,6 +688,8 @@ function kindLabel(kind) {
     filter: "Filter",
     label: "Sprungmarke",
     key: "Schlüssel",
+    element: "Element",
+    heading: "Überschrift",
   }[kind] || "Symbol";
 }
 
@@ -641,6 +751,25 @@ function localSymbols(text, lang) {
     lines.forEach((line, index) => {
       const match = line.match(/^\s*"((?:\\.|[^"\\])*)"\s*:/);
       if (match) items.push({ name: match[1], kind: "key", line: index + 1, end_line: index + 1, parent: "" });
+    });
+    return items;
+  }
+  if (lang === "html") {
+    lines.forEach((line, index) => {
+      const fn = line.match(/\b(?:async\s+)?function\s+([A-Za-z_$][\w$]*)/);
+      if (fn) items.push({ name: fn[1], kind: "function", line: index + 1, end_line: index + 1, parent: "" });
+      const tag = line.match(/<([A-Za-z][\w:-]*)\b([^>]*)>/);
+      if (!tag) return;
+      const tagName = tag[1].toLowerCase();
+      const idMatch = tag[2].match(/\bid\s*=\s*["']([^"']+)["']/i);
+      const textMatch = line.slice(line.indexOf(">") + 1).match(/^([^<]+)/);
+      const text = textMatch ? textMatch[1].replace(/\s+/g, " ").trim() : "";
+      const heading = /^h[1-6]$/.test(tagName);
+      if (!idMatch && !heading) return;
+      let label = tagName;
+      if (idMatch) label += "#" + idMatch[1];
+      if (heading && text) label += " " + text;
+      items.push({ name: label, kind: heading ? "heading" : "element", line: index + 1, end_line: index + 1, parent: "" });
     });
   }
   return items;
@@ -707,7 +836,7 @@ function renderFunctions() {
   if (!items.length) {
     const empty = document.createElement("div");
     empty.className = "fn-empty";
-    empty.textContent = "Keine Funktion in dieser Datei";
+    empty.textContent = languageOf(current.path) === "html" ? "Kein Element in dieser Datei" : "Keine Funktion in dieser Datei";
     host.appendChild(empty);
   }
   const selected = items.find((item) => S.symbol && S.symbol.name === item.name && S.symbol.line === item.line) || null;
@@ -1839,6 +1968,7 @@ function lineIndexes(text, start, end) {
 function commentMark(path) {
   const lang = languageOf(path);
   if (lang === "json") return null;
+  if (lang === "html") return { line: "<!--", end: "-->" };
   if (lang === "js") return { line: "//" };
   if (lang === "sql") return { line: "--" };
   if (lang === "batch") return { line: "REM" };
@@ -1854,8 +1984,22 @@ function toggleComment() {
   const lines = text.split("\n");
   const spec = commentMark(current.path);
   if (!spec) return toast("JSON-Kommentare sind kein gültiges JSON.");
-  const mark = spec.line;
   const body = lines.slice(startLine, endLine + 1);
+  if (spec.end) {
+    const startRe = new RegExp("^(\\s*)" + spec.line.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\s?");
+    const endRe = new RegExp("\\s?" + spec.end.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\s*$");
+    const commented = body.every((line) => !line.trim() || (startRe.test(line) && endRe.test(line)));
+    const next = body.map((line) => {
+      if (!line.trim()) return line;
+      if (commented) return line.replace(startRe, "$1").replace(endRe, "");
+      return line.replace(/^(\s*)/, "$1" + spec.line + " ").replace(/\s*$/, " " + spec.end);
+    });
+    lines.splice(startLine, body.length, ...next);
+    const updated = lines.join("\n");
+    setBuffer(updated, bounds.start, bounds.start + next.join("\n").length);
+    return;
+  }
+  const mark = spec.line;
   const commented = body.every((line) => !line.trim() || new RegExp("^\\s*" + mark.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\s?").test(line));
   const next = body.map((line) => {
     if (!line.trim()) return line;
@@ -3110,7 +3254,7 @@ async function openFileDialog(start) {
   list.className = "browse-list";
   list.id = "browse-list";
   const filter = document.createElement("input");
-  filter.placeholder = "Name filtern, zum Beispiel .py, .json oder .sh";
+  filter.placeholder = "Name filtern, zum Beispiel .py, .html, .json oder .sh";
   body.appendChild(pathInput);
   body.appendChild(filter);
   body.appendChild(list);

@@ -15,7 +15,14 @@ SHELL_SUFFIXES = {".sh", ".bash", ".ksh", ".zsh"}
 POWERSHELL_SUFFIXES = {".ps1", ".psm1", ".psd1"}
 PYTHON_SUFFIXES = {".py", ".pyw", ".pyi"}
 JSON_SUFFIXES = {".json", ".jsonc"}
+HTML_SUFFIXES = {".html", ".htm", ".xhtml"}
 SHELL_NAMES = {".bashrc", ".bash_profile", ".bash_login", ".profile", ".zshrc"}
+_HTML_VOID = {
+    "area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track", "wbr",
+}
+_HTML_OPTIONAL = {"html", "head", "body", "p", "li", "dt", "dd", "tr", "td", "th", "thead", "tbody", "tfoot", "option", "colgroup", "caption", "rt", "rp"}
+_HTML_RAW = {"script", "style", "pre", "textarea"}
+_HTML_HEADING = {"h1", "h2", "h3", "h4", "h5", "h6"}
 
 
 def language_of(path: str) -> str:
@@ -27,6 +34,8 @@ def language_of(path: str) -> str:
         return "shell"
     if suffix in JSON_SUFFIXES:
         return "json"
+    if suffix in HTML_SUFFIXES:
+        return "html"
     if suffix in POWERSHELL_SUFFIXES:
         return "powershell"
     if suffix in {".bat", ".cmd"}:
@@ -70,6 +79,8 @@ def run_argv(path: str, python: str, args: list[str] | None = None) -> list[str]
     lang = language_of(path)
     if lang == "json":
         raise RuntimeError("JSON-Dateien werden geprüft und formatiert, nicht ausgeführt.")
+    if lang == "html":
+        raise RuntimeError("HTML-Dateien werden geprüft und formatiert, nicht ausgeführt.")
     if lang == "shell":
         binary = shell_binary()
         if not binary:
@@ -95,6 +106,8 @@ def syntax_check(path: str, content: str | None = None) -> dict:
     lang = language_of(path)
     if lang == "json":
         return _json_syntax(path, content)
+    if lang == "html":
+        return _html_syntax(path, content)
     if lang == "shell":
         binary = shell_binary()
         if not binary:
@@ -218,7 +231,338 @@ def format_json(content: str) -> dict:
 
 def selection_suffix(path: str) -> str:
     lang = language_of(path) if path else "python"
-    return {"shell": ".sh", "powershell": ".ps1", "batch": ".bat"}.get(lang, ".py")
+    return {"shell": ".sh", "powershell": ".ps1", "batch": ".bat", "html": ".html", "json": ".json"}.get(lang, ".py")
+
+
+def _html_syntax(path: str, content: str | None) -> dict:
+    try:
+        source = _json_text(path, content)
+    except OSError as exc:
+        return {"ok": False, "error": str(exc)}
+    problems = html_problems(source)
+    if problems:
+        first = problems[0]
+        return {"ok": False, "error": f"Zeile {first['line']}: {first['message']}"}
+    return {"ok": True, "message": "HTML in Ordnung."}
+
+
+def html_problems(source: str) -> list[dict]:
+    tokens, error = _html_tokens(source)
+    if error:
+        return [error]
+    return _html_structure(tokens, source)
+
+
+def html_outline(source: str) -> list[dict]:
+    tokens, error = _html_tokens(source)
+    if error:
+        return []
+    return _html_items(tokens, source)
+
+
+def html_fragment(source: str, line: int) -> str:
+    tokens, error = _html_tokens(source)
+    if error:
+        return source
+    best = ""
+    stack: list[dict] = []
+    for token in tokens:
+        if token["kind"] == "start" and token["void"]:
+            if best == "" and _line_at(source, token["start"]) == line:
+                best = token["raw"]
+            continue
+        if token["kind"] == "start" and not token["void"]:
+            stack.append(token)
+            continue
+        if token["kind"] != "end":
+            continue
+        while stack:
+            start = stack.pop()
+            if start["name"] != token["name"]:
+                continue
+            start_line = _line_at(source, start["start"])
+            end_line = _line_at(source, max(start["start"], token["end"] - 1))
+            if best == "" and start_line <= line <= end_line:
+                best = source[start["start"]:token["end"]]
+            break
+    return best or source
+
+
+def format_html(content: str) -> dict:
+    source = content[1:] if content.startswith("\ufeff") else content
+    if not source.strip():
+        return {"ok": True, "content": source, "tool": "html"}
+    problems = html_problems(source)
+    if problems:
+        first = problems[0]
+        return {"ok": False, "error": f"Zeile {first['line']}: {first['message']}"}
+    tokens, _error = _html_tokens(source)
+    chunks: list[str] = []
+    depth = 0
+
+    def emit(text: str, level: int) -> None:
+        chunks.append(("  " * level) + text.strip())
+
+    for token in tokens:
+        kind = token["kind"]
+        if kind == "text":
+            if token.get("raw_block"):
+                body = token["text"]
+                if not body.strip():
+                    continue
+                if "\n" in body:
+                    chunks.append(body.strip("\n"))
+                else:
+                    emit(body, depth)
+                continue
+            collapsed = re.sub(r"\s+", " ", token["text"]).strip()
+            if collapsed:
+                emit(collapsed, depth)
+            continue
+        if kind == "end":
+            depth = max(0, depth - 1)
+            emit(token["raw"], depth)
+            continue
+        emit(token["raw"], depth)
+        if kind == "start" and not token["void"]:
+            depth += 1
+    text = "\n".join(chunks)
+    if text and not text.endswith("\n"):
+        text += "\n"
+    return {"ok": True, "content": text, "tool": "html"}
+
+
+def _html_problem(source: str, index: int, message: str) -> dict:
+    line = _line_at(source, index)
+    col = index - source.rfind("\n", 0, index)
+    return {
+        "line": line,
+        "col": col,
+        "end_line": line,
+        "end_col": col,
+        "severity": "error",
+        "message": message,
+        "code": "HTML",
+    }
+
+
+def _html_gt(source: str, start: int) -> int:
+    quote = ""
+    i = start + 1
+    while i < len(source):
+        ch = source[i]
+        if quote:
+            if ch == quote:
+                quote = ""
+            elif ch == "\\":
+                i += 1
+            i += 1
+            continue
+        if ch in "\"'":
+            quote = ch
+        elif ch == ">":
+            return i
+        i += 1
+    return -1
+
+
+def _html_tag_start(source: str, index: int) -> bool:
+    if source.startswith("<!--", index) or source.startswith("<!", index) or source.startswith("<?", index):
+        return True
+    nxt = index + 1
+    if nxt < len(source) and source[nxt] == "/":
+        nxt += 1
+    return nxt < len(source) and source[nxt].isalpha()
+
+
+def _html_tokens(source: str) -> tuple[list[dict], dict | None]:
+    tokens: list[dict] = []
+    i = 0
+    length = len(source)
+    while i < length:
+        if source.startswith("<!--", i):
+            end = source.find("-->", i + 4)
+            if end < 0:
+                return tokens, _html_problem(source, i, "Kommentar wird nicht geschlossen.")
+            tokens.append({"kind": "comment", "start": i, "end": end + 3, "raw": source[i:end + 3]})
+            i = end + 3
+            continue
+        if source[i] == "<" and _html_tag_start(source, i):
+            end = _html_gt(source, i)
+            if end < 0:
+                return tokens, _html_problem(source, i, "Tag wird nicht geschlossen.")
+            raw = source[i:end + 1]
+            token = _html_tag(raw, i, end + 1)
+            tokens.append(token)
+            i = end + 1
+            if token["kind"] == "start" and token["name"] in _HTML_RAW and not token["void"]:
+                match = re.search(rf"</{re.escape(token['name'])}\s*>", source[i:], re.I)
+                if match is None:
+                    tokens.append({"kind": "text", "raw_block": True, "start": i, "end": length, "text": source[i:], "raw": source[i:]})
+                    break
+                stop = i + match.start()
+                tokens.append({"kind": "text", "raw_block": True, "start": i, "end": stop, "text": source[i:stop], "raw": source[i:stop]})
+                close_end = i + match.end()
+                close_raw = source[stop:close_end]
+                tokens.append(_html_tag(close_raw, stop, close_end))
+                i = close_end
+            continue
+        nxt = source.find("<", i + 1)
+        if nxt < 0:
+            nxt = length
+        if nxt > i:
+            tokens.append({"kind": "text", "start": i, "end": nxt, "text": source[i:nxt], "raw": source[i:nxt]})
+        i = nxt
+    return tokens, None
+
+
+def _html_tag(raw: str, start: int, end: int) -> dict:
+    body = raw[1:-1].strip()
+    if body.startswith("!") or body.startswith("?"):
+        return {"kind": "doctype", "start": start, "end": end, "raw": raw, "name": "", "void": True}
+    closing = body.startswith("/")
+    if closing:
+        body = body[1:].strip()
+    self_closing = body.endswith("/")
+    if self_closing:
+        body = body[:-1].strip()
+    name = re.match(r"[A-Za-z][\w:-]*", body)
+    tag = name.group(0).lower() if name else ""
+    void = closing or self_closing or tag in _HTML_VOID
+    return {
+        "kind": "end" if closing else "start",
+        "start": start,
+        "end": end,
+        "raw": raw,
+        "name": tag,
+        "void": void if not closing else True,
+        "attrs": body[name.end():] if name else body,
+    }
+
+
+def _html_attr(attrs: str, key: str) -> str:
+    match = re.search(rf"""(?i)\b{re.escape(key)}\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))""", attrs)
+    if not match:
+        return ""
+    return next(group for group in match.groups() if group is not None)
+
+
+def _html_structure(tokens: list[dict], source: str) -> list[dict]:
+    problems: list[dict] = []
+    stack: list[tuple[str, int]] = []
+    for token in tokens:
+        if token["kind"] == "start" and not token["void"]:
+            _html_open(stack, token["name"])
+            stack.append((token["name"], token["start"]))
+            continue
+        if token["kind"] != "end":
+            continue
+        name = token["name"]
+        while stack and stack[-1][0] != name and stack[-1][0] in _HTML_OPTIONAL:
+            stack.pop()
+        if stack and stack[-1][0] == name:
+            stack.pop()
+            continue
+        if any(item[0] == name for item in stack):
+            while stack and stack[-1][0] != name:
+                open_name, open_at = stack.pop()
+                if open_name not in _HTML_OPTIONAL:
+                    problems.append(_html_problem(source, token["start"], f"Ende </{name}>, offen ist <{open_name}>."))
+                    break
+            if stack and stack[-1][0] == name:
+                stack.pop()
+            continue
+        problems.append(_html_problem(source, token["start"], f"Unerwartetes </{name}>."))
+    for name, index in stack:
+        if name not in _HTML_OPTIONAL:
+            problems.append(_html_problem(source, index, f"<{name}> ist nicht geschlossen."))
+    return problems
+
+
+def _html_open(stack: list[tuple[str, int]], incoming: str) -> None:
+    closes_p = _HTML_HEADING | {"p", "div", "ul", "ol", "table", "section", "article", "header", "footer", "nav", "main", "aside", "form", "blockquote", "pre", "hr"}
+    while stack and stack[-1][0] in _HTML_OPTIONAL:
+        top = stack[-1][0]
+        if top == "p" and incoming in closes_p:
+            stack.pop()
+            continue
+        if top == incoming and top in {"li", "dt", "dd", "option", "tr", "td", "th", "p"}:
+            stack.pop()
+            continue
+        break
+
+
+def _html_items(tokens: list[dict], source: str) -> list[dict]:
+    items: list[dict] = []
+    stack: list[tuple[str, int | None]] = []
+    for index, token in enumerate(tokens):
+        if token["kind"] == "text" and token.get("raw_block"):
+            items.extend(_html_script_functions(source, token))
+            continue
+        if token["kind"] == "start" and token["void"]:
+            _html_add_item(items, tokens, source, index)
+            continue
+        if token["kind"] == "start" and not token["void"]:
+            item_index = _html_add_item(items, tokens, source, index)
+            stack.append((token["name"], item_index))
+            continue
+        if token["kind"] != "end":
+            continue
+        while stack:
+            name, item_index = stack.pop()
+            if item_index is not None:
+                items[item_index]["end_line"] = _line_at(source, token["start"])
+            if name == token["name"]:
+                break
+    return items
+
+
+def _html_add_item(items: list[dict], tokens: list[dict], source: str, index: int) -> int | None:
+    token = tokens[index]
+    name = token["name"]
+    ident = _html_attr(token.get("attrs", ""), "id")
+    heading = name in _HTML_HEADING
+    if not ident and not heading:
+        return None
+    text = ""
+    if heading and index + 1 < len(tokens) and tokens[index + 1]["kind"] == "text" and not tokens[index + 1].get("raw_block"):
+        text = re.sub(r"\s+", " ", tokens[index + 1]["text"]).strip()
+    label = name
+    if ident:
+        label += "#" + ident
+    if heading and text:
+        label += " " + text[:80]
+    items.append(
+        {
+            "name": label,
+            "kind": "heading" if heading else "element",
+            "line": _line_at(source, token["start"]),
+            "end_line": _line_at(source, token["start"]),
+            "parent": "",
+            "params": "",
+        }
+    )
+    return len(items) - 1
+
+
+def _html_script_functions(source: str, token: dict) -> list[dict]:
+    text = token["text"]
+    base = token["start"]
+    found = []
+    pattern = re.compile(r"(?m)^[ \t]*(?:async[ \t]+)?function[ \t]+([A-Za-z_$][\w$]*)")
+    for match in pattern.finditer(text):
+        line = _line_at(source, base + match.start())
+        found.append(
+            {
+                "name": match.group(1),
+                "kind": "function",
+                "line": line,
+                "end_line": line,
+                "parent": "",
+                "params": "",
+            }
+        )
+    return found
 
 
 _PS_DECL = re.compile(r"(?im)^[ \t]*(function|filter|class)[ \t]+([A-Za-z_][\w-]*)")

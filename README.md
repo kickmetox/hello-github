@@ -26,6 +26,8 @@ Bash- und PowerShell-Skripte lassen sich laden und bearbeiten. **Ausführen** st
 
 `.json` wird mit Schlüsseln, Zeichenketten, Zahlen und `true`/`false`/`null` gefärbt. **Syntax prüfen** und die Problemleiste nennen die Fehlerzeile. **Format** rückt das JSON ein. Ausführen und Debuggen gibt es für JSON nicht.
 
+`.html`, `.htm` und `.xhtml` werden mit Tags, Attributen und Kommentaren gefärbt. Die Funktionsleiste zeigt Elemente mit `id`, Überschriften und `function` in `<script>`. **Syntax prüfen** nennt die Zeile eines offenen oder falschen Tags. **Format** rückt die Tags ein und lässt den Inhalt von `script`, `style`, `pre` und `textarea` stehen. Ausführen und Debuggen gibt es für HTML nicht. **Im Fenster prüfen** prüft das Element an der Schreibmarke.
+
 **Alt+F5** prüft die markierte Zeile oder den Abschnitt in einem eigenen Fenster. **Umschalt+Alt+F5** nimmt die Funktion, Methode oder Klasse an der Schreibmarke, ruft sie ohne Argumente auf, spielt ihren Doctest oder genau diesen Test. Die geöffnete Datei bleibt unverändert. Im Fenster kann der Ausschnitt vor einem erneuten Lauf geändert werden.
 
 Installation in das Zielverzeichnis, ohne vorhandene Icons zu überschreiben:
@@ -57,6 +59,7 @@ Liegt im Programmordner bereits `icon.png`, `icon.ico`, `logo.png` oder `grafik.
 - PowerShell lokal, per WinRM oder SSH; integrierte 32-bit- und 64-bit-Konsole, soweit der Rechner sie hat
 - Wiederherstellung ungespeicherter Puffer
 - JSON-Dateien laden, färben, auf Fehlerzeilen prüfen und formatieren
+- HTML laden, färben, prüfen, formatieren und in der Funktionsleiste nach id, Überschrift und Skriptfunktion zeigen
 - Markierte Zeile, Abschnitt oder Funktion in einem eigenen Testfenster ausführen
 - unittest, pytest, doctest, Coverage-Markierung
 - venv, pip, conda, Poetry, Pipenv, Download einer eigenständigen CPython-Distribution
