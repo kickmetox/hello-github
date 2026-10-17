@@ -7,6 +7,7 @@ from tkinter import filedialog, ttk
 
 from spheredrive.commands import format_bytes, suggest_letter
 from spheredrive.models import DriveCard, NetSpec, OpResult, ShareSpec, SubstSpec
+from spheredrive.paths import default_drive_icon
 from spheredrive.ui.widgets import L, P
 
 
@@ -41,7 +42,7 @@ class DriveDialog(tk.Toplevel):
         self.mode = tk.StringVar(value=self._initial_mode())
         self.letter = tk.StringVar(value=card.letter if card else suggest_letter(used))
         self.label = tk.StringVar(value="" if card is None else card.label)
-        self.icon = tk.StringVar(value=_icon_file("" if card is None else card.icon))
+        self.icon = tk.StringVar(value=_icon_file(card.icon) if card is not None else default_drive_icon())
         self.path = tk.StringVar(value=card.target if card and card.origin == "subst" else "")
         self.remote = tk.StringVar(value=card.target if card and card.origin == "net" else "")
         self.user = tk.StringVar(value="" if card is None else card.user)

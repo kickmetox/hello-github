@@ -9,7 +9,7 @@ from tkinter import filedialog, ttk
 from spheredrive.catalog import COMPARISON, LINK_KINDS, PERMISSIONS, PS_PROVIDERS
 from spheredrive.commands import build_unc, normalize_letter, suggest_letter
 from spheredrive.models import DriveCard, LinkSpec, MountSpec, NetSpec, OpResult, PsSpec, ShareSpec, Snapshot, SubstSpec
-from spheredrive.paths import WORK_DIR
+from spheredrive.paths import WORK_DIR, default_drive_icon
 from spheredrive.ui.drive_dialog import DriveDialog, disconnect_card, explorer_target, paint_drive
 from spheredrive.ui.widgets import (
     Button,
@@ -361,7 +361,7 @@ class SubstPage(Page):
         self.letter = tk.StringVar()
         self.path = tk.StringVar()
         self.label = tk.StringVar()
-        self.icon = tk.StringVar()
+        self.icon = tk.StringVar(value=default_drive_icon())
         self.persistent = tk.BooleanVar(value=True)
         self.uac = tk.BooleanVar(value=False)
         self.recycle = tk.BooleanVar(value=False)
@@ -543,7 +543,7 @@ class NetPage(Page):
         self.password = tk.StringVar()
         self.persistent = tk.BooleanVar(value=True)
         self.label = tk.StringVar()
-        self.icon = tk.StringVar()
+        self.icon = tk.StringVar(value=default_drive_icon())
         self.share_name = tk.StringVar()
         self.share_path = tk.StringVar()
         self.permission = tk.StringVar(value="Lesen")

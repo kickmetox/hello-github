@@ -81,9 +81,13 @@ class SphereApp(tk.Tk):
         sidebar.grid(row=1, column=0, sticky="nsew")
         brand = tk.Frame(sidebar, bg=P.sidebar)
         brand.pack(fill="x", padx=16, pady=(18, 8))
-        logo = tk.Canvas(brand, width=36, height=36, bg=P.sidebar, highlightthickness=0)
-        logo.pack(side="left")
-        self._draw_logo(logo)
+        self._brand_logo = self._load_logo(36)
+        if self._brand_logo is not None:
+            tk.Label(brand, image=self._brand_logo, bg=P.sidebar, bd=0, highlightthickness=0).pack(side="left")
+        else:
+            logo = tk.Canvas(brand, width=36, height=36, bg=P.sidebar, highlightthickness=0)
+            logo.pack(side="left")
+            self._draw_logo(logo)
         titles = tk.Frame(brand, bg=P.sidebar)
         titles.pack(side="left", padx=(10, 0))
         tk.Label(titles, text="SphereDrive", bg=P.sidebar, fg=P.text, font=(P.font, 14, "bold")).pack(anchor="w")
@@ -200,6 +204,19 @@ class SphereApp(tk.Tk):
         menu.add_cascade(label="Hilfe", menu=help_menu)
         self.config(menu=menu)
 
+    def _load_logo(self, size: int) -> tk.PhotoImage | None:
+        png = find_window_png()
+        if png is None:
+            return None
+        try:
+            image = tk.PhotoImage(file=str(png))
+        except tk.TclError:
+            return None
+        step = max(image.width() // max(size, 1), 1)
+        if step > 1:
+            image = image.subsample(step, step)
+        return image
+
     def _draw_logo(self, canvas: tk.Canvas) -> None:
         canvas.create_oval(2, 2, 34, 34, fill="#12304a", outline="")
         canvas.create_oval(7, 7, 29, 29, fill="#1d6fa8", outline="")
@@ -310,6 +327,11 @@ class SphereApp(tk.Tk):
         dialog.configure(bg=P.panel)
         dialog.transient(self)
         dialog.resizable(False, False)
+        body = tk.Frame(dialog, bg=P.panel)
+        body.pack(padx=18, pady=16)
+        dialog.logo = self._load_logo(64)
+        if dialog.logo is not None:
+            tk.Label(body, image=dialog.logo, bg=P.panel, bd=0, highlightthickness=0).pack(anchor="w", pady=(0, 12))
         text = (
             f"SphereDrive {__version__}\n\n"
             "Grafische Oberfläche für subst, net use, mklink, New-PSDrive und Bereitstellungspunkte.\n\n"
@@ -317,5 +339,5 @@ class SphereApp(tk.Tk):
             f"Symbol: {icon or 'keins gefunden'}\n"
             f"Konfiguration: {self.service.store.path}"
         )
-        tk.Label(dialog, text=text, bg=P.panel, fg=P.text, justify="left", font=(P.font, 10), padx=18, pady=16).pack()
+        tk.Label(body, text=text, bg=P.panel, fg=P.text, justify="left", font=(P.font, 10)).pack(anchor="w")
         Button(dialog, "Schließen", dialog.destroy, "primary").pack(pady=(0, 16))

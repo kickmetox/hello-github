@@ -42,6 +42,8 @@ class GuiTests(unittest.TestCase):
             self.assertEqual(app.current, page_id)
 
         subst = app.pages["subst"]
+        self.assertTrue(subst.icon.get().lower().endswith("spheredrive.ico"))
+        self.assertIsNotNone(app._brand_logo)
         subst.path.set(r"C:\Projekte\SphereDrive")
         subst.label.set("Projekte")
         subst.persistent.set(True)
@@ -142,6 +144,7 @@ class GuiTests(unittest.TestCase):
         self.assertIn("Administratoren", dialog.uac_box.cget("text"))
         self.assertIn("Papierkorb", dialog.recycle_box.cget("text"))
         self.assertEqual(dialog.path.get(), r"C:\Projekte\SphereDrive")
+        self.assertTrue(dialog.icon.get().lower().endswith("spheredrive.ico"))
         fixed = overview.open_detail(next(card for card in overview.cards if card.letter == "C"))
         app.update_idletasks()
         self.assertEqual(fixed.mode.get(), "appearance")
@@ -149,6 +152,7 @@ class GuiTests(unittest.TestCase):
         self.assertEqual(fixed.net_radio.cget("state"), "disabled")
         self.assertEqual(fixed.disconnect_button.cget("state"), "disabled")
         self.assertIn("echter Datenträger", fixed.hint.cget("text"))
+        self.assertEqual(fixed.icon.get(), "")
         self.assertTrue(hasattr(fixed, "spawn_button"))
         fixed.label.set("Windows")
         fixed.icon.set(r"C:\icons\drive.ico")
@@ -163,6 +167,7 @@ class GuiTests(unittest.TestCase):
         self.assertIn("Z", hidden)
         overview.show_all.set(True)
         added = overview.open_add()
+        self.assertTrue(added.icon.get().lower().endswith("spheredrive.ico"))
         added.letter.set("R")
         added.path.set(r"C:\Temp\Neu")
         added.label.set("Neu")

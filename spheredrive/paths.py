@@ -74,6 +74,12 @@ def find_icon() -> Path | None:
     return None
 
 
+def default_drive_icon() -> str:
+    """Programmsymbol als Vorgabe für eine neue Laufwerkszuordnung."""
+    found = find_icon()
+    return str(found) if found is not None else ""
+
+
 def find_window_png() -> Path | None:
     icon = find_icon()
     if icon is not None:

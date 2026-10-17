@@ -19,7 +19,7 @@ SphereDrive gleicht die bekannten Lücken von `subst` aus:
 | Erhöhte Programme sehen das Laufwerk nicht | `EnableLinkedConnections` und eine Anmeldungsaufgabe mit höchsten Rechten |
 | Löschen ist sofort endgültig | Known-Folder-Registrierung, damit der Papierkorb des Zieldatenträgers greift |
 
-Der vorgesehene Arbeitsordner ist `D:\AI_Temp\SphereDrive`. Ein Symbol in diesem Ordner hat Vorrang vor dem mitgelieferten `assets\SphereDrive.ico`. Liegt dort eine andere `.ico`-Datei, wird sie verwendet.
+Der vorgesehene Arbeitsordner ist `D:\AI_Temp\SphereDrive`. Ein Symbol in diesem Ordner hat Vorrang vor dem mitgelieferten `assets\SphereDrive.ico`. Liegt dort eine andere `.ico`-Datei, wird sie verwendet. Dieses Symbol erscheint in der Seitenleiste, im Infofenster und als Vorgabe im Feld „Symbol“ bei einer neuen Zuordnung. Ein Laufwerk, das schon ein eigenes Symbol hat, behält es.
 
 ## Installation
 
