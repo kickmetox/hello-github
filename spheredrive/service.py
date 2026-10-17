@@ -581,6 +581,8 @@ class SphereService:
         target = path.strip()
         if not target:
             return OpResult(False, "Es ist nichts zum Öffnen ausgewählt.")
+        if not self.host.preview and not self.host.path_exists(target):
+            return OpResult(False, f"Der Pfad kann nicht geöffnet werden: {target}")
         self.host.open_path(target)
         return OpResult(True, f"Explorer: {target}")
 

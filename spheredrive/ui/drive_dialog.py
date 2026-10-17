@@ -7,7 +7,7 @@ from tkinter import filedialog, ttk
 
 from spheredrive.commands import format_bytes, suggest_letter
 from spheredrive.models import DriveCard, NetSpec, OpResult, ShareSpec, SubstSpec
-from spheredrive.paths import default_drive_icon
+from spheredrive.paths import browse_directory, default_drive_icon
 from spheredrive.ui.widgets import L, P
 
 
@@ -427,7 +427,7 @@ class DriveDialog(tk.Toplevel):
         self.app.select_page("compare")
 
     def _browse_path(self) -> None:
-        selected = filedialog.askdirectory(parent=self, title="Ordner für Subst")
+        selected = filedialog.askdirectory(parent=self, title="Ordner für Subst", initialdir=browse_directory() or None)
         if selected:
             self.path.set(selected)
 
@@ -435,13 +435,14 @@ class DriveDialog(tk.Toplevel):
         selected = filedialog.askopenfilename(
             parent=self,
             title="Laufwerkssymbol",
+            initialdir=browse_directory() or None,
             filetypes=[("Symbole", "*.ico"), ("Alle Dateien", "*.*")],
         )
         if selected:
             self.icon.set(selected)
 
     def _browse_spawn(self) -> None:
-        selected = filedialog.askdirectory(parent=self, title="Ordner auf diesem Laufwerk")
+        selected = filedialog.askdirectory(parent=self, title="Ordner auf diesem Laufwerk", initialdir=browse_directory() or None)
         if selected:
             self.spawn_path.set(selected)
 

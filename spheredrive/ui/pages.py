@@ -9,7 +9,7 @@ from tkinter import filedialog, ttk
 from spheredrive.catalog import COMPARISON, LINK_KINDS, PERMISSIONS, PS_PROVIDERS
 from spheredrive.commands import build_unc, normalize_letter, suggest_letter
 from spheredrive.models import DriveCard, LinkSpec, MountSpec, NetSpec, OpResult, PsSpec, ShareSpec, Snapshot, SubstSpec
-from spheredrive.paths import WORK_DIR, default_drive_icon
+from spheredrive.paths import WORK_DIR, browse_directory, default_drive_icon
 from spheredrive.ui.drive_dialog import DriveDialog, disconnect_card, explorer_target, paint_drive
 from spheredrive.ui.widgets import (
     Button,
@@ -31,9 +31,8 @@ from spheredrive.ui.widgets import (
 
 
 def _initial_dir() -> str:
-    if WORK_DIR.is_dir():
-        return str(WORK_DIR)
-    return str(os.path.expanduser("~"))
+    folder = browse_directory()
+    return folder or str(os.path.expanduser("~"))
 
 
 def _used_letters(snap: Snapshot) -> set[str]:

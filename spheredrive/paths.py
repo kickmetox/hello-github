@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 import sys
 from pathlib import Path
 
@@ -88,6 +89,91 @@ def find_window_png() -> Path | None:
             return sibling
     bundled = package_root() / "assets" / "SphereDrive.png"
     return bundled if bundled.is_file() else None
+
+
+def program_source() -> Path:
+    """Ordner mit assets und, im Quelltext, SphereDrive.pyw."""
+    installed = install_root()
+    if installed is not None and (installed / "assets").is_dir():
+        return installed
+    return package_root()
+
+
+def _same_folder(left: Path, right: Path) -> bool:
+    return os.path.normcase(os.path.abspath(left)) == os.path.normcase(os.path.abspath(right))
+
+
+def _copy_tree(source: Path, target: Path) -> None:
+    target.mkdir(parents=True, exist_ok=True)
+    for item in source.iterdir():
+        if item.name == "__pycache__" or item.suffix.lower() == ".pyc":
+            continue
+        dest = target / item.name
+        if item.is_dir():
+            _copy_tree(item, dest)
+        elif item.is_file():
+            shutil.copy2(item, dest)
+
+
+def publish_to(target: Path, source: Path | None = None) -> list[str]:
+    """Kopiert Programmdateien nach target. Ein bereits belegter Ordner wird ergänzt, nicht geleert."""
+    origin = source or program_source()
+    target.mkdir(parents=True, exist_ok=True)
+    if _same_folder(origin, target):
+        return []
+    copied: list[str] = []
+    for name in ("SphereDrive.pyw", "Start-SphereDrive.bat", "README.md", "SphereDrive-Setup-1.0.0.exe"):
+        src = origin / name
+        if not src.is_file():
+            continue
+        shutil.copy2(src, target / name)
+        copied.append(name)
+    for name in ("assets", "spheredrive"):
+        src = origin / name
+        if not src.is_dir():
+            continue
+        _copy_tree(src, target / name)
+        copied.append(name + "\\")
+    return copied
+
+
+def place_logo(target: Path, source: Path | None = None) -> None:
+    """Legt das mitgelieferte Symbol in den Arbeitsordner, solange dort kein eigenes .ico liegt."""
+    origin = source or program_source()
+    target.mkdir(parents=True, exist_ok=True)
+    custom = [path for path in _icons_in(target) if path.name.lower() != "spheredrive.ico"]
+    if custom:
+        return
+    for name in ("SphereDrive.ico", "SphereDrive.png"):
+        src = origin / "assets" / name
+        if not src.is_file():
+            src = origin / name
+        if src.is_file() and not (target / name).is_file():
+            shutil.copy2(src, target / name)
+
+
+def ensure_work_dir() -> str | None:
+    """Legt D:\\AI_Temp\\SphereDrive an. Unter anderen Systemen passiert nichts."""
+    if sys.platform != "win32":
+        return None
+    try:
+        WORK_DIR.mkdir(parents=True, exist_ok=True)
+        source = program_source()
+        if (source / "SphereDrive.pyw").is_file() or (source / "assets").is_dir():
+            publish_to(WORK_DIR, source)
+            place_logo(WORK_DIR, source)
+    except OSError as exc:
+        return f"Der Pfad kann nicht geöffnet werden: {WORK_DIR}. {exc}"
+    return None
+
+
+def browse_directory() -> str:
+    """Vorhandener Startordner für Dateidialoge. Fehlt D:, wird das Benutzerverzeichnis genommen."""
+    ensure_work_dir()
+    if WORK_DIR.is_dir():
+        return str(WORK_DIR)
+    home = Path.home()
+    return str(home) if home.is_dir() else ""
 
 
 def entry_script() -> Path:

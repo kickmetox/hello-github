@@ -6,7 +6,7 @@ import ctypes
 import logging
 import sys
 
-from spheredrive.paths import default_log_path
+from spheredrive.paths import default_log_path, ensure_work_dir
 from spheredrive.service import SphereService
 
 
@@ -38,6 +38,9 @@ def main(argv: list[str] | None = None) -> int:
     args = list(sys.argv[1:] if argv is None else argv)
     setup_logging()
     logger = logging.getLogger("spheredrive")
+    folder_problem = ensure_work_dir()
+    if folder_problem:
+        logger.warning(folder_problem)
     if "--restore" in args:
         service = SphereService()
         results = service.restore_persistent()

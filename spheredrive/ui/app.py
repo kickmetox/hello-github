@@ -10,7 +10,7 @@ from tkinter import ttk
 from spheredrive import __version__
 from spheredrive.catalog import NAV_ITEMS
 from spheredrive.models import OpResult, Snapshot
-from spheredrive.paths import WORK_DIR, find_icon, find_window_png
+from spheredrive.paths import WORK_DIR, ensure_work_dir, find_icon, find_window_png
 from spheredrive.service import SphereService
 from spheredrive.ui.pages import ComparePage, LinkPage, MountPage, NetPage, OverviewPage, PsPage, SettingsPage, SubstPage
 from spheredrive.ui.widgets import Button, L, P, apply_theme, ask_yes_no, load_font
@@ -137,8 +137,10 @@ class SphereApp(tk.Tk):
             anchor="w",
             wraplength=200,
             justify="left",
+            cursor="hand2",
         )
         self.work_label.pack(anchor="w", pady=(8, 0))
+        self.work_label.bind("<Button-1>", lambda _event: self.open_work_dir())
 
         content = tk.Frame(self, bg=P.bg)
         content.grid(row=1, column=1, sticky="nsew")
@@ -319,6 +321,13 @@ class SphereApp(tk.Tk):
         self.log_box.see("end")
         self.log_box.configure(state="disabled")
         self.status_var.set(text.splitlines()[0][:180])
+
+    def open_work_dir(self) -> None:
+        problem = ensure_work_dir()
+        if problem:
+            self.log(problem)
+            return
+        self.on_result(self.service.open_in_explorer(str(WORK_DIR)))
 
     def show_about(self) -> None:
         icon = find_icon()

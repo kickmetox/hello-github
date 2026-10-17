@@ -27,7 +27,15 @@ from spheredrive.commands import (
 from spheredrive.host import PreviewHost
 from spheredrive.models import LinkSpec, MountSpec, NetSpec, PsSpec, ShareSpec, SubstSpec
 from spheredrive.parsers import parse_mountvol, parse_net_share, parse_net_use, parse_subst
-from spheredrive.paths import bundled_restore, choose_icon, format_launch, restore_launch
+from spheredrive.paths import (
+    bundled_restore,
+    choose_icon,
+    ensure_work_dir,
+    format_launch,
+    place_logo,
+    publish_to,
+    restore_launch,
+)
 from spheredrive.service import SphereService
 
 
@@ -317,6 +325,35 @@ class ServiceTests(unittest.TestCase):
         custom.write_bytes(b"ico")
         self.assertEqual(choose_icon([bundled, custom]), custom)
         self.assertEqual(choose_icon([bundled]), bundled)
+
+    def test_publish_copies_program_and_keeps_a_custom_icon(self) -> None:
+        source = Path("tests") / "_runtime" / "publish-src"
+        target = Path("tests") / "_runtime" / "publish-dst"
+        if source.exists():
+            shutil.rmtree(source)
+        if target.exists():
+            shutil.rmtree(target)
+        (source / "assets").mkdir(parents=True)
+        (source / "assets" / "SphereDrive.ico").write_bytes(b"ICO")
+        (source / "assets" / "SphereDrive.png").write_bytes(b"PNG")
+        (source / "SphereDrive.pyw").write_text("start", encoding="utf-8")
+        (source / "spheredrive").mkdir()
+        (source / "spheredrive" / "__init__.py").write_text("", encoding="utf-8")
+        cache = source / "spheredrive" / "__pycache__"
+        cache.mkdir()
+        (cache / "x.pyc").write_bytes(b"0")
+        copied = publish_to(target, source)
+        self.assertIn("SphereDrive.pyw", copied)
+        self.assertEqual((target / "SphereDrive.pyw").read_text(encoding="utf-8"), "start")
+        self.assertTrue((target / "assets" / "SphereDrive.ico").is_file())
+        self.assertFalse((target / "spheredrive" / "__pycache__").exists())
+        (target / "logo.ico").write_bytes(b"CUSTOM")
+        place_logo(target, source)
+        self.assertFalse((target / "SphereDrive.ico").exists())
+        (target / "logo.ico").unlink()
+        place_logo(target, source)
+        self.assertEqual((target / "SphereDrive.ico").read_bytes(), b"ICO")
+        self.assertIsNone(ensure_work_dir())
 
 
 class CliTests(unittest.TestCase):
