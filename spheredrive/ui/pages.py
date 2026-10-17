@@ -11,6 +11,7 @@ from spheredrive.commands import build_unc, normalize_letter, suggest_letter
 from spheredrive.models import DriveCard, LinkSpec, MountSpec, NetSpec, OpResult, PsSpec, ShareSpec, Snapshot, SubstSpec
 from spheredrive.paths import WORK_DIR, browse_directory, default_drive_icon
 from spheredrive.ui.drive_dialog import DriveDialog, disconnect_card, explorer_target, paint_drive
+from spheredrive.ui.folders import FolderBrowser
 from spheredrive.ui.widgets import (
     Button,
     L,
@@ -393,6 +394,9 @@ class SubstPage(Page):
             "Zusätzlich setzt „Für Administratoren sichtbar“ EnableLinkedConnections und eine erhöhte Anmeldungsaufgabe. "
             "Der Papierkorb ist eine Known-Folder-Registrierung und braucht ebenfalls Administratorrechte.",
         ).pack(anchor="w", pady=(6, 4))
+        tk.Label(self.body, text="Ordner und Unterordner", bg=P.bg, fg=P.text, font=(P.font, 11, "bold")).pack(anchor="w")
+        self.folders = FolderBrowser(self.body, self.app, self._pick_folder, choose_drive=True, height=6)
+        self.folders.pack(fill="x", pady=(2, 8))
         row = buttons(self.body)
         row.pack(anchor="w", pady=(0, 8))
         Button(row, "Verbinden", self.connect, "primary").pack(side="left")
@@ -508,6 +512,12 @@ class SubstPage(Page):
         if letter is None:
             return
         self.app.on_result(self.app.service.open_in_explorer(f"{letter}:\\"))
+
+    def _pick_folder(self, path: str) -> None:
+        self.path.set(path)
+        folder_name = path.rstrip("\\").split("\\")[-1]
+        if folder_name and not self.label.get().strip():
+            self.label.set(folder_name)
 
     def browse_path(self) -> None:
         chosen = filedialog.askdirectory(parent=self.app, initialdir=_initial_dir())
@@ -988,8 +998,12 @@ class MountPage(Page):
             self.body,
             "Der Ordner muss leer sein. Eine VHD legst du in der Datenträgerverwaltung an "
             "(Aktion, Virtuelle Festplatte erstellen) und stellst sie danach hier oder dort in einen Ordner bereit. "
-            "Aufheben entfernt nur den Bereitstellungspunkt, nicht das Volume.",
+            "Aufheben entfernt nur den Bereitstellungspunkt, nicht das Volume. "
+            "Im Baum darunter kann ein Unterordner des Laufwerks das Ziel sein.",
         ).pack(anchor="w", pady=(6, 4))
+        tk.Label(self.body, text="Ordner und Unterordner", bg=P.bg, fg=P.text, font=(P.font, 11, "bold")).pack(anchor="w")
+        self.folders = FolderBrowser(self.body, self.app, self._pick_mount_folder, choose_drive=True, height=6)
+        self.folders.pack(fill="x", pady=(2, 8))
         row = buttons(self.body)
         row.pack(anchor="w", pady=(0, 8))
         Button(row, "Bereitstellen", self.mount, "primary").pack(side="left")
@@ -1072,6 +1086,10 @@ class MountPage(Page):
 
     def diskmgmt(self) -> None:
         self.app.run_bg(self.app.service.open_diskmgmt, self.app.on_result)
+
+    def _pick_mount_folder(self, path: str) -> None:
+        self.folder.set(path)
+        self.mode.set("folder")
 
     def browse(self) -> None:
         chosen = filedialog.askdirectory(parent=self.app, initialdir=_initial_dir())

@@ -67,6 +67,25 @@ def norm_path(path: str) -> str:
     return _windows_join(kind, parts).casefold()
 
 
+def join_path(parent: str, name: str) -> str:
+    """Hängt einen Ordnernamen an einen Windows-Pfad, auch unterhalb von C:\\."""
+    kind, parts = _windows_parts(parent)
+    return _windows_join(kind, parts + [name])
+
+
+def map_through_subst(path: str, subst: dict[str, str]) -> str:
+    """Ersetzt einen Subst-Buchstaben durch den Zielordner, Unterordner bleiben erhalten."""
+    kind, parts = _windows_parts(path)
+    if kind != "drive" or not parts:
+        return _windows_join(kind, parts) if parts else path.strip()
+    letter = parts[0][0].upper()
+    target = subst.get(letter)
+    if not target:
+        return _windows_join(kind, parts)
+    target_kind, target_parts = _windows_parts(target)
+    return _windows_join(target_kind, target_parts + parts[1:])
+
+
 def parent_dir(path: str) -> str:
     kind, parts = _windows_parts(path)
     if len(parts) <= 1:

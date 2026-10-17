@@ -12,7 +12,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from spheredrive.commands import TASK_NAME, norm_path, normalize_letter, parent_dir, task_xml
+from spheredrive.commands import TASK_NAME, map_through_subst, norm_path, normalize_letter, parent_dir, task_xml
 from spheredrive.parsers import (
     LiveNet,
     LiveShare,
@@ -204,6 +204,11 @@ class PreviewHost:
 
     def is_reparse(self, path: str) -> bool:
         return self._key(path) in self.links
+
+    def list_folders(self, path: str) -> list[str]:
+        """Unterordner eines Laufwerks oder Ordners. Die Vorschau kennt einen festen Baum unter C:."""
+        resolved = map_through_subst(path, self.subst)
+        return list(_PREVIEW_FOLDERS.get(norm_path(resolved), []))
 
     def logical_drives(self) -> set[str]:
         letters = set(self.subst) | set(self.net)
@@ -479,6 +484,28 @@ class PreviewHost:
         return left.rstrip("\\").lower() == right.rstrip("\\").lower()
 
 
+def _preview_tree() -> dict[str, list[str]]:
+    raw = {
+        "C:\\": ["Benutzer", "Programme", "Projekte", "Windows"],
+        "C:\\Benutzer": ["Öffentlich"],
+        "C:\\Benutzer\\Öffentlich": ["Dokumente"],
+        "C:\\Programme": ["SphereDrive"],
+        "C:\\Projekte": ["Archiv", "SphereDrive"],
+        "C:\\Projekte\\Archiv": ["2024", "2026"],
+        "C:\\Projekte\\Archiv\\2024": [],
+        "C:\\Projekte\\Archiv\\2026": [],
+        "C:\\Projekte\\SphereDrive": ["assets"],
+        "C:\\Projekte\\SphereDrive\\assets": [],
+        "C:\\Programme\\SphereDrive": [],
+        "C:\\Windows": ["System32"],
+        "C:\\Windows\\System32": [],
+    }
+    return {norm_path(path): names for path, names in raw.items()}
+
+
+_PREVIEW_FOLDERS = _preview_tree()
+
+
 def _permissive_kind(path: str) -> str:
     text = path.strip().strip('"')
     if not text:
@@ -582,6 +609,20 @@ class WindowsHost:
         if attrs == INVALID_FILE_ATTRIBUTES:
             return False
         return bool(attrs & FILE_ATTRIBUTE_REPARSE_POINT)
+
+    def list_folders(self, path: str) -> list[str]:
+        names: list[str] = []
+        try:
+            with os.scandir(path) as scan:
+                for entry in scan:
+                    try:
+                        if entry.is_dir(follow_symlinks=False):
+                            names.append(entry.name)
+                    except OSError:
+                        continue
+        except OSError:
+            return []
+        return sorted(names, key=str.casefold)
 
     def logical_drives(self) -> set[str]:
         try:

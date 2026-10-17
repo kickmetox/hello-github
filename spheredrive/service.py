@@ -577,6 +577,12 @@ class SphereService:
             return OpResult(True, "Vorschau: die Freigabeverwaltung würde jetzt geöffnet.")
         return OpResult(True, "Freigabeverwaltung wird geöffnet.")
 
+    def list_folders(self, path: str) -> list[str]:
+        return self.host.list_folders(path)
+
+    def drive_letters(self) -> list[str]:
+        return sorted(self.host.logical_drives())
+
     def open_in_explorer(self, path: str) -> OpResult:
         target = path.strip()
         if not target:

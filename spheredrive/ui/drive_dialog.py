@@ -8,6 +8,7 @@ from tkinter import filedialog, ttk
 from spheredrive.commands import format_bytes, suggest_letter
 from spheredrive.models import DriveCard, NetSpec, OpResult, ShareSpec, SubstSpec
 from spheredrive.paths import browse_directory, default_drive_icon
+from spheredrive.ui.folders import FolderBrowser
 from spheredrive.ui.widgets import L, P
 
 
@@ -89,6 +90,7 @@ class DriveDialog(tk.Toplevel):
         shell = tk.Frame(self, bg=L.bg)
         shell.pack(fill="both", expand=True, padx=16, pady=(0, 4))
         canvas = tk.Canvas(shell, bg=L.bg, highlightthickness=0, bd=0)
+        self._canvas = canvas
         scroll = ttk.Scrollbar(shell, orient="vertical", command=canvas.yview)
         canvas.configure(yscrollcommand=scroll.set)
         canvas.pack(side="left", fill="both", expand=True)
@@ -105,6 +107,8 @@ class DriveDialog(tk.Toplevel):
         body.bind("<Configure>", fit)
         canvas.bind("<Configure>", stretch)
         self._form(body)
+        if self.card is not None:
+            self.after(30, self._reveal_folders)
 
     def _header(self, header: tk.Frame) -> None:
         icon = tk.Canvas(header, width=72, height=56, bg=L.paper, highlightthickness=0)
@@ -171,6 +175,16 @@ class DriveDialog(tk.Toplevel):
             self.subst_radio.configure(state="disabled")
             self.net_radio.configure(state="disabled")
 
+        if self.card is None:
+            tk.Label(
+                box,
+                text="Ordner und Unterordner eines Laufwerks",
+                bg=L.paper,
+                fg=L.text,
+                font=(P.font, 10, "bold"),
+            ).pack(anchor="w", padx=12, pady=(8, 2))
+            self.folders = FolderBrowser(box, self.app, self._pick_new_folder, choose_drive=True, light=True, height=6)
+            self.folders.pack(fill="x", padx=12, pady=(0, 8))
         path_row = self._row(box, L.paper)
         tk.Label(path_row, text="Ordner", bg=L.paper, fg=L.muted, font=(P.font, 10), width=16, anchor="w").pack(side="left")
         self.path_entry = self._entry(path_row, self.path)
@@ -236,6 +250,15 @@ class DriveDialog(tk.Toplevel):
             fg=L.text,
             font=(P.font, 11, "bold"),
         ).pack(anchor="w", padx=12, pady=(10, 4))
+        tk.Label(
+            box,
+            text="Aufklappen zeigt die Unterordner. Ein Klick übernimmt den Ordner als neues Laufwerk.",
+            bg=L.paper,
+            fg=L.muted,
+            font=(P.font, 9),
+            wraplength=640,
+            justify="left",
+        ).pack(anchor="w", padx=12, pady=(0, 4))
         row = self._row(box, L.paper)
         tk.Label(row, text="Ordner", bg=L.paper, fg=L.muted, font=(P.font, 10), width=16, anchor="w").pack(side="left")
         self._entry(row, self.spawn_path).pack(side="left", fill="x", expand=True)
@@ -251,10 +274,19 @@ class DriveDialog(tk.Toplevel):
         self.spawn_button = self._button(letter_row, "Anlegen", self.spawn, "primary")
         self.spawn_button.pack(side="left", padx=(8, 0))
         flags = tk.Frame(box, bg=L.paper)
-        flags.pack(anchor="w", padx=12, pady=(0, 12))
+        flags.pack(anchor="w", padx=12, pady=(0, 6))
         self._check(flags, "Dauerhaft", self.spawn_persistent).pack(side="left", padx=(0, 12))
         self._check(flags, "Für Administratoren sichtbar", self.spawn_uac).pack(side="left", padx=(0, 12))
         self._check(flags, "Papierkorb", self.spawn_recycle).pack(side="left")
+        self.folders = FolderBrowser(
+            box,
+            self.app,
+            self._pick_spawn_folder,
+            root=f"{self.card.letter}:\\",
+            light=True,
+            height=5,
+        )
+        self.folders.pack(fill="x", padx=12, pady=(0, 12))
 
     def _share_section(self, body: tk.Frame) -> None:
         box = tk.Frame(body, bg=L.paper, highlightthickness=1, highlightbackground=L.line)
@@ -378,6 +410,20 @@ class DriveDialog(tk.Toplevel):
             self.icon.get(),
         )
         return self.app.service.connect_net(spec)
+
+    def _reveal_folders(self) -> None:
+        canvas = getattr(self, "_canvas", None)
+        if canvas is not None:
+            canvas.yview_moveto(1.0)
+
+    def _pick_new_folder(self, path: str) -> None:
+        self.path.set(path)
+        self.mode.set("subst")
+        if not self.label.get().strip():
+            self.label.set(path.rstrip("\\").split("\\")[-1])
+
+    def _pick_spawn_folder(self, path: str) -> None:
+        self.spawn_path.set(path)
 
     def spawn(self) -> OpResult:
         spec = SubstSpec(

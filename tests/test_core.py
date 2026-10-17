@@ -10,6 +10,8 @@ import unittest
 from pathlib import Path
 
 from spheredrive.commands import (
+    join_path,
+    map_through_subst,
     BITBUCKET,
     DOS_DEVICES,
     FOLDER_DESC,
@@ -359,6 +361,17 @@ class ServiceTests(unittest.TestCase):
         self.assertEqual(system_caption(19045), "Windows 10")
         if sys.platform != "win32":
             self.assertEqual(system_caption(), "Vorschau")
+
+    def test_folder_tree_includes_subfolders_and_follows_subst(self) -> None:
+        svc, host = service(Path("tests") / "_runtime" / "folders")
+        self.assertEqual(svc.list_folders(r"C:\Projekte"), ["Archiv", "SphereDrive"])
+        self.assertEqual(svc.list_folders(r"C:\Projekte\Archiv"), ["2024", "2026"])
+        self.assertEqual(svc.list_folders(r"C:\Projekte\SphereDrive"), ["assets"])
+        self.assertEqual(join_path(r"C:\Projekte", "Archiv"), r"C:\Projekte\Archiv")
+        host.subst["P"] = r"C:\Projekte"
+        self.assertEqual(map_through_subst(r"P:\Archiv", host.subst), r"C:\Projekte\Archiv")
+        self.assertEqual(svc.list_folders(r"P:\\"), ["Archiv", "SphereDrive"])
+        self.assertEqual(svc.list_folders(r"P:\SphereDrive"), ["assets"])
 
 
 class CliTests(unittest.TestCase):
