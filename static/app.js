@@ -41,6 +41,7 @@ const BOTTOM = [
   ["db", "Datenbank"],
   ["vars", "Variablen"],
   ["remote", "Remote"],
+  ["studio", "Studio"],
 ];
 
 const $ = (id) => document.getElementById(id);
@@ -587,6 +588,7 @@ function renderPanel() {
     db: renderDb,
     vars: renderVars,
     remote: renderRemote,
+    studio: renderStudio,
   };
   (builders[S.bottom] || renderOutput)(host);
 }
@@ -673,7 +675,49 @@ function renderTests(host) {
   host.appendChild(pre);
 }
 
+function allBreakpoints() {
+  const points = [];
+  Object.entries(S.breaks).forEach(([file, lines]) => {
+    Object.entries(lines || {}).forEach(([line, condition]) => {
+      points.push({ file, line: Number(line), condition: condition || null });
+    });
+  });
+  return points;
+}
+
+function scheduleRecovery() {
+  clearTimeout(S.recoveryTimer);
+  S.recoveryTimer = setTimeout(() => {
+    const current = tab();
+    if (!current || !current.path || current.content === current.saved) return;
+    api("/api/studio", { action: "recovery", path: current.path, content: current.content }).catch(() => {});
+  }, 1200);
+}
+
 function renderTerminal(host) {
+  const select = document.createElement("select");
+  const automatic = document.createElement("option");
+  automatic.value = "";
+  automatic.textContent = "Standard-Shell";
+  select.appendChild(automatic);
+  apiGet("/api/studio?action=shells").then((data) => {
+    (data.shells || []).forEach((item) => {
+      const option = document.createElement("option");
+      option.value = item.path;
+      option.textContent = item.label;
+      if (S.terminalShell === item.path) option.selected = true;
+      select.appendChild(option);
+    });
+  }).catch(() => {});
+  select.onchange = async () => {
+    S.terminalShell = select.value;
+    if (S.terminalId) {
+      await api("/api/terminal", { action: "close", id: S.terminalId }).catch(() => {});
+      S.terminalId = "";
+      S.terminalText = "";
+    }
+    await startTerminal();
+  };
   const pre = document.createElement("div");
   pre.id = "term-text";
   pre.textContent = S.terminalText || "";
@@ -685,13 +729,14 @@ function renderTerminal(host) {
     await api("/api/terminal", { action: "write", id: S.terminalId, data: input.value + "\n" });
     input.value = "";
   };
+  host.appendChild(select);
   host.appendChild(pre);
   host.appendChild(input);
   if (!S.terminalId) startTerminal();
 }
 
 async function startTerminal() {
-  const data = await api("/api/terminal", { action: "start" });
+  const data = await api("/api/terminal", { action: "start", shell: S.terminalShell || "" });
   S.terminalId = data.id;
   S.terminalFrom = 0;
   pollTerminal();
@@ -1076,11 +1121,80 @@ function renderRemote(host) {
   ssh.onclick = async () => show(await api("/api/remote", { action: "ssh", target: target.value, command: command.value }));
   ps.onclick = async () => show(await api("/api/remote", { action: "docker-ps" }));
   wsl.onclick = async () => show(await api("/api/remote", { action: "wsl", command: command.value || "python3 --version" }));
+  const hostName = document.createElement("input");
+  hostName.placeholder = "PowerShell-Host, leer = dieser Rechner";
+  const user = document.createElement("input");
+  user.placeholder = "Benutzer für SSH";
+  const psCommand = document.createElement("textarea");
+  psCommand.placeholder = "Get-Date oder Skript. Leer = aktuelle Datei.";
+  psCommand.style.width = "100%";
+  psCommand.style.height = "70px";
+  const local = document.createElement("button");
+  local.type = "button";
+  local.textContent = "PS lokal";
+  const winrm = document.createElement("button");
+  winrm.type = "button";
+  winrm.textContent = "WinRM";
+  const remoteSsh = document.createElement("button");
+  remoteSsh.type = "button";
+  remoteSsh.textContent = "PS per SSH";
+  const trace = document.createElement("button");
+  trace.type = "button";
+  trace.textContent = "Ablauf verfolgen";
+  async function powershellBody() {
+    if (psCommand.value.trim()) return psCommand.value;
+    const current = tab();
+    if (!current) throw new Error("Kein Befehl und keine Datei");
+    return current.content;
+  }
+  async function runRemote(transport) {
+    const data = await api("/api/studio", {
+      action: "remote",
+      transport,
+      host: hostName.value,
+      user: user.value,
+      command: await powershellBody(),
+    });
+    S.output = "";
+    S.runId = data.id;
+    S.runFrom = 0;
+    setBottom("output");
+    pollRun();
+    toast(data.message || "Remote-Befehl");
+  }
+  local.onclick = () => runRemote("local").catch((err) => toast(err.message));
+  winrm.onclick = () => runRemote("winrm").catch((err) => toast(err.message));
+  remoteSsh.onclick = () => runRemote("ssh").catch((err) => toast(err.message));
+  trace.onclick = async () => {
+    const current = tab();
+    if (!current) return toast("Keine Datei");
+    await saveTab();
+    const data = await api("/api/studio", {
+      action: "trace",
+      path: current.path,
+      content: current.content,
+      transport: hostName.value.trim() ? "ssh" : "local",
+      host: hostName.value,
+      user: user.value,
+    });
+    S.output = "";
+    S.runId = data.id;
+    S.runFrom = 0;
+    setBottom("output");
+    pollRun();
+  };
   host.appendChild(target);
   host.appendChild(command);
   host.appendChild(ssh);
   host.appendChild(ps);
   host.appendChild(wsl);
+  host.appendChild(hostName);
+  host.appendChild(user);
+  host.appendChild(psCommand);
+  host.appendChild(local);
+  host.appendChild(winrm);
+  host.appendChild(remoteSsh);
+  host.appendChild(trace);
   host.appendChild(out);
 }
 
@@ -1106,9 +1220,7 @@ async function runFile(debug) {
       updateStatus("Läuft");
       return;
     }
-    const points = Object.entries(S.breaks[current.path] || {}).map(([line, condition]) => ({
-      file: current.path, line: Number(line), condition: condition || null,
-    }));
+    const points = allBreakpoints();
     await api("/api/debug/start", { path: current.path, breakpoints: points });
     S.debugFrom = 0;
     setBottom("debug");
@@ -1159,10 +1271,7 @@ async function pollDebug() {
 }
 
 async function debugCmd(cmd) {
-  const current = tab();
-  const points = current ? Object.entries(S.breaks[current.path] || {}).map(([line, condition]) => ({
-    file: current.path, line: Number(line), condition: condition || null,
-  })) : [];
+  const points = allBreakpoints();
   await api("/api/debug", { cmd, breakpoints: points });
   setTimeout(pollDebug, 200);
 }
@@ -1924,6 +2033,320 @@ function bindFindbar() {
   });
 }
 
+async function openGenerated(path, content) {
+  const written = await api("/api/file", { path, content });
+  await refreshTree();
+  await openPath(written.path);
+}
+
+function runSession(data) {
+  S.output = "";
+  S.runId = data.id;
+  S.runFrom = 0;
+  setBottom("output");
+  pollRun();
+  if (data.message) toast(data.message);
+}
+
+async function buildExe() {
+  const current = tab();
+  if (!current) return toast("Keine Datei");
+  await saveTab();
+  const stem = (current.path.split(/[/\\]/).pop() || "ShatuApp").replace(/\.[^.]+$/, "") || "ShatuApp";
+  const lang = languageOf(current.path);
+  const data = await api("/api/studio", {
+    action: "exe",
+    path: current.path,
+    content: current.content,
+    name: stem,
+    target: (lang === "powershell" || lang === "batch") ? "windows" : "native",
+  });
+  if (data.id) runSession(data);
+  else toast(data.message || data.path || "EXE erzeugt");
+}
+
+function buildMsi() {
+  const current = tab();
+  const body = document.createElement("div");
+  const name = document.createElement("input");
+  name.value = "ShatuApp";
+  const version = document.createElement("input");
+  version.value = "1.0.0";
+  const maker = document.createElement("input");
+  maker.value = "ShatuIDE";
+  body.append("Produkt", name, "Version", version, "Hersteller", maker);
+  modal("MSI-Installer", body, [
+    { label: "Abbrechen", run: () => {} },
+    { label: "Erzeugen", run: () => {
+      api("/api/studio", {
+        action: "msi",
+        name: name.value,
+        version: version.value,
+        manufacturer: maker.value,
+        path: current ? current.path : "",
+      }).then((data) => {
+        toast(data.message || data.path);
+        $("modal").classList.add("hidden");
+      }).catch((err) => toast(err.message));
+      return false;
+    } },
+  ]);
+}
+
+function buildModule() {
+  const current = tab();
+  if (!current) return toast("Keine Datei");
+  promptModal("PowerShell-Modul", "Modulname", "Werkzeug", async (name) => {
+    const data = await api("/api/studio", {
+      action: "module",
+      name,
+      content: current.content,
+      path: current.path,
+      version: "1.0.0",
+    });
+    toast(data.message);
+    await refreshTree();
+    await openPath(data.psm1);
+  });
+}
+
+function buildFunction() {
+  const body = document.createElement("div");
+  const name = document.createElement("input");
+  name.value = "Get-Wert";
+  const synopsis = document.createElement("input");
+  synopsis.placeholder = "Kurzbeschreibung";
+  const description = document.createElement("textarea");
+  description.placeholder = "Beschreibung";
+  const params = document.createElement("textarea");
+  params.placeholder = "Name Typ Pflicht Hilfe, eine Zeile je Parameter\nWert int ja Die Zahl";
+  body.append("Name", name, "Synopsis", synopsis, "Beschreibung", description, "Parameter", params);
+  modal("Erweiterte Funktion", body, [
+    { label: "Abbrechen", run: () => {} },
+    { label: "Erzeugen", run: () => {
+      const parameters = params.value.split("\n").map((line) => line.trim()).filter(Boolean).map((line) => {
+        const parts = line.split(/\s+/);
+        return { name: parts[0], type: parts[1] || "string", mandatory: parts[2] || "", help: parts.slice(3).join(" ") };
+      });
+      api("/api/studio", {
+        action: "function",
+        name: name.value,
+        synopsis: synopsis.value,
+        description: description.value,
+        parameters,
+      }).then(async (data) => {
+        const current = tab();
+        if (current && languageOf(current.path) === "powershell" && current.writable !== false) {
+          const area = codeEl();
+          area.focus();
+          area.selectionStart = area.selectionEnd = area.value.length;
+          replaceSelection((area.value.endsWith("\n") || !area.value ? "" : "\n") + data.content);
+          toast("Funktion eingefügt");
+        } else {
+          await openGenerated("ausgabe/" + name.value + ".ps1", data.content);
+        }
+        $("modal").classList.add("hidden");
+      }).catch((err) => toast(err.message));
+      return false;
+    } },
+  ]);
+}
+
+function openGuiDesigner() {
+  const controls = [];
+  let selected = -1;
+  let drag = null;
+  const body = document.createElement("div");
+  const title = document.createElement("input");
+  title.value = "Werkzeug";
+  const lang = document.createElement("select");
+  [["powershell", "PowerShell WinForms"], ["python", "Python tkinter"]].forEach(([value, label]) => {
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = label;
+    lang.appendChild(option);
+  });
+  const tools = document.createElement("div");
+  tools.className = "row";
+  const canvas = document.createElement("div");
+  canvas.id = "gui-canvas";
+  const nameInput = document.createElement("input");
+  const textInput = document.createElement("input");
+  function draw() {
+    canvas.innerHTML = "";
+    controls.forEach((item, index) => {
+      const node = document.createElement("div");
+      node.className = "widget" + (index === selected ? " on" : "");
+      node.textContent = item.text || item.kind;
+      node.style.left = item.x + "px";
+      node.style.top = item.y + "px";
+      node.style.width = item.w + "px";
+      node.style.height = item.h + "px";
+      node.onmousedown = (event) => {
+        event.preventDefault();
+        selected = index;
+        drag = { index, ox: event.clientX, oy: event.clientY, x: item.x, y: item.y };
+        nameInput.value = item.name;
+        textInput.value = item.text;
+        draw();
+      };
+      canvas.appendChild(node);
+    });
+  }
+  canvas.onmousemove = (event) => {
+    if (!drag) return;
+    const item = controls[drag.index];
+    item.x = Math.max(0, Math.min(500, drag.x + event.clientX - drag.ox));
+    item.y = Math.max(0, Math.min(330, drag.y + event.clientY - drag.oy));
+    drag.ox = event.clientX;
+    drag.oy = event.clientY;
+    drag.x = item.x;
+    drag.y = item.y;
+    draw();
+  };
+  canvas.onmouseup = () => { drag = null; };
+  nameInput.onchange = () => { if (controls[selected]) { controls[selected].name = nameInput.value; } };
+  textInput.onchange = () => { if (controls[selected]) { controls[selected].text = textInput.value; draw(); } };
+  [["label", "Beschriftung"], ["button", "Schaltfläche"], ["textbox", "Eingabe"], ["checkbox", "Auswahl"], ["combo", "Liste"]].forEach(([kind, label]) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = label;
+    button.onclick = () => {
+      const count = controls.length + 1;
+      controls.push({ kind, name: kind + count, text: label, x: 16, y: 16 + controls.length * 36, w: 140, h: 28, items: kind === "combo" ? ["Eins", "Zwei"] : [] });
+      selected = controls.length - 1;
+      nameInput.value = controls[selected].name;
+      textInput.value = controls[selected].text;
+      draw();
+    };
+    tools.appendChild(button);
+  });
+  body.append("Titel", title, "Ziel", lang, tools, canvas, "Name", nameInput, "Text", textInput);
+  modal("GUI entwerfen", body, [
+    { label: "Abbrechen", run: () => {} },
+    { label: "Skript erzeugen", run: () => {
+      api("/api/studio", { action: "gui", title: title.value, language: lang.value, controls: controls.map((item) => ({ ...item })) })
+        .then(async (data) => {
+          await refreshTree();
+          await openPath(data.path);
+          $("modal").classList.add("hidden");
+          toast(data.message);
+        })
+        .catch((err) => toast(err.message));
+      return false;
+    } },
+  ]);
+}
+
+function buildService() {
+  const body = document.createElement("div");
+  const name = document.createElement("input");
+  name.value = "ShatuDienst";
+  const description = document.createElement("input");
+  description.placeholder = "Beschreibung";
+  body.append("Dienstname", name, "Beschreibung", description);
+  modal("Windows-Dienst", body, [
+    { label: "Abbrechen", run: () => {} },
+    { label: "Skripte schreiben", run: () => {
+      const current = tab();
+      api("/api/studio", { action: "service", name: name.value, description: description.value, path: current ? current.path : "" })
+        .then(async (data) => {
+          toast(data.message);
+          await refreshTree();
+          if (data.path) await openPath(data.path);
+          $("modal").classList.add("hidden");
+        })
+        .catch((err) => toast(err.message));
+      return false;
+    } },
+  ]);
+}
+
+async function measureFile() {
+  const current = tab();
+  if (!current) return toast("Keine Datei");
+  await saveTab();
+  const data = await api("/api/studio", { action: "measure", path: current.path });
+  runSession(data);
+}
+
+function restoreRecovery() {
+  apiGet("/api/studio?action=recovery").then((data) => {
+    const body = document.createElement("div");
+    if (!data.items || !data.items.length) {
+      body.textContent = "Keine Wiederherstellung.";
+    }
+    (data.items || []).forEach((item) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "hit";
+      button.textContent = item.time + "  " + item.path;
+      button.onclick = async () => {
+        const restored = await api("/api/studio", { action: "recovery-read", id: item.id });
+        const existing = S.tabs.findIndex((tabItem) => tabItem.path === restored.path);
+        if (existing >= 0) activate(existing);
+        else {
+          S.tabs.push({
+            path: restored.path,
+            content: restored.content,
+            saved: "",
+            dirty: true,
+            writable: true,
+            problems: [],
+            outline: [],
+          });
+          activate(S.tabs.length - 1);
+        }
+        const current = tab();
+        current.content = restored.content;
+        current.dirty = true;
+        renderEditor();
+        $("modal").classList.add("hidden");
+        toast("Wiederhergestellt, noch nicht gespeichert");
+      };
+      body.appendChild(button);
+    });
+    modal("Wiederherstellen", body, [{ label: "Schließen", run: () => {} }]);
+  }).catch((err) => toast(err.message));
+}
+
+function renderStudio(host) {
+  const row = document.createElement("div");
+  row.className = "row";
+  const actions = [
+    ["EXE", buildExe],
+    ["MSI", buildMsi],
+    ["Modul", buildModule],
+    ["Funktion", buildFunction],
+    ["GUI", openGuiDesigner],
+    ["Dienst", buildService],
+    ["Messen", measureFile],
+    ["Wiederherstellen", restoreRecovery],
+  ];
+  actions.forEach(([label, fn]) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = label;
+    button.onclick = () => Promise.resolve(fn()).catch((err) => toast(err.message));
+    row.appendChild(button);
+  });
+  const topic = document.createElement("input");
+  topic.placeholder = "Get-Help Thema, z. B. Get-Date";
+  topic.value = "Get-Command";
+  const help = document.createElement("button");
+  help.type = "button";
+  help.textContent = "PS-Hilfe";
+  const out = document.createElement("div");
+  help.onclick = async () => {
+    const data = await apiGet("/api/studio?action=help&topic=" + encodeURIComponent(topic.value));
+    out.textContent = data.text || "";
+  };
+  host.appendChild(row);
+  host.appendChild(topic);
+  host.appendChild(help);
+  host.appendChild(out);
+}
+
 function buildMenus() {
   const menus = [
     ["Datei", [
@@ -1933,6 +2356,7 @@ function buildMenus() {
       ["Ordner öffnen…", openFolder],
       ["Speichern", saveTab, "Strg+S"],
       ["Alles speichern", saveTab],
+      ["Wiederherstellen…", restoreRecovery],
     ]],
     ["Bearbeiten", [
       ["Rückgängig", () => editorHistory(false), "Strg+Z"],
@@ -1975,7 +2399,19 @@ function buildMenus() {
       ["Bytecode kompilieren", () => compileCurrent("file")],
       ["Projekt kompilieren", () => compileCurrent("project")],
       ["PyInstaller", pyInstaller],
+      ["EXE erzeugen", buildExe],
+      ["MSI-Installer…", buildMsi],
+      ["Leistung messen", measureFile],
       ["Framework starten", runFramework],
+    ]],
+    ["Erzeugen", [
+      ["EXE erzeugen", buildExe],
+      ["MSI-Installer…", buildMsi],
+      ["Modul aus Funktionen…", buildModule],
+      ["Funktion erzeugen…", buildFunction],
+      ["GUI entwerfen…", openGuiDesigner],
+      ["Windows-Dienst…", buildService],
+      ["Leistung messen", measureFile],
     ]],
     ["Debuggen", [
       ["Start / Weiter", () => S.debugLine ? debugCmd("continue") : runFile(true), "F5"],
@@ -1985,6 +2421,7 @@ function buildMenus() {
       ["Haltepunkt", () => toggleBreak(cursorPos().line), "F9"],
       ["Bedingung…", conditionBreak],
       ["Stopp", stopAll],
+      ["Remote-Ablauf", () => setBottom("remote")],
     ]],
     ["Refactor", [
       ["Umbenennen", renameSymbol, "Umschalt+F6"],
@@ -2020,6 +2457,7 @@ function buildMenus() {
       ["Testfenster", () => probeWindow("mark")],
     ]],
     ["Hilfe", [
+      ["PS-Hilfe", () => setBottom("studio")],
       ["Tastatur", showKeys],
       ["Über ShatuIDE", about],
     ]],
@@ -2666,7 +3104,7 @@ async function startCollab() {
 
 function showKeys() {
   const body = document.createElement("pre");
-  body.textContent = "Strg+S Speichern\nStrg+Z Rückgängig\nStrg+Y Wiederholen\nStrg+X Ausschneiden\nStrg+C Kopieren\nStrg+V Einfügen\nStrg+F Suchen\nStrg+H Ersetzen\nStrg+/ Zeile kommentieren\nStrg+D Nächstes Vorkommen\nAlt+↑/↓ Zeile verschieben\nUmschalt+Alt+↓ Zeile duplizieren\nStrg+Umschalt+K Zeile löschen\nStrg+G Gehe zu Zeile\nStrg+F5 Ausführen\nAlt+F5 Markierung im Fenster\nUmschalt+Alt+F5 Funktion im Fenster\nF5 Debug/Weiter\nF9 Haltepunkt\nF10 Schritt über\nF11 Schritt hinein\nF12 Definition\nStrg+K Inline-KI\nStrg+Eingabe Prompt senden\nStrg+Leertaste Vervollständigen\nStrg+Umschalt+F Suche\nStrg+Umschalt+H In Dateien ersetzen";
+  body.textContent = "Strg+S Speichern\nStrg+Z Rückgängig\nStrg+Y Wiederholen\nStrg+X Ausschneiden\nStrg+C Kopieren\nStrg+V Einfügen\nStrg+F Suchen\nStrg+H Ersetzen\nStrg+/ Zeile kommentieren\nStrg+D Nächstes Vorkommen\nAlt+↑/↓ Zeile verschieben\nUmschalt+Alt+↓ Zeile duplizieren\nStrg+Umschalt+K Zeile löschen\nStrg+G Gehe zu Zeile\nStrg+F5 Ausführen\nAlt+F5 Markierung im Fenster\nUmschalt+Alt+F5 Funktion im Fenster\nF5 Debug/Weiter\nF9 Haltepunkt\nF10 Schritt über\nF11 Schritt hinein\nF12 Definition\nStrg+K Inline-KI\nStrg+Eingabe Prompt senden\nStrg+Leertaste Vervollständigen\nStrg+Umschalt+F Suche\nStrg+Umschalt+H In Dateien ersetzen\nStudio EXE, MSI, Modul, GUI, Dienst, Messen, PS-Hilfe";
   modal("Tastatur", body, [{ label: "Schließen", run: () => {} }]);
 }
 
@@ -2779,6 +3217,7 @@ async function boot() {
     renderGutter();
     renderTabs();
     scheduleAnalyze();
+    scheduleRecovery();
     if (/[A-Za-z0-9_.]$/.test(area.value.slice(0, area.selectionStart))) completeAt().catch(() => {});
     else hidePopup();
   });
@@ -2807,6 +3246,9 @@ async function boot() {
   await refreshTree();
   await loadPythons();
   setBottom("output");
+  apiGet("/api/studio?action=recovery").then((data) => {
+    if (data.items && data.items.length) toast(data.items.length + " Wiederherstellungen unter Datei");
+  }).catch(() => {});
   const welcome = state.workspace.replace(/[/\\]$/, "") + "/beispiele/hallo.py";
   openPath(welcome).catch(() => {});
   updateStatus("Bereit");

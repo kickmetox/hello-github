@@ -16,7 +16,9 @@ Unter Windows: `ShatuIDE.bat` oder `py -3 shatuide.py`.
 
 **Strg+F** sucht in der offenen Datei, **Strg+H** ersetzt darin. Groß/Klein, ganzes Wort und reguläre Ausdrücke lassen sich umschalten. **Strg+Umschalt+H** ersetzt im Workspace, nach einer Vorschau und nur in Dateien dieses Ordners. Weitere Editorbefehle: Zeile kommentieren, duplizieren, verschieben, löschen und verbinden, Einrücken, Groß-/Kleinschreibung, nächstes Vorkommen, Gehe zu Zeile und Zeilenumbruch.
 
-`.sh`, `.bash` und `.ps1` lassen sich laden und bearbeiten. **Ausführen** startet Bash beziehungsweise PowerShell (`pwsh` oder `powershell`). **Syntax prüfen** nutzt `bash -n` oder den PowerShell-Parser. **Debug** hält an Haltepunkten an, zeigt Variablen und geht schrittweise weiter. Fehlt der Interpreter, meldet die IDE das, statt ein Ergebnis zu erfinden.
+Bash- und PowerShell-Skripte lassen sich laden und bearbeiten. **Ausführen** startet Bash beziehungsweise PowerShell (`pwsh` oder `powershell`, auch Windows PowerShell 32-bit und 64-bit, sobald beide vorhanden sind). **Syntax prüfen** nutzt `bash -n` oder den PowerShell-Parser. **Format** rückt Klammern und Shell-Blöcke ein. **Debug** hält an Haltepunkten an, auch in weiteren Dateien und Modulen im selben Ordner, zeigt Variablen und geht schrittweise weiter. Fehlt der Interpreter, meldet die IDE das, statt ein Ergebnis zu erfinden.
+
+**Erzeugen** macht aus dem Skript ein Programm: Python mit installiertem PyInstaller als EXE inklusive Interpreter, sonst eine EXE (MinGW oder `csc`) beziehungsweise ein Linux-Programm (`gcc`), das den Interpreter auf dem Zielrechner startet. **MSI-Installer** packt die Dateien mit `msibuild` und legt zusätzlich eine WiX-Quelle ab. **Modul aus Funktionen** schreibt `.psm1` und `.psd1` aus Funktionen oder aus Kommentarhilfe mit `.NAME`. **Funktion erzeugen** baut eine erweiterte Funktion mit Kommentarhilfe. **GUI entwerfen** setzt Beschriftung, Schaltfläche, Eingabe, Auswahl und Liste auf eine Fläche und schreibt WinForms-PowerShell oder tkinter. **Windows-Dienst** schreibt das Dienstskript plus Installation und Entfernung; anlegen lässt sich der Dienst unter Windows mit Administratorrechten. **Leistung messen** nennt Laufzeit und Speicher. **PS-Hilfe** zeigt `Get-Help`. **Remote** führt PowerShell lokal, per WinRM oder per SSH aus und kann den Ablauf verfolgen. **Datei → Wiederherstellen** holt ungespeicherte Puffer zurück. Git bleibt die Versionsverwaltung für alle diese Dateien.
 
 `.json` wird mit Schlüsseln, Zeichenketten, Zahlen und `true`/`false`/`null` gefärbt. **Syntax prüfen** und die Problemleiste nennen die Fehlerzeile. **Format** rückt das JSON ein. Ausführen und Debuggen gibt es für JSON nicht.
 
@@ -41,7 +43,11 @@ Liegt im Programmordner bereits `icon.png`, `icon.ico`, `logo.png` oder `grafik.
 - Projektweites Umbenennen, Methode extrahieren, Dubletten
 - Suche, Ersetzen in der Datei und im Workspace, Gliederung, Gehe-zu-Definition inklusive Bibliotheken, TODO, Lesezeichen
 - Ausführen, Bytecode kompilieren, PyInstaller, grafischer Debugger (Haltepunkte, Bedingungen, Schritt, Watches)
-- Bash- und PowerShell-Skripte laden, prüfen, ausführen und an Haltepunkten debuggen
+- Bash- und PowerShell-Skripte laden, formatieren, prüfen, ausführen und über mehrere Dateien debuggen
+- EXE erzeugen (PyInstaller, MinGW oder gcc) und MSI-Installer mit WiX-Quelle
+- PowerShell-Modul, Funktionsgenerator, GUI-Entwurf, Windows-Dienst, Leistungsmessung, Get-Help
+- PowerShell lokal, per WinRM oder SSH; integrierte 32-bit- und 64-bit-Konsole, soweit der Rechner sie hat
+- Wiederherstellung ungespeicherter Puffer
 - JSON-Dateien laden, färben, auf Fehlerzeilen prüfen und formatieren
 - Markierte Zeile, Abschnitt oder Funktion in einem eigenen Testfenster ausführen
 - unittest, pytest, doctest, Coverage-Markierung

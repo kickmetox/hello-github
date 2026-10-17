@@ -29,13 +29,12 @@ def write_breakpoints(path: Path, script: str, points: list[dict]) -> None:
         if not isinstance(point, dict):
             continue
         file_name = str(point.get("file") or "")
+        target = script_resolved
         if file_name:
             candidate = Path(file_name)
             try:
-                same = candidate.resolve() == script_resolved
+                target = candidate.resolve()
             except OSError:
-                same = False
-            if not same and candidate.name != script_path.name:
                 continue
         try:
             line = int(point.get("line") or 0)
@@ -43,8 +42,11 @@ def write_breakpoints(path: Path, script: str, points: list[dict]) -> None:
             continue
         if line <= 0:
             continue
-        condition = str(point.get("condition") or "").replace("\n", " ").replace("\t", " ")
-        lines.append(f"{line}\t{condition}" if condition else str(line))
+        condition = str(point.get("condition") or "").replace("\n", " ").replace("\t", " ").replace("\x1f", " ")
+        if target == script_resolved:
+            lines.append(f"{line}\t{condition}" if condition else str(line))
+        else:
+            lines.append(f"{line}\x1f{target}\x1f{condition}")
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(("\n".join(lines) + "\n") if lines else "", encoding="utf-8")
 
@@ -129,14 +131,22 @@ class _LineSession:
             self.cond.notify_all()
 
     def _on_protocol(self, line: str) -> None:
-        if line.startswith("STOP "):
+        if line.startswith("STOP"):
             self._locals = {}
+            payload = line[4:].lstrip(" \t")
+            if "\t" in payload:
+                number_text, _, filename = payload.partition("\t")
+            else:
+                parts = payload.split()
+                number_text = parts[0] if parts else "0"
+                filename = ""
             try:
-                number = int(line.split()[1])
-            except (IndexError, ValueError):
+                number = int(number_text)
+            except ValueError:
                 number = 0
             with self.cond:
                 self._pending_line = number
+                self._pending_file = filename or self.script
             return
         if line.startswith("VAR "):
             name, _, value = line[4:].partition(" ")
@@ -149,7 +159,7 @@ class _LineSession:
                 self.paused = {
                     "event": "stopped",
                     "line": number,
-                    "file": self.script,
+                    "file": getattr(self, "_pending_file", "") or self.script,
                     "reason": "breakpoint",
                     "locals": dict(self._locals),
                 }
@@ -213,18 +223,32 @@ shatu_hook() {
   trap - DEBUG
   local line="${BASH_LINENO[0]}"
   local src="${BASH_SOURCE[1]}"
-  if [[ "$src" == "$SHATU_SCRIPT" ]]; then
+  if [[ -n "$src" && "$src" != /* ]]; then
+    src="$(cd "$(dirname "$src")" 2>/dev/null && pwd)/$(basename "$src")"
+  fi
+  local allowed=0
+  case "$src" in
+    "$SHATU_SCRIPT"|"$SHATU_DIR"|"$SHATU_DIR"/*) allowed=1 ;;
+  esac
+  if [[ $allowed == 1 ]]; then
     local stop=0
     local depth=$(( ${#FUNCNAME[@]} - 1 ))
     if [[ "$SHATU_MODE" == step ]]; then stop=1; fi
     if [[ "$SHATU_MODE" == out && "$depth" -lt "$SHATU_DEPTH" ]]; then stop=1; fi
     if [[ -f "$SHATU_BP" ]]; then
-      local entry n cond
+      local entry n cond bfile
       while IFS= read -r entry || [[ -n "$entry" ]]; do
-        n=${entry%%$'\t'*}
+        if [[ "$entry" == *$'\x1f'* ]]; then
+          IFS=$'\x1f' read -r n bfile cond <<<"$entry"
+        else
+          n=${entry%%$'\t'*}
+          bfile=
+          if [[ "$entry" == *$'\t'* ]]; then cond=${entry#*$'\t'}; else cond=; fi
+        fi
         [[ "$n" == "$line" ]] || continue
-        if [[ "$entry" == *$'\t'* ]]; then
-          cond=${entry#*$'\t'}
+        if [[ -n "$bfile" && "$bfile" != "$src" ]]; then continue; fi
+        if [[ -z "$bfile" && "$src" != "$SHATU_SCRIPT" ]]; then continue; fi
+        if [[ -n "$cond" ]]; then
           eval "$cond" && stop=1
         else
           stop=1
@@ -232,7 +256,7 @@ shatu_hook() {
       done < "$SHATU_BP"
     fi
     if [[ $stop == 1 ]]; then
-      printf 'STOP %s\n' "$line" >&4
+      printf 'STOP\t%s\t%s\n' "$line" "$src" >&4
       shatu_vars
       printf 'END\n' >&4
       local cmd
@@ -285,6 +309,7 @@ class ShellDebugSession(_LineSession):
         preamble = _BASH.replace("__CMD_FD__", str(r_cmd)).replace("__EV_FD__", str(w_ev))
         env = os.environ.copy()
         env["SHATU_SCRIPT"] = self.script
+        env["SHATU_DIR"] = str(Path(self.script).parent)
         env["SHATU_BP"] = str(self.bp_file)
         self.proc = subprocess.Popen(
             [binary, "--noprofile", "--norc", "-c", preamble],
@@ -350,7 +375,8 @@ _PS1 = r"""
 param(
   [Parameter(Mandatory = $true)][int]$Port,
   [Parameter(Mandatory = $true)][string]$Script,
-  [Parameter(Mandatory = $true)][string]$BpFile
+  [Parameter(Mandatory = $true)][string]$BpFile,
+  [string[]]$Also = @()
 )
 $ErrorActionPreference = "Continue"
 $client = [System.Net.Sockets.TcpClient]::new("127.0.0.1", $Port)
@@ -393,18 +419,32 @@ function global:Shatu-Vars {
 }
 
 function global:Shatu-Hit {
-  param([int]$Line)
+  param([int]$Line, [string]$ScriptName)
   $stop = $false
   $depth = @(Get-PSCallStack).Count
   if ($global:ShatuMode -eq "step") { $stop = $true }
   if ($global:ShatuMode -eq "out" -and $depth -lt $global:ShatuDepth) { $stop = $true }
   if (Test-Path -LiteralPath $global:ShatuBpFile) {
     foreach ($entry in @(Get-Content -LiteralPath $global:ShatuBpFile -ErrorAction SilentlyContinue)) {
-      $parts = $entry -split "`t", 2
-      if ($parts[0] -ne "$Line") { continue }
-      if ($parts.Count -gt 1 -and $parts[1]) {
+      $fileSpec = ""
+      $cond = ""
+      $lineNo = ""
+      if ($entry.Contains([char]31)) {
+        $parts = $entry.Split([char]31, 3)
+        $lineNo = $parts[0]
+        if ($parts.Count -gt 1) { $fileSpec = $parts[1] }
+        if ($parts.Count -gt 2) { $cond = $parts[2] }
+      } else {
+        $parts = $entry -split "`t", 2
+        $lineNo = $parts[0]
+        if ($parts.Count -gt 1) { $cond = $parts[1] }
+      }
+      if ($lineNo -ne "$Line") { continue }
+      if ($fileSpec -and ($fileSpec -ne $ScriptName)) { continue }
+      if (-not $fileSpec -and $ScriptName -and ($ScriptName -ne $Script)) { continue }
+      if ($cond) {
         $ok = $false
-        try { $ok = [bool](Invoke-Expression $parts[1]) } catch { $ok = $false }
+        try { $ok = [bool](Invoke-Expression $cond) } catch { $ok = $false }
         if ($ok) { $stop = $true }
       } else {
         $stop = $true
@@ -413,7 +453,7 @@ function global:Shatu-Hit {
   }
   if (-not $stop) { return }
   $global:ShatuMode = "run"
-  $global:ShatuWriter.WriteLine("STOP $Line")
+  $global:ShatuWriter.WriteLine("STOP`t$Line`t$ScriptName")
   Shatu-Vars
   $global:ShatuWriter.WriteLine("END")
   while ($true) {
@@ -436,10 +476,17 @@ function global:Shatu-Hit {
   }
 }
 
-$lines = @(Get-Content -LiteralPath $Script -ErrorAction SilentlyContinue)
-for ($i = 1; $i -le $lines.Count; $i++) {
-  if ($lines[$i - 1] -match '\S') {
-    $null = Set-PSBreakpoint -Script $Script -Line $i -Action { Shatu-Hit -Line $_.Line }
+$targets = New-Object System.Collections.Generic.List[string]
+[void]$targets.Add($Script)
+foreach ($extra in @($Also)) {
+  if ($extra -and (Test-Path -LiteralPath $extra)) { [void]$targets.Add($extra) }
+}
+foreach ($target in $targets) {
+  $fileLines = @(Get-Content -LiteralPath $target -ErrorAction SilentlyContinue)
+  for ($i = 1; $i -le $fileLines.Count; $i++) {
+    if ($fileLines[$i - 1] -match '\S') {
+      $null = Set-PSBreakpoint -Script $target -Line $i -Action { Shatu-Hit -Line $_.Line -ScriptName ([string]$_.Script) }
+    }
   }
 }
 & $Script
@@ -469,19 +516,24 @@ class PowerShellDebugSession(_LineSession):
         listener.bind(("127.0.0.1", 0))
         listener.listen(1)
         port = listener.getsockname()[1]
+        from shatuide.studio import powershell_companions
+
+        command = [
+            binary,
+            "-NoProfile",
+            "-File",
+            str(self.driver),
+            "-Port",
+            str(port),
+            "-Script",
+            self.script,
+            "-BpFile",
+            str(self.bp_file),
+        ]
+        for extra in powershell_companions(Path(self.script), breakpoints):
+            command.extend(["-Also", extra])
         self.proc = subprocess.Popen(
-            [
-                binary,
-                "-NoProfile",
-                "-File",
-                str(self.driver),
-                "-Port",
-                str(port),
-                "-Script",
-                self.script,
-                "-BpFile",
-                str(self.bp_file),
-            ],
+            command,
             cwd=cwd,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,

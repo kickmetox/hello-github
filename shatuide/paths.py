@@ -66,6 +66,9 @@ TEXT_SUFFIXES = {
     ".bash",
     ".zsh",
     ".ksh",
+    ".wxs",
+    ".cs",
+    ".c",
 }
 
 

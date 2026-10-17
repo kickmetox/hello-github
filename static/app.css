@@ -115,7 +115,10 @@ button:hover, button.on { border-color: var(--amber); color: var(--amber-2); }
 #modal .checks label { display: flex; gap: 6px; align-items: center; margin: 0; color: var(--text); }
 #modal .checks input { width: auto; }
 #modal .editor-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
-.row { display: flex; gap: 8px; margin-top: 12px; }
+.row { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+#gui-canvas { position: relative; width: 640px; height: 360px; max-width: 100%; background: #12151c; border: 1px solid var(--line); margin: 8px 0; }
+#gui-canvas .widget { position: absolute; box-sizing: border-box; border: 1px solid #6af; background: #243044; color: #fff; font-size: 12px; display: flex; align-items: center; justify-content: center; cursor: move; overflow: hidden; }
+#gui-canvas .widget.on { outline: 2px solid #fc6; }
 .diff-del { background: rgba(224, 122, 114, .2); }
 .diff-add { background: rgba(183, 196, 161, .2); }
 .toast { position: fixed; bottom: 28px; right: 12px; background: #3a3126; border: 1px solid var(--amber); padding: 8px 12px; z-index: 50; }

@@ -710,5 +710,147 @@ class ScriptEditTests(unittest.TestCase):
         self.fail(session.snapshot())
 
 
+class StudioTests(unittest.TestCase):
+    def test_format_function_module_gui_and_service(self) -> None:
+        from shatuide.studio import advanced_function, build_module, format_script, gui_script, service_sources
+
+        formatted = format_script("powershell", "function A {\nif ($true) {\nWrite-Output 1\n}\n}\n")
+        self.assertIn("    Write-Output 1", formatted["content"])
+        self.assertEqual(formatted["tool"], "shatu")
+        shell = format_script("shell", "if true; then\necho hi\nfi\n")
+        self.assertIn("    echo hi", shell["content"])
+        function = advanced_function({
+            "name": "Get-Wert",
+            "synopsis": "Liefert eine Zahl",
+            "parameters": [{"name": "Wert", "type": "int", "mandatory": True, "help": "Die Zahl"}],
+            "output": "int",
+        })
+        self.assertIn("[CmdletBinding()]", function)
+        self.assertIn("[int]$Wert", function)
+        self.assertIn(".PARAMETER Wert", function)
+        module = build_module(function, "Werkzeug", "1.2.0")
+        self.assertTrue(module["ok"], module)
+        self.assertEqual(module["functions"], ["Get-Wert"])
+        self.assertIn("FunctionsToExport = @('Get-Wert')", module["psd1"])
+        help_only = "<#\n.NAME\nGet-Hinweis\n.SYNOPSIS\nKurz\n#>\n"
+        from_help = build_module(help_only, "Hinweis")
+        self.assertEqual(from_help["functions"], ["Get-Hinweis"])
+        gui = gui_script("Werkzeug", [{"kind": "button", "name": "btnOk", "text": "OK", "x": 10, "y": 12, "w": 80, "h": 24}], "powershell")
+        self.assertIn("System.Windows.Forms.Button", gui["content"])
+        self.assertIn("$btnOk", gui["content"])
+        python_gui = gui_script("Werkzeug", [{"kind": "label", "name": "lbl", "text": "Hallo", "x": 1, "y": 2, "w": 40, "h": 20}], "python")
+        self.assertIn("tk.Label", python_gui["content"])
+        service = service_sources("LagerDienst", "Nachtlauf")
+        install = "\n".join(service["files"].values())
+        self.assertIn("New-Service", install)
+        self.assertIn("LagerDienst", install)
+        self.assertIn("stop.flag", install)
+
+    def test_exe_msi_measure_recovery_and_remote(self) -> None:
+        import shutil
+        import subprocess
+
+        from shatuide.studio import (
+            build_msi,
+            compile_exe,
+            measure_invocation,
+            recovery_read,
+            recovery_store,
+            remote_powershell,
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            native = compile_exe(root, "echo shatu-exe-ok\n", "shell", "Hallo", target="native")
+            self.assertTrue(native["ok"], native)
+            proc = subprocess.run([native["path"]], capture_output=True, text=True, timeout=20)
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            self.assertIn("shatu-exe-ok", proc.stdout)
+            if shutil.which("x86_64-w64-mingw32-gcc"):
+                windows = compile_exe(root, "Write-Output shatu-win\n", "powershell", "Fenster", target="windows")
+                self.assertTrue(windows["ok"], windows)
+                self.assertTrue(Path(windows["path"]).read_bytes().startswith(b"MZ"))
+            payload = root / "liesmich.txt"
+            payload.write_text("installer-ok", encoding="utf-8")
+            package = build_msi(root, "Paket", "1.0.0", "ShatuIDE", [payload])
+            if shutil.which("msibuild") and shutil.which("gcab"):
+                self.assertTrue(package["ok"], package)
+                self.assertTrue(Path(package["wxs"]).is_file())
+                out = root / "entpackt"
+                out.mkdir()
+                extracted = subprocess.run(["msiextract", "-C", str(out), package["path"]], capture_output=True, text=True)
+                self.assertEqual(extracted.returncode, 0, extracted.stderr)
+                self.assertEqual((out / "liesmich.txt").read_text(encoding="utf-8"), "installer-ok")
+            else:
+                self.assertFalse(package["ok"])
+                self.assertIn("wxs", package)
+            script = root / "mess.py"
+            script.write_text("print('mess-ok')\n", encoding="utf-8")
+            plan = measure_invocation("python", str(script), sys.executable, root / "tmp")
+            measured = subprocess.run(plan["argv"], capture_output=True, text=True, timeout=20)
+            self.assertIn("SHATU_MEASURE", measured.stdout)
+            self.assertIn("mess-ok", measured.stdout)
+            stored = recovery_store(root, str(script), "print('neu')\n")
+            self.assertEqual(recovery_read(root, stored["id"])["content"], "print('neu')\n")
+            bad = remote_powershell("ssh", "bad host", "Write-Output 1", "user")
+            self.assertFalse(bad["ok"])
+            local = remote_powershell("local", "", "Write-Output shatu-remote-ok", "")
+            if local.get("ok"):
+                remote = subprocess.run(local["argv"], capture_output=True, text=True, timeout=30)
+                self.assertIn("shatu-remote-ok", remote.stdout)
+
+    def test_debug_other_file(self) -> None:
+        from shatuide.shell_debug import ShellDebugSession
+
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp)
+            lib = folder / "lib.sh"
+            lib.write_text("echo lib\nx=9\necho libend\n", encoding="utf-8")
+            script = folder / "tool.sh"
+            script.write_text(
+                'echo start\nsource "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib.sh"\necho end\n',
+                encoding="utf-8",
+            )
+            session = ShellDebugSession()
+            try:
+                session.start(str(script), tmp, [{"file": str(lib), "line": 2}], folder / "bp.json")
+                stopped = session.wait_event("stopped", timeout=8)
+                self.assertEqual(stopped["line"], 2)
+                self.assertTrue(str(stopped["file"]).endswith("lib.sh"), stopped)
+                session.command({"cmd": "step"})
+                deadline = time.time() + 8
+                stepped = None
+                while time.time() < deadline:
+                    paused = session.snapshot().get("paused")
+                    if paused and paused.get("line") == 3:
+                        stepped = paused
+                        break
+                    time.sleep(0.05)
+                self.assertIsNotNone(stepped, session.snapshot())
+                session.command({"cmd": "continue"})
+                session.wait_event("terminated", timeout=8)
+            finally:
+                session.close()
+            module = folder / "lib.ps1"
+            module.write_text("$x = 9\nWrite-Output $x\n", encoding="utf-8")
+            entry = folder / "main.ps1"
+            entry.write_text('. "$PSScriptRoot/lib.ps1"\n', encoding="utf-8")
+            from shatuide.scripting import powershell_binary
+            from shatuide.shell_debug import PowerShellDebugSession
+
+            if not powershell_binary():
+                return
+            ps = PowerShellDebugSession()
+            try:
+                ps.start(str(entry), tmp, [{"file": str(module), "line": 1}], folder / "ps-bp.json")
+                stopped = ps.wait_event("stopped", timeout=12)
+                self.assertEqual(stopped["line"], 1)
+                self.assertTrue(str(stopped["file"]).endswith("lib.ps1"), stopped)
+                ps.command({"cmd": "continue"})
+                ps.wait_event("terminated", timeout=12)
+            finally:
+                ps.close()
+
+
 if __name__ == "__main__":
     unittest.main()

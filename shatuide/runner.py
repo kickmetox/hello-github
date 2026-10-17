@@ -114,11 +114,16 @@ class PtyTerminal:
         if os.name != "nt":
             import pty
 
-            shell = shell or os.environ.get("SHELL", "/bin/bash")
+            program = shell or os.environ.get("SHELL", "/bin/bash")
+            lower = Path(program).name.lower()
+            if "pwsh" in lower or "powershell" in lower:
+                argv = [program, "-NoLogo"]
+            else:
+                argv = [program, "-i"]
             master, slave = pty.openpty()
             self.master = master
             self.proc = subprocess.Popen(
-                [shell, "-i"],
+                argv,
                 stdin=slave,
                 stdout=slave,
                 stderr=slave,
@@ -128,8 +133,9 @@ class PtyTerminal:
             os.close(slave)
             threading.Thread(target=self._read_pty, daemon=True).start()
         else:
+            command = [shell, "-NoExit"] if shell else ["cmd.exe"]
             self.proc = subprocess.Popen(
-                ["cmd.exe"],
+                command,
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,

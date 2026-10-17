@@ -46,11 +46,21 @@ def powershell_binary() -> str | None:
         found = shutil.which(name)
         if found:
             return found
+    candidates = [
+        Path.home() / "pwsh" / "pwsh",
+        Path.home() / "pwsh" / "pwsh.exe",
+        Path("/opt/microsoft/powershell/7/pwsh"),
+        Path("/usr/local/bin/pwsh"),
+    ]
     if os.name == "nt":
-        root = os.environ.get("SystemRoot", r"C:\Windows")
-        system = Path(root) / "System32" / "WindowsPowerShell" / "v1.0" / "powershell.exe"
-        if system.is_file():
-            return str(system)
+        root = Path(os.environ.get("SystemRoot", r"C:\Windows"))
+        candidates.append(root / "System32" / "WindowsPowerShell" / "v1.0" / "powershell.exe")
+        program = os.environ.get("ProgramFiles")
+        if program:
+            candidates.append(Path(program) / "PowerShell" / "7" / "pwsh.exe")
+    for candidate in candidates:
+        if candidate.is_file() and os.access(candidate, os.X_OK):
+            return str(candidate)
     return None
 
 

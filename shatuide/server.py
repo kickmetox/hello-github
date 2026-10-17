@@ -28,6 +28,7 @@ from shatuide.formatter import format_source
 from shatuide.icon_util import load_icon_bytes
 from shatuide.paths import SKIP_DIRS, STATIC, default_workspace, inside, meta_dir
 from shatuide.probe import prepare as prepare_probe
+from shatuide import studio
 
 MAX_READ = 2_000_000
 
@@ -855,6 +856,8 @@ class Handler(BaseHTTPRequestHandler):
             self.wfile.write(data)
         elif path == "/api/collab":
             self._json(app.collab.fetch(self._q(query, "token")))
+        elif path == "/api/studio":
+            self._json(self._studio_get(query))
         else:
             self._json({"ok": False, "error": "Unbekannter Pfad."}, 404)
 
@@ -883,8 +886,11 @@ class Handler(BaseHTTPRequestHandler):
         elif path == "/api/format":
             content = str(payload.get("content") or "")
             file_path = str(payload.get("path") or "")
-            if scripting.language_of(file_path) == "json":
+            language = scripting.language_of(file_path)
+            if language == "json":
                 self._json(scripting.format_json(content))
+            elif language in {"powershell", "shell", "batch"}:
+                self._json(studio.format_script(language, content))
             else:
                 self._json(format_source(content, app.python_exe()))
         elif path == "/api/goto":
@@ -1020,8 +1026,225 @@ class Handler(BaseHTTPRequestHandler):
             self._json(app.bookmarks(str(payload.get("action") or "list"), payload))
         elif path == "/api/compile":
             self._json(self._compile(payload))
+        elif path == "/api/studio":
+            self._json(self._studio(payload))
         else:
             self._json({"ok": False, "error": "Unbekannter Pfad."}, 404)
+
+    def _studio_get(self, query: dict) -> dict:
+        action = self._q(query, "action")
+        workspace = Path(self.app.workspace)
+        if action == "shells":
+            return {"ok": True, "shells": studio.local_shells(), "compilers": studio.compiler_status()}
+        if action == "recovery":
+            return studio.recovery_list(workspace)
+        if action == "help":
+            return studio.powershell_help(self._q(query, "topic") or "Get-Help")
+        if action == "compilers":
+            return studio.compiler_status()
+        return {"ok": False, "error": "Unbekannte Studio-Abfrage."}
+
+    def _studio_dir(self, path: str) -> Path:
+        workspace = Path(self.app.workspace)
+        if not path:
+            return workspace
+        try:
+            target = self.app.resolve_write(path)
+        except Exception:
+            return workspace
+        return target.parent if target.suffix else target
+
+    def _studio(self, payload: dict) -> dict:
+        action = str(payload.get("action") or "")
+        workspace = Path(self.app.workspace)
+        if action == "recovery":
+            return studio.recovery_store(workspace, str(payload.get("path") or ""), str(payload.get("content") or ""))
+        if action == "recovery-read":
+            return studio.recovery_read(workspace, str(payload.get("id") or ""))
+        if action == "recovery-drop":
+            return studio.recovery_drop(workspace, str(payload.get("id") or ""))
+        if action == "function":
+            try:
+                content = studio.advanced_function(payload)
+            except ValueError as exc:
+                return {"ok": False, "error": str(exc)}
+            return {"ok": True, "content": content, "suffix": ".ps1"}
+        if action == "module":
+            try:
+                built = studio.build_module(
+                    str(payload.get("content") or ""),
+                    str(payload.get("name") or "Modul"),
+                    str(payload.get("version") or "1.0.0"),
+                    str(payload.get("author") or "ShatuIDE"),
+                    str(payload.get("description") or ""),
+                )
+            except ValueError as exc:
+                return {"ok": False, "error": str(exc)}
+            if not built.get("ok"):
+                return built
+            folder = self._studio_dir(str(payload.get("path") or ""))
+            folder.mkdir(parents=True, exist_ok=True)
+            psm1 = folder / f"{built['name']}.psm1"
+            psd1 = folder / f"{built['name']}.psd1"
+            psm1.write_text(built["psm1"], encoding="utf-8")
+            psd1.write_text(built["psd1"], encoding="utf-8")
+            return {
+                "ok": True,
+                "psm1": str(psm1),
+                "psd1": str(psd1),
+                "functions": built["functions"],
+                "message": f"Modul {built['name']} mit {len(built['functions'])} Funktionen.",
+            }
+        if action == "gui":
+            built = studio.gui_script(
+                str(payload.get("title") or "Werkzeug"),
+                payload.get("controls") or [],
+                str(payload.get("language") or "powershell"),
+            )
+            if not built.get("ok"):
+                return built
+            raw_title = re.sub(r"[^A-Za-z0-9_-]", "", str(payload.get("title") or "Gui")) or "Gui"
+            try:
+                stem = studio.safe_name(raw_title, "Gui")
+            except ValueError:
+                stem = "Gui"
+            path = studio.output_dir(workspace) / (stem + built["suffix"])
+            path.write_text(built["content"], encoding="utf-8")
+            return {"ok": True, "path": str(path), "content": built["content"], "message": "GUI-Skript erzeugt."}
+        if action == "service":
+            try:
+                built = studio.service_sources(
+                    str(payload.get("name") or "ShatuDienst"),
+                    str(payload.get("description") or ""),
+                )
+            except ValueError as exc:
+                return {"ok": False, "error": str(exc)}
+            folder = self._studio_dir(str(payload.get("path") or "")) / built["name"]
+            folder.mkdir(parents=True, exist_ok=True)
+            written = []
+            first = ""
+            for filename, text in built["files"].items():
+                target = folder / filename
+                target.write_text(text, encoding="utf-8")
+                written.append(str(target))
+                if not first:
+                    first = str(target)
+            return {
+                "ok": True,
+                "path": first,
+                "files": written,
+                "message": f"Dienstskripte für {built['name']} liegen im Workspace. Installieren geht unter Windows mit Administratorrechten.",
+            }
+        if action == "exe":
+            source = str(payload.get("content") or "")
+            path = str(payload.get("path") or "")
+            language = scripting.language_of(path or "a.py")
+            if not source and path:
+                try:
+                    source = self.app.resolve_any(path).read_text(encoding="utf-8")
+                except OSError as exc:
+                    return {"ok": False, "error": str(exc)}
+            result = studio.compile_exe(
+                workspace,
+                source,
+                language,
+                str(payload.get("name") or Path(path).stem or "ShatuApp"),
+                target=str(payload.get("target") or "auto"),
+                windowed=bool(payload.get("windowed")),
+                python=self.app.python_exe(),
+            )
+            if result.get("argv"):
+                started = self._session(result["argv"], str(workspace))
+                started["message"] = result.get("message", "")
+                started["kind"] = result.get("kind", "")
+                return started
+            return result
+        if action == "msi":
+            name = str(payload.get("name") or "ShatuApp")
+            paths = payload.get("files") or []
+            files: list[Path] = []
+            if isinstance(paths, list):
+                for item in paths:
+                    try:
+                        files.append(self.app.resolve_write(str(item)))
+                    except Exception:
+                        return {"ok": False, "error": "Installer-Datei liegt außerhalb des Workspace."}
+            if not files:
+                raw_path = str(payload.get("path") or "")
+                for option in (studio.output_dir(workspace) / f"{name}.exe", studio.output_dir(workspace) / name):
+                    if option.is_file():
+                        files.append(option)
+                        break
+                if not files and raw_path:
+                    try:
+                        files.append(self.app.resolve_write(raw_path))
+                    except Exception:
+                        return {"ok": False, "error": "Die Datei liegt außerhalb des Workspace."}
+            return studio.build_msi(
+                workspace,
+                name,
+                str(payload.get("version") or "1.0.0"),
+                str(payload.get("manufacturer") or "ShatuIDE"),
+                files,
+            )
+        if action == "measure":
+            path = str(payload.get("path") or "")
+            if not path:
+                return {"ok": False, "error": "Keine Datei."}
+            script = self.app.resolve_any(path)
+            if not script.is_file():
+                return {"ok": False, "error": "Datei nicht gefunden."}
+            plan = studio.measure_invocation(
+                scripting.language_of(str(script)),
+                str(script),
+                self.app.python_exe(),
+                meta_dir(workspace) / "tmp",
+            )
+            if not plan.get("ok"):
+                return plan
+            started = self._session(plan["argv"], str(script.parent))
+            started["message"] = "Messung läuft."
+            return started
+        if action == "help":
+            return studio.powershell_help(str(payload.get("topic") or "Get-Help"))
+        if action == "remote":
+            plan = studio.remote_powershell(
+                str(payload.get("transport") or "local"),
+                str(payload.get("host") or ""),
+                str(payload.get("command") or payload.get("content") or ""),
+                str(payload.get("user") or ""),
+            )
+            if not plan.get("ok"):
+                return plan
+            started = self._session(plan["argv"], str(workspace))
+            started["message"] = "Remote-Befehl läuft."
+            return started
+        if action == "trace":
+            path = str(payload.get("path") or "")
+            content = str(payload.get("content") or "")
+            if path and not content:
+                try:
+                    content = self.app.resolve_any(path).read_text(encoding="utf-8")
+                except OSError:
+                    content = ""
+            plan = studio.remote_trace(
+                scripting.language_of(path or "a.py"),
+                path or "skript",
+                content,
+                str(payload.get("transport") or "local"),
+                str(payload.get("host") or ""),
+                str(payload.get("user") or ""),
+                self.app.python_exe(),
+            )
+            if not plan.get("ok"):
+                return plan
+            if plan.get("argv"):
+                cwd = str(Path(path).parent) if path and Path(path).parent.is_dir() else str(workspace)
+                started = self._session(plan["argv"], cwd)
+                started["message"] = "Ablaufverfolgung läuft."
+                return started
+            return plan
+        return {"ok": False, "error": "Unbekannte Studio-Aktion."}
 
     def _search(self, query: str) -> list[dict]:
         query = query.strip()
@@ -1290,7 +1513,11 @@ class Handler(BaseHTTPRequestHandler):
         action = str(payload.get("action") or "read")
         ident = str(payload.get("id") or "")
         if action == "start":
-            term = runner.PtyTerminal(self.app.workspace)
+            requested = str(payload.get("shell") or "")
+            chosen = studio.match_shell(requested)
+            if requested and not chosen:
+                return {"ok": False, "error": "Diese Shell ist nicht installiert."}
+            term = runner.PtyTerminal(self.app.workspace, chosen or None)
             ident = secrets.token_hex(4)
             self.app.terminals[ident] = term
             return {"ok": True, "id": ident}
