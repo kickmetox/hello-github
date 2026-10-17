@@ -2371,7 +2371,7 @@ function openScriptCreator() {
   modelLabel.append(model, document.createTextNode(" Prompt an das verbundene Sprachmodell senden"));
   const hint = document.createElement("div");
   hint.className = "hint";
-  hint.textContent = "Ohne Modell entsteht ein lauffähiges Skript aus den Antworten. Mit Modell wird derselbe Auftrag geschickt; dafür muss unter KI eine Verbindung stehen. Bei CSV und Text speichern ist die erste Abfrage die Datei.";
+  hint.textContent = "Ohne Modell entsteht das Skript aus diesen Feldern. Mit Modell braucht es eine Verbindung unter KI. Bei CSV und Text speichern ist die erste Abfrage die Datei.";
   labeled(body, "Sprache", lang);
   labeled(body, "Name", name);
   labeled(body, "Aktion", action);
@@ -2433,7 +2433,7 @@ function openDatabaseCreator() {
   applyLabel.append(apply, document.createTextNode(" Auf dem Server anlegen (PostgreSQL, MySQL, MongoDB)"));
   const hint = document.createElement("div");
   hint.className = "hint";
-  hint.textContent = "SQLite wird als Datei im Workspace angelegt. PostgreSQL und MySQL bekommen ein SQL-Skript, MongoDB ein Schema und ein Python-Skript. Anlegen auf einem Server braucht den Treiber und eine Verbindung. Zeile je Spalte: Name Typ pk pflicht unique.";
+  hint.textContent = "SQLite wird als Datei angelegt. Andere Engines bekommen SQL oder ein Schema. Spalte: Name Typ pk pflicht unique.";
   labeled(body, "Engine", engine);
   labeled(body, "Name", name);
   labeled(body, "Datei", path);

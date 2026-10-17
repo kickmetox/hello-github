@@ -974,6 +974,14 @@ class CreatorTests(unittest.TestCase):
             compile(Path(mongo["script"]).read_text(encoding="utf-8"), "mongo.py", "exec")
             injected = create_database(root, {"engine": "sqlite", "name": "Boese", "schema": "person\n  name);drop text\n"})
             self.assertFalse(injected["ok"])
+            from shatuide.database import sqlite_query
+
+            queried = sqlite_query(
+                str(database),
+                "INSERT INTO person (name, email) VALUES ('Bea', 'a;b');\nSELECT name FROM person WHERE email = 'a;b';",
+            )
+            self.assertTrue(queried["ok"], queried)
+            self.assertEqual(queried["rows"][0]["name"], "Bea")
 
     def test_api_script_and_database(self) -> None:
         tmp = tempfile.TemporaryDirectory()

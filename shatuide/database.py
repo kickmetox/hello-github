@@ -21,16 +21,62 @@ def sqlite_schema(path: str) -> dict:
     }
 
 
+def _split_sql(sql: str) -> list[str]:
+    parts: list[str] = []
+    buf: list[str] = []
+    quote = ""
+    i = 0
+    text = sql or ""
+    while i < len(text):
+        char = text[i]
+        if quote:
+            buf.append(char)
+            if char == quote:
+                if i + 1 < len(text) and text[i + 1] == quote:
+                    buf.append(text[i + 1])
+                    i += 2
+                    continue
+                quote = ""
+            i += 1
+            continue
+        if char in {"'", '"'}:
+            quote = char
+            buf.append(char)
+        elif char == "-" and i + 1 < len(text) and text[i + 1] == "-":
+            while i < len(text) and text[i] not in "\n\r":
+                buf.append(text[i])
+                i += 1
+            continue
+        elif char == ";":
+            piece = "".join(buf).strip()
+            if piece:
+                parts.append(piece)
+            buf = []
+        else:
+            buf.append(char)
+        i += 1
+    tail = "".join(buf).strip()
+    if tail:
+        parts.append(tail)
+    return parts
+
+
 def sqlite_query(path: str, sql: str, limit: int = 500) -> dict:
     file_path = Path(path)
     file_path.parent.mkdir(parents=True, exist_ok=True)
+    statements = _split_sql(sql)
+    if not statements:
+        return {"ok": False, "error": "SQL fehlt."}
     try:
         with sqlite3.connect(file_path) as con:
             con.row_factory = sqlite3.Row
-            cur = con.execute(sql)
+            for statement in statements[:-1]:
+                con.execute(statement)
+            cur = con.execute(statements[-1])
             if cur.description:
                 columns = [item[0] for item in cur.description]
                 rows = [dict(row) for row in cur.fetchmany(limit)]
+                con.commit()
                 return {"ok": True, "columns": columns, "rows": rows}
             con.commit()
             return {"ok": True, "columns": [], "rows": [], "rowcount": cur.rowcount}
