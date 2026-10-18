@@ -1,0 +1,8 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+*.log
+spheredrive/preview/
+tests/_runtime/
+build/

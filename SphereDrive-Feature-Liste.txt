@@ -1,0 +1,335 @@
+===== Deutsch =====
+SphereDrive Feature-Liste
+Version 1.0.0
+
+SphereDrive ist die Windows-Oberfläche für virtuelle Laufwerke und Ordnerverknüpfungen. Sie fasst subst, net use, mklink, New-PSDrive und mountvol in einem Fenster zusammen. Ein Ordner, ein Unterordner oder eine Freigabe erscheint damit wie ein eigenes Laufwerk, ohne dass die Dateien verschoben werden. Auf Windows 11 steht der Systemname in der Seitenleiste.
+
+Laufwerkszuordnungen
+- Kacheln oder Liste, Filter „Alle Laufwerke anzeigen“
+- Klick auf eine Kachel oder auf ··· öffnet die Aktionen dieses Buchstabens
+- Bezeichnung, Symbol, Explorer und Trennen
+- Echte Datenträger werden nicht durch subst oder net use verdeckt
+
+Ordner und Unterordner
+- Baum der Ordner eines Laufwerks, weitere Ebenen beim Aufklappen
+- Ein Unterordner wird als eigenes Laufwerk eingehängt
+- Dieselbe Auswahl unter Subst und als Ziel einer Ordner-Bereitstellung
+
+subst
+- Lokale Ordner, auch tief in OneDrive, Google Drive oder Dropbox
+- Dauerhaft über den Autostart und, mit Administratorrechten, über DOS Devices
+- Papierkorb über die Known-Folder-Registrierung
+- Sichtbarkeit für erhöhte Programme über EnableLinkedConnections und eine Anmeldungsaufgabe
+
+net use
+- UNC-Freigaben, dauerhaft mit /persistent:yes
+- Freigaben anlegen und entfernen
+- Kennwörter werden für den Aufruf verwendet und nicht gespeichert
+
+Verknüpfungen
+- mklink /J für Junctions, /D für Ordnerlinks, dazu Dateisymlinks und Hardlinks
+- Entfernen löscht nur die Verknüpfung, nicht den Zielordner
+
+PowerShell
+- New-PSDrive für Dateisystem, Registrierung, Zertifikate und weitere Anbieter
+- Optional im PowerShell-Profil; -Persist nur für UNC-Pfade
+
+Bereitstellung
+- Partition oder VHD/VHDX auf einen Buchstaben oder in einen leeren NTFS-Ordner
+- Aufruf der Datenträgerverwaltung (diskmgmt.msc)
+
+Programm
+- Vergleich, welcher Befehl wofür gedacht ist
+- Arbeitsordner D:\AI_Temp\SphereDrive, Logo aus diesem Ordner hat Vorrang
+- Installer mit eingebettetem Python, Wiederherstellung beim Anmelden mit --restore
+- Hilfe im Programm und als SphereDrive-Hilfe.html neben dem Programm
+- Feature-Liste im Menü Hilfe und als SphereDrive-Feature-Liste.txt
+- Bedienung auf Deutsch, Englisch, Französisch, Spanisch, Portugiesisch, Russisch und Chinesisch
+
+===== English =====
+SphereDrive feature list
+Version 1.0.0
+
+SphereDrive is the Windows interface for virtual drives and folder links. It brings subst, net use, mklink, New-PSDrive and mountvol into one window. A folder, a subfolder or a share then appears as its own drive, without moving the files. On Windows 11 the system name is shown in the sidebar.
+
+Drive mappings
+- Tiles or list, filter “Show all drives”
+- A click on a tile or on ··· opens the actions for that letter
+- Label, icon, Explorer and disconnect
+- Real disks are not covered by subst or net use
+
+Folders and subfolders
+- A tree of a drive’s folders, further levels when expanded
+- A subfolder is mounted as its own drive
+- The same picker under Subst and as the target of a folder mount
+
+subst
+- Local folders, including deep inside OneDrive, Google Drive or Dropbox
+- Persistent through startup and, with administrator rights, through DOS Devices
+- Recycle Bin through known-folder registration
+- Visibility for elevated programs through EnableLinkedConnections and a logon task
+
+net use
+- UNC shares, persistent with /persistent:yes
+- Create and remove shares
+- Passwords are used for the call and are not stored
+
+Shortcuts
+- mklink /J for junctions, /D for folder links, plus file symlinks and hard links
+- Remove deletes only the shortcut, not the target folder
+
+PowerShell
+- New-PSDrive for the file system, registry, certificates and other providers
+- Optional in the PowerShell profile; -Persist only for UNC paths
+
+Mount
+- A partition or VHD/VHDX on a letter or in an empty NTFS folder
+- Opens Disk Management (diskmgmt.msc)
+
+Program
+- A comparison of which command is meant for which job
+- Work folder D:\AI_Temp\SphereDrive; a logo in that folder takes priority
+- Installer with embedded Python, restore at logon with --restore
+- Help inside the program and as SphereDrive-Hilfe.html next to the program
+- Feature list in the Help menu and as SphereDrive-Feature-Liste.txt
+- Usable in German, English, French, Spanish, Portuguese, Russian and Chinese
+
+===== Français =====
+Liste des fonctions SphereDrive
+Version 1.0.0
+
+SphereDrive est l'interface Windows pour les lecteurs virtuels et les liens de dossiers. Il réunit subst, net use, mklink, New-PSDrive et mountvol dans une fenêtre. Un dossier, un sous-dossier ou un partage apparaît alors comme un lecteur, sans déplacer les fichiers. Sous Windows 11, le nom du système figure dans la barre latérale.
+
+Lecteurs mappés
+- Tuiles ou liste, filtre « Afficher tous les lecteurs »
+- Un clic sur une tuile ou sur ··· ouvre les actions de cette lettre
+- Libellé, icône, Explorateur et déconnexion
+- Les vrais disques ne sont pas masqués par subst ou net use
+
+Dossiers et sous-dossiers
+- Arbre des dossiers d'un lecteur, niveaux suivants au dépliage
+- Un sous-dossier est monté comme lecteur propre
+- Le même choix sous Subst et comme cible d'un montage de dossier
+
+subst
+- Dossiers locaux, même profondément dans OneDrive, Google Drive ou Dropbox
+- Persistant via le démarrage automatique et, avec des droits d'administrateur, via DOS Devices
+- Corbeille via l'enregistrement de dossier connu
+- Visibilité pour les programmes élevés via EnableLinkedConnections et une tâche de connexion
+
+net use
+- Partages UNC, persistants avec /persistent:yes
+- Créer et supprimer des partages
+- Les mots de passe servent à l'appel et ne sont pas enregistrés
+
+Raccourcis
+- mklink /J pour les jonctions, /D pour les liens de dossier, plus liens symboliques de fichier et liens physiques
+- Supprimer n'efface que le raccourci, pas le dossier cible
+
+PowerShell
+- New-PSDrive pour le système de fichiers, le registre, les certificats et d'autres fournisseurs
+- Facultatif dans le profil PowerShell ; -Persist seulement pour les chemins UNC
+
+Montage
+- Une partition ou un VHD/VHDX sur une lettre ou dans un dossier NTFS vide
+- Ouverture de la gestion des disques (diskmgmt.msc)
+
+Programme
+- Comparaison de la commande adaptée à chaque usage
+- Dossier de travail D:\AI_Temp\SphereDrive ; un logo dans ce dossier a la priorité
+- Installateur avec Python intégré, restauration à la connexion avec --restore
+- Aide dans le programme et comme SphereDrive-Hilfe.html à côté du programme
+- Liste des fonctions dans le menu Aide et comme SphereDrive-Feature-Liste.txt
+- Utilisable en allemand, anglais, français, espagnol, portugais, russe et chinois
+
+===== Español =====
+Lista de funciones de SphereDrive
+Version 1.0.0
+
+SphereDrive es la interfaz de Windows para unidades virtuales y vínculos de carpetas. Reúne subst, net use, mklink, New-PSDrive y mountvol en una ventana. Una carpeta, una subcarpeta o un recurso aparece entonces como una unidad propia, sin mover los archivos. En Windows 11 el nombre del sistema está en la barra lateral.
+
+Unidades asignadas
+- Mosaicos o lista, filtro «Mostrar todas las unidades»
+- Un clic en un mosaico o en ··· abre las acciones de esa letra
+- Etiqueta, icono, Explorador y desconectar
+- Los discos reales no se cubren con subst ni net use
+
+Carpetas y subcarpetas
+- Árbol de carpetas de una unidad, más niveles al expandir
+- Una subcarpeta se monta como unidad propia
+- La misma elección en Subst y como destino de un montaje de carpeta
+
+subst
+- Carpetas locales, también en lo profundo de OneDrive, Google Drive o Dropbox
+- Persistente mediante el inicio automático y, con derechos de administrador, mediante DOS Devices
+- Papelera mediante el registro de carpeta conocida
+- Visibilidad para programas elevados mediante EnableLinkedConnections y una tarea de inicio
+
+net use
+- Recursos UNC, persistentes con /persistent:yes
+- Crear y quitar recursos
+- Las contraseñas se usan en la llamada y no se guardan
+
+Vínculos
+- mklink /J para uniones, /D para vínculos de carpeta, además de vínculos simbólicos de archivo y vínculos físicos
+- Quitar borra solo el vínculo, no la carpeta de destino
+
+PowerShell
+- New-PSDrive para el sistema de archivos, el registro, los certificados y otros proveedores
+- Opcional en el perfil de PowerShell; -Persist solo para rutas UNC
+
+Montaje
+- Una partición o VHD/VHDX en una letra o en una carpeta NTFS vacía
+- Apertura de Administración de discos (diskmgmt.msc)
+
+Programa
+- Comparación de qué comando corresponde a cada uso
+- Carpeta de trabajo D:\AI_Temp\SphereDrive; un logotipo de esa carpeta tiene prioridad
+- Instalador con Python integrado, restauración al iniciar sesión con --restore
+- Ayuda en el programa y como SphereDrive-Hilfe.html junto al programa
+- Lista de funciones en el menú Ayuda y como SphereDrive-Feature-Liste.txt
+- Se puede usar en alemán, inglés, francés, español, portugués, ruso y chino
+
+===== Português =====
+Lista de funções do SphereDrive
+Version 1.0.0
+
+O SphereDrive é a interface do Windows para unidades virtuais e atalhos de pastas. Reúne subst, net use, mklink, New-PSDrive e mountvol numa janela. Uma pasta, uma subpasta ou uma partilha aparece então como unidade própria, sem mover os ficheiros. No Windows 11 o nome do sistema fica na barra lateral.
+
+Unidades mapeadas
+- Mosaicos ou lista, filtro «Mostrar todas as unidades»
+- Um clique num mosaico ou em ··· abre as ações dessa letra
+- Etiqueta, ícone, Explorador e desligar
+- Os discos reais não são cobertos por subst nem por net use
+
+Pastas e subpastas
+- Árvore das pastas de uma unidade, mais níveis ao expandir
+- Uma subpasta é montada como unidade própria
+- A mesma escolha em Subst e como destino de uma montagem de pasta
+
+subst
+- Pastas locais, também no interior do OneDrive, Google Drive ou Dropbox
+- Persistente através do arranque automático e, com direitos de administrador, através de DOS Devices
+- Reciclagem através do registo de pasta conhecida
+- Visibilidade para programas elevados através de EnableLinkedConnections e de uma tarefa de início de sessão
+
+net use
+- Partilhas UNC, persistentes com /persistent:yes
+- Criar e remover partilhas
+- As palavras-passe são usadas na chamada e não são guardadas
+
+Atalhos
+- mklink /J para junções, /D para ligações de pasta, além de ligações simbólicas de ficheiro e ligações físicas
+- Remover apaga só o atalho, não a pasta de destino
+
+PowerShell
+- New-PSDrive para o sistema de ficheiros, o registo, os certificados e outros fornecedores
+- Opcional no perfil do PowerShell; -Persist só para caminhos UNC
+
+Montagem
+- Uma partição ou VHD/VHDX numa letra ou numa pasta NTFS vazia
+- Abertura da Gestão de discos (diskmgmt.msc)
+
+Programa
+- Comparação de qual comando serve para cada uso
+- Pasta de trabalho D:\AI_Temp\SphereDrive; um logótipo nessa pasta tem prioridade
+- Instalador com Python incorporado, restauro no início de sessão com --restore
+- Ajuda no programa e como SphereDrive-Hilfe.html ao lado do programa
+- Lista de funções no menu Ajuda e como SphereDrive-Feature-Liste.txt
+- Utilizável em alemão, inglês, francês, espanhol, português, russo e chinês
+
+===== Русский =====
+Список функций SphereDrive
+Version 1.0.0
+
+SphereDrive — это интерфейс Windows для виртуальных дисков и ссылок на папки. Он собирает subst, net use, mklink, New-PSDrive и mountvol в одном окне. Папка, вложенная папка или общий ресурс выглядит как отдельный диск, файлы при этом не перемещаются. В Windows 11 имя системы показано на боковой панели.
+
+Назначения дисков
+- Плитки или список, фильтр «Показать все диски»
+- Щелчок по плитке или по ··· открывает действия этой буквы
+- Метка, значок, проводник и отключение
+- Реальные диски не закрываются через subst или net use
+
+Папки и вложенные папки
+- Дерево папок диска, следующие уровни при раскрытии
+- Вложенная папка подключается как собственный диск
+- Тот же выбор в Subst и как цель подключения папки
+
+subst
+- Локальные папки, в том числе глубоко в OneDrive, Google Drive или Dropbox
+- Постоянно через автозапуск и, с правами администратора, через DOS Devices
+- Корзина через регистрацию известной папки
+- Видимость для программ с повышенными правами через EnableLinkedConnections и задачу входа
+
+net use
+- Ресурсы UNC, постоянно с /persistent:yes
+- Создавать и удалять общие ресурсы
+- Пароли используются для вызова и не сохраняются
+
+Ярлыки
+- mklink /J для точек соединения, /D для ссылок на папки, а также символические ссылки на файлы и жёсткие ссылки
+- Удаление стирает только ярлык, не целевую папку
+
+PowerShell
+- New-PSDrive для файловой системы, реестра, сертификатов и других поставщиков
+- По желанию в профиле PowerShell; -Persist только для UNC-путей
+
+Подключение
+- Раздел или VHD/VHDX на букву или в пустую папку NTFS
+- Открытие управления дисками (diskmgmt.msc)
+
+Программа
+- Сравнение, какая команда для какой задачи
+- Рабочая папка D:\AI_Temp\SphereDrive; логотип из этой папки имеет приоритет
+- Установщик со встроенным Python, восстановление при входе с --restore
+- Справка в программе и файл SphereDrive-Hilfe.html рядом с программой
+- Список функций в меню «Справка» и файл SphereDrive-Feature-Liste.txt
+- Интерфейс на немецком, английском, французском, испанском, португальском, русском и китайском
+
+===== 中文 =====
+SphereDrive 功能列表
+Version 1.0.0
+
+SphereDrive 是用于虚拟驱动器和文件夹链接的 Windows 界面。它把 subst、net use、mklink、New-PSDrive 和 mountvol 放在同一个窗口里。文件夹、子文件夹或共享会显示为独立驱动器，而文件并不移动。在 Windows 11 上，侧栏会显示系统名称。
+
+驱动器映射
+- 磁贴或列表，筛选“显示所有驱动器”
+- 单击磁贴或 ··· 会打开该盘符的操作
+- 标签、图标、资源管理器和断开
+- 真实磁盘不会被 subst 或 net use 盖住
+
+文件夹和子文件夹
+- 驱动器的文件夹树，展开后加载下一层
+- 子文件夹可以作为独立驱动器装入
+- 在 Subst 中以及作为文件夹装载目标时使用同一选择器
+
+subst
+- 本地文件夹，包括 OneDrive、Google Drive 或 Dropbox 中较深的位置
+- 通过开机启动保持永久；有管理员权限时还通过 DOS Devices
+- 通过已知文件夹注册使用回收站
+- 通过 EnableLinkedConnections 和登录任务，让提升权限的程序也能看到
+
+net use
+- UNC 共享，使用 /persistent:yes 保持永久
+- 创建和删除共享
+- 密码只用于本次调用，不会保存
+
+链接
+- mklink /J 用于 Junction，/D 用于文件夹链接，以及文件符号链接和硬链接
+- 删除只去掉链接，不删除目标文件夹
+
+PowerShell
+- New-PSDrive 用于文件系统、注册表、证书和其他提供程序
+- 可选写入 PowerShell 配置文件；-Persist 仅用于 UNC 路径
+
+装载
+- 把分区或 VHD/VHDX 装到盘符或空的 NTFS 文件夹
+- 打开磁盘管理 (diskmgmt.msc)
+
+程序
+- 比较哪种命令适合哪种用途
+- 工作文件夹 D:\AI_Temp\SphereDrive，该文件夹中的徽标优先
+- 安装程序内嵌 Python，登录时用 --restore 恢复
+- 程序内的帮助，以及程序旁边的 SphereDrive-Hilfe.html
+- 帮助菜单中的功能列表，以及 SphereDrive-Feature-Liste.txt
+- 可使用德语、英语、法语、西班牙语、葡萄牙语、俄语和中文
