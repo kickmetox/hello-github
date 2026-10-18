@@ -1365,6 +1365,19 @@ class GuideTests(unittest.TestCase):
         self.assertIn("Strg+F5", short["document"])
         self.assertIn("Feature-Liste", short["share"])
         self.assertEqual((ROOT / "KURZANLEITUNG.md").read_text(encoding="utf-8"), quick_document())
+        from shatuide.guide import feature_document, manual_document
+
+        manual = catalog("anleitung")
+        self.assertTrue(manual["ok"], manual)
+        self.assertEqual(manual["kind"], "anleitung")
+        self.assertEqual(manual["title"], "Anleitung")
+        self.assertIn("für andere Nutzer", manual["document"])
+        self.assertIn("ShatuIDE-Setup.exe", manual["document"])
+        self.assertIn("FEATURE-LISTE.md", manual["document"])
+        self.assertEqual((ROOT / "ANLEITUNG.md").read_text(encoding="utf-8"), manual_document())
+        self.assertEqual((ROOT / "FEATURE-LISTE.md").read_text(encoding="utf-8"), feature_document())
+        self.assertIn("für andere Nutzer", features["document"])
+        self.assertNotIn("Get-ChildItem", features["document"])
 
     def test_guide_api_and_saved_handout(self) -> None:
         tmp = tempfile.TemporaryDirectory()
@@ -1395,6 +1408,10 @@ class GuideTests(unittest.TestCase):
             self.assertIn("Feature-Liste", text)
             self.assertIn("Get-ChildItem", text)
             self.assertTrue(str(Path(saved["path"]).resolve()).startswith(str(Path(tmp.name).resolve())))
+            folder = Path(tmp.name) / "ausgabe"
+            self.assertIn("für andere Nutzer", (folder / "ANLEITUNG.md").read_text(encoding="utf-8"))
+            self.assertIn("Feature-Liste", (folder / "FEATURE-LISTE.md").read_text(encoding="utf-8"))
+            self.assertNotIn("Get-ChildItem", (folder / "FEATURE-LISTE.md").read_text(encoding="utf-8"))
         finally:
             httpd.shutdown()
             httpd.server_close()

@@ -21,7 +21,8 @@ _KINDS = {
     "liste": "features",
     "kurz": "kurz",
     "kurzanleitung": "kurz",
-    "anleitung": "kurz",
+    "anleitung": "anleitung",
+    "handbuch": "anleitung",
 }
 
 
@@ -233,9 +234,113 @@ _QUICK = [
     {
         "title": "Weitergeben",
         "items": [
-            "Hilfe → Feature-Liste ist die Übersicht für andere. Dieselbe Fassung steht in INFO.md.",
-            "Alles zur Weitergabe kopiert den Text. Speichern schreibt ausgabe/ShatuIDE-Info.md.",
-            "ShatuIDE.zip enthält den kompletten Arbeitsordner.",
+            "Hilfe → Anleitung und ANLEITUNG.md erklären die Bedienung für andere Nutzer.",
+            "Hilfe → Feature-Liste und FEATURE-LISTE.md nennen die Funktionen.",
+            "Speichern schreibt beide Dateien nach ausgabe/. ShatuIDE.zip enthält den kompletten Arbeitsordner.",
+        ],
+    },
+]
+
+_MANUAL = [
+    {
+        "title": "Für andere Nutzer",
+        "items": [
+            "ShatuIDE ist eine lokale IDE für Python, PowerShell unter Windows, Linux-Shell und Windows-Batch.",
+            "Diese Anleitung erklärt Installation und die tägliche Arbeit. Die Feature-Liste nennt, was das Programm kann.",
+            "Autor: Andreas Meyer, ame@sellerbach.de.",
+        ],
+    },
+    {
+        "title": "Installieren",
+        "items": [
+            "Python 3 muss auf dem Rechner installiert sein. Dieses Paket enthält kein Python.",
+            "ShatuIDE-Setup.exe doppelklicken. Der Assistent bleibt vor den anderen Fenstern.",
+            "Seiten: Willkommen, Zielordner, Startmenü-Ordner, Installieren, Fortschritt, Fertigstellen.",
+            "Das Kästchen ShatuIDE jetzt starten ist frei. Das Programm startet erst, wenn der Assistent zu ist.",
+            "Der Assistent legt ein Symbol auf dem Desktop und einen Eintrag im Startmenü an.",
+        ],
+    },
+    {
+        "title": "Starten",
+        "items": [
+            "ShatuIDE.exe öffnet ein eigenes Windows-Fenster. Darin läuft die IDE.",
+            "ShatuIDE.bat startet diese Anwendung.",
+            "py -3 shatuide.py öffnet dieselbe IDE im Browser. Unter Linux lautet der Start python3 shatuide.py.",
+            "Unter Windows ist der Arbeitsordner D:\\AI_Temp\\ShatuIDE. Die IDE liest und schreibt dort.",
+            "Der eingebaute Server hört nur auf 127.0.0.1.",
+        ],
+    },
+    {
+        "title": "Neue Datei",
+        "items": [
+            "Datei → Neue Datei oder die Schaltfläche Neu.",
+            "Art wählen: Python, PowerShell, Linux-Shell, Windows-Batch, CMD, JSON, HTML oder Text.",
+            "Namen eintragen. Aus hallo wird hallo.py, hallo.ps1, hallo.sh oder hallo.bat.",
+            "Anlegen öffnet die Datei. Eine Batch-Datei beginnt mit @echo off, eine Shell mit #!/bin/bash.",
+            "Strg+S speichert. Strg+F5 führt aus.",
+        ],
+    },
+    {
+        "title": "Öffnen und speichern",
+        "items": [
+            "Datei → Öffnen lädt eine vorhandene Datei aus dem Arbeitsordner, aus darüberliegenden Ordnern oder vom Home-Verzeichnis.",
+            "Dateien außerhalb des Arbeitsordners sind nur lesbar.",
+            "Datei laden übernimmt eine Datei in den Arbeitsordner. Speichern schreibt sie dorthin.",
+            "Datei → Wiederherstellen holt einen ungespeicherten Puffer zurück.",
+        ],
+    },
+    {
+        "title": "Bearbeiten",
+        "items": [
+            "Strg+X schneidet aus, Strg+C kopiert, Strg+V fügt ein.",
+            "Strg+F sucht in der Datei, Strg+H ersetzt darin. Strg+Umschalt+H ersetzt im Arbeitsordner.",
+            "Fenster → Zweites Fenster öffnet eine weitere Ansicht. Fenster schließen schließt sie.",
+            "Rechts stehen Funktionen und Eigenschaften der offenen Datei. Ein Klick springt an die Stelle.",
+        ],
+    },
+    {
+        "title": "Ausführen",
+        "items": [
+            "Strg+F5 oder Ausführen startet die offene Datei.",
+            "Python läuft mit dem installierten Python. PowerShell sucht pwsh, danach powershell.exe.",
+            "Eine Linux-Shell läuft mit bash. Eine Batch-Datei startet unter Windows mit cmd.exe.",
+            "Ausführen → Syntax prüfen kontrolliert Python, PowerShell und die Linux-Shell, bevor die Datei läuft.",
+        ],
+    },
+    {
+        "title": "Debug und Fehler",
+        "items": [
+            "F9 setzt einen Haltepunkt, F5 startet den Debug oder läuft weiter, F10 geht einen Schritt weiter.",
+            "Eine Fehlerzeile bleibt rot, bis ihr Text korrigiert ist oder ein Lauf ohne Fehler endet.",
+            "Das gilt für Python, Bash und PowerShell. JSON und HTML werden geprüft, aber nicht ausgeführt.",
+            "Alt+F5 prüft die markierte Zeile in einem eigenen Fenster. Umschalt+Alt+F5 prüft die Funktion an der Schreibmarke.",
+        ],
+    },
+    {
+        "title": "PowerShell, Linux-Shell und Batch",
+        "items": [
+            "PowerShell-Dateien enden auf .ps1, .psm1 oder .psd1. Linux-Shell auf .sh oder .bash. Windows-Batch auf .bat oder .cmd.",
+            "Hilfe → Befehlslisten erklärt die häufigen Befehle mit Syntax und einem Beispiel.",
+            "Format rückt Blöcke ein. Sprungmarken einer Batch-Datei stehen in der Funktionsleiste.",
+        ],
+    },
+    {
+        "title": "Erzeugen",
+        "items": [
+            "Erzeugen → Baukasten setzt ein Skript aus Modulen zusammen. Das Ergebnis liegt unter ausgabe/.",
+            "Erzeugen → Skript aus Abfrage baut ein Python-, PowerShell-, Bash- oder Batch-Skript aus den Antworten.",
+            "Datenbank erzeugen legt SQLite im Arbeitsordner an. Andere Systeme bekommen ein SQL-Skript oder ein Schema.",
+            "EXE, MSI, PowerShell-Modul, Funktion, GUI-Entwurf und Windows-Dienst liegen ebenfalls unter Erzeugen.",
+        ],
+    },
+    {
+        "title": "Weitergeben",
+        "items": [
+            "Hilfe → Anleitung ist diese Fassung. Die Datei heißt ANLEITUNG.md.",
+            "Hilfe → Feature-Liste ist die Übersicht der Funktionen. Die Datei heißt FEATURE-LISTE.md.",
+            "Hilfe → Kurzanleitung fasst die täglichen Schritte kurz zusammen.",
+            "Speichern schreibt ausgabe/ANLEITUNG.md, ausgabe/FEATURE-LISTE.md und ausgabe/ShatuIDE-Info.md.",
+            "ShatuIDE.zip enthält den kompletten Arbeitsordner und kann an andere weitergegeben werden.",
         ],
     },
 ]
@@ -304,10 +409,11 @@ _FEATURES = [
     {
         "title": "Weitergeben",
         "items": [
+            "Die Anleitung für andere Nutzer liegt als ANLEITUNG.md und unter Hilfe → Anleitung.",
             "Die Kurzanleitung liegt als KURZANLEITUNG.md und unter Hilfe → Kurzanleitung.",
-            "Diese Feature-Liste liegt als INFO.md im Arbeitsordner.",
-            "Im Fenster Hilfe kopiert Alles zur Weitergabe denselben Text.",
-            "Speichern schreibt ausgabe/ShatuIDE-Info.md.",
+            "Diese Feature-Liste liegt als FEATURE-LISTE.md und unter Hilfe → Feature-Liste.",
+            "INFO.md enthält dieselbe Feature-Liste plus die Befehlslisten.",
+            "Speichern schreibt ausgabe/ANLEITUNG.md, ausgabe/FEATURE-LISTE.md und ausgabe/ShatuIDE-Info.md.",
             "ShatuIDE.zip enthält den kompletten Arbeitsordner.",
         ],
     },
@@ -315,7 +421,7 @@ _FEATURES = [
 
 
 def kinds() -> list[str]:
-    return ["kurz", "powershell", "shell", "batch", "features"]
+    return ["kurz", "anleitung", "powershell", "shell", "batch", "features"]
 
 
 def _normalize(kind: str) -> str:
@@ -378,21 +484,39 @@ def quick_document() -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
-def feature_document() -> str:
+def manual_document() -> str:
     lines = [
-        "# ShatuIDE",
+        "# ShatuIDE Anleitung",
         "",
         f"Version {__version__}",
         f"{__author__}, {__email__}",
         "",
-        "Lokale Entwicklungsumgebung für Python, PowerShell unter Windows, Linux-Shell und Windows-Batch.",
-        "Diese Info- und Feature-Liste darf weitergegeben werden.",
+        "Diese Anleitung ist für andere Nutzer. Sie erklärt Installation und die tägliche Arbeit.",
+        "Die Funktionen stehen in FEATURE-LISTE.md.",
         "",
-        "## Feature-Liste",
+    ]
+    for section in _MANUAL:
+        lines.append(f"## {section['title']}")
+        lines.append("")
+        for number, item in enumerate(section["items"], start=1):
+            lines.append(f"{number}. {item}")
+        lines.append("")
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def feature_document() -> str:
+    lines = [
+        "# ShatuIDE Feature-Liste",
+        "",
+        f"Version {__version__}",
+        f"{__author__}, {__email__}",
+        "",
+        "Diese Feature-Liste ist für andere Nutzer und darf weitergegeben werden.",
+        "Die Bedienung steht in ANLEITUNG.md.",
         "",
     ]
     for section in _FEATURES:
-        lines.append(f"### {section['title']}")
+        lines.append(f"## {section['title']}")
         lines.append("")
         for item in section["items"]:
             lines.append(f"- {item}")
@@ -413,7 +537,7 @@ def share_document() -> str:
 def catalog(kind: str) -> dict:
     key = _normalize(kind)
     if not key:
-        return {"ok": False, "error": "Unbekannte Hilfe. Erlaubt sind kurz, powershell, shell, batch und features."}
+        return {"ok": False, "error": "Unbekannte Hilfe. Erlaubt sind kurz, anleitung, powershell, shell, batch und features."}
     if key == "kurz":
         return {
             "ok": True,
@@ -424,12 +548,22 @@ def catalog(kind: str) -> dict:
             "document": quick_document(),
             "share": share_document(),
         }
+    if key == "anleitung":
+        return {
+            "ok": True,
+            "kind": "anleitung",
+            "title": "Anleitung",
+            "intro": f"Version {__version__}. {__author__}, {__email__}. Für andere Nutzer.",
+            "sections": _MANUAL,
+            "document": manual_document(),
+            "share": share_document(),
+        }
     if key == "features":
         return {
             "ok": True,
             "kind": "features",
-            "title": "ShatuIDE",
-            "intro": f"Version {__version__}. {__author__}, {__email__}. Diese Liste darf weitergegeben werden.",
+            "title": "Feature-Liste",
+            "intro": f"Version {__version__}. {__author__}, {__email__}. Diese Liste ist für andere Nutzer und darf weitergegeben werden.",
             "sections": _FEATURES,
             "document": feature_document(),
             "share": share_document(),

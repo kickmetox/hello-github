@@ -39,6 +39,6 @@ Kurze Schritte für den Alltag. Die Befehlslisten stehen unter Hilfe.
 
 ## Weitergeben
 
-1. Hilfe → Feature-Liste ist die Übersicht für andere. Dieselbe Fassung steht in INFO.md.
-2. Alles zur Weitergabe kopiert den Text. Speichern schreibt ausgabe/ShatuIDE-Info.md.
-3. ShatuIDE.zip enthält den kompletten Arbeitsordner.
+1. Hilfe → Anleitung und ANLEITUNG.md erklären die Bedienung für andere Nutzer.
+2. Hilfe → Feature-Liste und FEATURE-LISTE.md nennen die Funktionen.
+3. Speichern schreibt beide Dateien nach ausgabe/. ShatuIDE.zip enthält den kompletten Arbeitsordner.

@@ -1096,9 +1096,19 @@ class Handler(BaseHTTPRequestHandler):
         action = str(payload.get("action") or "")
         workspace = Path(self.app.workspace)
         if action == "guide-save":
-            path = studio.output_dir(workspace) / "ShatuIDE-Info.md"
-            path.write_text(guide.share_document(), encoding="utf-8")
-            return {"ok": True, "path": str(path), "message": "Info liegt in ausgabe/ShatuIDE-Info.md."}
+            folder = studio.output_dir(workspace)
+            info = folder / "ShatuIDE-Info.md"
+            manual = folder / "ANLEITUNG.md"
+            features = folder / "FEATURE-LISTE.md"
+            info.write_text(guide.share_document(), encoding="utf-8")
+            manual.write_text(guide.manual_document(), encoding="utf-8")
+            features.write_text(guide.feature_document(), encoding="utf-8")
+            return {
+                "ok": True,
+                "path": str(info),
+                "paths": [str(manual), str(features), str(info)],
+                "message": "Anleitung und Feature-Liste liegen in ausgabe/.",
+            }
         if action == "recovery":
             return studio.recovery_store(workspace, str(payload.get("path") or ""), str(payload.get("content") or ""))
         if action == "recovery-read":
