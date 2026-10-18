@@ -1,7 +1,9 @@
-"""Baut den Windows-Installer. NSIS und pynsist müssen installiert sein.
+"""Baut den Windows-Installer und die portable Zip-Datei.
 
-Das Skript lädt den offiziellen Python-Installer, entnimmt daraus Tcl/Tk in
-derselben Version wie das eingebettete Python und lässt pynsist das Setup erzeugen.
+NSIS und pynsist müssen installiert sein. Das Skript lädt den offiziellen
+Python-Installer, entnimmt daraus Tcl/Tk in derselben Version wie das
+eingebettete Python und lässt pynsist das Setup erzeugen. Dieselbe Fassung
+wird als SphereDrive-<Version>.zip gepackt, ohne Installer.
 """
 
 from __future__ import annotations
@@ -11,6 +13,7 @@ import shutil
 import subprocess
 import sys
 import urllib.request
+import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -51,8 +54,81 @@ def main() -> int:
     produced = BUILD / "nsis" / installer_name
     if not produced.is_file():
         raise SystemExit(f"Installer fehlt: {produced}")
+    shutil.copy2(produced, ROOT / installer_name)
+    archive = ROOT / portable_archive_name(version)
+    write_portable_zip(BUILD / "nsis", archive, version)
     print(f"Installer: {produced} ({produced.stat().st_size} Bytes)")
+    print(f"Zip: {archive} ({archive.stat().st_size} Bytes)")
     return 0
+
+
+PORTABLE_LAUNCHER = """@echo off
+setlocal
+cd /d "%~dp0"
+if not exist "%~dp0Python\\pythonw.exe" (
+    echo SphereDrive wurde nicht vollstaendig entpackt.
+    echo Python\\pythonw.exe fehlt neben dieser Datei.
+    pause
+    exit /b 1
+)
+start "" "%~dp0Python\\pythonw.exe" "%~dp0SphereDrive.launch.pyw" %*
+exit /b 0
+"""
+
+
+def portable_archive_name(version: str) -> str:
+    return f"SphereDrive-{version}.zip"
+
+
+def portable_readme(version: str) -> str:
+    return f"""SphereDrive {version}
+
+Diese Zip-Datei enthält das fertige Windows-Programm mit eingebettetem Python.
+Eine Installation und ein eigenes Python sind nicht nötig.
+
+1. Den Ordner SphereDrive entpacken, zum Beispiel nach D:\\AI_Temp\\SphereDrive
+2. SphereDrive.bat oder bin\\SphereDrive.exe doppelklicken
+
+Hilfe: SphereDrive-Hilfe.html
+Feature-Liste: SphereDrive-Feature-Liste.txt
+
+Die Sprache steht im Menü Sprache und in den Einstellungen:
+Deutsch, English, Français, Español, Português, Русский, 中文
+"""
+
+
+def write_portable_zip(source: Path, dest: Path, version: str) -> None:
+    """Packt die gebaute Windows-Fassung. Installer und NSIS-Skript bleiben draußen."""
+    folder = "SphereDrive"
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    temporary = dest.with_suffix(dest.suffix + ".part")
+    if temporary.exists():
+        temporary.unlink()
+    with zipfile.ZipFile(temporary, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        for path in sorted(source.rglob("*")):
+            if not path.is_file():
+                continue
+            relative = path.relative_to(source)
+            if _skip_portable(relative):
+                continue
+            archive.write(path, f"{folder}/{relative.as_posix()}")
+        archive.writestr(f"{folder}/SphereDrive.bat", _crlf(PORTABLE_LAUNCHER))
+        archive.writestr(f"{folder}/Liesmich.txt", _utf8_bom(_crlf(portable_readme(version))))
+    temporary.replace(dest)
+
+
+def _skip_portable(relative: Path) -> bool:
+    if relative.name == "installer.nsi" or relative.name.startswith("SphereDrive-Setup-"):
+        return True
+    return any(part == "__pycache__" or part.endswith(".pyc") for part in relative.parts)
+
+
+def _crlf(text: str) -> str:
+    return text.replace("\r\n", "\n").replace("\n", "\r\n")
+
+
+def _utf8_bom(text: str) -> bytes:
+    return ("\ufeff" + text).encode("utf-8")
 
 
 def _read_version() -> str:

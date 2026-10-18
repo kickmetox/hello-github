@@ -417,6 +417,54 @@ class ServiceTests(unittest.TestCase):
         for name in (HELP_FILE, FEATURE_FILE):
             self.assertIn(name, bat)
             self.assertIn(name, installer)
+        self.assertIn("write_portable_zip", installer)
+        self.assertIn("SphereDrive-{version}.zip", installer)
+
+    def test_portable_zip_contains_the_windows_program(self) -> None:
+        import importlib.util
+        import zipfile
+
+        spec = importlib.util.spec_from_file_location(
+            "build_installer", Path("tools") / "build_installer.py"
+        )
+        self.assertIsNotNone(spec)
+        self.assertIsNotNone(spec.loader)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        source = Path("tests") / "_runtime" / "portable-src"
+        if source.exists():
+            shutil.rmtree(source)
+        (source / "Python").mkdir(parents=True)
+        (source / "Python" / "pythonw.exe").write_bytes(b"PY")
+        (source / "bin").mkdir()
+        (source / "bin" / "SphereDrive.exe").write_bytes(b"EXE")
+        (source / "pkgs" / "spheredrive" / "__pycache__").mkdir(parents=True)
+        (source / "pkgs" / "spheredrive" / "app.py").write_text("app", encoding="utf-8")
+        (source / "pkgs" / "spheredrive" / "__pycache__" / "app.pyc").write_bytes(b"pyc")
+        (source / "SphereDrive.launch.pyw").write_text("launch", encoding="utf-8")
+        (source / "SphereDrive-Hilfe.html").write_text("hilfe", encoding="utf-8")
+        (source / "SphereDrive-Feature-Liste.txt").write_text("liste", encoding="utf-8")
+        (source / "installer.nsi").write_text("nsi", encoding="utf-8")
+        (source / "SphereDrive-Setup-1.0.0.exe").write_bytes(b"setup")
+        dest = Path("tests") / "_runtime" / "SphereDrive-1.0.0.zip"
+        module.write_portable_zip(source, dest, "1.0.0")
+        with zipfile.ZipFile(dest) as archive:
+            names = set(archive.namelist())
+            bat = archive.read("SphereDrive/SphereDrive.bat").decode("utf-8")
+            readme = archive.read("SphereDrive/Liesmich.txt").decode("utf-8-sig")
+        self.assertIn("SphereDrive/Python/pythonw.exe", names)
+        self.assertIn("SphereDrive/bin/SphereDrive.exe", names)
+        self.assertIn("SphereDrive/SphereDrive.launch.pyw", names)
+        self.assertIn("SphereDrive/SphereDrive-Hilfe.html", names)
+        self.assertIn("SphereDrive/SphereDrive-Feature-Liste.txt", names)
+        self.assertIn("SphereDrive/pkgs/spheredrive/app.py", names)
+        self.assertNotIn("SphereDrive/installer.nsi", names)
+        self.assertNotIn("SphereDrive/SphereDrive-Setup-1.0.0.exe", names)
+        self.assertFalse(any(name.endswith(".pyc") for name in names))
+        self.assertIn("pythonw.exe", bat)
+        self.assertIn("SphereDrive.launch.pyw", bat)
+        self.assertIn("SphereDrive 1.0.0", readme)
+        self.assertIn("中文", readme)
 
     def test_folder_tree_includes_subfolders_and_follows_subst(self) -> None:
         svc, host = service(Path("tests") / "_runtime" / "folders")
