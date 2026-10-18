@@ -1069,6 +1069,9 @@ class StudioTests(unittest.TestCase):
                     "Zielordner",
                     "Installieren",
                     "ShatuIDE jetzt starten",
+                    "MUI_FINISHPAGE_RUN_NOTCHECKED",
+                    "BringSetupForward",
+                    "SetWindowPos",
                     "Fertigstellen",
                     "Python 3 muss vorhanden sein",
                 ):

@@ -49,7 +49,7 @@ VIAddVersionKey /LANG=1031 "FileVersion" "${VERSIONTEXT}"
 !define MUI_ABORTWARNING_CANCEL_DEFAULT
 
 !define MUI_WELCOMEPAGE_TITLE "Willkommen beim ShatuIDE-Setup"
-!define MUI_WELCOMEPAGE_TEXT "Dieser Assistent richtet ShatuIDE ein.$\r$\n$\r$\nDie nächsten Seiten wählen Zielordner und Startmenü. Installieren kopiert danach die Dateien und zeigt den Fortschritt.$\r$\n$\r$\nEs entstehen ein Desktop-Symbol und ein Startmenü-Eintrag.$\r$\n$\r$\nPython 3 muss vorhanden sein. Dieses Paket bringt kein Python mit."
+!define MUI_WELCOMEPAGE_TEXT "Dieser Assistent richtet ShatuIDE ein.$\r$\n$\r$\nDas Fenster bleibt vor anderen Programmen, auch vor einem schon geöffneten ShatuIDE.$\r$\n$\r$\nDie nächsten Seiten wählen Zielordner und Startmenü. Installieren kopiert danach die Dateien und zeigt den Fortschritt.$\r$\n$\r$\nEs entstehen ein Desktop-Symbol und ein Startmenü-Eintrag.$\r$\n$\r$\nPython 3 muss vorhanden sein. Dieses Paket bringt kein Python mit."
 
 !define MUI_DIRECTORYPAGE_TEXT_TOP "ShatuIDE wird in den folgenden Ordner installiert. Durchsuchen wählt einen anderen Ordner. Weiter geht zum Startmenü."
 !define MUI_DIRECTORYPAGE_TEXT_DESTINATION "Zielordner"
@@ -60,15 +60,19 @@ VIAddVersionKey /LANG=1031 "FileVersion" "${VERSIONTEXT}"
 !define MUI_STARTMENUPAGE_REGISTRY_VALUENAME "StartMenuFolder"
 
 !define MUI_FINISHPAGE_TITLE "ShatuIDE ist eingerichtet"
-!define MUI_FINISHPAGE_TEXT "ShatuIDE ist eingerichtet.$\r$\n$\r$\nStart über das Desktop-Symbol, das Startmenü oder das Kästchen unten.$\r$\n$\r$\nDie Dateien liegen im gewählten Ordner. Python 3 wird zum Start gebraucht.$\r$\n$\r$\nFertigstellen schließt den Assistenten."
+!define MUI_FINISHPAGE_TEXT "ShatuIDE ist eingerichtet.$\r$\n$\r$\nFertigstellen schließt diesen Assistenten. Erst danach kann ShatuIDE starten.$\r$\n$\r$\nStart über das Desktop-Symbol, das Startmenü oder das Kästchen unten.$\r$\n$\r$\nDie Dateien liegen im gewählten Ordner. Python 3 wird zum Start gebraucht."
 !define MUI_FINISHPAGE_RUN "$INSTDIR\ShatuIDE.exe"
 !define MUI_FINISHPAGE_RUN_TEXT "ShatuIDE jetzt starten"
+!define MUI_FINISHPAGE_RUN_NOTCHECKED
 !define MUI_FINISHPAGE_NOAUTOCLOSE
 
 !define MUI_UNCONFIRMPAGE_TEXT_TOP "ShatuIDE wird entfernt. Desktop-Symbol, Startmenü-Eintrag und der Programmordner werden gelöscht."
 
 Var StartMenuFolder
 Var ReadyDialog
+
+!define MUI_CUSTOMFUNCTION_GUIINIT BringSetupForward
+!define MUI_CUSTOMFUNCTION_UNGUIINIT un.BringSetupForward
 
 !insertmacro MUI_PAGE_WELCOME
 !insertmacro MUI_PAGE_DIRECTORY
@@ -98,6 +102,32 @@ FunctionEnd
 
 Function un.onInit
   SetRegView 64
+FunctionEnd
+
+Function BringSetupForward
+  ; Nach der Rechteabfrage legt Windows den Assistenten oft hinter das aktive Fenster.
+  ; Verstecken und wiederherstellen, dann dauerhaft vor andere Fenster legen.
+  ShowWindow $HWNDPARENT ${SW_HIDE}
+  ShowWindow $HWNDPARENT ${SW_RESTORE}
+  System::Call "user32::SetWindowPos(i $HWNDPARENT, i -1, i 0, i 0, i 0, i 0, i 0x43)"
+  System::Call "user32::SetForegroundWindow(i $HWNDPARENT)"
+  System::Call "user32::BringWindowToTop(i $HWNDPARENT)"
+FunctionEnd
+
+Function un.BringSetupForward
+  ShowWindow $HWNDPARENT ${SW_HIDE}
+  ShowWindow $HWNDPARENT ${SW_RESTORE}
+  System::Call "user32::SetWindowPos(i $HWNDPARENT, i -1, i 0, i 0, i 0, i 0, i 0x43)"
+  System::Call "user32::SetForegroundWindow(i $HWNDPARENT)"
+  System::Call "user32::BringWindowToTop(i $HWNDPARENT)"
+FunctionEnd
+
+Function .onGUIEnd
+  System::Call "user32::SetWindowPos(i $HWNDPARENT, i -2, i 0, i 0, i 0, i 0, i 0x43)"
+FunctionEnd
+
+Function un.onGUIEnd
+  System::Call "user32::SetWindowPos(i $HWNDPARENT, i -2, i 0, i 0, i 0, i 0, i 0x43)"
 FunctionEnd
 
 Function ReadyCreate
