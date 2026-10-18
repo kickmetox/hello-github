@@ -566,13 +566,16 @@ function cursorPos() {
   return { line: lines.length, col: lines[lines.length - 1].length };
 }
 
+function languageName(path) {
+  const names = { python: "Python", powershell: "PowerShell", shell: "Shell", batch: "Batch", json: "JSON", html: "HTML", js: "JavaScript", sql: "SQL", text: "Text" };
+  return names[languageOf(path)] || "Text";
+}
+
 function updateStatus(extra) {
   const pos = cursorPos();
   const current = tab();
   $("st-pos").textContent = `Zeile ${pos.line}, Spalte ${pos.col + 1}`;
-  const names = { python: "Python", powershell: "PowerShell", shell: "Shell", batch: "Batch", json: "JSON", html: "HTML", js: "JavaScript", sql: "SQL", text: "Text" };
-  const lang = languageOf(current && current.path);
-  if ($("st-lang")) $("st-lang").textContent = names[lang] || "Text";
+  if ($("st-lang")) $("st-lang").textContent = languageName(current && current.path);
   if ($("st-eol")) $("st-eol").textContent = current && current.content.includes("\r\n") ? "CRLF" : "LF";
   if (extra) $("st-mode").textContent = extra + (current && current.writable === false ? " · nur lesen" : "");
   const py = S.python || "";
@@ -866,7 +869,7 @@ function renderProperties(current, item) {
   }
   const lines = current.content ? current.content.split("\n").length : 1;
   propRow(host, "Datei", current.path.split(/[\\/]/).pop());
-  propRow(host, "Sprache", $("st-lang") ? $("st-lang").textContent : languageOf(current.path));
+  propRow(host, "Sprache", languageName(current.path));
   propRow(host, "Zeilen", String(lines));
   propRow(host, "Geändert", current.dirty ? "ja" : "nein");
   if (!item) return;
@@ -3641,12 +3644,84 @@ async function openFileDialog(start) {
   await load(start || S.workspace || "");
 }
 
+const NEW_KINDS = [
+  ["python", "Python", ".py"],
+  ["powershell", "PowerShell", ".ps1"],
+  ["shell", "Linux-Shell", ".sh"],
+  ["batch", "Windows-Batch", ".bat"],
+  ["cmd", "Windows-CMD", ".cmd"],
+  ["json", "JSON", ".json"],
+  ["html", "HTML", ".html"],
+  ["text", "Text", ".txt"],
+];
+
 function newFile() {
-  promptModal("Neue Datei", "Pfad im Workspace", "neu.py", async (path) => {
-    const written = await api("/api/file", { path, content: "" });
-    await refreshTree();
-    openPath(written.path);
+  const body = document.createElement("div");
+  const name = document.createElement("input");
+  name.value = "neu.py";
+  name.spellcheck = false;
+  name.autocomplete = "off";
+  const kind = document.createElement("select");
+  kind.id = "new-kind";
+  NEW_KINDS.forEach(([value, label]) => {
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = label;
+    kind.appendChild(option);
   });
+  const preview = document.createElement("div");
+  preview.className = "hint";
+  let stem = "neu";
+  const specOf = (value) => NEW_KINDS.find((item) => item[0] === value) || NEW_KINDS[0];
+  const suffixOf = (text) => {
+    const base = String(text || "").split(/[\\/]/).pop().toLowerCase();
+    return NEW_KINDS.find((item) => base.endsWith(item[2])) || null;
+  };
+  const readStem = () => {
+    const text = name.value.trim();
+    const found = suffixOf(text);
+    if (!found) return text.replace(/[\\/]+$/, "") || "neu";
+    return text.slice(0, text.length - found[2].length) || "neu";
+  };
+  const show = () => {
+    const spec = specOf(kind.value);
+    preview.textContent = "Angelegt wird " + stem + spec[2] + ". Zur Wahl stehen Python, PowerShell, Linux-Shell, Windows-Batch, CMD, JSON, HTML und Text.";
+  };
+  kind.onchange = () => {
+    stem = readStem();
+    name.value = stem + specOf(kind.value)[2];
+    show();
+  };
+  name.oninput = () => {
+    const found = suffixOf(name.value.trim());
+    if (found) kind.value = found[0];
+    stem = readStem();
+    show();
+  };
+  labeled(body, "Name", name);
+  labeled(body, "Art", kind);
+  body.appendChild(preview);
+  show();
+  modal("Neue Datei", body, [
+    { label: "Abbrechen", run: () => {} },
+    { label: "Anlegen", run: () => {
+      stem = readStem();
+      const spec = specOf(kind.value);
+      api("/api/file", { path: stem + spec[2], kind: spec[0] }).then(async (written) => {
+        await refreshTree();
+        await openPath(written.path);
+        closeModal();
+      }).catch((err) => toast(err.message));
+      return false;
+    } },
+  ]);
+  name.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    const ok = $("modal").querySelector(".row button:last-child");
+    if (ok) ok.click();
+  });
+  setTimeout(() => { name.focus(); name.select(); }, 0);
 }
 
 function openFolder() {
@@ -4194,6 +4269,7 @@ async function boot() {
   bindClick("btn-cut", cutSelection);
   bindClick("btn-copy", () => copySelection(false));
   bindClick("btn-paste", pasteClip);
+  bindClick("btn-new", newFile);
   bindClick("btn-open", () => openFileDialog());
   bindClick("btn-save", saveTab);
   $("btn-run").onclick = () => runFile(false);

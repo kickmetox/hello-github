@@ -1390,6 +1390,64 @@ class GuideTests(unittest.TestCase):
             tmp.cleanup()
 
 
+class NewFileTests(unittest.TestCase):
+    def test_plan_keeps_the_chosen_kind(self) -> None:
+        from shatuide.scripting import plan_new_file
+
+        batch = plan_new_file("neu.py", "batch")
+        self.assertTrue(batch["ok"], batch)
+        self.assertEqual(batch["path"], "neu.bat")
+        self.assertTrue(batch["content"].startswith("@echo off"))
+        shell = plan_new_file("skripte/hallo", "shell")
+        self.assertEqual(shell["path"], "skripte/hallo.sh")
+        self.assertIn("#!/bin/bash", shell["content"])
+        powershell = plan_new_file("werk\\gruss.ps1", "powershell")
+        self.assertEqual(powershell["path"], "werk/gruss.ps1")
+        self.assertIn("Write-Output", powershell["content"])
+        kept = plan_new_file("hallo.bat", "batch")
+        self.assertEqual(kept["path"], "hallo.bat")
+        self.assertFalse(plan_new_file("../hallo", "batch")["ok"])
+        self.assertFalse(plan_new_file("C:/hallo", "python")["ok"])
+
+    def test_api_creates_batch_and_shell(self) -> None:
+        tmp = tempfile.TemporaryDirectory()
+        httpd, app = create_server("127.0.0.1", 0, tmp.name)
+        thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+        thread.start()
+        host, port = httpd.server_address[:2]
+        base = f"http://{host}:{port}"
+
+        def request(payload: dict) -> dict:
+            req = urllib.request.Request(base + "/api/file", data=json.dumps(payload).encode("utf-8"), method="POST")
+            req.add_header("X-Shatu-Token", app.token)
+            req.add_header("Host", "127.0.0.1")
+            req.add_header("Content-Type", "application/json")
+            try:
+                with urllib.request.urlopen(req, timeout=20) as response:
+                    return json.loads(response.read().decode("utf-8"))
+            except urllib.error.HTTPError as exc:
+                return json.loads(exc.read().decode("utf-8"))
+
+        try:
+            created = request({"path": "neu.py", "kind": "batch"})
+            self.assertTrue(created["ok"], created)
+            target = Path(created["path"])
+            self.assertEqual(target.suffix, ".bat")
+            self.assertTrue(target.read_text(encoding="utf-8").startswith("@echo off"))
+            self.assertTrue(str(target.resolve()).startswith(str(Path(tmp.name).resolve())))
+            shell = request({"path": "hallo", "kind": "shell"})
+            self.assertTrue(Path(shell["path"]).read_text(encoding="utf-8").startswith("#!/bin/bash"))
+            again = request({"path": "neu.bat", "kind": "batch"})
+            self.assertFalse(again["ok"])
+            self.assertIn("gibt es schon", again["error"])
+            saved = request({"path": "notiz.txt", "content": "bleiben"})
+            self.assertEqual(Path(saved["path"]).read_text(encoding="utf-8"), "bleiben")
+        finally:
+            httpd.shutdown()
+            httpd.server_close()
+            tmp.cleanup()
+
+
 class KitTests(unittest.TestCase):
     def test_modules_build_a_running_script(self) -> None:
         import sqlite3

@@ -368,8 +368,10 @@ class App:
             "writable": writable,
         }
 
-    def write_file(self, path: str, content: str) -> dict:
+    def write_file(self, path: str, content: str, *, overwrite: bool = True) -> dict:
         target = self.resolve_write(path)
+        if not overwrite and target.exists():
+            return {"ok": False, "error": "Die Datei gibt es schon."}
         target.parent.mkdir(parents=True, exist_ok=True)
         relative = self.rel(target)
         previous = target.read_text(encoding="utf-8", errors="replace") if target.is_file() else ""
@@ -881,7 +883,17 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/workspace":
             self._json(app.set_workspace(str(payload.get("path") or "")))
         elif path == "/api/file":
-            self._json(app.write_file(str(payload.get("path") or ""), str(payload.get("content") or "")))
+            kind = str(payload.get("kind") or "")
+            raw_path = str(payload.get("path") or "")
+            if kind:
+                planned = scripting.plan_new_file(raw_path, kind)
+                if not planned.get("ok"):
+                    self._json(planned)
+                    return
+                content = planned["content"] if "content" not in payload else str(payload.get("content") or "")
+                self._json(app.write_file(planned["path"], content, overwrite=False))
+            else:
+                self._json(app.write_file(raw_path, str(payload.get("content") or "")))
         elif path == "/api/mkdir":
             self._json(app.make_dir(str(payload.get("path") or "")))
         elif path == "/api/delete":

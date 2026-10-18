@@ -246,6 +246,47 @@ def selection_suffix(path: str) -> str:
     return {"shell": ".sh", "powershell": ".ps1", "batch": ".bat", "html": ".html", "json": ".json"}.get(lang, ".py")
 
 
+_NEW_FILES = {
+    "python": (".py", ""),
+    "powershell": (".ps1", "Write-Output \"Hallo\"\n"),
+    "shell": (".sh", "#!/bin/bash\necho Hallo\n"),
+    "batch": (".bat", "@echo off\nsetlocal\necho Hallo\n"),
+    "cmd": (".cmd", "@echo off\nsetlocal\necho Hallo\n"),
+    "json": (".json", "{\n}\n"),
+    "html": (
+        ".html",
+        "<!DOCTYPE html>\n<html lang=\"de\">\n<head>\n  <meta charset=\"utf-8\">\n  <title>Neu</title>\n</head>\n<body>\n</body>\n</html>\n",
+    ),
+    "text": (".txt", ""),
+}
+
+
+def plan_new_file(name: str, kind: str) -> dict:
+    """Baut Pfad und Anfangstext für eine neue Datei. Die Art bestimmt die Endung."""
+    key = (kind or "python").strip().lower()
+    spec = _NEW_FILES.get(key)
+    if not spec:
+        return {"ok": False, "error": "Unbekannte Dateiart. Erlaubt sind Python, PowerShell, Shell, Batch, CMD, JSON, HTML und Text."}
+    suffix, content = spec
+    raw = (name or "").strip().strip("/\\").replace("\\", "/")
+    if not raw:
+        raw = "neu"
+    if ":" in raw or raw.startswith("//") or any(part in {"", ".", ".."} for part in raw.split("/")):
+        return {"ok": False, "error": "Name nur als Datei im Workspace, ohne Laufwerk."}
+    current = Path(raw).suffix.lower()
+    known = {item[0] for item in _NEW_FILES.values()}
+    if current == suffix:
+        path = raw
+    elif current in known:
+        path = str(Path(raw).with_suffix(suffix)).replace("\\", "/")
+    elif current == "":
+        path = raw + suffix
+    else:
+        path = raw
+        content = ""
+    return {"ok": True, "path": path, "content": content, "kind": key, "suffix": Path(path).suffix.lower()}
+
+
 def _html_syntax(path: str, content: str | None) -> dict:
     try:
         source = _json_text(path, content)
