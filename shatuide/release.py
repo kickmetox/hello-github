@@ -82,11 +82,12 @@ def compile_launcher(kind: str, dest: Path) -> dict:
         source = PACKAGING / "launcher_win.c"
         if not compiler:
             return {"ok": False, "error": "Windows-Compiler fehlt (x86_64-w64-mingw32-gcc)."}
-        argv = [compiler, "-O2", "-s", "-o", str(dest), str(source), "-lshell32"]
+        argv = [compiler, "-O2", "-s", "-mwindows", "-o", str(dest), str(source)]
         with tempfile.TemporaryDirectory() as tmp:
             icon_object = _windows_icon_object(Path(tmp))
             if icon_object is not None:
-                argv.insert(-1, str(icon_object))
+                argv.append(str(icon_object))
+            argv.extend(["-lshell32", "-lole32", "-luuid", "-lws2_32", "-lgdi32", "-luser32"])
             proc = subprocess.run(argv, capture_output=True, text=True, timeout=120)
         if proc.returncode != 0:
             return {"ok": False, "error": (proc.stderr or proc.stdout or "Compiler fehlgeschlagen.").strip()}
@@ -214,6 +215,9 @@ def build_release(source: Path, dest: Path | None = None, bundle_python: bool = 
     windows = compile_launcher("windows", stage / "ShatuIDE.exe")
     if not windows["ok"]:
         return windows
+    loader = PACKAGING / "WebView2Loader.dll"
+    if loader.is_file():
+        shutil.copy2(loader, stage / "WebView2Loader.dll")
     linux_path = dest / "ShatuIDE"
     linux = compile_launcher("native", linux_path)
     if not linux["ok"]:
@@ -244,6 +248,9 @@ def build_release(source: Path, dest: Path | None = None, bundle_python: bool = 
     exe = dest / "ShatuIDE.exe"
     shutil.copy2(package["path"], msi)
     shutil.copy2(stage / "ShatuIDE.exe", exe)
+    staged_loader = stage / "WebView2Loader.dll"
+    if staged_loader.is_file():
+        shutil.copy2(staged_loader, dest / "WebView2Loader.dll")
     if bundled:
         hint = "Python liegt im Installer unter python\\python.exe."
     else:
