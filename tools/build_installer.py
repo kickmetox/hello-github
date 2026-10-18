@@ -57,8 +57,11 @@ def main() -> int:
     shutil.copy2(produced, ROOT / installer_name)
     archive = ROOT / portable_archive_name(version)
     write_portable_zip(BUILD / "nsis", archive, version)
+    work_archive = ROOT / work_archive_name()
+    write_work_zip(ROOT, work_archive)
     print(f"Installer: {produced} ({produced.stat().st_size} Bytes)")
     print(f"Zip: {archive} ({archive.stat().st_size} Bytes)")
+    print(f"Arbeitsordner: {work_archive} ({work_archive.stat().st_size} Bytes)")
     return 0
 
 
@@ -121,6 +124,55 @@ def _skip_portable(relative: Path) -> bool:
     if relative.name == "installer.nsi" or relative.name.startswith("SphereDrive-Setup-"):
         return True
     return any(part == "__pycache__" or part.endswith(".pyc") for part in relative.parts)
+
+
+WORK_SKIP_DIRS = {
+    ".git",
+    ".pytest_cache",
+    ".venv",
+    "__pycache__",
+    "_runtime",
+    "build",
+    "preview",
+}
+
+
+def work_archive_name() -> str:
+    return "SphereDrive-Arbeitsordner.zip"
+
+
+def write_work_zip(source: Path, dest: Path) -> None:
+    """Packt den gesamten Arbeitsordner. Zwischendateien und der Build-Cache bleiben draußen."""
+    folder = "SphereDrive"
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    temporary = dest.with_suffix(dest.suffix + ".part")
+    if temporary.exists():
+        temporary.unlink()
+    with zipfile.ZipFile(temporary, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        written: set[str] = set()
+        for path in sorted(source.rglob("*")):
+            if not path.is_file():
+                continue
+            relative = path.relative_to(source)
+            if _skip_work(relative, dest.name):
+                continue
+            arcname = f"{folder}/{relative.as_posix()}"
+            archive.write(path, arcname)
+            written.add(arcname)
+        for name in ("SphereDrive.ico", "SphereDrive.png"):
+            arcname = f"{folder}/{name}"
+            icon = source / "assets" / name
+            if arcname not in written and icon.is_file():
+                archive.write(icon, arcname)
+    temporary.replace(dest)
+
+
+def _skip_work(relative: Path, archive_name: str) -> bool:
+    if relative.name in {archive_name, archive_name + ".part"} or relative.name.endswith(".part"):
+        return True
+    if relative.suffix.lower() in {".pyc", ".log"}:
+        return True
+    return any(part in WORK_SKIP_DIRS for part in relative.parts)
 
 
 def _crlf(text: str) -> str:

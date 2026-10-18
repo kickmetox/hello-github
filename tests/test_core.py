@@ -418,7 +418,9 @@ class ServiceTests(unittest.TestCase):
             self.assertIn(name, bat)
             self.assertIn(name, installer)
         self.assertIn("write_portable_zip", installer)
+        self.assertIn("write_work_zip", installer)
         self.assertIn("SphereDrive-{version}.zip", installer)
+        self.assertIn("SphereDrive-Arbeitsordner.zip", installer)
 
     def test_portable_zip_contains_the_windows_program(self) -> None:
         import importlib.util
@@ -465,6 +467,72 @@ class ServiceTests(unittest.TestCase):
         self.assertIn("SphereDrive.launch.pyw", bat)
         self.assertIn("SphereDrive 1.0.0", readme)
         self.assertIn("中文", readme)
+
+    def test_work_zip_contains_the_whole_folder(self) -> None:
+        import importlib.util
+        import zipfile
+
+        spec = importlib.util.spec_from_file_location(
+            "build_installer_work", Path("tools") / "build_installer.py"
+        )
+        self.assertIsNotNone(spec)
+        self.assertIsNotNone(spec.loader)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        source = Path("tests") / "_runtime" / "work-src"
+        if source.exists():
+            shutil.rmtree(source)
+        (source / "spheredrive").mkdir(parents=True)
+        (source / "spheredrive" / "__init__.py").write_text("app", encoding="utf-8")
+        (source / "spheredrive" / "__pycache__").mkdir()
+        (source / "spheredrive" / "__pycache__" / "app.pyc").write_bytes(b"pyc")
+        (source / "assets").mkdir()
+        (source / "assets" / "SphereDrive.ico").write_bytes(b"ICO")
+        (source / "assets" / "SphereDrive.png").write_bytes(b"PNG")
+        (source / "tests").mkdir()
+        (source / "tests" / "test_core.py").write_text("test", encoding="utf-8")
+        (source / "tests" / "_runtime").mkdir()
+        (source / "tests" / "_runtime" / "config.json").write_text("{}", encoding="utf-8")
+        (source / "tools").mkdir()
+        (source / "tools" / "build_installer.py").write_text("build", encoding="utf-8")
+        (source / "build" / "nsis").mkdir(parents=True)
+        (source / "build" / "nsis" / "installer.nsi").write_text("nsi", encoding="utf-8")
+        (source / ".git").mkdir()
+        (source / ".git" / "HEAD").write_text("ref", encoding="utf-8")
+        (source / "SphereDrive.pyw").write_text("start", encoding="utf-8")
+        (source / "Start-SphereDrive.bat").write_text("bat", encoding="utf-8")
+        (source / "README.md").write_text("readme", encoding="utf-8")
+        (source / "SphereDrive-Hilfe.html").write_text("hilfe", encoding="utf-8")
+        (source / "SphereDrive-Feature-Liste.txt").write_text("liste", encoding="utf-8")
+        (source / "SphereDrive-Setup-1.0.0.exe").write_bytes(b"setup")
+        (source / "SphereDrive-1.0.0.zip").write_bytes(b"zip")
+        (source / "notes.log").write_text("log", encoding="utf-8")
+        dest = source / "SphereDrive-Arbeitsordner.zip"
+        module.write_work_zip(source, dest)
+        with zipfile.ZipFile(dest) as archive:
+            names = set(archive.namelist())
+        for name in (
+            "SphereDrive/SphereDrive.pyw",
+            "SphereDrive/Start-SphereDrive.bat",
+            "SphereDrive/README.md",
+            "SphereDrive/SphereDrive-Hilfe.html",
+            "SphereDrive/SphereDrive-Feature-Liste.txt",
+            "SphereDrive/SphereDrive-Setup-1.0.0.exe",
+            "SphereDrive/SphereDrive-1.0.0.zip",
+            "SphereDrive/spheredrive/__init__.py",
+            "SphereDrive/assets/SphereDrive.ico",
+            "SphereDrive/SphereDrive.ico",
+            "SphereDrive/SphereDrive.png",
+            "SphereDrive/tests/test_core.py",
+            "SphereDrive/tools/build_installer.py",
+        ):
+            self.assertIn(name, names)
+        self.assertNotIn("SphereDrive/SphereDrive-Arbeitsordner.zip", names)
+        self.assertNotIn("SphereDrive/.git/HEAD", names)
+        self.assertNotIn("SphereDrive/build/nsis/installer.nsi", names)
+        self.assertNotIn("SphereDrive/tests/_runtime/config.json", names)
+        self.assertNotIn("SphereDrive/notes.log", names)
+        self.assertFalse(any(name.endswith(".pyc") for name in names))
 
     def test_folder_tree_includes_subfolders_and_follows_subst(self) -> None:
         svc, host = service(Path("tests") / "_runtime" / "folders")

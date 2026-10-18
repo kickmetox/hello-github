@@ -75,7 +75,9 @@ Der vorgesehene Arbeitsordner ist `D:\AI_Temp\SphereDrive`. `Start-SphereDrive.b
 
 ## Installation
 
-`SphereDrive-1.0.0.zip` enthält das fertige Windows-Programm mit eingebettetem Python. Den Ordner `SphereDrive` entpacken und `SphereDrive.bat` oder `bin\SphereDrive.exe` starten. Eine eigene Python-Installation und ein Setup sind dafür nicht nötig. `Liesmich.txt` in der Zip-Datei beschreibt denselben Start.
+`SphereDrive-Arbeitsordner.zip` ist der komplette Arbeitsordner. Entpacken, zum Beispiel nach `D:\AI_Temp\SphereDrive`. Darin liegen Quelltext, Tests, Bau-Skript, Hilfe, Feature-Liste, Logo, Installer und `SphereDrive-1.0.0.zip`.
+
+`SphereDrive-1.0.0.zip` enthält nur das fertige Windows-Programm mit eingebettetem Python. Den Ordner `SphereDrive` entpacken und `SphereDrive.bat` oder `bin\SphereDrive.exe` starten. Eine eigene Python-Installation und ein Setup sind dafür nicht nötig. `Liesmich.txt` in der Zip-Datei beschreibt denselben Start.
 
 `SphereDrive-Setup-1.0.0.exe` installiert dieselbe Fassung und legt eine Verknüpfung im Startmenü an. Die Wiederherstellung beim Anmelden ruft `bin\SphereDrive.exe` mit `--restore` auf.
 
@@ -85,7 +87,7 @@ Gebaut wird der Installer auf einem Rechner mit NSIS und pynsist:
 python3 tools/build_installer.py
 ```
 
-Das Skript lädt Python 3.12.10 für Windows und die dazu passenden Tcl/Tk-Dateien, packt SphereDrive dazu und schreibt `build/nsis/SphereDrive-Setup-1.0.0.exe` sowie `SphereDrive-1.0.0.zip`. Dieselben Dateien liegen im Projektordner, neben `SphereDrive.pyw` und `assets\SphereDrive.ico`.
+Das Skript lädt Python 3.12.10 für Windows und die dazu passenden Tcl/Tk-Dateien, packt SphereDrive dazu und schreibt `build/nsis/SphereDrive-Setup-1.0.0.exe`, `SphereDrive-1.0.0.zip` und `SphereDrive-Arbeitsordner.zip`. Dieselben Dateien liegen im Projektordner, neben `SphereDrive.pyw` und `assets\SphereDrive.ico`.
 
 ## Start aus dem Quelltext
 
