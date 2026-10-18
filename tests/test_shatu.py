@@ -1092,6 +1092,7 @@ class StudioTests(unittest.TestCase):
                     self.assertNotIn("ausgabe/", listed.stdout)
                     self.assertNotIn("__pycache__", listed.stdout)
                     self.assertNotIn(".msi", listed.stdout)
+                    self.assertNotIn("ShatuIDE.zip", listed.stdout)
 
     def test_debug_other_file(self) -> None:
         from shatuide.shell_debug import ShellDebugSession

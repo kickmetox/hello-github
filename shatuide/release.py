@@ -54,7 +54,7 @@ def project_files(source: Path) -> list[Path]:
         relative = path.relative_to(root)
         if any(part in SKIP_DIRS or part.startswith(".") for part in relative.parts):
             continue
-        if path.suffix.lower() in {".pyc", ".msi", ".exe"}:
+        if path.suffix.lower() in {".pyc", ".msi", ".exe", ".zip"}:
             continue
         files.append(path)
     return files
