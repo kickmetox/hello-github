@@ -1050,6 +1050,38 @@ class StudioTests(unittest.TestCase):
                 ui = subprocess.run(["msiinfo", "export", str(msi), "InstallUISequence"], capture_output=True, text=True)
                 self.assertIn("WelcomeDlg", ui.stdout)
                 self.assertIn("ExitOk", ui.stdout)
+            if shutil.which("makensis"):
+                script = Path(__file__).resolve().parent.parent / "packaging" / "ShatuIDE.nsi"
+                wizard = script.read_text(encoding="utf-8-sig")
+                for text in (
+                    "MUI_PAGE_WELCOME",
+                    "MUI_PAGE_DIRECTORY",
+                    "MUI_PAGE_STARTMENU",
+                    "MUI_PAGE_INSTFILES",
+                    "MUI_PAGE_FINISH",
+                    "Willkommen beim ShatuIDE-Setup",
+                    "Zielordner",
+                    "Installieren",
+                    "ShatuIDE jetzt starten",
+                    "Fertigstellen",
+                    "Python 3 muss vorhanden sein",
+                ):
+                    self.assertIn(text, wizard, text)
+                setup = Path(built["setup"])
+                self.assertTrue(setup.is_file(), built)
+                self.assertTrue(setup.read_bytes().startswith(b"MZ"))
+                self.assertGreater(setup.stat().st_size, 10000)
+                if shutil.which("7z"):
+                    listed = subprocess.run(["7z", "l", str(setup)], capture_output=True, text=True, timeout=60)
+                    self.assertEqual(listed.returncode, 0, listed.stderr)
+                    self.assertIn("shatuide.py", listed.stdout)
+                    self.assertIn("ShatuIDE.exe", listed.stdout)
+                    self.assertIn("app.js", listed.stdout)
+                    self.assertNotIn("inhalt/", listed.stdout)
+                    self.assertNotIn("inhalt\\", listed.stdout)
+                    self.assertNotIn("ausgabe/", listed.stdout)
+                    self.assertNotIn("__pycache__", listed.stdout)
+                    self.assertNotIn(".msi", listed.stdout)
 
     def test_debug_other_file(self) -> None:
         from shatuide.shell_debug import ShellDebugSession

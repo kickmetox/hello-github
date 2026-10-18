@@ -15,6 +15,17 @@ from shatuide.paths import ASSETS
 from shatuide.studio import build_msi
 from shatuide.tools import RELEASE_API, pick_asset
 
+
+def version_quad(version: str) -> str:
+    """Windows-Versionsinfo braucht vier Zahlen, zum Beispiel 1.0.0.0."""
+    parts: list[str] = []
+    for part in str(version).split("."):
+        number = "".join(ch for ch in part if ch.isdigit())
+        parts.append(number or "0")
+    while len(parts) < 4:
+        parts.append("0")
+    return ".".join(parts[:4])
+
 ROOT = Path(__file__).resolve().parent.parent
 PACKAGING = ROOT / "packaging"
 SKIP_DIRS = {
@@ -142,6 +153,51 @@ def _bundle_windows_python(stage: Path, cache: Path) -> dict:
     return {"ok": True, "python": str(target / "python.exe"), "archive": asset["name"]}
 
 
+def build_setup(stage: Path, dest: Path, version: str) -> dict:
+    """Baut den mehrseitigen Windows-Assistenten ShatuIDE-Setup.exe mit NSIS."""
+    compiler = shutil.which("makensis")
+    script = PACKAGING / "ShatuIDE.nsi"
+    icon = ASSETS / "icon.ico"
+    if not compiler:
+        return {"ok": False, "skipped": True, "error": "NSIS-Compiler fehlt (makensis)."}
+    if not script.is_file():
+        return {"ok": False, "error": f"Installerskript fehlt: {script.name}"}
+    if not icon.is_file():
+        return {"ok": False, "error": "Icon fehlt: assets/icon.ico"}
+    dest.mkdir(parents=True, exist_ok=True)
+    out = dest / "ShatuIDE-Setup.exe"
+    out.unlink(missing_ok=True)
+    proc = subprocess.run(
+        [
+            compiler,
+            "-INPUTCHARSET",
+            "UTF8",
+            f"-DSTAGE={stage.resolve().as_posix()}",
+            f"-DOUT={dest.resolve().as_posix()}",
+            f"-DVERSION={version_quad(version)}",
+            f"-DVERSIONTEXT={version}",
+            f"-DICON={icon.resolve().as_posix()}",
+            str(script),
+        ],
+        capture_output=True,
+        text=True,
+        timeout=180,
+    )
+    if proc.returncode != 0 or not out.is_file():
+        detail = (proc.stderr or proc.stdout or "makensis fehlgeschlagen.").strip()
+        return {"ok": False, "error": detail[-2000:]}
+    return {"ok": True, "path": str(out)}
+
+
+def _clean_stage(stage: Path) -> None:
+    """Entfernt Laufzeitreste, die nicht in den Installer gehören."""
+    for folder in stage.rglob("__pycache__"):
+        if folder.is_dir():
+            shutil.rmtree(folder, ignore_errors=True)
+    for leftover in stage.rglob("*.pyc"):
+        leftover.unlink(missing_ok=True)
+
+
 def build_release(source: Path, dest: Path | None = None, bundle_python: bool = False) -> dict:
     source = Path(source).resolve()
     dest = Path(dest or (source / "ausgabe")).resolve()
@@ -170,12 +226,16 @@ def build_release(source: Path, dest: Path | None = None, bundle_python: bool = 
     if help_run.returncode != 0 or "ShatuIDE" not in (help_run.stdout or ""):
         detail = (help_run.stderr or help_run.stdout or "Startprogramm antwortet nicht auf --help.").strip()
         return {"ok": False, "error": detail}
+    _clean_stage(stage)
     bundled = False
     if bundle_python:
         placed = _bundle_windows_python(stage, dest / "cache")
         if not placed["ok"]:
             return placed
         bundled = True
+    setup = build_setup(stage, dest, __version__)
+    if not setup.get("skipped") and not setup.get("ok"):
+        return setup
     files = [path for path in stage.rglob("*") if path.is_file()]
     package = build_msi(stage, "ShatuIDE", __version__, "Andreas Meyer", files)
     if not package["ok"]:
@@ -188,18 +248,31 @@ def build_release(source: Path, dest: Path | None = None, bundle_python: bool = 
         hint = "Python liegt im Installer unter python\\python.exe."
     else:
         hint = "Python 3 muss installiert sein, oder python\\python.exe liegt neben der EXE."
+    setup_path = setup.get("path") or ""
+    if setup_path:
+        message = (
+            f"Einrichtungsassistent {Path(setup_path).name} erzeugt. "
+            "Unter Windows diese Datei doppelklicken: Willkommen, Zielordner, Startmenü, "
+            f"Installieren, Fortschritt, Fertigstellen. {hint}"
+        )
+    else:
+        message = (
+            f"Installer {msi.name} und {exe.name} erzeugt. "
+            f"Setup-Assistent nicht gebaut: {setup.get('error')}. {hint}"
+        )
     return {
         "ok": True,
         "msi": str(msi),
         "exe": str(exe),
+        "setup": setup_path,
         "linux": str(linux_path),
         "files": len(files),
-        "message": f"Installer {msi.name} und {exe.name} erzeugt. Unter Windows: msiexec /i {msi.name}. Danach startet ShatuIDE.exe die IDE. {hint}",
+        "message": message,
     }
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="ShatuIDE als EXE und MSI bauen")
+    parser = argparse.ArgumentParser(description="ShatuIDE als EXE, Setup und MSI bauen")
     parser.add_argument("--dest", default="", help="Zielordner, sonst ausgabe/")
     parser.add_argument("--with-python", action="store_true", help="Windows-CPython in den Installer packen")
     args = parser.parse_args()

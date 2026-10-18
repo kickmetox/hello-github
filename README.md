@@ -30,7 +30,7 @@ Bash- und PowerShell-Skripte lassen sich laden und bearbeiten. **Ausführen** st
 
 **Alt+F5** prüft die markierte Zeile oder den Abschnitt in einem eigenen Fenster. **Umschalt+Alt+F5** nimmt die Funktion, Methode oder Klasse an der Schreibmarke, ruft sie ohne Argumente auf, spielt ihren Doctest oder genau diesen Test. Die geöffnete Datei bleibt unverändert. Im Fenster kann der Ausschnitt vor einem erneuten Lauf geändert werden.
 
-**Installer:** Im Ordner `installer` liegen `ShatuIDE.exe` und `ShatuIDE.msi`. Ein Doppelklick auf `ShatuIDE.msi` öffnet zuerst ein Fenster: Zielordner `Programme\ShatuIDE`, Desktop-Symbol, Startmenü und der Hinweis auf Python 3. **Installieren** startet die Einrichtung, **Abbrechen** beendet sie ohne Änderung. Danach läuft der blaue Balken, das ist das Kopieren der Dateien. Zum Schluss sagt ein Fenster, dass ShatuIDE eingerichtet ist und wie es startet. Eine ältere ShatuIDE-Installation wird dabei ersetzt. Ist genau diese MSI schon installiert, fragt das Fenster nach **Reparieren** oder **Entfernen**. Die MSI nicht als Archiv entpacken: dabei entsteht `PFiles\ShatuIDE` und Windows sucht `ShatuIDE.exe` daneben. `ShatuIDE.exe` startet `shatuide.py`. Sie sucht zuerst `python\python.exe` neben sich, danach `py -3`, `python` und `python3`. Dieses Paket enthält kein Python, auf dem Rechner muss Python 3 installiert sein. Neu bauen: `python3 -m shatuide.release`. `python3 -m shatuide.release --with-python` packt ein Windows-CPython dazu (etwa 160 MB), dann braucht der Zielrechner kein eigenes Python.
+**Installer:** Im Ordner `installer` liegt `ShatuIDE-Setup.exe`. Ein Doppelklick startet den Einrichtungsassistenten, Seite für Seite: **Willkommen**, **Zielordner** mit **Durchsuchen**, **Startmenü-Ordner**, **Bereit zur Installation** mit der Schaltfläche **Installieren**, dann die Fortschrittsseite mit den Dateinamen und zum Schluss **Fertigstellen**. Dort kann ShatuIDE sofort gestartet werden. Der Assistent legt ein Symbol auf dem Desktop und einen Eintrag im Startmenü an und trägt ShatuIDE bei den installierten Apps ein, inklusive Deinstallation. Eine vorhandene Installation im selben Ordner wird aktualisiert. `ShatuIDE.exe` startet `shatuide.py`. Sie sucht zuerst `python\python.exe` neben sich, danach `py -3`, `python` und `python3`. Dieses Paket enthält kein Python, auf dem Rechner muss Python 3 installiert sein. `ShatuIDE.msi` liegt zusätzlich im selben Ordner. Neu bauen: `python3 -m shatuide.release`. `python3 -m shatuide.release --with-python` packt ein Windows-CPython dazu (etwa 160 MB), dann braucht der Zielrechner kein eigenes Python.
 
 Installation in das Zielverzeichnis, ohne vorhandene Icons zu überschreiben:
 
@@ -57,7 +57,7 @@ Das Programm-Icon ist die Mitte von `shatuide.png`. Liegt im Programmordner `sha
 - Skript aus Abfrage oder Prompt (Python, PowerShell, Bash, Batch), optional über das verbundene Sprachmodell
 - Datenbank erzeugen: SQLite-Datei, sonst SQL oder MongoDB-Schema im Workspace
 - EXE erzeugen (PyInstaller, MinGW oder gcc) und MSI-Installer mit WiX-Quelle
-- ShatuIDE selbst als ShatuIDE.exe und ShatuIDE.msi (`python3 -m shatuide.release`)
+- ShatuIDE selbst als ShatuIDE-Setup.exe, ShatuIDE.exe und ShatuIDE.msi (`python3 -m shatuide.release`)
 - PowerShell-Modul, Funktionsgenerator, GUI-Entwurf, Windows-Dienst, Leistungsmessung, Get-Help
 - PowerShell lokal, per WinRM oder SSH; integrierte 32-bit- und 64-bit-Konsole, soweit der Rechner sie hat
 - Wiederherstellung ungespeicherter Puffer
