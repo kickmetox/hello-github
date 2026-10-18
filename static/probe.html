@@ -7,10 +7,10 @@
   <link rel="stylesheet" href="/static/app.css">
   <style>
     body { height: 100%; display: flex; flex-direction: column; }
-    header { display: flex; justify-content: space-between; gap: 12px; align-items: center; padding: 8px 12px; background: #141311; border-bottom: 1px solid var(--line); }
+    header { position: relative; z-index: 2; display: flex; justify-content: space-between; gap: 12px; align-items: center; padding: 8px 12px; background: #141311; border-bottom: 1px solid var(--line); }
     header p { margin: 0; color: var(--muted); }
     main { flex: 1; display: flex; flex-direction: column; min-height: 0; padding: 8px; gap: 8px; }
-    textarea, pre { flex: 1; margin: 0; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 4px; padding: 8px; font-family: var(--mono); font-size: 13px; }
+    textarea, pre, #code, #out { position: static; inset: auto; flex: 1; margin: 0; background: var(--bg); color: var(--text); caret-color: var(--text); border: 1px solid var(--line); border-radius: 4px; padding: 8px; font-family: var(--mono); font-size: 13px; }
     textarea { resize: none; }
     pre { overflow: auto; white-space: pre-wrap; }
     .row { display: flex; gap: 8px; align-items: center; }
@@ -93,8 +93,13 @@
       }
     }
 
+    function closeThis() {
+      window.open("", "_self");
+      window.close();
+    }
+
     $("run").onclick = () => execute();
-    $("close").onclick = () => window.close();
+    $("close").onclick = () => closeThis();
     window.addEventListener("message", (event) => {
       if (event.origin !== location.origin) return;
       if (!event.data || event.data.type !== "shatu-probe") return;

@@ -3305,8 +3305,12 @@ function secondWindow() {
 
 function closeWindow() {
   const child = !!window.opener;
-  window.close();
-  if (!child) toast("Das Hauptfenster schließt der Browser über seinen eigenen Rahmen");
+  if (child) {
+    window.open("", "_self");
+    window.close();
+    return;
+  }
+  toast("Das Hauptfenster schließt der Browser über seinen eigenen Rahmen");
 }
 
 function loadPickedFiles() {
