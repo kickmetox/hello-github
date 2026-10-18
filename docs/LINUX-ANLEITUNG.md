@@ -72,7 +72,7 @@ Ohne Argument ist das Ziel `$HOME/AI_Temp/CPCM`.
 "$HOME/AI_Temp/CPCM/cpcm.sh"
 ```
 
-Oder über das Anwendungsmenü „CPCM“. Die Seite ist `http://127.0.0.1:8765/`. Kopfzeile: Vault-Pfad und „Andreas Meyer · ame@sellerbach.de“.
+Oder über das Anwendungsmenü „CPCM“. Die Seite ist `http://127.0.0.1:8910/`. Kopfzeile: Vault-Pfad und „Andreas Meyer · ame@sellerbach.de“.
 
 Prüfung ohne Browser:
 
@@ -85,7 +85,7 @@ python3 cpcm.py serve --no-browser
 In einer zweiten Shell:
 
 ```bash
-curl -sS http://127.0.0.1:8765/api/status
+curl -sS http://127.0.0.1:8910/api/status
 ```
 
 Die Antwort enthält `"author": "Andreas Meyer"` und `"author_email": "ame@sellerbach.de"`.
@@ -108,7 +108,7 @@ Start über das Menü „CPCM“, oder:
 "$HOME/AI_Temp/CPCM/CPCM" serve
 ```
 
-Die Seite ist `http://127.0.0.1:8765/`. Neu bauen im Quellordner: `python3 -m PyInstaller --noconfirm --clean CPCM.spec`.
+Die Seite ist `http://127.0.0.1:8910/`. Neu bauen im Quellordner: `python3 -m PyInstaller --noconfirm --clean CPCM.spec`.
 
 ## 5. Beide Welten verbinden
 

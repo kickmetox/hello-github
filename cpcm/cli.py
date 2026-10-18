@@ -43,9 +43,10 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     root = (args.root or install_root()).resolve()
     if args.command == "serve":
-        from cpcm.server import serve
+        from cpcm.server import DEFAULT_PORT, serve
         settings = load_settings(root)
-        serve(args.host, args.port or int(settings.get("port") or 8765), root, open_browser=not args.no_browser)
+        chosen = args.port if args.port is not None else int(settings.get("port") or DEFAULT_PORT)
+        serve(args.host, chosen, root, open_browser=not args.no_browser)
         return 0
     vault = vault_dir(load_settings(root), root)
     host = host_identity()

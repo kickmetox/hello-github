@@ -20,5 +20,11 @@ mkdir -p "${STAGE}/Lib"
 unzip -q "${ZIP}" -d "${STAGE}"
 cp "${ROOT}/installer/python312._pth" "${STAGE}/python312._pth"
 
+if ! command -v x86_64-w64-mingw32-gcc >/dev/null 2>&1; then
+  echo "x86_64-w64-mingw32-gcc fehlt. Unter Debian/Ubuntu: sudo apt-get install -y gcc-mingw-w64-x86-64" >&2
+  exit 1
+fi
+x86_64-w64-mingw32-gcc -O2 -s -mwindows -o "${ROOT}/CPCM.exe" "${ROOT}/installer/cpcm_launch_win.c" -lkernel32 -luser32
+
 makensis "${ROOT}/installer/CPCM.nsi"
 echo "Fertig: ${ROOT}/CPCM-Setup.exe"

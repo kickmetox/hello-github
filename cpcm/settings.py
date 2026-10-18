@@ -54,7 +54,7 @@ def default_settings(host: Identity | None = None) -> dict:
             "linux": str(host.home) if host.world == World.LINUX else f"/home/{host.user}",
             "windows": str(host.home) if host.world == World.WINDOWS else rf"C:\Users\{host.user}",
         },
-        "port": 8765,
+        "port": 8910,
         "install_dir_windows": WINDOWS_INSTALL_DIR,
     }
 
@@ -68,6 +68,9 @@ def load_settings(root: Path | None = None) -> dict:
             for key in ("vault", "port", "install_dir_windows"):
                 if key in stored:
                     data[key] = stored[key]
+            port = data.get("port")
+            if isinstance(port, int) and 8765 <= port < 8865:
+                data["port"] = 8910
             homes = stored.get("homes")
             if isinstance(homes, dict):
                 for key in ("linux", "windows"):

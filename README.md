@@ -25,7 +25,7 @@ Linux:
 ./cpcm.sh
 ```
 
-Die Oberfläche bindet nur an `127.0.0.1:8765`.
+Die Oberfläche bindet nur an `127.0.0.1`. Der Port ist 8910. 8765 bis 8864 bleiben für ShatuIDE frei.
 
 ## Windows-Setup
 

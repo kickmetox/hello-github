@@ -1,4 +1,5 @@
 import json
+import socket
 import tempfile
 import threading
 import unittest
@@ -6,10 +7,27 @@ import urllib.request
 from http.server import ThreadingHTTPServer
 from pathlib import Path
 
-from cpcm.server import App, make_handler
+from cpcm.server import DEFAULT_PORT, App, bind_server, effective_port, make_handler
 
 
 class ApiTests(unittest.TestCase):
+    def test_port_stays_away_from_shatuide(self):
+        self.assertEqual(effective_port(8765), DEFAULT_PORT)
+        self.assertEqual(effective_port(8864), DEFAULT_PORT)
+        self.assertEqual(effective_port(None), DEFAULT_PORT)
+        self.assertEqual(DEFAULT_PORT, 8910)
+        busy = socket.socket()
+        busy.bind(("127.0.0.1", DEFAULT_PORT))
+        server = None
+        try:
+            server = bind_server("127.0.0.1", 8765, make_handler(App(Path(tempfile.gettempdir()))))
+            self.assertEqual(server.server_address[1], DEFAULT_PORT + 1)
+            self.assertNotIn(server.server_address[1], range(8765, 8865))
+        finally:
+            if server is not None:
+                server.server_close()
+            busy.close()
+
     def test_backup_restore_over_http(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

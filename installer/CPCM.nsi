@@ -30,7 +30,8 @@ ShowUninstDetails show
 !define MUI_ABORTWARNING
 !define MUI_WELCOMEPAGE_TITLE "CPCM Setup"
 !define MUI_WELCOMEPAGE_TEXT "Dieser Assistent installiert CPCM (Cross Platform Config Manager).$\r$\n$\r$\nAndreas Meyer, ame@sellerbach.de$\r$\n$\r$\nPython 3.12 ist enthalten. Ein separates Python ist nicht nötig.$\r$\n$\r$\nStandardordner: D:\AI_Temp\CPCM. Der Ordner kann geändert werden. Ein vorhandener Ordner vault und die Datei cpcm-settings.json bleiben erhalten."
-!define MUI_DIRECTORYPAGE_TEXT_TOP "Zielordner wählen. Voreingestellt ist D:\AI_Temp\CPCM. Vorhandene Daten in vault\ und cpcm-settings.json werden nicht gelöscht."
+!define MUI_DIRECTORYPAGE_TEXT_TOP "Zielordner wählen. Voreingestellt ist D:\AI_Temp\CPCM. Der Ordner von ShatuIDE wird abgelehnt. Vorhandene Daten in vault\ und cpcm-settings.json werden nicht gelöscht."
+!define MUI_CUSTOMFUNCTION_DIRECTORY_LEAVE RejectShatuDir
 !define MUI_FINISHPAGE_RUN
 !define MUI_FINISHPAGE_RUN_FUNCTION LaunchCPCM
 !define MUI_FINISHPAGE_RUN_TEXT "CPCM jetzt starten"
@@ -63,9 +64,19 @@ VIAddVersionKey "OriginalFilename" "CPCM-Setup.exe"
   !error "build/python/python.exe fehlt. Zuerst installer/build-setup.sh ausführen."
 !endif
 
+Function RejectShatuDir
+  ${GetFileName} "$INSTDIR" $0
+  ${If} $0 == "ShatuIDE"
+  ${OrIf} ${FileExists} "$INSTDIR\shatuide.py"
+  ${OrIf} ${FileExists} "$INSTDIR\ShatuIDE.exe"
+    MessageBox MB_OK|MB_ICONSTOP "Dieser Ordner gehört zu ShatuIDE.$\r$\n$\r$\nCPCM wird nach D:\AI_Temp\CPCM installiert und startet ShatuIDE nicht."
+    Abort
+  ${EndIf}
+FunctionEnd
+
 Function LaunchCPCM
   SetOutPath "$INSTDIR"
-  Exec '"$INSTDIR\python\python.exe" "$INSTDIR\cpcm.py" serve'
+  Exec '"$INSTDIR\CPCM.exe"'
 FunctionEnd
 
 Section "CPCM" SecMain
@@ -81,6 +92,7 @@ Section "CPCM" SecMain
   File "..\install-cpcm.sh"
   File "..\install-cpcm-bin.sh"
   File "..\CPCM.bat"
+  File "..\CPCM.exe"
   File "..\cpcm.sh"
   File "..\CPCM.desktop"
   File "..\pyproject.toml"
@@ -133,8 +145,9 @@ Section "CPCM" SecMain
   WriteUninstaller "$INSTDIR\Uninstall.exe"
 
   CreateDirectory "$SMPROGRAMS\CPCM"
-  CreateShortCut "$DESKTOP\CPCM.lnk" "$INSTDIR\python\python.exe" '"$INSTDIR\cpcm.py" serve' "$INSTDIR\cpcm.ico" 0 SW_SHOWNORMAL "" "CPCM - Andreas Meyer, ame@sellerbach.de"
-  CreateShortCut "$SMPROGRAMS\CPCM\CPCM.lnk" "$INSTDIR\python\python.exe" '"$INSTDIR\cpcm.py" serve' "$INSTDIR\cpcm.ico" 0 SW_SHOWNORMAL "" "CPCM - Andreas Meyer, ame@sellerbach.de"
+  SetOutPath "$INSTDIR"
+  CreateShortCut "$DESKTOP\CPCM.lnk" "$INSTDIR\CPCM.exe" "" "$INSTDIR\cpcm.ico" 0 SW_SHOWNORMAL "" "CPCM - Andreas Meyer, ame@sellerbach.de"
+  CreateShortCut "$SMPROGRAMS\CPCM\CPCM.lnk" "$INSTDIR\CPCM.exe" "" "$INSTDIR\cpcm.ico" 0 SW_SHOWNORMAL "" "CPCM - Andreas Meyer, ame@sellerbach.de"
   CreateShortCut "$SMPROGRAMS\CPCM\CPCM deinstallieren.lnk" "$INSTDIR\Uninstall.exe" "" "$INSTDIR\cpcm.ico" 0
 
   WriteRegStr HKCU "Software\CPCM" "InstallDir" "$INSTDIR"
@@ -179,6 +192,7 @@ Section "Uninstall"
   Delete "$INSTDIR\install-cpcm.sh"
   Delete "$INSTDIR\install-cpcm-bin.sh"
   Delete "$INSTDIR\CPCM.bat"
+  Delete "$INSTDIR\CPCM.exe"
   Delete "$INSTDIR\cpcm.sh"
   Delete "$INSTDIR\CPCM.desktop"
   Delete "$INSTDIR\pyproject.toml"

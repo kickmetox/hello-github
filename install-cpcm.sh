@@ -29,7 +29,7 @@ if [[ "${SOURCE}" == "${TARGET}" ]]; then
 fi
 
 mkdir -p "${TARGET}"
-for name in cpcm.py cpcm.sh CPCM.bat CPCM.desktop icon.png cpcm.ico Install-CPCM.ps1 Create-Shortcut.ps1 install-cpcm.sh README.md pyproject.toml; do
+for name in cpcm.py cpcm.sh CPCM.bat CPCM.exe CPCM.desktop icon.png cpcm.ico Install-CPCM.ps1 Create-Shortcut.ps1 install-cpcm.sh README.md pyproject.toml; do
   if [[ -f "${SOURCE}/${name}" ]]; then
     cp -a "${SOURCE}/${name}" "${TARGET}/${name}"
   fi

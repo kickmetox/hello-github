@@ -19,6 +19,11 @@ if (Test-Path $Bundled) {
 }
 $Shell = New-Object -ComObject WScript.Shell
 $Shortcut = $Shell.CreateShortcut((Join-Path $env:USERPROFILE "Desktop\CPCM.lnk"))
+$Launcher = Join-Path $Root "CPCM.exe"
+if ((Test-Path $Bundled) -and (Test-Path $Launcher)) {
+    $Python = $Launcher
+    $Arguments = ""
+}
 $Shortcut.TargetPath = $Python
 $Shortcut.Arguments = $Arguments
 $Shortcut.WorkingDirectory = $Root

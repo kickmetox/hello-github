@@ -23,6 +23,10 @@ from cpcm.translate import identities_from_request, translate_config
 
 WEB = resource_root() / "web"
 MAX_BODY = 2 * 1024 * 1024
+DEFAULT_PORT = 8910
+# ShatuIDE belegt 8765 und sucht danach bis 8864. CPCM nutzt diesen Bereich nicht.
+FOREIGN_PORT_START = 8765
+FOREIGN_PORT_END = 8865
 
 
 class App:
@@ -271,12 +275,41 @@ def make_handler(app: App):
     return Handler
 
 
-def serve(host: str = "127.0.0.1", port: int = 8765, root: Path | None = None, open_browser: bool = False) -> None:
+def effective_port(port: int | None) -> int:
+    """8765–8864 bleiben ShatuIDE. CPCM startet bei 8910."""
+    if port is None:
+        return DEFAULT_PORT
+    number = int(port)
+    if FOREIGN_PORT_START <= number < FOREIGN_PORT_END:
+        return DEFAULT_PORT
+    if number <= 0 or number > 65535:
+        return DEFAULT_PORT
+    return number
+
+
+def bind_server(host: str, port: int | None, handler):
+    """Bindet CPCM. Ein belegter Wunschport fällt auf 8910–8929, nie auf den ShatuIDE-Bereich."""
+    first = effective_port(port)
+    candidates = [first]
+    for extra in range(DEFAULT_PORT, DEFAULT_PORT + 20):
+        if extra not in candidates:
+            candidates.append(extra)
+    last_error: OSError | None = None
+    for candidate in candidates:
+        try:
+            return ThreadingHTTPServer((host, candidate), handler)
+        except OSError as exc:
+            last_error = exc
+    raise OSError(f"Kein freier Port für CPCM ab {DEFAULT_PORT}") from last_error
+
+
+def serve(host: str = "127.0.0.1", port: int = DEFAULT_PORT, root: Path | None = None, open_browser: bool = False) -> None:
     if host not in ("127.0.0.1", "localhost", "::1"):
         raise ValueError("CPCM bindet nur an die lokale Schleife")
     application = App(root)
-    server = ThreadingHTTPServer((host, port), make_handler(application))
-    url = f"http://{host}:{port}/"
+    server = bind_server(host, port, make_handler(application))
+    bound = int(server.server_address[1])
+    url = f"http://{host}:{bound}/"
     print(f"CPCM läuft auf {url}", flush=True)
     print(f"Vault: {application.vault()}", flush=True)
     if open_browser:

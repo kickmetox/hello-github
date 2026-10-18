@@ -11,5 +11,9 @@ if not defined PYEXE (
   pause
   exit /b 1
 )
+if exist "%~dp0CPCM.exe" if exist "%~dp0python\python.exe" (
+  "%~dp0CPCM.exe"
+  exit /b %ERRORLEVEL%
+)
 "%PYEXE%" %PYARGS% "%~dp0cpcm.py" serve
 if errorlevel 1 pause
