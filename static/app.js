@@ -24,6 +24,7 @@ const S = {
   wrap: false,
   dock: "functions",
   symbol: null,
+  faults: {},
 };
 
 const BOTTOM = [
@@ -58,7 +59,7 @@ function toast(message) {
   setTimeout(() => el.remove(), 4200);
 }
 
-async function api(path, body) {
+async function apiRaw(path, body) {
   const opt = { credentials: "same-origin", headers: {} };
   if (body !== undefined) {
     opt.method = "POST";
@@ -67,9 +68,13 @@ async function api(path, body) {
   }
   const response = await fetch(path, opt);
   const data = await response.json().catch(() => ({}));
-  if (!response.ok || data.ok === false) {
-    throw new Error(data.error || response.statusText || "Fehler");
-  }
+  if (!response.ok && data.ok !== false) throw new Error(data.error || response.statusText || "Fehler");
+  return data;
+}
+
+async function api(path, body) {
+  const data = await apiRaw(path, body);
+  if (data.ok === false) throw new Error(data.error || "Fehler");
   return data;
 }
 
@@ -185,6 +190,15 @@ function highlightPython(src, errorLines) {
   return html;
 }
 
+function faultOf(current) {
+  if (!current) return null;
+  const fault = S.faults[current.path];
+  if (!fault) return null;
+  const text = (current.content || "").split("\n")[fault.line - 1] || "";
+  if (fault.text != null && text !== fault.text) return null;
+  return fault;
+}
+
 function errorLineSet() {
   const current = tab();
   const lines = new Set();
@@ -192,6 +206,8 @@ function errorLineSet() {
   (current.problems || []).forEach((item) => {
     if (item.severity === "error") lines.add(item.line);
   });
+  const fault = faultOf(current);
+  if (fault) lines.add(fault.line);
   return lines;
 }
 
@@ -476,7 +492,8 @@ function renderGutter() {
     const classes = ["gutter-line"];
     if (breaks[line] !== undefined) classes.push("bp");
     if (S.debugFile && current && S.debugFile === current.path && S.debugLine === line) classes.push("current");
-    if (current && (current.problems || []).some((item) => item.line === line && item.severity !== "info")) classes.push("err");
+    const fault = faultOf(current);
+    if (current && ((current.problems || []).some((item) => item.line === line && item.severity !== "info") || (fault && fault.line === line))) classes.push("err");
     const mark = covered && covered.missing && covered.missing.includes(line) ? "·" : "";
     html += `<div class="${classes.join(" ")}" data-line="${line}">${mark}${line}</div>`;
   }
@@ -695,7 +712,13 @@ async function runAnalyze() {
   const current = tab();
   if (!current) return;
   const data = await api("/api/analyze", { path: current.path, content: current.content });
+  const fault = S.faults[current.path];
+  if (fault && fault.kind === "syntax") {
+    const still = (data.problems || []).some((item) => item.severity === "error" && item.line === fault.line);
+    if (!still) delete S.faults[current.path];
+  }
   current.problems = data.problems;
+  pinFault(current);
   current.outline = data.outline;
   renderOutline();
   renderEditor();
@@ -1587,12 +1610,69 @@ function appendOutput(text) {
   if (node) node.textContent = S.output;
 }
 
+function pinFault(current) {
+  const fault = faultOf(current);
+  if (!current || !fault) return;
+  const problems = current.problems || [];
+  if (!problems.some((item) => item.code === "LAUF" && item.line === fault.line)) {
+    problems.push({ line: fault.line, col: 0, end_line: fault.line, end_col: 1, severity: "error", message: fault.message, code: "LAUF" });
+    current.problems = problems;
+  }
+}
+
+function releaseFaultIfFixed(current) {
+  if (!current || !S.faults[current.path]) return;
+  const fault = S.faults[current.path];
+  const text = (current.content || "").split("\n")[fault.line - 1] || "";
+  if (text === fault.text) return;
+  delete S.faults[current.path];
+  current.problems = (current.problems || []).filter((item) => item.code !== "LAUF" || item.line !== fault.line);
+  updateStatus("Bereit");
+}
+
+async function holdFault(path, line, message, showProblems, kind) {
+  const number = Number(line) || 1;
+  const text = String(message || "Fehler").split("\n").filter(Boolean)[0] || "Fehler";
+  const mark = kind || "runtime";
+  const previous = path ? S.faults[path] : null;
+  const known = previous && previous.line === number && previous.message === text;
+  if (!known && path) {
+    try { await openPath(path, number); } catch (err) { /* Die Meldung bleibt auch ohne Sprung sichtbar. */ }
+  }
+  const current = tab();
+  const key = (current && current.path) || path;
+  if (!key) return;
+  const stored = S.faults[key];
+  const lineText = current ? ((current.content || "").split("\n")[number - 1] || "") : "";
+  const fresh = !stored || stored.line !== number || stored.message !== text;
+  if (fresh) {
+    S.faults[key] = { line: number, message: text, text: lineText, kind: mark };
+    toast(text);
+    updateStatus("Fehler Zeile " + number);
+    revealLine(number);
+  }
+  pinFault(tab());
+  renderEditor();
+  if (fresh && showProblems !== false) setBottom("problems");
+  else if (S.bottom === "problems" || S.bottom === "debug") renderPanel();
+}
+
+async function syntaxFault(current) {
+  const data = await apiRaw("/api/compile", { mode: "check", path: current.path, content: current.content });
+  if (data.ok === false && data.line) {
+    await holdFault(current.path, data.line, data.message || data.error || "Syntaxfehler", true, "syntax");
+    return true;
+  }
+  return false;
+}
+
 async function runFile(debug) {
   try {
     const current = tab();
     if (!current) return toast("Keine Datei");
     unfoldAll();
     await saveTab();
+    if (await syntaxFault(current)) return;
     S.output = "";
     if (!debug) {
       setBottom("output");
@@ -1622,8 +1702,26 @@ async function pollRun() {
   if (data.running) {
     setTimeout(pollRun, 300);
   } else {
+    const program = S.output || "";
     appendOutput(`\n[beendet ${data.code}]\n`);
-    updateStatus("Bereit");
+    const current = tab();
+    let marked = false;
+    if (current) {
+      const found = await api("/api/fault", { text: program, path: current.path });
+      const strong = /error|exception|syntax error|command not found|nicht gefunden|parsererror/i.test(program);
+      if (found.fault && found.fault.line && (data.code || strong)) {
+        await holdFault(found.fault.file || current.path, found.fault.line, found.fault.message, true, "runtime");
+        marked = true;
+      }
+    }
+    if (!marked) {
+      if (current) {
+        delete S.faults[current.path];
+        current.problems = (current.problems || []).filter((item) => item.code !== "LAUF");
+      }
+      updateStatus(data.code ? "Beendet " + data.code : "Bereit");
+      renderEditor();
+    }
     if (S.bottom === "output") renderPanel();
   }
 }
@@ -1639,6 +1737,11 @@ async function pollDebug() {
     S.debugText += `\nPause ${data.paused.reason} ${data.paused.file}:${data.paused.line}\n${locals}\n`;
     if (data.paused.file) {
       openPath(data.paused.file, data.paused.line).catch(() => {});
+    }
+    if (data.paused.reason === "exception") {
+      const message = String(data.paused.exception || "Ausnahme").split("\n").filter(Boolean).pop();
+      const kind = /syntax/i.test(message) ? "syntax" : "runtime";
+      await holdFault(data.paused.file, data.paused.line, message, false, kind);
     }
     updateStatus("Pause Zeile " + data.paused.line);
     if (S.bottom === "debug") renderPanel();
@@ -3995,6 +4098,7 @@ async function boot() {
     const current = tab();
     if (!current) return;
     current.content = area.value;
+    releaseFaultIfFixed(current);
     current.dirty = current.content !== current.saved;
     highlightEl().innerHTML = highlightSource(current.content, errorLineSet(), languageOf(current.path)) + "\n";
     renderGutter();

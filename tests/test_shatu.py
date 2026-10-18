@@ -185,6 +185,92 @@ class HistoryHttpNotebookTests(unittest.TestCase):
 
 
 class RuntimeTests(unittest.TestCase):
+    def test_fault_stops_on_syntax_and_exception(self) -> None:
+        from shatuide.faults import locate_fault
+
+        trace = (
+            'Traceback (most recent call last):\n'
+            '  File "/tmp/app.py", line 4, in <module>\n'
+            '  File "/tmp/lib.py", line 2, in f\n'
+            'ZeroDivisionError: division by zero\n'
+        )
+        found = locate_fault(trace, "/tmp/app.py")
+        self.assertIsNotNone(found)
+        assert found is not None
+        self.assertEqual(found["line"], 4)
+        self.assertEqual(found["file"], "/tmp/app.py")
+        self.assertIn("ZeroDivisionError", found["message"])
+        self.assertEqual(locate_fault("tool.sh: line 3: foo: command not found\n", "/tmp/tool.sh")["line"], 3)
+        self.assertEqual(locate_fault("At C:\\a.ps1:5 char:1\n+ nope\n", "C:\\a.ps1")["line"], 5)
+        modern = locate_fault("RuntimeException: C:\\a.ps1:5\nLine |\n   5 |  1 / 0\n", "C:\\a.ps1")
+        self.assertEqual(modern["line"], 5)
+        self.assertEqual(modern["file"], "C:\\a.ps1")
+        colored = locate_fault(
+            "\x1b[31;1mRuntimeException: \x1b[0m/tmp/app.ps1:2\x1b[0m\n",
+            "/tmp/app.ps1",
+        )
+        self.assertEqual(colored["line"], 2)
+        self.assertEqual(colored["file"], "/tmp/app.ps1")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            broken = Path(tmp) / "kaputt.py"
+            broken.write_text("def\n", encoding="utf-8")
+            session = DebugSession()
+            try:
+                session.start(sys.executable, str(broken), tmp, [], Path(tmp) / "bp.json")
+                event = session.wait_event("stopped", timeout=8)
+                self.assertEqual(event["line"], 1)
+                self.assertEqual(event["reason"], "exception")
+                session.command({"cmd": "continue"})
+                session.wait_event("terminated", timeout=8)
+            finally:
+                session.close()
+            crash = Path(tmp) / "rechnung.py"
+            crash.write_text("print(1)\nvalue = 1 / 0\n", encoding="utf-8")
+            session = DebugSession()
+            try:
+                session.start(sys.executable, str(crash), tmp, [], Path(tmp) / "crash.json")
+                event = session.wait_event("stopped", timeout=8)
+                self.assertEqual(event["line"], 2)
+                self.assertEqual(event["reason"], "exception")
+                self.assertIn("ZeroDivision", event.get("exception") or "")
+                session.command({"cmd": "continue"})
+                session.wait_event("terminated", timeout=8)
+            finally:
+                session.close()
+
+        from shatuide.shell_debug import PowerShellDebugSession, ShellDebugSession
+
+        with tempfile.TemporaryDirectory() as tmp:
+            script = Path(tmp) / "fehl.sh"
+            script.write_text("echo start\nnosuchcommand\necho after\n", encoding="utf-8")
+            session = ShellDebugSession()
+            try:
+                session.start(str(script), tmp, [], Path(tmp) / "sh-bp.json")
+                stopped = session.wait_event("stopped", timeout=8)
+                self.assertEqual(stopped["line"], 2, session.snapshot())
+                self.assertEqual(stopped["reason"], "exception")
+                session.command({"cmd": "continue"})
+                session.wait_event("terminated", timeout=8)
+            finally:
+                session.close()
+            from shatuide.scripting import powershell_binary
+
+            if powershell_binary():
+                ps_script = Path(tmp) / "fehl.ps1"
+                ps_script.write_text('Write-Output "start"\n1 / 0\nWrite-Output "after"\n', encoding="utf-8")
+                ps = PowerShellDebugSession()
+                try:
+                    ps.start(str(ps_script), tmp, [], Path(tmp) / "ps-bp.json")
+                    stopped = ps.wait_event("stopped", timeout=12)
+                    self.assertEqual(stopped["line"], 2, ps.snapshot())
+                    self.assertEqual(stopped["reason"], "exception")
+                    self.assertIn("zero", (stopped.get("exception") or "").lower())
+                    ps.command({"cmd": "continue"})
+                    ps.wait_event("terminated", timeout=12)
+                finally:
+                    ps.close()
+
     def test_compile_and_debug(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             script = Path(tmp) / "t.py"

@@ -9,6 +9,7 @@ import shutil
 import subprocess
 from pathlib import Path
 
+from shatuide.faults import locate_fault
 from shatuide.runner import run_args
 
 SHELL_SUFFIXES = {".sh", ".bash", ".ksh", ".zsh"}
@@ -118,7 +119,7 @@ def syntax_check(path: str, content: str | None = None) -> dict:
             proc = subprocess.run([binary, "-n"], input=content, capture_output=True, text=True)
         if proc.returncode == 0:
             return {"ok": True, "message": "Shell-Syntax in Ordnung."}
-        return {"ok": False, "error": (proc.stderr or proc.stdout or "Syntaxfehler").strip()}
+        return _with_line(path, (proc.stderr or proc.stdout or "Syntaxfehler").strip())
     if lang == "powershell":
         binary = powershell_binary()
         if not binary:
@@ -144,7 +145,7 @@ def syntax_check(path: str, content: str | None = None) -> dict:
             )
         if proc.returncode == 0:
             return {"ok": True, "message": "PowerShell-Syntax in Ordnung."}
-        return {"ok": False, "error": (proc.stdout or proc.stderr or "Syntaxfehler").strip()}
+        return _with_line(path, (proc.stdout or proc.stderr or "Syntaxfehler").strip())
     if lang == "batch":
         return {"ok": False, "error": "Für Batch-Dateien gibt es keine Syntaxprüfung. Unter Windows startet cmd.exe die Datei."}
     source = content
@@ -156,7 +157,8 @@ def syntax_check(path: str, content: str | None = None) -> dict:
     try:
         compile(source, path or "<memory>", "exec")
     except SyntaxError as exc:
-        return {"ok": False, "error": f"Zeile {exc.lineno}: {exc.msg}"}
+        line = exc.lineno or 1
+        return {"ok": False, "error": f"Zeile {line}: {exc.msg}", "line": line, "message": exc.msg or "Syntaxfehler"}
     return {"ok": True, "message": "Syntax in Ordnung."}
 
 
@@ -170,12 +172,22 @@ def _json_text(path: str, content: str | None) -> str:
     return source
 
 
+def _with_line(path: str, text: str) -> dict:
+    found = locate_fault(text, path)
+    result = {"ok": False, "error": text}
+    if found and found.get("line"):
+        result["line"] = found["line"]
+        result["message"] = found.get("message") or text
+    return result
+
+
 def _json_syntax(path: str, content: str | None) -> dict:
     try:
         source = _json_text(path, content)
         json.loads(source)
     except json.JSONDecodeError as exc:
-        return {"ok": False, "error": f"Zeile {exc.lineno}, Spalte {exc.colno}: {exc.msg}"}
+        line = exc.lineno or 1
+        return {"ok": False, "error": f"Zeile {line}, Spalte {exc.colno}: {exc.msg}", "line": line, "message": exc.msg}
     except OSError as exc:
         return {"ok": False, "error": str(exc)}
     return {"ok": True, "message": "JSON in Ordnung."}
@@ -242,7 +254,7 @@ def _html_syntax(path: str, content: str | None) -> dict:
     problems = html_problems(source)
     if problems:
         first = problems[0]
-        return {"ok": False, "error": f"Zeile {first['line']}: {first['message']}"}
+        return {"ok": False, "error": f"Zeile {first['line']}: {first['message']}", "line": first["line"], "message": first["message"]}
     return {"ok": True, "message": "HTML in Ordnung."}
 
 

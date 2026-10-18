@@ -1043,6 +1043,11 @@ class Handler(BaseHTTPRequestHandler):
             self._json(app.bookmarks(str(payload.get("action") or "list"), payload))
         elif path == "/api/compile":
             self._json(self._compile(payload))
+        elif path == "/api/fault":
+            from shatuide.faults import locate_fault
+
+            found = locate_fault(str(payload.get("text") or ""), str(payload.get("path") or ""))
+            self._json({"ok": True, "fault": found})
         elif path == "/api/studio":
             self._json(self._studio(payload))
         else:

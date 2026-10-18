@@ -82,7 +82,7 @@ button:hover, button.on { border-color: var(--amber); color: var(--amber-2); }
 .gutter-line { height: 1.45em; padding-right: 8px; cursor: pointer; }
 .gutter-line.bp { color: var(--red); }
 .gutter-line.current { background: rgba(224, 164, 90, 0.18); color: var(--amber-2); }
-.gutter-line.err { box-shadow: inset -2px 0 0 var(--red); }
+.gutter-line.err { background: rgba(224, 122, 114, 0.28); box-shadow: inset -3px 0 0 var(--red); color: var(--red); }
 #editor { position: relative; flex: 1; min-width: 0; background: var(--bg); }
 #highlight, #code {
   position: absolute; inset: 0; margin: 0; border: 0; padding: 8px 12px;
@@ -102,7 +102,7 @@ button:hover, button.on { border-color: var(--amber); color: var(--amber-2); }
 .fn { color: var(--blue); }
 .cls { color: var(--amber-2); }
 .op { color: #d7cfc3; }
-.errline { text-decoration: underline wavy var(--red); }
+.errline { text-decoration: underline wavy var(--red); background: rgba(224, 122, 114, 0.28); }
 #bottom { height: var(--bottom); background: var(--panel); border-top: 1px solid var(--line); display: flex; flex-direction: column; min-height: 80px; }
 #bottom-tabs { display: flex; gap: 2px; overflow: auto; flex: 1; padding: 0; }
 #bottom-tabs button { background: transparent; border-color: transparent; color: var(--muted); }

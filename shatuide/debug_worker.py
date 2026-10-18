@@ -40,6 +40,7 @@ class ShatuDbg(bdb.Bdb):
         self.bp_file = bp_file
         self.mode = "run"
         self._tick = 0
+        self._seen_exc = None
         self._skip_files = {self.canonic(__file__), self.canonic(bdb.__file__)}
 
     def trace_dispatch(self, frame, event, arg):
@@ -84,6 +85,30 @@ class ShatuDbg(bdb.Bdb):
                 self.set_continue()
             return
         self._pause(frame, "breakpoint" if hit else "step")
+
+    def _user_file(self, filename: str) -> bool:
+        if filename in self._skip_files:
+            return False
+        normalized = filename.replace("\\", "/")
+        if "/site-packages/" in normalized or normalized.startswith("<"):
+            return False
+        script = self.canonic(self.script)
+        if filename == script:
+            return True
+        return filename.startswith(os.path.dirname(script) + os.sep)
+
+    def dispatch_exception(self, frame, arg):  # type: ignore[override]
+        # Rückgabe ist die Trace-Funktion. Ein erneuter Aufruf mit "exception"
+        # würde hier endlos wieder eintreten.
+        exc_type, exc_value, _tb = arg
+        if exc_type not in (bdb.BdbQuit, KeyboardInterrupt, SystemExit):
+            filename = self.canonic(frame.f_code.co_filename)
+            if self._user_file(filename) and self._seen_exc is not exc_value:
+                self._seen_exc = exc_value
+                self.user_exception(frame, arg)
+                if self.quitting:
+                    raise bdb.BdbQuit
+        return self.trace_dispatch
 
     def user_exception(self, frame, exc_info) -> None:
         if exc_info[0] in (bdb.BdbQuit, KeyboardInterrupt, SystemExit):
@@ -169,6 +194,27 @@ class ShatuDbg(bdb.Bdb):
             self.conn.send({"event": "eval", "expr": expr, "error": str(exc)})
 
 
+def _hold_syntax(conn: JsonConn, script: str, exc: SyntaxError) -> None:
+    line = exc.lineno or 1
+    conn.send(
+        {
+            "event": "stopped",
+            "reason": "exception",
+            "file": script,
+            "line": line,
+            "func": "<module>",
+            "locals": {},
+            "stack": [{"file": script, "line": line, "func": "<module>"}],
+            "exception": f"SyntaxError: {exc.msg}",
+        }
+    )
+    while True:
+        cmd = conn.recv()
+        if not cmd or cmd.get("cmd") in {"stop", "continue", "step", "step_into", "step_out"}:
+            break
+    conn.send({"event": "terminated", "code": 1})
+
+
 def main() -> None:
     port = int(sys.argv[1])
     script = os.path.abspath(sys.argv[2])
@@ -185,7 +231,11 @@ def main() -> None:
         dbg.apply_points(init.get("points") or [])
         with open(script, encoding="utf-8") as handle:
             source = handle.read()
-        code = compile(source, script, "exec")
+        try:
+            code = compile(source, script, "exec")
+        except SyntaxError as exc:
+            _hold_syntax(conn, script, exc)
+            return
         globs = {"__name__": "__main__", "__file__": script, "__package__": None, "__cached__": None}
         sys.argv = [script, *sys.argv[5:]]
         try:

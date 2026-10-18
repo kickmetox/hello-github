@@ -131,10 +131,14 @@ class _LineSession:
             self.cond.notify_all()
 
     def _on_protocol(self, line: str) -> None:
-        if line.startswith("STOP"):
+        if line.startswith("STOP") or line.startswith("ERR"):
             self._locals = {}
-            payload = line[4:].lstrip(" \t")
-            if "\t" in payload:
+            error = line.startswith("ERR")
+            payload = line[3:].lstrip(" \t") if error else line[4:].lstrip(" \t")
+            message = ""
+            if error and payload.count("\t") >= 2:
+                number_text, filename, message = payload.split("\t", 2)
+            elif "\t" in payload:
                 number_text, _, filename = payload.partition("\t")
             else:
                 parts = payload.split()
@@ -147,6 +151,8 @@ class _LineSession:
             with self.cond:
                 self._pending_line = number
                 self._pending_file = filename or self.script
+                self._pending_reason = "exception" if error else "breakpoint"
+                self._pending_exception = message
             return
         if line.startswith("VAR "):
             name, _, value = line[4:].partition(" ")
@@ -160,9 +166,13 @@ class _LineSession:
                     "event": "stopped",
                     "line": number,
                     "file": getattr(self, "_pending_file", "") or self.script,
-                    "reason": "breakpoint",
+                    "reason": getattr(self, "_pending_reason", "") or "breakpoint",
                     "locals": dict(self._locals),
                 }
+                if getattr(self, "_pending_exception", ""):
+                    self.paused["exception"] = self._pending_exception
+                self._pending_reason = "breakpoint"
+                self._pending_exception = ""
                 self.events.append(self.paused)
                 self.cond.notify_all()
             return
@@ -282,10 +292,53 @@ shatu_hook() {
   trap shatu_hook DEBUG
   SHATU_IN=0
 }
+shatu_err() {
+  [[ "${SHATU_IN:-0}" == 1 ]] && return 0
+  SHATU_IN=1
+  local line="${BASH_LINENO[0]}"
+  local src="${BASH_SOURCE[1]}"
+  if [[ -n "$src" && "$src" != /* ]]; then
+    src="$(cd "$(dirname "$src")" 2>/dev/null && pwd)/$(basename "$src")"
+  fi
+  local allowed=0
+  case "$src" in
+    "$SHATU_SCRIPT"|"$SHATU_DIR"|"$SHATU_DIR"/*) allowed=1 ;;
+  esac
+  if [[ $allowed != 1 ]]; then
+    SHATU_IN=0
+    return 0
+  fi
+  local msg="${BASH_COMMAND}"
+  msg=${msg//$'\t'/ }
+  msg=${msg//$'\n'/ }
+  printf 'ERR\t%s\t%s\t%s\n' "$line" "$src" "${msg:0:300}" >&4
+  shatu_vars
+  printf 'END\n' >&4
+  local cmd depth=$(( ${#FUNCNAME[@]} - 1 ))
+  while true; do
+    IFS= read -r cmd <&3 || { trap shatu_hook DEBUG; trap shatu_err ERR; SHATU_IN=0; exit 0; }
+    case "$cmd" in
+      STOP) trap shatu_hook DEBUG; trap shatu_err ERR; SHATU_IN=0; exit 0 ;;
+      STEP|INTO) SHATU_MODE=step; break ;;
+      OUT) SHATU_MODE=out; SHATU_DEPTH=$depth; break ;;
+      CONT) SHATU_MODE=run; break ;;
+      EVAL\ *)
+        local expr="${cmd#EVAL }"
+        local val
+        val=$(eval "$expr" 2>&1) || true
+        val=${val//$'\n'/ }
+        printf 'EVAL %s\n' "${val:0:500}" >&4
+        ;;
+      *) SHATU_MODE=run; break ;;
+    esac
+  done
+  SHATU_IN=0
+}
 exec 3<&__CMD_FD__
 exec 4>&__EV_FD__
 set -o functrace
 trap shatu_hook DEBUG
+trap shatu_err ERR
 source "$SHATU_SCRIPT"
 printf 'DONE\n' >&4
 """
@@ -398,9 +451,12 @@ function global:Shatu-Vars {
     "EnabledExperimentalFeatures" = $true; "ShellId" = $true
   }
   $count = 0
-  foreach ($scope in 2, 3, 1) {
+  foreach ($scope in 1..8) {
     $vars = $null
-    try { $vars = @(Get-Variable -Scope $scope -ErrorAction Stop) } catch { continue }
+    try { $vars = @(Get-Variable -Scope $scope -ErrorAction Ignore) } catch { continue }
+    if ($null -eq $vars) { continue }
+    $names = @($vars | ForEach-Object { $_.Name })
+    if ($names -contains "taken" -or $names -contains "Kind" -or $names -contains "fileLines") { continue }
     $user = @($vars | Where-Object {
       $_.Name -match '^[A-Za-z_][A-Za-z0-9_]*$' -and -not $skip.ContainsKey($_.Name) -and $_.Name -notmatch '^(PS|Is|Shatu)'
     })
@@ -418,8 +474,61 @@ function global:Shatu-Vars {
   }
 }
 
+$global:ShatuErr = 0
+function global:Shatu-TakeError {
+  if ($Error.Count -le $global:ShatuErr) { return $null }
+  $record = $Error[0]
+  $global:ShatuErr = $Error.Count
+  $line = 0
+  $name = ""
+  $message = "Fehler"
+  try { $line = [int]$record.InvocationInfo.ScriptLineNumber } catch { $line = 0 }
+  try { $name = [string]$record.InvocationInfo.ScriptName } catch { $name = "" }
+  try { if ($record.Exception.Message) { $message = [string]$record.Exception.Message } } catch { }
+  $message = ($message -replace "[\r\n\t]", " ")
+  if ($message.Length -gt 300) { $message = $message.Substring(0, 300) }
+  if ($line -lt 1) { return $null }
+  return @{ Line = $line; Name = $name; Message = $message }
+}
+function global:Shatu-Pause {
+  param([string]$Kind, [int]$Line, [string]$ScriptName, [string]$Message)
+  $depth = @(Get-PSCallStack).Count
+  $global:ShatuMode = "run"
+  if ($Kind -eq "error") {
+    $global:ShatuWriter.WriteLine("ERR`t$Line`t$ScriptName`t$Message")
+  } else {
+    $global:ShatuWriter.WriteLine("STOP`t$Line`t$ScriptName")
+  }
+  Shatu-Vars
+  $global:ShatuWriter.WriteLine("END")
+  while ($true) {
+    $cmd = $global:ShatuReader.ReadLine()
+    if ($null -eq $cmd -or $cmd -eq "STOP") { exit 0 }
+    if ($cmd -eq "STEP" -or $cmd -eq "INTO") { $global:ShatuMode = "step"; $global:ShatuErr = $Error.Count; return }
+    if ($cmd -eq "OUT") { $global:ShatuMode = "out"; $global:ShatuDepth = $depth; $global:ShatuErr = $Error.Count; return }
+    if ($cmd -eq "CONT") { $global:ShatuMode = "run"; $global:ShatuErr = $Error.Count; return }
+    if ($cmd.StartsWith("EVAL ")) {
+      $expr = $cmd.Substring(5)
+      $val = ""
+      try { $val = "$(Invoke-Expression $expr)" } catch { $val = $_.Exception.Message }
+      $val = ($val -replace "[\r\n]", " ")
+      if ($val.Length -gt 500) { $val = $val.Substring(0, 500) }
+      $global:ShatuWriter.WriteLine("EVAL $val")
+      continue
+    }
+    $global:ShatuMode = "run"
+    $global:ShatuErr = $Error.Count
+    return
+  }
+}
 function global:Shatu-Hit {
   param([int]$Line, [string]$ScriptName)
+  $taken = Shatu-TakeError
+  if ($null -ne $taken) {
+    $errName = $ScriptName
+    if ($taken.Name) { $errName = $taken.Name }
+    Shatu-Pause -Kind "error" -Line $taken.Line -ScriptName $errName -Message $taken.Message
+  }
   $stop = $false
   $depth = @(Get-PSCallStack).Count
   if ($global:ShatuMode -eq "step") { $stop = $true }
@@ -452,28 +561,7 @@ function global:Shatu-Hit {
     }
   }
   if (-not $stop) { return }
-  $global:ShatuMode = "run"
-  $global:ShatuWriter.WriteLine("STOP`t$Line`t$ScriptName")
-  Shatu-Vars
-  $global:ShatuWriter.WriteLine("END")
-  while ($true) {
-    $cmd = $global:ShatuReader.ReadLine()
-    if ($null -eq $cmd -or $cmd -eq "STOP") { exit 0 }
-    if ($cmd -eq "STEP" -or $cmd -eq "INTO") { $global:ShatuMode = "step"; break }
-    if ($cmd -eq "OUT") { $global:ShatuMode = "out"; $global:ShatuDepth = $depth; break }
-    if ($cmd -eq "CONT") { $global:ShatuMode = "run"; break }
-    if ($cmd.StartsWith("EVAL ")) {
-      $expr = $cmd.Substring(5)
-      $val = ""
-      try { $val = "$(Invoke-Expression $expr)" } catch { $val = $_.Exception.Message }
-      $val = ($val -replace "[\r\n]", " ")
-      if ($val.Length -gt 500) { $val = $val.Substring(0, 500) }
-      $global:ShatuWriter.WriteLine("EVAL $val")
-      continue
-    }
-    $global:ShatuMode = "run"
-    break
-  }
+  Shatu-Pause -Kind "break" -Line $Line -ScriptName $ScriptName -Message ""
 }
 
 $targets = New-Object System.Collections.Generic.List[string]
@@ -489,7 +577,11 @@ foreach ($target in $targets) {
     }
   }
 }
+$global:ShatuErr = $Error.Count
 & $Script
+if ($Error.Count -gt $global:ShatuErr) {
+  Shatu-Hit -Line 1 -ScriptName $Script
+}
 $writer.WriteLine("DONE")
 """
 
