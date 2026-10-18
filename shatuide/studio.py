@@ -1116,6 +1116,153 @@ def _msi_shortcuts(staged: list[tuple[str, Path]]) -> list[list[str]]:
     return rows
 
 
+def _msi_ui_tables(has_shortcut: bool, upgrade: str, version: str) -> dict[str, str]:
+    """Fenster vor und nach dem blauen Balken: Frage, Abschluss, bei Bedarf Reparatur oder Entfernen."""
+    if has_shortcut:
+        welcome = (
+            "[ProductName] wird in den Ordner Programme, Unterordner [ProductName], kopiert. "
+            "Danach gibt es ein Symbol auf dem Desktop und einen Eintrag im Startmenü. "
+            "Python 3 muss vorhanden sein. Dieses Paket bringt kein Python mit. "
+            "Falls [ProductName] noch läuft, bitte vorher schließen. "
+            "Installieren startet das Kopieren, sichtbar als blauer Balken. Danach kommt eine Abschlussmeldung. "
+            "Abbrechen ändert nichts."
+        )
+        done = (
+            "[ProductName] ist eingerichtet. "
+            "Start über das Symbol auf dem Desktop oder den Eintrag im Startmenü. "
+            "Die Dateien liegen im Ordner Programme, Unterordner [ProductName]. "
+            "Python 3 wird zum Start gebraucht."
+        )
+    else:
+        welcome = (
+            "[ProductName] wird in den Ordner Programme, Unterordner [ProductName], kopiert. "
+            "Installieren startet das Kopieren, sichtbar als blauer Balken. Danach kommt eine Abschlussmeldung. "
+            "Abbrechen ändert nichts."
+        )
+        done = (
+            "[ProductName] ist eingerichtet. "
+            "Die Dateien liegen im Ordner Programme, Unterordner [ProductName]."
+        )
+    if has_shortcut:
+        maintain = (
+            "[ProductName] ist bereits installiert. "
+            "Reparieren schreibt die Dateien neu. Entfernen löscht Programm, Desktop-Symbol und Startmenü-Eintrag. "
+            "Abbrechen ändert nichts."
+        )
+        removed = "[ProductName] wurde entfernt. Desktop-Symbol und Startmenü-Eintrag sind gelöscht."
+    else:
+        maintain = (
+            "[ProductName] ist bereits installiert. "
+            "Reparieren schreibt die Dateien neu. Entfernen löscht das Programm. "
+            "Abbrechen ändert nichts."
+        )
+        removed = "[ProductName] wurde entfernt."
+    text_attr = "3"
+    button_attr = "3"
+    dialogs = [
+        ["WelcomeDlg", "50", "50", "370", "270", "3", "[ProductName]", "Install", "Install", "Cancel"],
+        ["MaintainDlg", "50", "50", "370", "270", "3", "[ProductName]", "Repair", "Repair", "Cancel"],
+        ["ExitOk", "50", "50", "370", "270", "3", "[ProductName]", "Finish", "Finish", "Finish"],
+        ["ExitGone", "50", "50", "370", "270", "3", "[ProductName]", "Finish", "Finish", "Finish"],
+    ]
+    controls = [
+        ["WelcomeDlg", "Title", "Text", "15", "15", "340", "16", text_attr, "", "[ProductName] installieren", "Body", ""],
+        ["WelcomeDlg", "Body", "Text", "15", "40", "340", "180", text_attr, "", welcome, "Install", ""],
+        ["WelcomeDlg", "Install", "PushButton", "200", "243", "80", "17", button_attr, "", "Installieren", "Cancel", ""],
+        ["WelcomeDlg", "Cancel", "PushButton", "286", "243", "70", "17", button_attr, "", "Abbrechen", "Title", ""],
+        ["MaintainDlg", "Title", "Text", "15", "15", "340", "16", text_attr, "", "[ProductName] ist installiert", "Body", ""],
+        ["MaintainDlg", "Body", "Text", "15", "40", "340", "180", text_attr, "", maintain, "Repair", ""],
+        ["MaintainDlg", "RemoveBtn", "PushButton", "120", "243", "74", "17", button_attr, "", "Entfernen", "Repair", ""],
+        ["MaintainDlg", "Repair", "PushButton", "200", "243", "80", "17", button_attr, "", "Reparieren", "Cancel", ""],
+        ["MaintainDlg", "Cancel", "PushButton", "286", "243", "70", "17", button_attr, "", "Abbrechen", "Title", ""],
+        ["ExitOk", "Title", "Text", "15", "15", "340", "16", text_attr, "", "Abschluss", "Body", ""],
+        ["ExitOk", "Body", "Text", "15", "40", "340", "180", text_attr, "", done, "Finish", ""],
+        ["ExitOk", "Finish", "PushButton", "286", "243", "70", "17", button_attr, "", "Fertig", "Title", ""],
+        ["ExitGone", "Title", "Text", "15", "15", "340", "16", text_attr, "", "Entfernt", "Body", ""],
+        ["ExitGone", "Body", "Text", "15", "40", "340", "180", text_attr, "", removed, "Finish", ""],
+        ["ExitGone", "Finish", "PushButton", "286", "243", "70", "17", button_attr, "", "Fertig", "Title", ""],
+    ]
+    events = [
+        ["WelcomeDlg", "Install", "EndDialog", "Return", "1", "1"],
+        ["WelcomeDlg", "Cancel", "EndDialog", "Exit", "1", "1"],
+        ["MaintainDlg", "Repair", "ReinstallMode", "ecmus", "1", "1"],
+        ["MaintainDlg", "Repair", "Reinstall", "ALL", "1", "2"],
+        ["MaintainDlg", "Repair", "EndDialog", "Return", "1", "3"],
+        ["MaintainDlg", "RemoveBtn", "Remove", "ALL", "1", "1"],
+        ["MaintainDlg", "RemoveBtn", "EndDialog", "Return", "1", "2"],
+        ["MaintainDlg", "Cancel", "EndDialog", "Exit", "1", "1"],
+        ["ExitOk", "Finish", "EndDialog", "Return", "1", "1"],
+        ["ExitGone", "Finish", "EndDialog", "Return", "1", "1"],
+    ]
+    ui_sequence = [
+        ["FindRelatedProducts", "", "400"],
+        ["CostInitialize", "", "800"],
+        ["FileCost", "", "900"],
+        ["CostFinalize", "", "1000"],
+        ["WelcomeDlg", "NOT Installed", "1200"],
+        ["MaintainDlg", "Installed", "1210"],
+        ["ExecuteAction", "", "1300"],
+        ["ExitOk", 'NOT REMOVE', "1400"],
+        ["ExitGone", 'REMOVE="ALL"', "1410"],
+    ]
+    action_text = [
+        ["InstallValidate", "Prüfung", ""],
+        ["InstallInitialize", "Start", ""],
+        ["ProcessComponents", "Komponenten", ""],
+        ["InstallFiles", "Dateien werden kopiert", "Datei: [1]"],
+        ["CreateShortcuts", "Verknuepfungen werden angelegt", ""],
+        ["RegisterProduct", "Produkt wird eingetragen", ""],
+        ["PublishProduct", "Eintrag wird veröffentlicht", ""],
+        ["InstallFinalize", "Abschluss der Kopie", ""],
+        ["RemoveExistingProducts", "Ältere Fassung wird entfernt", ""],
+        ["RemoveFiles", "Dateien werden entfernt", ""],
+    ]
+    return {
+        "Dialog.idt": _idt(
+            "Dialog",
+            ["Dialog", "HCentering", "VCentering", "Width", "Height", "Attributes", "Title", "Control_First", "Control_Default", "Control_Cancel"],
+            ["s72", "i2", "i2", "i2", "i2", "I4", "L128", "s50", "S50", "S50"],
+            ["Dialog"],
+            dialogs,
+        ),
+        "Control.idt": _idt(
+            "Control",
+            ["Dialog_", "Control", "Type", "X", "Y", "Width", "Height", "Attributes", "Property", "Text", "Control_Next", "Help"],
+            ["s72", "s50", "s20", "i2", "i2", "i2", "i2", "I4", "S50", "L0", "S50", "L50"],
+            ["Dialog_", "Control"],
+            controls,
+        ),
+        "ControlEvent.idt": _idt(
+            "ControlEvent",
+            ["Dialog_", "Control_", "Event", "Argument", "Condition", "Ordering"],
+            ["s72", "s50", "s50", "s255", "S255", "i2"],
+            ["Dialog_", "Control_", "Event", "Argument", "Condition"],
+            events,
+        ),
+        "InstallUISequence.idt": _idt(
+            "InstallUISequence",
+            ["Action", "Condition", "Sequence"],
+            ["s72", "S255", "I2"],
+            ["Action"],
+            ui_sequence,
+        ),
+        "ActionText.idt": _idt(
+            "ActionText",
+            ["Action", "Description", "Template"],
+            ["s72", "L128", "L128"],
+            ["Action"],
+            action_text,
+        ),
+        "Upgrade.idt": _idt(
+            "Upgrade",
+            ["UpgradeCode", "VersionMin", "VersionMax", "Language", "Attributes", "Remove", "ActionProperty"],
+            ["s38", "S20", "S20", "S255", "i4", "S255", "s72"],
+            ["UpgradeCode", "VersionMin", "VersionMax", "Language", "Attributes"],
+            [["{" + upgrade + "}", "0.0.0", version, "", "17", "", "OLDERFOUND"]],
+        ),
+    }
+
+
 def _idt(table: str, columns: list[str], types: list[str], keys: list[str], rows: list[list[str]]) -> str:
     lines = ["\t".join(columns), "\t".join(types), "\t".join([table, *keys])]
     for row in rows:
@@ -1275,11 +1422,13 @@ def build_msi(
             ["s72", "S255", "I2"],
             ["Action"],
             [
+                ["FindRelatedProducts", "", "400"],
                 ["CostInitialize", "", "800"],
                 ["FileCost", "", "900"],
                 ["CostFinalize", "", "1000"],
                 ["InstallValidate", "", "1400"],
                 ["InstallInitialize", "", "1500"],
+                ["RemoveExistingProducts", "", "1510"],
                 ["ProcessComponents", "", "1600"],
                 ["InstallFiles", "", "4000"],
                 ["CreateShortcuts", "", "4500"],
@@ -1291,6 +1440,8 @@ def build_msi(
             ],
         ),
     }
+    version_text = ver if ver.count(".") == 2 else _wix_version(ver)
+    tables.update(_msi_ui_tables(bool(shortcut_rows), upgrade, version_text))
     if shortcut_rows:
         tables["Shortcut.idt"] = _idt(
             "Shortcut",
@@ -1316,7 +1467,10 @@ def build_msi(
         "ok": True,
         "path": str(msi),
         "wxs": str(wxs_path),
-        "message": f"MSI {msi.name} erzeugt. Installieren unter Windows mit msiexec /i {msi.name}. Danach liegt ShatuIDE auf dem Desktop und im Startmenü.",
+        "message": (
+            f"MSI {msi.name} erzeugt. Unter Windows fragt ein Doppelklick zuerst nach Installieren oder Abbrechen, "
+            "zeigt dann den blauen Kopierbalken und am Ende eine Abschlussmeldung."
+        ),
     }
 
 

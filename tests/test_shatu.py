@@ -963,6 +963,27 @@ class StudioTests(unittest.TestCase):
                 script = next(out.rglob("app.js"))
                 self.assertEqual(script.read_text(encoding="utf-8"), "js-ok")
                 self.assertEqual(script.parent.name, "static")
+                if shutil.which("msiinfo"):
+                    ui = subprocess.run(["msiinfo", "export", package["path"], "InstallUISequence"], capture_output=True, text=True)
+                    self.assertEqual(ui.returncode, 0, ui.stderr)
+                    order = {}
+                    for line in ui.stdout.splitlines()[3:]:
+                        if not line.strip():
+                            continue
+                        cols = line.split("\t")
+                        order[cols[0]] = int(cols[2])
+                    self.assertLess(order["WelcomeDlg"], order["ExecuteAction"])
+                    self.assertLess(order["ExecuteAction"], order["ExitOk"])
+                    self.assertIn("MaintainDlg", order)
+                    controls = subprocess.run(["msiinfo", "export", package["path"], "Control"], capture_output=True, text=True)
+                    self.assertIn("Installieren", controls.stdout)
+                    self.assertIn("Abbrechen", controls.stdout)
+                    self.assertIn("Fertig", controls.stdout)
+                    self.assertNotIn("Desktop", controls.stdout)
+                    upgrade = subprocess.run(["msiinfo", "export", package["path"], "Upgrade"], capture_output=True, text=True)
+                    self.assertIn("OLDERFOUND", upgrade.stdout)
+                    execute = subprocess.run(["msiinfo", "export", package["path"], "InstallExecuteSequence"], capture_output=True, text=True)
+                    self.assertIn("RemoveExistingProducts", execute.stdout)
             else:
                 self.assertFalse(package["ok"])
                 self.assertIn("wxs", package)
@@ -1021,6 +1042,14 @@ class StudioTests(unittest.TestCase):
                 self.assertIn("DesktopFolder", shortcuts.stdout)
                 self.assertIn("ProgramMenuFolder", shortcuts.stdout)
                 self.assertIn("[#fil", shortcuts.stdout)
+                controls = subprocess.run(["msiinfo", "export", str(msi), "Control"], capture_output=True, text=True)
+                self.assertEqual(controls.returncode, 0, controls.stderr)
+                self.assertIn("Installieren", controls.stdout)
+                self.assertIn("Desktop", controls.stdout)
+                self.assertIn("blauer Balken", controls.stdout)
+                ui = subprocess.run(["msiinfo", "export", str(msi), "InstallUISequence"], capture_output=True, text=True)
+                self.assertIn("WelcomeDlg", ui.stdout)
+                self.assertIn("ExitOk", ui.stdout)
 
     def test_debug_other_file(self) -> None:
         from shatuide.shell_debug import ShellDebugSession
