@@ -1070,6 +1070,8 @@ def _msi_directories(product: str, relative_paths: list[str]) -> tuple[list[list
         ["TARGETDIR", "", "SourceDir"],
         ["ProgramFilesFolder", "TARGETDIR", "PFiles"],
         ["INSTALLDIR", "ProgramFilesFolder", f"{_short_dir(product)}|{product}"],
+        ["DesktopFolder", "TARGETDIR", "Desktop"],
+        ["ProgramMenuFolder", "TARGETDIR", "Programs"],
     ]
     mapping = {"": "INSTALLDIR"}
     index = 0
@@ -1093,6 +1095,25 @@ def _msi_directories(product: str, relative_paths: list[str]) -> tuple[list[list
         rows.append([f"Dir{index}", mapping[parent_key], _msi_token(parts[-1])])
         mapping[key] = f"Dir{index}"
     return rows, mapping
+
+
+def _msi_shortcuts(staged: list[tuple[str, Path]]) -> list[list[str]]:
+    """Desktop- und Startmenü-Verknüpfung auf ShatuIDE.exe, falls die EXE im Paket liegt."""
+    exe_index = None
+    for index, (relative, _path) in enumerate(staged):
+        if relative.replace("\\", "/") == "ShatuIDE.exe":
+            exe_index = index
+            break
+    if exe_index is None:
+        return []
+    target = f"[#fil{exe_index}]"
+    component = f"cmp{exe_index}"
+    name = "SHATU~1.LNK|ShatuIDE"
+    description = "ShatuIDE starten"
+    rows = []
+    for key, directory in (("Desktop", "DesktopFolder"), ("Start", "ProgramMenuFolder")):
+        rows.append([key, directory, name, component, target, "", description, "", "", "0", "1", "INSTALLDIR", "", "", "", ""])
+    return rows
 
 
 def _idt(table: str, columns: list[str], types: list[str], keys: list[str], rows: list[list[str]]) -> str:
@@ -1183,11 +1204,13 @@ def build_msi(
         component = "{" + str(uuid.uuid5(uuid.NAMESPACE_URL, f"shatuide-file:{product}:{relative}")).upper() + "}"
         parent = Path(relative).parent
         parent_key = "" if str(parent) == "." else parent.as_posix()
-        rows_component.append([f"cmp{index}", component, dir_ids[parent_key], "0", "", f"fil{index}"])
+        # 256 = 64-Bit-Komponente. Das Paket ist x64; ohne dieses Bit bricht Windows die Installation ab.
+        rows_component.append([f"cmp{index}", component, dir_ids[parent_key], "256", "", f"fil{index}"])
         rows_feature_components.append(["Main", f"cmp{index}"])
         # 512 = wichtig, 16384 = komprimiert im Cabinet. Ohne das zweite Bit sucht Windows die Datei
         # unkomprimiert neben der MSI, zum Beispiel installer\PFiles\ShatuIDE\ShatuIDE.exe.
         rows_file.append([f"fil{index}", f"cmp{index}", _msi_token(Path(relative).name), str(path.stat().st_size), "", "", "16896", str(index + 1)])
+    shortcut_rows = _msi_shortcuts(staged)
     tables = {
         "Property.idt": _idt(
             "Property",
@@ -1259,10 +1282,23 @@ def build_msi(
                 ["InstallInitialize", "", "1500"],
                 ["ProcessComponents", "", "1600"],
                 ["InstallFiles", "", "4000"],
+                ["CreateShortcuts", "", "4500"],
+                ["RegisterUser", "", "6000"],
+                ["RegisterProduct", "", "6100"],
+                ["PublishFeatures", "", "6300"],
+                ["PublishProduct", "", "6400"],
                 ["InstallFinalize", "", "6600"],
             ],
         ),
     }
+    if shortcut_rows:
+        tables["Shortcut.idt"] = _idt(
+            "Shortcut",
+            ["Shortcut", "Directory_", "Name", "Component_", "Target", "Arguments", "Description", "Hotkey", "Icon_", "IconIndex", "ShowCmd", "WkDir", "DisplayResourceDLL", "DisplayResourceId", "DescriptionResourceDLL", "DescriptionResourceId"],
+            ["s72", "s72", "l255", "s72", "s255", "S255", "L255", "I2", "S72", "I2", "I2", "S72", "S255", "I2", "S255", "I2"],
+            ["Shortcut"],
+            shortcut_rows,
+        )
     for filename, text in tables.items():
         (folder / filename).write_bytes(text.encode("utf-8"))
     msi = folder / f"{product}.msi"
@@ -1280,7 +1316,7 @@ def build_msi(
         "ok": True,
         "path": str(msi),
         "wxs": str(wxs_path),
-        "message": f"MSI {msi.name} erzeugt. Installieren unter Windows mit msiexec /i {msi.name}.",
+        "message": f"MSI {msi.name} erzeugt. Installieren unter Windows mit msiexec /i {msi.name}. Danach liegt ShatuIDE auf dem Desktop und im Startmenü.",
     }
 
 

@@ -926,6 +926,15 @@ class StudioTests(unittest.TestCase):
                 rows = [line.split("\t") for line in exported.stdout.splitlines()[3:] if line.strip()]
                 self.assertTrue(rows)
                 self.assertTrue(all(row[6] == "16896" for row in rows), rows[0])
+                components = subprocess.run(["msiinfo", "export", str(msi), "Component"], capture_output=True, text=True)
+                self.assertEqual(components.returncode, 0, components.stderr)
+                component_rows = [line.split("\t") for line in components.stdout.splitlines()[3:] if line.strip()]
+                self.assertTrue(all(row[3] == "256" for row in component_rows))
+                shortcuts = subprocess.run(["msiinfo", "export", str(msi), "Shortcut"], capture_output=True, text=True)
+                self.assertEqual(shortcuts.returncode, 0, shortcuts.stderr)
+                self.assertIn("DesktopFolder", shortcuts.stdout)
+                self.assertIn("ProgramMenuFolder", shortcuts.stdout)
+                self.assertIn("[#fil", shortcuts.stdout)
 
     def test_debug_other_file(self) -> None:
         from shatuide.shell_debug import ShellDebugSession
