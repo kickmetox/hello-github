@@ -19,6 +19,9 @@ _KINDS = {
     "feature": "features",
     "info": "features",
     "liste": "features",
+    "kurz": "kurz",
+    "kurzanleitung": "kurz",
+    "anleitung": "kurz",
 }
 
 
@@ -184,6 +187,59 @@ _BATCH = {
 
 _GUIDES = {"powershell": _POWERSHELL, "shell": _SHELL, "batch": _BATCH}
 
+_QUICK = [
+    {
+        "title": "Start",
+        "items": [
+            "ShatuIDE-Setup.exe starten und den Assistenten bis Fertigstellen durchgehen, oder ShatuIDE.exe direkt öffnen.",
+            "Python 3 muss auf dem Rechner installiert sein.",
+            "ShatuIDE.bat startet die Windows-Anwendung. py -3 shatuide.py öffnet dieselbe IDE im Browser.",
+        ],
+    },
+    {
+        "title": "Neue Datei",
+        "items": [
+            "Datei → Neue Datei oder die Schaltfläche Neu.",
+            "Art wählen: Python, PowerShell, Linux-Shell, Windows-Batch, CMD, JSON, HTML oder Text.",
+            "Namen eintragen. Aus hallo wird hallo.py, hallo.ps1, hallo.sh oder hallo.bat.",
+            "Anlegen öffnet die Datei. Strg+S speichert sie.",
+            "Strg+F5 führt sie aus. Eine Batch-Datei startet unter Windows mit cmd.exe.",
+        ],
+    },
+    {
+        "title": "Öffnen und bearbeiten",
+        "items": [
+            "Datei → Öffnen lädt eine vorhandene Datei. Datei laden übernimmt eine Datei in den Arbeitsordner.",
+            "Strg+X schneidet aus, Strg+C kopiert, Strg+V fügt ein.",
+            "Strg+F sucht in der Datei, Strg+H ersetzt darin.",
+        ],
+    },
+    {
+        "title": "Ausführen und Debug",
+        "items": [
+            "Ausführen → Syntax prüfen kontrolliert Python, PowerShell und die Linux-Shell.",
+            "F9 setzt einen Haltepunkt, F5 startet den Debug, F10 geht einen Schritt weiter.",
+            "Eine Fehlerzeile bleibt rot, bis ihr Text korrigiert ist oder ein Lauf ohne Fehler endet.",
+        ],
+    },
+    {
+        "title": "PowerShell, Linux-Shell und Batch",
+        "items": [
+            "PowerShell-Dateien enden auf .ps1, Linux-Shell auf .sh, Windows-Batch auf .bat oder .cmd.",
+            "Hilfe → Befehlslisten zeigt Erklärung, Syntax und ein Beispiel zu den häufigen Befehlen.",
+            "Erzeugen → Skript aus Abfrage baut ein fertiges Skript unter ausgabe/.",
+        ],
+    },
+    {
+        "title": "Weitergeben",
+        "items": [
+            "Hilfe → Feature-Liste ist die Übersicht für andere. Dieselbe Fassung steht in INFO.md.",
+            "Alles zur Weitergabe kopiert den Text. Speichern schreibt ausgabe/ShatuIDE-Info.md.",
+            "ShatuIDE.zip enthält den kompletten Arbeitsordner.",
+        ],
+    },
+]
+
 _FEATURES = [
     {
         "title": "Arbeitsweise",
@@ -248,6 +304,7 @@ _FEATURES = [
     {
         "title": "Weitergeben",
         "items": [
+            "Die Kurzanleitung liegt als KURZANLEITUNG.md und unter Hilfe → Kurzanleitung.",
             "Diese Feature-Liste liegt als INFO.md im Arbeitsordner.",
             "Im Fenster Hilfe kopiert Alles zur Weitergabe denselben Text.",
             "Speichern schreibt ausgabe/ShatuIDE-Info.md.",
@@ -258,7 +315,7 @@ _FEATURES = [
 
 
 def kinds() -> list[str]:
-    return ["powershell", "shell", "batch", "features"]
+    return ["kurz", "powershell", "shell", "batch", "features"]
 
 
 def _normalize(kind: str) -> str:
@@ -302,6 +359,25 @@ def language_document(kind: str) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
+def quick_document() -> str:
+    lines = [
+        "# ShatuIDE Kurzanleitung",
+        "",
+        f"Version {__version__}",
+        f"{__author__}, {__email__}",
+        "",
+        "Kurze Schritte für den Alltag. Die Befehlslisten stehen unter Hilfe.",
+        "",
+    ]
+    for section in _QUICK:
+        lines.append(f"## {section['title']}")
+        lines.append("")
+        for number, item in enumerate(section["items"], start=1):
+            lines.append(f"{number}. {item}")
+        lines.append("")
+    return "\n".join(lines).rstrip() + "\n"
+
+
 def feature_document() -> str:
     lines = [
         "# ShatuIDE",
@@ -337,7 +413,17 @@ def share_document() -> str:
 def catalog(kind: str) -> dict:
     key = _normalize(kind)
     if not key:
-        return {"ok": False, "error": "Unbekannte Hilfe. Erlaubt sind powershell, shell, batch und features."}
+        return {"ok": False, "error": "Unbekannte Hilfe. Erlaubt sind kurz, powershell, shell, batch und features."}
+    if key == "kurz":
+        return {
+            "ok": True,
+            "kind": "kurz",
+            "title": "Kurzanleitung",
+            "intro": f"Version {__version__}. {__author__}, {__email__}. Kurze Schritte für den Alltag.",
+            "sections": _QUICK,
+            "document": quick_document(),
+            "share": share_document(),
+        }
     if key == "features":
         return {
             "ok": True,

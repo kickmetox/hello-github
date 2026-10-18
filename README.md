@@ -12,6 +12,8 @@ python3 shatuide.py
 
 Unter Windows öffnet `ShatuIDE.exe` ein eigenes Anwendungsfenster. `ShatuIDE.bat` startet diese Anwendung. `py -3 shatuide.py` öffnet dieselbe IDE im Browser. Das Fenster braucht das mitgelieferte `WebView2Loader.dll` und die WebView2-Laufzeit, sonst Edge oder Chrome als Anwendungsfenster. Python 3 bleibt nötig.
 
+**Kurzanleitung:** [KURZANLEITUNG.md](KURZANLEITUNG.md). In der IDE liegt sie unter **Hilfe → Kurzanleitung**.
+
 **Datei → Öffnen** lädt vorhandene Python-Skripte und andere Textdateien aus dem Workspace, aus darüberliegenden Ordnern oder vom Home-Verzeichnis. Dateien außerhalb des Workspace sind nur lesbar. **Datei laden** übernimmt Dateien aus der Dateiauswahl; Speichern schreibt sie in den Workspace. **Bearbeiten** schneidet aus, kopiert die Markierung oder einen Zeilenbereich und fügt ein. **Fenster → Zweites Fenster** öffnet eine weitere IDE-Ansicht. Jeder Dateireiter, jeder Dialog und das Testfenster haben **Schließen**. Die Bereiche Projekt, Funktionen und Ausgabe lassen sich mit **×** zuklappen und über **Ansicht** wieder öffnen. **Fenster → Fenster schließen** schließt ein zweites Fenster.
 
 Das Menüband hat die Reiter **Start**, **Entwurf**, **Erzeugen** und **Ansicht**. Darunter liegen Zwischenablage, Starten, Debug, Baukasten, GUI, EXE, MSI und die Fenster. Rechts listet **Funktionen** die Funktionen, Methoden, Shell-Funktionen oder Sprungmarken der offenen Datei. **Eigenschaften** zeigt Name, Art und Zeile. Ein Klick springt an die Stelle, **Im Fenster prüfen** startet die Funktion getrennt von der Datei. Die KI bleibt im selben Bereich als Reiter.

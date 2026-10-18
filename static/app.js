@@ -3141,6 +3141,7 @@ function renderGuide(host) {
   const tools = document.createElement("div");
   tools.className = "guide-tools";
   const kinds = [
+    ["kurz", "Kurzanleitung"],
     ["powershell", "PowerShell"],
     ["shell", "Linux-Shell"],
     ["batch", "Batch"],
@@ -3176,7 +3177,7 @@ function renderGuide(host) {
     intro.className = "hint";
     guideText(intro, payload.intro);
     view.appendChild(intro);
-    if (payload.kind === "features") {
+    if (payload.sections) {
       (payload.sections || []).forEach((section) => {
         const items = (section.items || []).filter((item) => !needle || (section.title + " " + item).toLowerCase().includes(needle));
         if (!items.length) return;
@@ -3258,7 +3259,8 @@ function renderGuide(host) {
   copy.onclick = () => {
     if (!payload || !payload.document) return;
     copyText(payload.document);
-    toast(payload.kind === "features" ? "Feature-Liste kopiert" : "Befehlsliste kopiert");
+    const copied = { kurz: "Kurzanleitung kopiert", features: "Feature-Liste kopiert" };
+    toast(copied[payload.kind] || "Befehlsliste kopiert");
   };
   share.onclick = () => {
     const text = payload && (payload.share || (payload.kind === "features" ? payload.document : ""));
@@ -3428,6 +3430,7 @@ function buildMenus() {
       ["Fenster schließen", closeWindow],
     ]],
     ["Hilfe", [
+      ["Kurzanleitung", () => { S.guideKind = "kurz"; setBottom("guide"); }],
       ["Befehlslisten", () => { S.guideKind = "powershell"; setBottom("guide"); }],
       ["PowerShell", () => { S.guideKind = "powershell"; setBottom("guide"); }],
       ["Linux-Shell", () => { S.guideKind = "shell"; setBottom("guide"); }],
@@ -4162,13 +4165,13 @@ async function startCollab() {
 
 function showKeys() {
   const body = document.createElement("pre");
-  body.textContent = "Strg+S Speichern\nStrg+W Datei schließen\nEscape Dialog schließen\nStrg+Z Rückgängig\nStrg+Y Wiederholen\nStrg+X Ausschneiden\nStrg+C Kopieren\nStrg+V Einfügen\nStrg+F Suchen\nStrg+H Ersetzen\nStrg+/ Zeile kommentieren\nStrg+D Nächstes Vorkommen\nAlt+↑/↓ Zeile verschieben\nUmschalt+Alt+↓ Zeile duplizieren\nStrg+Umschalt+K Zeile löschen\nStrg+G Gehe zu Zeile\nStrg+F5 Ausführen\nAlt+F5 Markierung im Fenster\nUmschalt+Alt+F5 Funktion im Fenster\nF5 Debug/Weiter\nF9 Haltepunkt\nF10 Schritt über\nF11 Schritt hinein\nF12 Definition\nStrg+K Inline-KI\nStrg+Eingabe Prompt senden\nStrg+Leertaste Vervollständigen\nStrg+Umschalt+F Suche\nStrg+Umschalt+H In Dateien ersetzen\nHilfe Befehlslisten für PowerShell, Linux-Shell und Batch, Feature-Liste zum Weitergeben\nStudio Baukasten, Skript, Datenbank, EXE, MSI, Modul, GUI, Dienst, Messen, PS-Hilfe";
+  body.textContent = "Strg+S Speichern\nStrg+W Datei schließen\nEscape Dialog schließen\nStrg+Z Rückgängig\nStrg+Y Wiederholen\nStrg+X Ausschneiden\nStrg+C Kopieren\nStrg+V Einfügen\nStrg+F Suchen\nStrg+H Ersetzen\nStrg+/ Zeile kommentieren\nStrg+D Nächstes Vorkommen\nAlt+↑/↓ Zeile verschieben\nUmschalt+Alt+↓ Zeile duplizieren\nStrg+Umschalt+K Zeile löschen\nStrg+G Gehe zu Zeile\nStrg+F5 Ausführen\nAlt+F5 Markierung im Fenster\nUmschalt+Alt+F5 Funktion im Fenster\nF5 Debug/Weiter\nF9 Haltepunkt\nF10 Schritt über\nF11 Schritt hinein\nF12 Definition\nStrg+K Inline-KI\nStrg+Eingabe Prompt senden\nStrg+Leertaste Vervollständigen\nStrg+Umschalt+F Suche\nStrg+Umschalt+H In Dateien ersetzen\nHilfe Kurzanleitung, Befehlslisten für PowerShell, Linux-Shell und Batch, Feature-Liste zum Weitergeben\nStudio Baukasten, Skript, Datenbank, EXE, MSI, Modul, GUI, Dienst, Messen, PS-Hilfe";
   modal("Tastatur", body, [{ label: "Schließen", run: () => {} }]);
 }
 
 function about() {
   const body = document.createElement("div");
-  body.innerHTML = "<p><b>ShatuIDE</b> 1.0</p><p>Andreas Meyer<br>ame@sellerbach.de</p><p>Lokale IDE für Python, PowerShell, Linux-Shell und Windows-Batch. Workspace mit vollem Dateizugriff, Standard unter Windows: D:\\AI_Temp\\ShatuIDE. Hilfe enthält die Befehlslisten und die Feature-Liste zur Weitergabe.</p>";
+  body.innerHTML = "<p><b>ShatuIDE</b> 1.0</p><p>Andreas Meyer<br>ame@sellerbach.de</p><p>Lokale IDE für Python, PowerShell, Linux-Shell und Windows-Batch. Workspace mit vollem Dateizugriff, Standard unter Windows: D:\\AI_Temp\\ShatuIDE. Hilfe enthält die Kurzanleitung, die Befehlslisten und die Feature-Liste zur Weitergabe.</p>";
   modal("Über", body, [{ label: "Schließen", run: () => {} }]);
 }
 

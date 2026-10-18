@@ -1354,6 +1354,17 @@ class GuideTests(unittest.TestCase):
         self.assertFalse(catalog("cobol")["ok"])
         info = ROOT / "INFO.md"
         self.assertEqual(info.read_text(encoding="utf-8"), share_document())
+        from shatuide.guide import quick_document
+
+        short = catalog("kurzanleitung")
+        self.assertTrue(short["ok"], short)
+        self.assertEqual(short["kind"], "kurz")
+        self.assertEqual(short["title"], "Kurzanleitung")
+        self.assertIn("hallo.bat", short["document"])
+        self.assertIn("Windows-Batch", short["document"])
+        self.assertIn("Strg+F5", short["document"])
+        self.assertIn("Feature-Liste", short["share"])
+        self.assertEqual((ROOT / "KURZANLEITUNG.md").read_text(encoding="utf-8"), quick_document())
 
     def test_guide_api_and_saved_handout(self) -> None:
         tmp = tempfile.TemporaryDirectory()

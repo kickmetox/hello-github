@@ -58,6 +58,7 @@ Diese Info- und Feature-Liste darf weitergegeben werden.
 
 ### Weitergeben
 
+- Die Kurzanleitung liegt als KURZANLEITUNG.md und unter Hilfe → Kurzanleitung.
 - Diese Feature-Liste liegt als INFO.md im Arbeitsordner.
 - Im Fenster Hilfe kopiert Alles zur Weitergabe denselben Text.
 - Speichern schreibt ausgabe/ShatuIDE-Info.md.
