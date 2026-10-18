@@ -1,0 +1,8 @@
+{
+  "mode": "schedule",
+  "accent": "#dff24a",
+  "cursor": "Adwaita",
+  "wallpaper": "/home/andreas/.local/share/backgrounds/graphite.png",
+  "dark_from": "19:00",
+  "light_from": "07:00"
+}

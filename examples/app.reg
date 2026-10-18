@@ -1,0 +1,9 @@
+Windows Registry Editor Version 5.00
+
+[HKEY_CURRENT_USER\Software\Git\user]
+"name"="Andreas"
+"email"="andreas@example.com"
+
+[HKEY_CURRENT_USER\Software\Git\core]
+"editor"="C:\\Users\\andreas\\AppData\\Local\\bin\\nvim"
+"autocrlf"="true"

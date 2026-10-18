@@ -1,0 +1,5 @@
+# CrossOS-Beispiel, keine echte Shell-Konfiguration
+export EDITOR="/home/andreas/.local/bin/nvim"
+export PROJECTS="/mnt/c/Users/andreas/Documents"
+export XDG_CONFIG_HOME="$HOME/.config"
+alias ll='ls -al'

@@ -1,0 +1,11 @@
+Okt 18 18:02:11 host systemd[1]: nginx.service: Main process exited, code=exited, status=1/FAILURE
+Okt 18 18:02:11 host systemd[1]: nginx.service: Failed with result 'exit-code'.
+Okt 18 18:02:11 host systemd[1]: Failed to start nginx.service - A high performance web server.
+Okt 18 18:04:02 host kernel: demo[4412]: segfault at 0 ip 00007f0a0b0c0d0e sp 00007ffd1a2b3c4d error 4 in libc.so.6
+demo[4412]: Segmentation fault (core dumped)
+dpkg: error processing package nginx (--configure):
+ installed nginx package post-installation script subprocess returned error exit status 1
+Errors were encountered while processing:
+ nginx
+E: Unmet dependencies. Try 'apt --fix-broken install' with no packages (or specify a solution).
+You have held broken packages.

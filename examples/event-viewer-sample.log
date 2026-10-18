@@ -1,0 +1,26 @@
+Log Name:      Application
+Source:        Application Error
+Event ID:      1000
+Level:         Error
+Description:
+Faulting application name: report.exe, version: 1.0.0.0
+Faulting module name: VCRUNTIME140.dll, version: 14.0.0.0
+Exception code: 0xC0000005
+Fault offset: 0x0000000000012345
+
+Log Name:      System
+Source:        Microsoft-Windows-Kernel-Power
+Event ID:      41
+Level:         Critical
+Description:
+The system has rebooted without cleanly shutting down first.
+
+Log Name:      System
+Source:        Microsoft-Windows-WindowsUpdateClient
+Event ID:      20
+Level:         Error
+Description:
+Installation Failure: Windows failed to install the following update with error 0x80070002.
+A second attempt failed with 0x80070005: Access is denied.
+Parameter from the caller was rejected: 0x80070057.
+Unspecified COM failure 0x80004005.

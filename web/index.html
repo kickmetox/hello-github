@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CrossOS — Workflow &amp; System Sync</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="app">
+    <aside class="rail">
+      <div class="brand">
+        <svg class="mark" viewBox="0 0 36 36" aria-hidden="true">
+          <rect x="1" y="1" width="34" height="34" fill="#1d2218" stroke="#dff24a" stroke-width="1.5"/>
+          <path d="M8 18h20M18 8v20" stroke="#dff24a" stroke-width="1.5"/>
+          <circle cx="18" cy="18" r="3" fill="#dff24a"/>
+        </svg>
+        <strong>CROSSOS</strong>
+        <span>Workflow / Sync / SYS</span>
+      </div>
+      <nav>
+        <button type="button" data-page="overview" class="active">Übersicht</button>
+        <button type="button" data-page="migrator">Migrator</button>
+        <button type="button" data-page="diagnose">Diagnose</button>
+        <button type="button" data-page="hardware">Hardware</button>
+      </nav>
+      <div class="stamp">
+        Standard ist <b>Dry-Run</b>. Skripte werden gezeigt, bevor irgendetwas läuft. Dateisystem, Firmware und Spannung bleiben Plan.
+      </div>
+    </aside>
+    <main class="main">
+      <header class="top">
+        <div>
+          <div class="eyebrow" id="eyebrow">Modul 00</div>
+          <h1 id="title">Übersicht</h1>
+        </div>
+        <div class="pill">DRY-RUN · LOKAL · KEIN CLOUD-LLM</div>
+      </header>
+
+      <section id="page-overview" class="grid">
+        <div class="grid cols-3">
+          <article class="panel">
+            <div class="kicker">MOD / 01</div>
+            <h2>Migrator</h2>
+            <p class="muted">Dotfiles, Registry, Pfade, App-Gleichwertigkeit, Kürzel, Gesten, Design. Nichts wird installiert.</p>
+          </article>
+          <article class="panel">
+            <div class="kicker">MOD / 02</div>
+            <h2>Diagnose</h2>
+            <p class="muted">Ereignisanzeige, journalctl, dmesg. Klartext auf Deutsch, Skript als Plan, Ein-Klick nur auf der Freigabeliste.</p>
+          </article>
+          <article class="panel">
+            <div class="kicker">MOD / 03</div>
+            <h2>Hardware</h2>
+            <p class="muted">Dieselben Lüfterschwellen, sysfs-Lesung, Ladeschwelle nur mit Knoten und Bestätigung, Undervolt nur als Datensatz.</p>
+          </article>
+        </div>
+        <article class="panel">
+          <div class="row">
+            <h2>Systemlage</h2>
+            <button type="button" class="btn" id="reload-overview">Aktualisieren</button>
+          </div>
+          <pre id="overview-out">Lade …</pre>
+        </article>
+      </section>
+
+      <section id="page-migrator" class="grid hidden">
+        <div class="subnav" id="mig-tabs">
+          <button type="button" data-tab="config" class="active">Konfiguration</button>
+          <button type="button" data-tab="paths">Pfade</button>
+          <button type="button" data-tab="apps">Apps</button>
+          <button type="button" data-tab="keys">Kürzel</button>
+          <button type="button" data-tab="gestures">Gesten</button>
+          <button type="button" data-tab="theme">Design</button>
+        </div>
+
+        <div data-mig="config" class="grid cols-2">
+          <article class="panel">
+            <h2>Quelle</h2>
+            <div class="row">
+              <button type="button" class="btn-ghost" data-example="gitconfig.sample">gitconfig</button>
+              <button type="button" class="btn-ghost" data-example="bashrc.sample">bashrc</button>
+              <button type="button" class="btn-ghost" data-example="vscode-settings.json">VS Code</button>
+              <button type="button" class="btn-ghost" data-example="app.reg">.reg</button>
+            </div>
+            <label>Text<textarea id="cfg-text"></textarea></label>
+            <div class="grid cols-2">
+              <label>Quellformat
+                <select id="cfg-from">
+                  <option value="">erkennen</option>
+                  <option>ini</option><option>json</option><option>reg</option>
+                  <option>bash</option><option>xml</option><option>env</option>
+                </select>
+              </label>
+              <label>Zielformat
+                <select id="cfg-to">
+                  <option>reg</option><option>json</option><option>ini</option>
+                  <option>bash</option><option>xml</option><option>env</option>
+                </select>
+              </label>
+              <label>Zielsystem
+                <select id="cfg-os"><option>windows</option><option>linux</option><option>wsl</option></select>
+              </label>
+              <label>Benutzer für ~ und %VAR%<input id="cfg-user" value="andreas"></label>
+            </div>
+            <button type="button" class="btn" id="cfg-run">Übersetzen</button>
+          </article>
+          <article class="panel">
+            <h2>Ergebnis und Pfaddiff</h2>
+            <pre id="cfg-out"></pre>
+            <div id="cfg-diff"></div>
+          </article>
+        </div>
+
+        <div data-mig="paths" class="panel hidden">
+          <h2>Pfadkorrektur</h2>
+          <div class="grid cols-2">
+            <label>Pfad<input id="path-in" value="/home/andreas/.config/Code/User/settings.json"></label>
+            <label>Ziel
+              <select id="path-os"><option>windows</option><option>linux</option><option>wsl</option></select>
+            </label>
+          </div>
+          <button type="button" class="btn" id="path-run">Übersetzen</button>
+          <pre id="path-out"></pre>
+        </div>
+
+        <div data-mig="apps" class="panel hidden">
+          <h2>App-Plan</h2>
+          <p class="muted">Photoshop wird nicht als Linux-Paket ausgegeben. GIMP und Krita stehen als Workflow, nicht als 1:1.</p>
+          <div class="grid cols-2">
+            <label>Namen, kommagetrennt<input id="apps-in" value="Notepad++, Photoshop, Git"></label>
+            <label>Zielsystem
+              <select id="apps-os"><option>linux</option><option>windows</option></select>
+            </label>
+          </div>
+          <label class="checks"><input type="checkbox" id="apps-detect"> Installierte Binärdateien und dpkg auf diesem Host prüfen</label>
+          <button type="button" class="btn" id="apps-run">Plan erstellen</button>
+          <div id="apps-out"></div>
+        </div>
+
+        <div data-mig="keys" class="panel hidden">
+          <h2>Kürzel</h2>
+          <div class="row">
+            <button type="button" class="btn-ghost" id="keys-example">VS-Code-Beispiel laden</button>
+          </div>
+          <label>Kürzel oder Keybindings-JSON<textarea id="keys-in">Strg+Alt+Entf</textarea></label>
+          <label>Ziel
+            <select id="keys-os"><option>windows</option><option>linux</option></select>
+          </label>
+          <button type="button" class="btn" id="keys-run">Übersetzen</button>
+          <pre id="keys-out"></pre>
+        </div>
+
+        <div data-mig="gestures" class="panel hidden">
+          <h2>Touchpad</h2>
+          <label class="checks"><input type="checkbox" id="g-natural" checked> Natürliches Scrollen</label>
+          <label class="checks"><input type="checkbox" id="g-tap" checked> Tippen klickt</label>
+          <div class="grid cols-2">
+            <label>Drei Finger
+              <select id="g-three"><option>workspace</option><option>back</option><option>overview</option><option>none</option></select>
+            </label>
+            <label>Vier Finger
+              <select id="g-four"><option>overview</option><option>workspace</option><option>none</option></select>
+            </label>
+          </div>
+          <button type="button" class="btn" id="g-run">Schnipsel erzeugen</button>
+          <pre id="g-out"></pre>
+        </div>
+
+        <div data-mig="theme" class="panel hidden">
+          <h2>Designbrücke</h2>
+          <div class="grid cols-2">
+            <label>Modus
+              <select id="t-mode"><option>dark</option><option>light</option><option>schedule</option></select>
+            </label>
+            <label>Akzent<input id="t-accent" value="#dff24a"></label>
+            <label>Zeiger<input id="t-cursor" value="Adwaita"></label>
+            <label>Wallpaper<input id="t-wall" value="/home/andreas/.local/share/backgrounds/graphite.png"></label>
+          </div>
+          <button type="button" class="btn" id="t-run">Pläne erzeugen</button>
+          <pre id="t-out"></pre>
+        </div>
+      </section>
+
+      <section id="page-diagnose" class="grid hidden">
+        <article class="panel">
+          <div class="row">
+            <h2>Protokoll</h2>
+            <div class="row">
+              <button type="button" class="btn-ghost" data-log="journal-sample.log">journalctl</button>
+              <button type="button" class="btn-ghost" data-log="event-viewer-sample.log">Ereignisanzeige</button>
+              <button type="button" class="btn-ghost" data-log="dmesg-sample.log">dmesg</button>
+            </div>
+          </div>
+          <label>Text<textarea id="diag-text"></textarea></label>
+          <label>Skript-Shell
+            <select id="diag-shell"><option>bash</option><option>powershell</option></select>
+          </label>
+          <button type="button" class="btn" id="diag-run">Analysieren</button>
+        </article>
+        <div id="diag-out"></div>
+        <article class="panel">
+          <h2>Firmware, nur lesen</h2>
+          <button type="button" class="btn" id="fw-run">fwupdmgr prüfen oder Plan zeigen</button>
+          <pre id="fw-out"></pre>
+        </article>
+        <article class="panel">
+          <h2>Dateisystem-Rettung, nur Plan</h2>
+          <div class="grid cols-3">
+            <label>Host
+              <select id="rs-host"><option>linux</option><option>windows</option></select>
+            </label>
+            <label>Dateisystem
+              <select id="rs-fs"><option>ntfs</option><option>ext4</option><option>btrfs</option></select>
+            </label>
+            <label>Gerät<input id="rs-dev" value="/dev/sdb1"></label>
+          </div>
+          <button type="button" class="btn" id="rs-run">Plan</button>
+          <pre id="rs-out"></pre>
+        </article>
+      </section>
+
+      <section id="page-hardware" class="grid hidden">
+        <article class="panel">
+          <div class="row">
+            <h2>Sonde</h2>
+            <button type="button" class="btn" id="hw-probe">sysfs lesen</button>
+          </div>
+          <pre id="hw-probe-out">Noch nicht gelesen.</pre>
+        </article>
+        <article class="panel">
+          <h2>Lüfterkurve</h2>
+          <p class="muted">Silent, Balanced, Performance und Turbo verwenden auf beiden Systemen dieselben °C- und Duty-Punkte. PWM wird nicht geschrieben.</p>
+          <div class="subnav" id="fan-names"></div>
+          <div id="fan-svg"></div>
+          <pre id="fan-out"></pre>
+        </article>
+        <div class="grid cols-2">
+          <article class="panel">
+            <h2>Ladeschwelle</h2>
+            <label>Stopp bei <span id="bat-label">80</span> %
+              <input class="slider" id="bat-range" type="range" min="20" max="100" value="80">
+            </label>
+            <label class="checks"><input type="checkbox" id="bat-confirm"> Schreiben bestätigen, falls der sysfs-Knoten existiert und beschreibbar ist</label>
+            <button type="button" class="btn" id="bat-run">Profil speichern</button>
+            <pre id="bat-out"></pre>
+          </article>
+          <article class="panel">
+            <h2>Undervolt / OC, nur Daten</h2>
+            <div class="warn">Moderne Intel-CPUs sperren Undervolting häufig. Der Offset wird gespeichert und nicht angewendet.</div>
+            <div class="grid cols-2">
+              <label>CPU
+                <select id="uv-cpu"><option>intel</option><option>amd</option></select>
+              </label>
+              <label>GPU
+                <select id="uv-gpu"><option>nvidia</option><option>amd</option><option>intel</option></select>
+              </label>
+              <label>CPU-Kern mV<input id="uv-core" type="number" value="-50"></label>
+              <label>CPU-Cache mV<input id="uv-cache" type="number" value="-50"></label>
+              <label>GPU mV<input id="uv-gmv" type="number" value="0"></label>
+              <label>GPU-Kern MHz<input id="uv-gcore" type="number" value="0"></label>
+            </div>
+            <button type="button" class="btn" id="uv-run">Offset speichern</button>
+            <pre id="uv-out"></pre>
+          </article>
+        </div>
+        <article class="panel">
+          <h2>Energieprofile</h2>
+          <p class="muted">powerprofilesctl nur mit Bestätigung und nur wenn das Programm da ist. TLP bleibt ein Schnipsel.</p>
+          <label class="checks"><input type="checkbox" id="pwr-confirm"> powerprofilesctl set bestätigen</label>
+          <div id="pwr-out"></div>
+        </article>
+      </section>
+    </main>
+  </div>
+  <script src="/app.js"></script>
+</body>
+</html>

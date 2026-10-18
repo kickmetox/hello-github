@@ -1,0 +1,6 @@
+{
+  "terminal.integrated.defaultProfile.linux": "bash",
+  "files.eol": "\n",
+  "python.defaultInterpreterPath": "/home/andreas/.local/bin/python3",
+  "editor.fontFamily": "IBM Plex Mono"
+}

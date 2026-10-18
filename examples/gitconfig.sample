@@ -1,0 +1,7 @@
+[user]
+	name = Andreas
+	email = andreas@example.com
+[core]
+	editor = /home/andreas/.local/bin/nvim
+	autocrlf = input
+	excludesfile = /home/andreas/.config/git/ignore

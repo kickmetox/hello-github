@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<configuration>
+  <section name="editor">
+    <add key="path" value="/home/andreas/.config/nvim/init.vim"/>
+    <add key="files.eol" value="&#10;"/>
+  </section>
+</configuration>
