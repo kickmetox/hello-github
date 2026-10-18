@@ -25,6 +25,9 @@ PRESERVE = {
     "bild.png",
     "app.ico",
     "app.png",
+    "shatuide.png",
+    "shatuide.jpg",
+    "shatuide.jpeg",
 }
 
 

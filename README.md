@@ -42,7 +42,7 @@ Auf diesem Linux-System gibt es kein Laufwerk `D:`. `install.py` kopiert erst un
 
 ## Icon
 
-Liegt im Programmordner `shatuide.jpg`, `icon.png`, `icon.ico`, `logo.png` oder `grafik.png`, wird diese Datei verwendet. `shatuide.jpg` hat Vorrang. Eine nicht quadratische PNG wird auf das Quadrat in der Mitte zugeschnitten. Sonst gilt `assets/icon.png`.
+Das Programm-Icon ist die Mitte von `shatuide.png`. Liegt im Programmordner `shatuide.jpg`, `shatuide.png`, `icon.png`, `icon.ico`, `logo.png` oder `grafik.png`, wird diese Datei verwendet. `shatuide.jpg` und `shatuide.png` haben Vorrang. Eine nicht quadratische PNG wird auf das Quadrat in der Mitte zugeschnitten. Sonst gilt `assets/icon.png`. `ShatuIDE.exe` trägt dasselbe Icon.
 
 ## Funktionen
 

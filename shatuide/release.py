@@ -6,10 +6,12 @@ import argparse
 import shutil
 import subprocess
 import tarfile
+import tempfile
 import urllib.request
 from pathlib import Path
 
 from shatuide import __version__
+from shatuide.paths import ASSETS
 from shatuide.studio import build_msi
 from shatuide.tools import RELEASE_API, pick_asset
 
@@ -47,6 +49,21 @@ def project_files(source: Path) -> list[Path]:
     return files
 
 
+def _windows_icon_object(folder: Path) -> Path | None:
+    """Bettet assets/icon.ico in die EXE, wenn der Ressourcen-Compiler da ist."""
+    ico = ASSETS / "icon.ico"
+    windres = shutil.which("x86_64-w64-mingw32-windres")
+    if not ico.is_file() or not windres:
+        return None
+    rc = folder / "shatuide_icon.rc"
+    obj = folder / "shatuide_icon.o"
+    rc.write_text(f'1 ICON "{ico.as_posix()}"\n', encoding="ascii")
+    proc = subprocess.run([windres, "-O", "coff", "-o", str(obj), str(rc)], capture_output=True, text=True, timeout=60)
+    if proc.returncode != 0 or not obj.is_file():
+        return None
+    return obj
+
+
 def compile_launcher(kind: str, dest: Path) -> dict:
     dest.parent.mkdir(parents=True, exist_ok=True)
     if kind == "windows":
@@ -55,6 +72,14 @@ def compile_launcher(kind: str, dest: Path) -> dict:
         if not compiler:
             return {"ok": False, "error": "Windows-Compiler fehlt (x86_64-w64-mingw32-gcc)."}
         argv = [compiler, "-O2", "-s", "-o", str(dest), str(source), "-lshell32"]
+        with tempfile.TemporaryDirectory() as tmp:
+            icon_object = _windows_icon_object(Path(tmp))
+            if icon_object is not None:
+                argv.insert(-1, str(icon_object))
+            proc = subprocess.run(argv, capture_output=True, text=True, timeout=120)
+        if proc.returncode != 0:
+            return {"ok": False, "error": (proc.stderr or proc.stdout or "Compiler fehlgeschlagen.").strip()}
+        return {"ok": True, "path": str(dest)}
     else:
         compiler = shutil.which("gcc")
         source = PACKAGING / "launcher_posix.c"

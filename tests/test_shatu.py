@@ -21,7 +21,8 @@ sys.path.insert(0, str(ROOT))
 from shatuide import analysis, ai, history, http_client, integrations, notebook, refactor, tools
 from shatuide.debug_session import DebugSession
 from shatuide.formatter import fallback_format
-from shatuide.icon_util import crop_center_square, decode_png, encode_png, generated_icon_png, icon_priority
+from shatuide.icon_util import crop_center_square, decode_png, encode_png, generated_icon_png, icon_priority, load_icon_bytes
+from shatuide.paths import ASSETS
 from shatuide.kernel_worker import main as kernel_main  # noqa: F401  (Importpfad)
 from shatuide.runner import compile_file
 from shatuide.server import KernelSession, create_server
@@ -137,6 +138,16 @@ class ToolTests(unittest.TestCase):
         assert shatu is not None and graphic is not None
         self.assertLess(shatu, graphic)
         self.assertIsNone(icon_priority(Path("readme.md")))
+        graphic = ROOT / "shatuide.png"
+        self.assertTrue(graphic.is_file())
+        decoded_icon = decode_png(graphic.read_bytes())
+        self.assertIsNotNone(decoded_icon)
+        assert decoded_icon is not None
+        expected = crop_center_square(*decoded_icon)
+        served, content_type = load_icon_bytes()
+        self.assertEqual(content_type, "image/png")
+        self.assertEqual(served, expected)
+        self.assertEqual((ASSETS / "icon.png").read_bytes(), expected)
 
 
 class HistoryHttpNotebookTests(unittest.TestCase):
@@ -894,7 +905,9 @@ class StudioTests(unittest.TestCase):
             built = build_release(Path(__file__).resolve().parent.parent, Path(tmp), bundle_python=False)
             self.assertTrue(built["ok"], built)
             exe = Path(built["exe"])
-            self.assertTrue(exe.read_bytes().startswith(b"MZ"))
+            exe_bytes = exe.read_bytes()
+            self.assertTrue(exe_bytes.startswith(b"MZ"))
+            self.assertIn(b"\x89PNG", exe_bytes)
             msi = Path(built["msi"])
             self.assertTrue(msi.is_file())
             self.assertGreater(msi.stat().st_size, 1000)
