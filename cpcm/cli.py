@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -40,8 +41,15 @@ def main(argv: list[str] | None = None) -> int:
     diagnose_parser = sub.add_parser("diagnose")
     diagnose_parser.add_argument("file", type=Path)
     sub.add_parser("probe")
+    sub.add_parser("window")
     args = parser.parse_args(argv)
     root = (args.root or install_root()).resolve()
+    if args.command == "window":
+        if os.name != "nt":
+            print("Das Fenster ist das Windows-Programm CPCM.exe. Unter Linux entsteht es mit docs/LINUX-BUILD.md.")
+            return 0
+        from cpcm.winui import run
+        return run(root)
     if args.command == "serve":
         from cpcm.server import DEFAULT_PORT, serve
         settings = load_settings(root)

@@ -1,0 +1,25 @@
+CPCM Hilfe
+
+Andreas Meyer
+ame@sellerbach.de
+
+Das Programm ist ein Fenster. Es öffnet keinen Browser.
+
+Sicherung
+Ordner öffnen, Eintrag markieren, Aufnehmen. Sicherung erstellen schreibt in den Vault. Datei… nimmt eine einzelne Datei auf. Entfernen löscht nur die Auswahl, nicht die Datei auf der Platte.
+
+Wiederherstellen
+Menü Bearbeiten, Wiederherstellen. Sicherung wählen. Ein leeres Ziel benutzt die eigenen Ordner. Ein Zielordner schreibt dorthin. Vor dem Ersetzen bleibt die alte Datei unter vault\pre-restore.
+
+Welten
+Menü Bearbeiten, Welten. Linux-Home und Windows-Home bestimmen die Pfade der anderen Welt. Der Vault kann auf einer gemeinsamen Partition liegen.
+
+Programme, Konfiguration, Diagnose, Hardware
+Diese Punkte erzeugen Text. Pakete werden nicht installiert. Dateisysteme werden nicht repariert. Spannung wird nicht geschrieben.
+
+Dokumente
+Hilfe, Bedienungsanleitung öffnet die Anleitung in WordPad.
+Hilfe, Feature-Liste öffnet die Funktionsliste in WordPad.
+
+Installation
+CPCM-Setup.exe. Zielordner D:\AI_Temp\CPCM. Der Ordner von ShatuIDE wird abgelehnt.

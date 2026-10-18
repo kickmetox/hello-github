@@ -3,7 +3,8 @@ setlocal
 cd /d "%~dp0"
 set "PYEXE="
 set "PYARGS="
-if exist "%~dp0python\python.exe" set "PYEXE=%~dp0python\python.exe"
+if exist "%~dp0python\pythonw.exe" set "PYEXE=%~dp0python\pythonw.exe"
+if not defined PYEXE if exist "%~dp0python\python.exe" set "PYEXE=%~dp0python\python.exe"
 if not defined PYEXE where py >nul 2>&1 && set "PYEXE=py" && set "PYARGS=-3"
 if not defined PYEXE where python >nul 2>&1 && set "PYEXE=python"
 if not defined PYEXE (
@@ -15,5 +16,5 @@ if exist "%~dp0CPCM.exe" if exist "%~dp0python\python.exe" (
   "%~dp0CPCM.exe"
   exit /b %ERRORLEVEL%
 )
-"%PYEXE%" %PYARGS% "%~dp0cpcm.py" serve
+"%PYEXE%" %PYARGS% "%~dp0cpcm.py" window
 if errorlevel 1 pause

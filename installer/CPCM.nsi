@@ -36,7 +36,7 @@ ShowUninstDetails show
 !define MUI_FINISHPAGE_RUN_FUNCTION LaunchCPCM
 !define MUI_FINISHPAGE_RUN_TEXT "CPCM jetzt starten"
 !define MUI_FINISHPAGE_TITLE "CPCM ist installiert"
-!define MUI_FINISHPAGE_TEXT "CPCM liegt im gewählten Ordner. Die Verknüpfung auf dem Desktop und im Startmenü startet die mitgelieferte python.exe.$\r$\n$\r$\nAndreas Meyer, ame@sellerbach.de"
+!define MUI_FINISHPAGE_TEXT "CPCM liegt im gewählten Ordner. Die Verknüpfung öffnet das Programmfenster, nicht den Browser. Hilfe, Bedienungsanleitung und Feature-Liste liegen im Menü Hilfe.$\r$\n$\r$\nAndreas Meyer, ame@sellerbach.de"
 
 !insertmacro MUI_PAGE_WELCOME
 !insertmacro MUI_PAGE_DIRECTORY
@@ -108,6 +108,9 @@ Section "CPCM" SecMain
 
   SetOutPath "$INSTDIR\docs"
   File "..\docs\*.md"
+  File "..\docs\HILFE.txt"
+  File "..\docs\BEDIENUNGSANLEITUNG.rtf"
+  File "..\docs\FEATURE-LISTE.rtf"
 
   SetOutPath "$INSTDIR\examples"
   File "..\examples\*.*"

@@ -9,7 +9,7 @@ Zielordner: `D:\AI_Temp\CPCM`
 
 ## Setup
 
-Normaler Weg: `CPCM-Setup.exe` doppelklicken. Python 3.12 (64-bit) ist im Setup enthalten, ein separates Python ist nicht nötig. Der Assistent schlägt `D:\AI_Temp\CPCM` vor. Der Ordner lässt sich ändern. `D:\AI_Temp\ShatuIDE` und jeder Ordner mit `ShatuIDE.exe` oder `shatuide.py` wird abgelehnt. Das Setup legt eine Desktop-Verknüpfung und einen Startmenü-Eintrag an. Beide starten `CPCM.exe`. Diese Datei ruft nur die mitgelieferte `python\python.exe` mit `cpcm.py serve` auf und übergibt die `.py`-Datei nicht an die Windows-Dateizuordnung. Die Oberfläche liegt auf `http://127.0.0.1:8910/`. Die Ports 8765 bis 8864 bleiben ShatuIDE. Icon `cpcm.ico`. Die Deinstallation steht in der Windows-Softwareliste. `vault\` und `cpcm-settings.json` werden beim Aktualisieren und beim Deinstallieren nicht gelöscht. `AUTOR.txt` nennt die Rolle Windows-Referenz, Andreas Meyer, ame@sellerbach.de.
+Normaler Weg: `CPCM-Setup.exe` doppelklicken. Python 3.12 (64-bit) ist im Setup enthalten, ein separates Python ist nicht nötig. Der Assistent schlägt `D:\AI_Temp\CPCM` vor. Der Ordner lässt sich ändern. `D:\AI_Temp\ShatuIDE` und jeder Ordner mit `ShatuIDE.exe` oder `shatuide.py` wird abgelehnt. Das Setup legt eine Desktop-Verknüpfung und einen Startmenü-Eintrag an. Beide starten `CPCM.exe`. Das ist ein Windows-Fenster, kein Browser. `CPCM.exe` ruft `python\pythonw.exe` mit `cpcm.py window` auf und übergibt die `.py`-Datei nicht an die Windows-Dateizuordnung. Hilfe, Bedienungsanleitung und Feature-Liste liegen im Menü Hilfe. Icon `cpcm.ico`. Die Deinstallation steht in der Windows-Softwareliste. `vault\` und `cpcm-settings.json` werden beim Aktualisieren und beim Deinstallieren nicht gelöscht. `AUTOR.txt` nennt die Rolle Windows-Referenz, Andreas Meyer, ame@sellerbach.de.
 
 `Install-CPCM.ps1` ist die Alternative, wenn der Quellordner schon vorliegt. Dafür gilt der folgende Ablauf, inklusive selbst installiertem Python.
 
@@ -42,7 +42,7 @@ Liegt der Ordner schon in `D:\AI_Temp\CPCM`, denselben Befehl dort ausführen. R
 
 ## 3. Start
 
-`CPCM.exe`, `CPCM.bat` oder die Desktop-Verknüpfung. Der Browser öffnet `http://127.0.0.1:8910/`. In der Kopfzeile stehen Vault-Pfad und „Andreas Meyer · ame@sellerbach.de“. Ist 8910 belegt, nimmt CPCM den nächsten freien Port bis 8929 und öffnet genau diese Adresse.
+`CPCM.exe`, `CPCM.bat` oder die Desktop-Verknüpfung. Es öffnet sich das Programmfenster. Unten stehen Vault-Pfad und „Andreas Meyer · ame@sellerbach.de“. Die Bedienungsanleitung ist `docs\BEDIENUNGSANLEITUNG.rtf`, die Feature-Liste `docs\FEATURE-LISTE.rtf`.
 
 Der normale Weg ist `CPCM-Setup.exe` im Abschnitt Setup. `Install-CPCM.ps1` bleibt die Alternative für den Quellordner.
 

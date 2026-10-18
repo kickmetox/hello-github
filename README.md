@@ -4,20 +4,19 @@ CPCM sichert selbst gewählte Dateien und Ordner in einen gemeinsamen Vault, lie
 
 Andreas Meyer, ame@sellerbach.de.
 
-Die Windows-Fassung in `D:\AI_Temp\CPCM` ist die Referenz. Die Linux-Fassung wird daraus später nachgebaut.
+Die Windows-Fassung in `D:\AI_Temp\CPCM` ist die Referenz. Das Programm ist ein Fenster, kein Browser. Die Linux-Fassung wird daraus später nachgebaut.
 
 - Windows, zuerst: [docs/WINDOWS-ANLEITUNG.md](docs/WINDOWS-ANLEITUNG.md)
+- Bedienungsanleitung: [docs/BEDIENUNGSANLEITUNG.rtf](docs/BEDIENUNGSANLEITUNG.rtf)
+- Feature-Liste: [docs/FEATURE-LISTE.rtf](docs/FEATURE-LISTE.rtf)
+- Linux bauen: [docs/LINUX-BUILD.md](docs/LINUX-BUILD.md)
 - Linux, danach: [docs/LINUX-ANLEITUNG.md](docs/LINUX-ANLEITUNG.md)
 
 ## Start
 
 Python 3.11 oder neuer, keine zusätzlichen Pakete.
 
-Windows, im Ordner `D:\AI_Temp\CPCM`:
-
-```bat
-CPCM.bat
-```
+Windows, im Ordner `D:\AI_Temp\CPCM`: Desktop-Verknüpfung oder `CPCM.exe`. Das öffnet das Fenster.
 
 Linux:
 
@@ -25,7 +24,7 @@ Linux:
 ./cpcm.sh
 ```
 
-Die Oberfläche bindet nur an `127.0.0.1`. Der Port ist 8910. 8765 bis 8864 bleiben für ShatuIDE frei.
+Unter Windows öffnet `CPCM.exe` das Fenster und keinen Browser. Der optionale Befehl `python3 cpcm.py serve` bindet nur an `127.0.0.1`, Port 8910. 8765 bis 8864 bleiben für ShatuIDE frei.
 
 ## Windows-Setup
 
