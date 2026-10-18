@@ -30,7 +30,7 @@ Bash- und PowerShell-Skripte lassen sich laden und bearbeiten. **Ausführen** st
 
 **Alt+F5** prüft die markierte Zeile oder den Abschnitt in einem eigenen Fenster. **Umschalt+Alt+F5** nimmt die Funktion, Methode oder Klasse an der Schreibmarke, ruft sie ohne Argumente auf, spielt ihren Doctest oder genau diesen Test. Die geöffnete Datei bleibt unverändert. Im Fenster kann der Ausschnitt vor einem erneuten Lauf geändert werden.
 
-**Installer:** `python3 -m shatuide.release` schreibt `ausgabe/ShatuIDE.exe` und `ausgabe/ShatuIDE.msi`. Die EXE startet `shatuide.py`. Sie sucht zuerst `python\python.exe` neben sich, danach `py -3`, `python` und `python3`. Das MSI installiert nach `Programme\ShatuIDE`. Start danach: `ShatuIDE.exe`. `python3 -m shatuide.release --with-python` packt ein Windows-CPython in den Installer, dann braucht der Zielrechner kein eigenes Python. Ohne dieses Paket muss Python 3 installiert sein.
+**Installer:** Im Ordner `installer` liegen `ShatuIDE.exe` und `ShatuIDE.msi`. Unter Windows installiert `msiexec /i ShatuIDE.msi` nach `Programme\ShatuIDE`. `ShatuIDE.exe` startet `shatuide.py`. Sie sucht zuerst `python\python.exe` neben sich, danach `py -3`, `python` und `python3`. Dieses Paket enthält kein Python, auf dem Rechner muss Python 3 installiert sein. Neu bauen: `python3 -m shatuide.release`. `python3 -m shatuide.release --with-python` packt ein Windows-CPython dazu (etwa 160 MB), dann braucht der Zielrechner kein eigenes Python.
 
 Installation in das Zielverzeichnis, ohne vorhandene Icons zu überschreiben:
 
