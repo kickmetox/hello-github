@@ -1036,6 +1036,65 @@ def _short_dir(name: str) -> str:
     return (stem[:6] + "~1")
 
 
+def _msi_token(name: str) -> str:
+    if re.fullmatch(r"[A-Za-z0-9_]{1,8}(\.[A-Za-z0-9_]{1,3})?", name):
+        return name
+    suffix = Path(name).suffix[1:]
+    stem = Path(name).stem
+    short_ext = re.sub(r"[^A-Za-z0-9]", "", suffix).upper()[:3]
+    short_stem = re.sub(r"[^A-Za-z0-9]", "", stem).upper()[:6] or "FILE"
+    short = short_stem + "~1" + (f".{short_ext}" if short_ext else "")
+    return f"{short}|{name}"
+
+
+def _payloads(workspace: Path, files: list[Path]) -> list[tuple[str, Path]]:
+    root = Path(workspace).resolve()
+    staged: list[tuple[str, Path]] = []
+    seen: set[str] = set()
+    for payload in files:
+        path = Path(payload).resolve()
+        if not path.is_file():
+            continue
+        if not inside(root, path):
+            raise ValueError("Der Installer nimmt nur Dateien aus dem Workspace.")
+        relative = path.relative_to(root).as_posix()
+        if relative in seen:
+            continue
+        seen.add(relative)
+        staged.append((relative, path))
+    return staged
+
+
+def _msi_directories(product: str, relative_paths: list[str]) -> tuple[list[list[str]], dict[str, str]]:
+    rows = [
+        ["TARGETDIR", "", "SourceDir"],
+        ["ProgramFilesFolder", "TARGETDIR", "PFiles"],
+        ["INSTALLDIR", "ProgramFilesFolder", f"{_short_dir(product)}|{product}"],
+    ]
+    mapping = {"": "INSTALLDIR"}
+    index = 0
+    folders: list[tuple[str, ...]] = []
+    seen: set[str] = set()
+    for relative in relative_paths:
+        parent = Path(relative).parent
+        if str(parent) == ".":
+            continue
+        parts: list[str] = []
+        for part in parent.parts:
+            parts.append(part)
+            key = "/".join(parts)
+            if key not in seen:
+                seen.add(key)
+                folders.append(tuple(parts))
+    for parts in folders:
+        index += 1
+        key = "/".join(parts)
+        parent_key = "/".join(parts[:-1])
+        rows.append([f"Dir{index}", mapping[parent_key], _msi_token(parts[-1])])
+        mapping[key] = f"Dir{index}"
+    return rows, mapping
+
+
 def _idt(table: str, columns: list[str], types: list[str], keys: list[str], rows: list[list[str]]) -> str:
     lines = ["\t".join(columns), "\t".join(types), "\t".join([table, *keys])]
     for row in rows:
@@ -1056,35 +1115,34 @@ def build_msi(
     except ValueError as exc:
         return {"ok": False, "error": str(exc)}
     maker = (manufacturer or "ShatuIDE").strip()[:80] or "ShatuIDE"
-    payloads = [Path(item) for item in files if Path(item).is_file()]
-    if not payloads:
+    try:
+        staged = _payloads(workspace, files)
+    except ValueError as exc:
+        return {"ok": False, "error": str(exc)}
+    if not staged:
         return {"ok": False, "error": "Keine Datei für den Installer."}
-    for payload in payloads:
-        if not inside(workspace, payload):
-            return {"ok": False, "error": "Der Installer nimmt nur Dateien aus dem Workspace."}
     folder = output_dir(workspace) / product
     if folder.exists():
         shutil.rmtree(folder)
     folder.mkdir(parents=True)
-    staged: list[tuple[str, Path]] = []
-    for index, payload in enumerate(payloads):
-        safe = re.sub(r"[^A-Za-z0-9._-]", "_", payload.name) or f"datei{index}"
-        if safe.startswith("-") or safe.startswith("."):
-            safe = f"datei{index}_{safe.lstrip('.-')}"
-        if any(safe == existing for existing, _path in staged):
-            safe = f"{index}_{safe}"
-        target = folder / safe
-        shutil.copy2(payload, target)
-        staged.append((safe, target))
+    cab_names: list[str] = []
+    for index, (relative, payload) in enumerate(staged):
+        cab_name = f"fil{index}"
+        shutil.copy2(payload, folder / cab_name)
+        cab_names.append(cab_name)
+        mirror = folder / relative
+        mirror.parent.mkdir(parents=True, exist_ok=True)
+        if mirror.resolve() != (folder / cab_name).resolve():
+            shutil.copy2(payload, mirror)
     upgrade = str(uuid.uuid5(uuid.NAMESPACE_URL, "shatuide-msi:" + product)).upper()
     product_code = str(uuid.uuid4()).upper()
     package_code = str(uuid.uuid4()).upper()
     wxs_files = []
-    for index, (safe, _path) in enumerate(staged):
-        component = str(uuid.uuid5(uuid.NAMESPACE_URL, f"shatuide-file:{product}:{safe}")).upper()
+    for index, (relative, _path) in enumerate(staged):
+        component = str(uuid.uuid5(uuid.NAMESPACE_URL, f"shatuide-file:{product}:{relative}")).upper()
         wxs_files.append(
             f'          <Component Id="cmp{index}" Guid="{component}">\n'
-            f'            <File Id="fil{index}" Source="{_xml(safe)}" KeyPath="yes" />\n'
+            f'            <File Id="fil{index}" Source="{_xml(relative)}" KeyPath="yes" />\n'
             "          </Component>"
         )
     wxs = (
@@ -1114,22 +1172,20 @@ def build_msi(
             "wxs": str(wxs_path),
         }
     cab = folder / "files.cab"
-    proc = subprocess.run([gcab, "-c", "-n", str(cab), *[name for name, _path in staged]], cwd=str(folder), capture_output=True, text=True)
+    proc = subprocess.run([gcab, "-c", "-n", str(cab), *cab_names], cwd=str(folder), capture_output=True, text=True)
     if proc.returncode != 0:
         return {"ok": False, "error": (proc.stderr or proc.stdout or "cab fehlgeschlagen").strip(), "wxs": str(wxs_path)}
-    rows_dir = [
-        ["TARGETDIR", "", "SourceDir"],
-        ["ProgramFilesFolder", "TARGETDIR", "PFiles"],
-        ["INSTALLDIR", "ProgramFilesFolder", f"{_short_dir(product)}|{product}"],
-    ]
+    rows_dir, dir_ids = _msi_directories(product, [relative for relative, _path in staged])
     rows_component = []
     rows_feature_components = []
     rows_file = []
-    for index, (safe, path) in enumerate(staged):
-        component = "{" + str(uuid.uuid5(uuid.NAMESPACE_URL, f"shatuide-file:{product}:{safe}")).upper() + "}"
-        rows_component.append([f"cmp{index}", component, "INSTALLDIR", "0", "", f"fil{index}"])
+    for index, (relative, path) in enumerate(staged):
+        component = "{" + str(uuid.uuid5(uuid.NAMESPACE_URL, f"shatuide-file:{product}:{relative}")).upper() + "}"
+        parent = Path(relative).parent
+        parent_key = "" if str(parent) == "." else parent.as_posix()
+        rows_component.append([f"cmp{index}", component, dir_ids[parent_key], "0", "", f"fil{index}"])
         rows_feature_components.append(["Main", f"cmp{index}"])
-        rows_file.append([f"fil{index}", f"cmp{index}", safe, str(path.stat().st_size), "", "", "512", str(index + 1)])
+        rows_file.append([f"fil{index}", f"cmp{index}", _msi_token(Path(relative).name), str(path.stat().st_size), "", "", "512", str(index + 1)])
     tables = {
         "Property.idt": _idt(
             "Property",

@@ -844,7 +844,10 @@ class StudioTests(unittest.TestCase):
                 self.assertTrue(Path(windows["path"]).read_bytes().startswith(b"MZ"))
             payload = root / "liesmich.txt"
             payload.write_text("installer-ok", encoding="utf-8")
-            package = build_msi(root, "Paket", "1.0.0", "ShatuIDE", [payload])
+            nested = root / "static"
+            nested.mkdir()
+            (nested / "app.js").write_text("js-ok", encoding="utf-8")
+            package = build_msi(root, "Paket", "1.0.0", "ShatuIDE", [payload, nested / "app.js"])
             if shutil.which("msibuild") and shutil.which("gcab"):
                 self.assertTrue(package["ok"], package)
                 self.assertTrue(Path(package["wxs"]).is_file())
@@ -852,7 +855,10 @@ class StudioTests(unittest.TestCase):
                 out.mkdir()
                 extracted = subprocess.run(["msiextract", "-C", str(out), package["path"]], capture_output=True, text=True)
                 self.assertEqual(extracted.returncode, 0, extracted.stderr)
-                self.assertEqual((out / "liesmich.txt").read_text(encoding="utf-8"), "installer-ok")
+                self.assertEqual(next(out.rglob("liesmich.txt")).read_text(encoding="utf-8"), "installer-ok")
+                script = next(out.rglob("app.js"))
+                self.assertEqual(script.read_text(encoding="utf-8"), "js-ok")
+                self.assertEqual(script.parent.name, "static")
             else:
                 self.assertFalse(package["ok"])
                 self.assertIn("wxs", package)
@@ -870,6 +876,30 @@ class StudioTests(unittest.TestCase):
             if local.get("ok"):
                 remote = subprocess.run(local["argv"], capture_output=True, text=True, timeout=30)
                 self.assertIn("shatu-remote-ok", remote.stdout)
+
+    def test_release_exe_and_installer(self) -> None:
+        import shutil
+        import subprocess
+
+        from shatuide.release import build_release
+
+        with tempfile.TemporaryDirectory() as tmp:
+            built = build_release(Path(__file__).resolve().parent.parent, Path(tmp), bundle_python=False)
+            self.assertTrue(built["ok"], built)
+            exe = Path(built["exe"])
+            self.assertTrue(exe.read_bytes().startswith(b"MZ"))
+            msi = Path(built["msi"])
+            self.assertTrue(msi.is_file())
+            self.assertGreater(msi.stat().st_size, 1000)
+            if shutil.which("msiextract"):
+                out = Path(tmp) / "entpackt"
+                out.mkdir()
+                extracted = subprocess.run(["msiextract", "-C", str(out), str(msi)], capture_output=True, text=True)
+                self.assertEqual(extracted.returncode, 0, extracted.stderr)
+                self.assertTrue(any(path.name == "shatuide.py" for path in out.rglob("shatuide.py")))
+                page = next(path for path in out.rglob("app.js") if path.parent.name == "static")
+                self.assertIn("ShatuIDE", page.read_text(encoding="utf-8"))
+                self.assertTrue(any(path.name == "ShatuIDE.exe" for path in out.rglob("ShatuIDE.exe")))
 
     def test_debug_other_file(self) -> None:
         from shatuide.shell_debug import ShellDebugSession
