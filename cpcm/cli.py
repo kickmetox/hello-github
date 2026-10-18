@@ -12,7 +12,7 @@ from cpcm.diagnose import analyze
 from cpcm.hardware import probe
 from cpcm.paths import host_identity
 from cpcm.selection import add_path, load_selection, save_selection
-from cpcm.settings import counterpart_identity, load_settings, vault_dir
+from cpcm.settings import counterpart_identity, install_root, load_settings, vault_dir
 from cpcm.translate import identities_from_request, translate_config
 
 
@@ -41,7 +41,7 @@ def main(argv: list[str] | None = None) -> int:
     diagnose_parser.add_argument("file", type=Path)
     sub.add_parser("probe")
     args = parser.parse_args(argv)
-    root = (args.root or Path(__file__).resolve().parent.parent).resolve()
+    root = (args.root or install_root()).resolve()
     if args.command == "serve":
         from cpcm.server import serve
         settings = load_settings(root)

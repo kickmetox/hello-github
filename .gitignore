@@ -7,3 +7,5 @@ vault/selection.json
 vault/hardware-profiles.json
 cpcm-settings.json
 *.cpcm
+build/
+dist/

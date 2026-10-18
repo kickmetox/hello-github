@@ -38,6 +38,8 @@ Liegt der Ordner schon in `D:\AI_Temp\CPCM`, denselben Befehl dort ausführen. R
 
 `CPCM.bat` oder die Desktop-Verknüpfung. Der Browser öffnet `http://127.0.0.1:8765/`. In der Kopfzeile stehen Vault-Pfad und „Andreas Meyer · ame@sellerbach.de“.
 
+Installer dieser Referenz bleibt `Install-CPCM.ps1`. Eine `CPCM.exe` wird nicht mitgeliefert; der Start bleibt `CPCM.bat` bzw. `Desktop\CPCM.lnk` mit installiertem Python 3.11 oder neuer.
+
 Ohne Browserfenster:
 
 ```bat

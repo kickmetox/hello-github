@@ -90,6 +90,26 @@ curl -sS http://127.0.0.1:8765/api/status
 
 Die Antwort enthält `"author": "Andreas Meyer"` und `"author_email": "ame@sellerbach.de"`.
 
+## 4a. Kompilierte Fassung
+
+Binary: `dist/CPCM` (eine Datei, gebaut mit PyInstaller aus `CPCM.spec`). Installer: `install-cpcm-bin.sh`. Eine Windows-EXE liegt daneben nicht.
+
+```bash
+chmod 755 install-cpcm-bin.sh
+./install-cpcm-bin.sh
+```
+
+Ohne Argument ist das Ziel `$HOME/AI_Temp/CPCM`. Das Skript kopiert `dist/CPCM` dorthin, macht `CPCM` und `cpcm.sh` ausführbar, schreibt `AUTOR.txt` mit der Rolle `Linux-Nachbau der Windows-Referenz` und setzt `~/.local/share/applications/cpcm.desktop`. Ein vorhandener `vault/` bleibt. Quelle und Ziel dürfen nicht derselbe Ordner sein.
+
+Start über das Menü „CPCM“, oder:
+
+```bash
+"$HOME/AI_Temp/CPCM/cpcm.sh"
+"$HOME/AI_Temp/CPCM/CPCM" serve
+```
+
+Die Seite ist `http://127.0.0.1:8765/`. Neu bauen im Quellordner: `python3 -m PyInstaller --noconfirm --clean CPCM.spec`.
+
 ## 5. Beide Welten verbinden
 
 Unter **Welten**:

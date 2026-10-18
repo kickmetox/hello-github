@@ -16,12 +16,12 @@ from cpcm.filesystems import repair_plan
 from cpcm.hardware import load_profiles, probe, set_active, upsert_profile
 from cpcm.paths import World, host_identity, identity_for_home
 from cpcm.selection import add_path, load_selection, remove_item, save_selection, set_world_path
-from cpcm.settings import ROOT, counterpart_identity, host_home_identity, load_settings, save_settings, vault_dir
+from cpcm.settings import ROOT, bundled_path, counterpart_identity, host_home_identity, load_settings, resource_root, save_settings, vault_dir
 from cpcm.shortcuts import GESTURE_DEFAULTS, gesture_artifacts, translate_shortcut
 from cpcm.themes import theme_artifacts
 from cpcm.translate import identities_from_request, translate_config
 
-WEB = ROOT / "web"
+WEB = resource_root() / "web"
 MAX_BODY = 2 * 1024 * 1024
 
 
@@ -115,8 +115,8 @@ def make_handler(app: App):
                 "/index.html": (WEB / "index.html", "text/html; charset=utf-8"),
                 "/app.js": (WEB / "app.js", "text/javascript; charset=utf-8"),
                 "/styles.css": (WEB / "styles.css", "text/css; charset=utf-8"),
-                "/icon.png": (app.root / "icon.png", "image/png"),
-                "/cpcm.ico": (app.root / "cpcm.ico", "image/x-icon"),
+                "/icon.png": (bundled_path(app.root, "icon.png"), "image/png"),
+                "/cpcm.ico": (bundled_path(app.root, "cpcm.ico"), "image/x-icon"),
             }
             if path not in mapping:
                 self._send(404, {"error": "nicht gefunden"})
@@ -155,14 +155,14 @@ def make_handler(app: App):
             if path == "/api/apps/detect":
                 return {"installed": detect_installed()}
             if path == "/api/examples":
-                folder = app.root / "examples"
+                folder = bundled_path(app.root, "examples")
                 names = sorted(item.name for item in folder.glob("*") if item.is_file()) if folder.is_dir() else []
                 return {"examples": names}
             if path.startswith("/api/examples/"):
                 name = path.removeprefix("/api/examples/")
                 if "/" in name or name in ("", ".", ".."):
                     raise ValueError("Beispielname ungültig")
-                file = app.root / "examples" / name
+                file = bundled_path(app.root, "examples") / name
                 if not file.is_file():
                     raise FileNotFoundError(name)
                 return {"name": name, "text": file.read_text(encoding="utf-8")}
@@ -277,8 +277,8 @@ def serve(host: str = "127.0.0.1", port: int = 8765, root: Path | None = None, o
     application = App(root)
     server = ThreadingHTTPServer((host, port), make_handler(application))
     url = f"http://{host}:{port}/"
-    print(f"CPCM läuft auf {url}")
-    print(f"Vault: {application.vault()}")
+    print(f"CPCM läuft auf {url}", flush=True)
+    print(f"Vault: {application.vault()}", flush=True)
     if open_browser:
         import webbrowser
         webbrowser.open(url)

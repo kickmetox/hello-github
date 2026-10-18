@@ -5,12 +5,41 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import sys
 from pathlib import Path
 
 from cpcm import WINDOWS_INSTALL_DIR
 from cpcm.paths import Identity, World, host_identity, identity_for_home, looks_like_foreign_path
 
-ROOT = Path(__file__).resolve().parent.parent
+
+def _package_root() -> Path:
+    return Path(__file__).resolve().parent.parent
+
+
+def resource_root() -> Path:
+    """Quellbaum, oder bei PyInstaller das entpackte Bundle."""
+    meipass = getattr(sys, "_MEIPASS", None)
+    if meipass:
+        return Path(meipass)
+    return _package_root()
+
+
+def install_root() -> Path:
+    """Beschreibbarer Programmordner. Neben der Binary, sonst der Quellbaum."""
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent
+    return _package_root()
+
+
+def bundled_path(install: Path, relative: str) -> Path:
+    """Datei im Installationsordner, im Bundle nur wenn die Binary keine Kopie daneben hat."""
+    local = install / relative
+    if local.exists() or not getattr(sys, "frozen", False):
+        return local
+    return resource_root() / relative
+
+
+ROOT = install_root()
 
 
 def settings_file(root: Path | None = None) -> Path:
