@@ -31,11 +31,12 @@ def disconnect_card(service, card: DriveCard) -> OpResult:
 
 
 class DriveDialog(tk.Toplevel):
-    def __init__(self, app: tk.Misc, card: DriveCard | None, used: set[str]) -> None:
+    def __init__(self, app: tk.Misc, card: DriveCard | None, used: set[str], mode: str | None = None) -> None:
         super().__init__(app)
         self.app = app
         self.card = card
         self.used = set(used)
+        self._requested_mode = mode if mode in {"appearance", "subst", "net"} else None
         self.title("Laufwerk hinzufügen" if card is None else card.title)
         self.configure(bg=L.bg)
         self.transient(app)
@@ -69,10 +70,12 @@ class DriveDialog(tk.Toplevel):
         self.geometry(f"{width}x{height}+{x}+{y}")
 
     def _initial_mode(self) -> str:
+        if self.card is not None and self.card.real_fixed:
+            return "appearance"
+        if self._requested_mode is not None:
+            return self._requested_mode
         if self.card is None:
             return "subst"
-        if self.card.real_fixed:
-            return "appearance"
         if self.card.origin == "net":
             return "net"
         if self.card.origin == "subst":

@@ -286,11 +286,20 @@ class OverviewPage(Page):
             relief="flat",
             bd=1,
         )
+        self._fill_card_menu(menu, card)
+        menu.tk_popup(widget.winfo_rootx(), widget.winfo_rooty() + widget.winfo_height())
+
+    def _fill_card_menu(self, menu: tk.Menu, card: DriveCard) -> None:
         menu.add_command(label="Alle Möglichkeiten", command=lambda: self.open_detail(card))
+        menu.add_command(label="net use…", command=lambda: self.open_net_use(card))
         menu.add_command(label="Im Explorer öffnen", command=lambda: self._explorer(card))
         if card.can_disconnect:
             menu.add_command(label="Trennen", command=lambda: self._disconnect(card))
-        menu.tk_popup(widget.winfo_rootx(), widget.winfo_rooty() + widget.winfo_height())
+
+    def card_menu(self, card: DriveCard) -> tk.Menu:
+        menu = tk.Menu(self, tearoff=0)
+        self._fill_card_menu(menu, card)
+        return menu
 
     def _on_gallery_configure(self, event: tk.Event) -> None:
         if self.view.get() == "grid":
@@ -315,7 +324,7 @@ class OverviewPage(Page):
     def open_add(self) -> DriveDialog:
         return self.open_detail(None)
 
-    def open_detail(self, card: DriveCard | None) -> DriveDialog:
+    def open_detail(self, card: DriveCard | None, mode: str | None = None) -> DriveDialog:
         if self._dialog is not None:
             try:
                 if self._dialog.winfo_exists():
@@ -325,8 +334,14 @@ class OverviewPage(Page):
         used: set[str] = set()
         if self.app.snapshot is not None:
             used = {item.letter for item in self.app.service.drive_cards(True, self.app.snapshot)}
-        self._dialog = DriveDialog(self.app, card, used)
+        self._dialog = DriveDialog(self.app, card, used, mode=mode)
         return self._dialog
+
+    def open_net_use(self, card: DriveCard | None) -> DriveDialog:
+        if card is not None and card.real_fixed:
+            self.app.log(f"{card.letter}: ist ein echter Datenträger. net use verwendet einen freien Buchstaben.")
+            return self.open_detail(None, mode="net")
+        return self.open_detail(card, mode="net")
 
     def _explorer(self, card: DriveCard) -> None:
         self.app.on_result(self.app.service.open_in_explorer(explorer_target(card)))

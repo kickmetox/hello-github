@@ -9,6 +9,14 @@ from tkinter import ttk
 
 from spheredrive import __version__
 from spheredrive.catalog import DESCRIPTION, FEATURES, NAV_ITEMS
+from spheredrive.helptext import (
+    FEATURE_FILE,
+    HELP_FILE,
+    ensure_documents,
+    locate_document,
+    render_feature_text,
+    render_help_text,
+)
 from spheredrive.models import OpResult, Snapshot
 from spheredrive.paths import WORK_DIR, ensure_work_dir, find_icon, find_window_png
 from spheredrive.host import system_caption
@@ -31,6 +39,7 @@ class SphereApp(tk.Tk):
         self.minsize(1100, 700)
         self.configure(bg=P.bg)
         self._apply_icon()
+        ensure_documents()
         self._build()
         self.bind("<F5>", lambda _event: self.refresh_all())
         self.bind_all("<Button-4>", self._wheel)
@@ -197,14 +206,69 @@ class SphereApp(tk.Tk):
         )
 
         menu = tk.Menu(self, tearoff=0)
+        self.menus: dict[str, tk.Menu] = {}
         file_menu = tk.Menu(menu, tearoff=0)
         file_menu.add_command(label="Aktualisieren", command=self.refresh_all, accelerator="F5")
         file_menu.add_separator()
         file_menu.add_command(label="Beenden", command=self.destroy)
         menu.add_cascade(label="Datei", menu=file_menu)
-        help_menu = tk.Menu(menu, tearoff=0)
-        help_menu.add_command(label="Info", command=self.show_about)
-        menu.add_cascade(label="Hilfe", menu=help_menu)
+        self.menus["Datei"] = file_menu
+        self._tool_menu(
+            menu,
+            "Subst",
+            [
+                ("Seite öffnen", lambda: self.select_page("subst")),
+                ("Ordner als Laufwerk…", self._connect_subst),
+                ("Trennen…", lambda: self._disconnect_page("subst")),
+            ],
+        )
+        self._tool_menu(
+            menu,
+            "net use",
+            [
+                ("Seite öffnen", lambda: self.select_page("net")),
+                ("Freigabe verbinden…", self._connect_net),
+                ("Ordner freigeben", self._open_share),
+                ("Trennen…", lambda: self._disconnect_page("net")),
+            ],
+        )
+        self._tool_menu(
+            menu,
+            "Verknüpfungen",
+            [
+                ("Seite öffnen", lambda: self.select_page("links")),
+                ("Neue Verknüpfung…", lambda: self.select_page("links")),
+            ],
+        )
+        self._tool_menu(
+            menu,
+            "PowerShell",
+            [
+                ("Seite öffnen", lambda: self.select_page("ps")),
+                ("Neues Laufwerk…", lambda: self.select_page("ps")),
+            ],
+        )
+        self._tool_menu(
+            menu,
+            "Bereitstellung",
+            [
+                ("Seite öffnen", lambda: self.select_page("mounts")),
+                ("Volume bereitstellen…", lambda: self.select_page("mounts")),
+                ("Datenträgerverwaltung", lambda: self.on_result(self.service.open_diskmgmt())),
+            ],
+        )
+        self._tool_menu(
+            menu,
+            "Hilfe",
+            [
+                ("Hilfe", self.show_help),
+                ("Feature-Liste", self.show_features),
+                ("Hilfe-Datei öffnen", self.open_help_file),
+                ("Feature-Liste öffnen", self.open_feature_file),
+                None,
+                ("Info", self.show_about),
+            ],
+        )
         self.config(menu=menu)
 
     def _load_logo(self, size: int) -> tk.PhotoImage | None:
@@ -225,6 +289,50 @@ class SphereApp(tk.Tk):
         canvas.create_oval(7, 7, 29, 29, fill="#1d6fa8", outline="")
         canvas.create_oval(11, 9, 20, 18, fill="#d7f1ff", outline="")
         canvas.create_arc(8, 14, 28, 30, start=200, extent=140, style="arc", outline="#2bbbad", width=2)
+
+    def _tool_menu(self, menu: tk.Menu, label: str, items: list[tuple[str, object] | None]) -> None:
+        child = tk.Menu(menu, tearoff=0)
+        for item in items:
+            if item is None:
+                child.add_separator()
+                continue
+            text, command = item
+            child.add_command(label=text, command=command)
+        menu.add_cascade(label=label, menu=child)
+        self.menus[label] = child
+
+    def menu_labels(self) -> list[str]:
+        menu = self.nametowidget(self["menu"])
+        last = menu.index("end")
+        if last is None:
+            return []
+        labels: list[str] = []
+        for index in range(last + 1):
+            if menu.type(index) == "cascade":
+                labels.append(str(menu.entrycget(index, "label")))
+        return labels
+
+    def _connect_subst(self) -> None:
+        self.select_page("subst")
+        self.pages["overview"].open_detail(None, mode="subst")
+
+    def _connect_net(self) -> None:
+        self.select_page("net")
+        self.pages["overview"].open_net_use(None)
+
+    def _open_share(self) -> None:
+        self.select_page("net")
+        page = self.pages["net"]
+        page.update_idletasks()
+        page.canvas.yview_moveto(1.0)
+
+    def _disconnect_page(self, page_id: str) -> None:
+        self.select_page(page_id)
+        page = self.pages[page_id]
+        if page.tree.selection():
+            page.disconnect()
+            return
+        self.log("Zuerst ein Laufwerk in der Liste auswählen, dann Trennen.")
 
     def select_page(self, page_id: str) -> None:
         self.current = page_id
@@ -330,6 +438,59 @@ class SphereApp(tk.Tk):
             return
         self.on_result(self.service.open_in_explorer(str(WORK_DIR)))
 
+    def show_help(self) -> tk.Toplevel:
+        return self._text_window("Hilfe", render_help_text())
+
+    def show_features(self) -> tk.Toplevel:
+        return self._text_window("Feature-Liste", render_feature_text())
+
+    def open_help_file(self) -> None:
+        self._open_named_document(HELP_FILE)
+
+    def open_feature_file(self) -> None:
+        self._open_named_document(FEATURE_FILE)
+
+    def _open_named_document(self, name: str) -> None:
+        ensure_documents()
+        path = locate_document(name)
+        if path is None:
+            self.log(f"Die Datei fehlt: {name}")
+            return
+        self.on_result(self.service.open_in_explorer(str(path)))
+
+    def _text_window(self, title: str, body: str) -> tk.Toplevel:
+        dialog = tk.Toplevel(self)
+        dialog.title(title)
+        dialog.configure(bg=P.panel)
+        dialog.transient(self)
+        dialog.minsize(560, 420)
+        dialog.geometry("760x640")
+        shell = tk.Frame(dialog, bg=P.panel)
+        shell.pack(fill="both", expand=True, padx=16, pady=(16, 8))
+        scroll = ttk.Scrollbar(shell, orient="vertical")
+        box = tk.Text(
+            shell,
+            bg=P.panel,
+            fg=P.text,
+            insertbackground=P.text,
+            relief="flat",
+            highlightthickness=0,
+            font=(P.font, 11),
+            wrap="word",
+            yscrollcommand=scroll.set,
+            padx=4,
+            pady=4,
+        )
+        scroll.configure(command=box.yview)
+        box.pack(side="left", fill="both", expand=True)
+        scroll.pack(side="right", fill="y")
+        box.insert("1.0", body)
+        box.configure(state="disabled")
+        dialog.text = box
+        dialog.bind("<Escape>", lambda _event: dialog.destroy())
+        Button(dialog, "Schließen", dialog.destroy, "primary").pack(pady=(0, 16))
+        return dialog
+
     def show_about(self) -> None:
         icon = find_icon()
         dialog = tk.Toplevel(self)
@@ -409,7 +570,13 @@ class SphereApp(tk.Tk):
                 ).pack(anchor="w")
         tk.Label(
             body,
-            text=f"Arbeitsordner: {WORK_DIR}\nSymbol: {icon or 'keins gefunden'}\nKonfiguration: {self.service.store.path}",
+            text=(
+                f"Arbeitsordner: {WORK_DIR}\n"
+                f"Symbol: {icon or 'keins gefunden'}\n"
+                f"Konfiguration: {self.service.store.path}\n"
+                f"Hilfe: {HELP_FILE}\n"
+                f"Feature-Liste: {FEATURE_FILE}"
+            ),
             bg=P.panel,
             fg=P.faint,
             font=(P.font, 9),

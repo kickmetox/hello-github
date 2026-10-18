@@ -80,6 +80,12 @@ def _stage(tk_root: Path) -> None:
     for name in ("tcl8", "tcl8.6", "tk8.6"):
         shutil.copytree(tk_root / "tcl" / name, library / name)
     shutil.copytree(ROOT / "assets", STAGING / "assets")
+    if str(ROOT) not in sys.path:
+        sys.path.insert(0, str(ROOT))
+    from spheredrive.helptext import write_documents
+
+    write_documents(ROOT)
+    write_documents(STAGING)
 
 
 def _write_config(version: str, installer_name: str) -> None:
@@ -112,6 +118,8 @@ packages=spheredrive
     _tkinter
 files=assets > $INSTDIR
     lib > $INSTDIR
+    SphereDrive-Hilfe.html > $INSTDIR
+    SphereDrive-Feature-Liste.txt > $INSTDIR
 exclude=*/__pycache__/*
     *.pyc
 

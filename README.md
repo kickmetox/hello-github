@@ -4,7 +4,11 @@
 
 SphereDrive ist die Windows-Oberfläche für virtuelle Laufwerke und Ordnerverknüpfungen. Sie fasst subst, net use, mklink, New-PSDrive und mountvol in einem Fenster zusammen. Ein Ordner, ein Unterordner oder eine Freigabe erscheint damit wie ein eigenes Laufwerk, ohne dass die Dateien verschoben werden.
 
-Die Startseite zeigt die Laufwerke als Kacheln. Ein Klick öffnet die Aktionen für genau diesen Buchstaben. Echte Datenträger bleiben unangetastet: subst und net use legen sich nicht über einen vorhandenen Buchstaben. Ordner und Unterordner eines Laufwerks lassen sich aufklappen und als neuer Buchstabe einhängen. Auf Windows 11 steht der Systemname in der Seitenleiste. Dieselbe Beschreibung und die Feature-Liste stehen im Programm unter Hilfe, Info.
+Die Startseite zeigt die Laufwerke als Kacheln. Ein Klick öffnet die Aktionen für genau diesen Buchstaben. Echte Datenträger bleiben unangetastet: subst und net use legen sich nicht über einen vorhandenen Buchstaben. Ordner und Unterordner eines Laufwerks lassen sich aufklappen und als neuer Buchstabe einhängen. Auf Windows 11 steht der Systemname in der Seitenleiste.
+
+Die Menüleiste enthält Subst, net use, Verknüpfungen, PowerShell und Bereitstellung im selben Aufbau. net use bietet Seite öffnen, Freigabe verbinden, Ordner freigeben und Trennen. Die drei Punkte an einer Kachel enthalten zusätzlich net use.
+
+Dieselbe Beschreibung und die Feature-Liste stehen im Programm unter Hilfe. Die Dateien `SphereDrive-Hilfe.html` und `SphereDrive-Feature-Liste.txt` liegen neben dem Programm und werden in den Arbeitsordner kopiert.
 
 ## Feature-Liste
 
@@ -54,6 +58,8 @@ Die Startseite zeigt die Laufwerke als Kacheln. Ein Klick öffnet die Aktionen f
 - Vergleich, welcher Befehl wofür gedacht ist
 - Arbeitsordner `D:\AI_Temp\SphereDrive`, ein Logo in diesem Ordner hat Vorrang
 - Installer mit eingebettetem Python, Wiederherstellung beim Anmelden mit `--restore`
+- Hilfe im Programm und als `SphereDrive-Hilfe.html` neben dem Programm
+- Feature-Liste im Menü Hilfe und als `SphereDrive-Feature-Liste.txt`
 
 SphereDrive gleicht die bekannten Lücken von `subst` aus:
 

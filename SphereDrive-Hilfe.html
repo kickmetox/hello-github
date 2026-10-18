@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>SphereDrive Hilfe</title>
+<style>
+body{font-family:Segoe UI,sans-serif;max-width:46rem;margin:2rem auto;padding:0 1.2rem;color:#1b2531;background:#f5f7fa;line-height:1.45}
+h1{font-size:1.7rem;margin-bottom:0.2rem} h2{font-size:1.15rem;margin:1.6rem 0 0.4rem}
+p,li{font-size:1rem} .version{color:#5c6b7a;margin-top:0}
+table{border-collapse:collapse;width:100%;background:#fff} th,td{border:1px solid #d5dde6;padding:0.4rem 0.55rem;text-align:left;vertical-align:top}
+th{background:#e8eef5}
+</style>
+</head>
+<body>
+<h1>SphereDrive Hilfe</h1>
+<p class="version">Version 1.0.0</p>
+<p>SphereDrive ist die Windows-Oberfläche für virtuelle Laufwerke und Ordnerverknüpfungen. Sie fasst subst, net use, mklink, New-PSDrive und mountvol in einem Fenster zusammen. Ein Ordner, ein Unterordner oder eine Freigabe erscheint damit wie ein eigenes Laufwerk, ohne dass die Dateien verschoben werden. Auf Windows 11 steht der Systemname in der Seitenleiste.</p>
+<h2>Menüleiste</h2>
+<ul>
+<li>Datei aktualisiert die Anzeige oder beendet das Programm.</li>
+<li>Subst, net use, Verknüpfungen, PowerShell und Bereitstellung sind gleich aufgebaut: Seite öffnen, neu anlegen und trennen.</li>
+<li>Das Menü net use enthält Seite öffnen, Freigabe verbinden, Ordner freigeben und Trennen.</li>
+<li>Hilfe öffnet diesen Text, die Feature-Liste und die Dateien neben dem Programm.</li>
+</ul>
+<h2>Kachelmenü</h2>
+<ul>
+<li>Die drei Punkte an einer Kachel öffnen Alle Möglichkeiten, net use, Im Explorer öffnen und, wenn erlaubt, Trennen.</li>
+<li>net use auf einem echten Datenträger wie C: legt sich nicht über diesen Buchstaben. Es öffnet die Verbindung mit einem freien Buchstaben.</li>
+</ul>
+<h2>net use</h2>
+<ul>
+<li>Der Befehl lautet net use X: \\Computer\Freigabe.</li>
+<li>Dauerhaft setzt /persistent:yes. Ohne diese Option gilt die Verbindung nur bis zum Abmelden.</li>
+<li>Ein Kennwort wird nur für den Aufruf verwendet und nicht in der Konfiguration gespeichert.</li>
+<li>Ein lokaler Ordner muss zuerst freigegeben sein. Danach verbindet net use \\Computer\Freigabename.</li>
+<li>Freigabe verbinden öffnet den Dialog mit der Möglichkeit net use. Ordner freigeben wechselt auf die Seite Netzlaufwerke und zeigt dort das Freigeben eines Ordners.</li>
+</ul>
+<h2>Subst, Verknüpfungen, PowerShell und Bereitstellung</h2>
+<ul>
+<li>Subst hängt einen lokalen Ordner, auch einen Unterordner, als Laufwerksbuchstaben ein.</li>
+<li>Verknüpfungen legen Junctions, symbolische Links und Hardlinks an. Entfernen löscht nur die Verknüpfung.</li>
+<li>PowerShell legt ein New-PSDrive an, auf Wunsch im Profil. -Persist gilt nur für UNC-Pfade.</li>
+<li>Bereitstellung hängt eine Partition oder eine VHD an einen Buchstaben oder einen leeren NTFS-Ordner. Die Datenträgerverwaltung öffnet diskmgmt.msc.</li>
+</ul>
+<h2>Feature-Liste</h2>
+<h3>Laufwerkszuordnungen</h3><ul>
+<li>Kacheln oder Liste, Filter „Alle Laufwerke anzeigen“</li>
+<li>Klick auf eine Kachel oder auf ··· öffnet die Aktionen dieses Buchstabens</li>
+<li>Bezeichnung, Symbol, Explorer und Trennen</li>
+<li>Echte Datenträger werden nicht durch subst oder net use verdeckt</li>
+</ul>
+<h3>Ordner und Unterordner</h3><ul>
+<li>Baum der Ordner eines Laufwerks, weitere Ebenen beim Aufklappen</li>
+<li>Ein Unterordner wird als eigenes Laufwerk eingehängt</li>
+<li>Dieselbe Auswahl unter Subst und als Ziel einer Ordner-Bereitstellung</li>
+</ul>
+<h3>subst</h3><ul>
+<li>Lokale Ordner, auch tief in OneDrive, Google Drive oder Dropbox</li>
+<li>Dauerhaft über den Autostart und, mit Administratorrechten, über DOS Devices</li>
+<li>Papierkorb über die Known-Folder-Registrierung</li>
+<li>Sichtbarkeit für erhöhte Programme über EnableLinkedConnections und eine Anmeldungsaufgabe</li>
+</ul>
+<h3>net use</h3><ul>
+<li>UNC-Freigaben, dauerhaft mit /persistent:yes</li>
+<li>Freigaben anlegen und entfernen</li>
+<li>Kennwörter werden für den Aufruf verwendet und nicht gespeichert</li>
+</ul>
+<h3>Verknüpfungen</h3><ul>
+<li>mklink /J für Junctions, /D für Ordnerlinks, dazu Dateisymlinks und Hardlinks</li>
+<li>Entfernen löscht nur die Verknüpfung, nicht den Zielordner</li>
+</ul>
+<h3>PowerShell</h3><ul>
+<li>New-PSDrive für Dateisystem, Registrierung, Zertifikate und weitere Anbieter</li>
+<li>Optional im PowerShell-Profil; -Persist nur für UNC-Pfade</li>
+</ul>
+<h3>Bereitstellung</h3><ul>
+<li>Partition oder VHD/VHDX auf einen Buchstaben oder in einen leeren NTFS-Ordner</li>
+<li>Aufruf der Datenträgerverwaltung (diskmgmt.msc)</li>
+</ul>
+<h3>Programm</h3><ul>
+<li>Vergleich, welcher Befehl wofür gedacht ist</li>
+<li>Arbeitsordner D:\AI_Temp\SphereDrive, Logo aus diesem Ordner hat Vorrang</li>
+<li>Installer mit eingebettetem Python, Wiederherstellung beim Anmelden mit --restore</li>
+<li>Hilfe im Programm und als SphereDrive-Hilfe.html neben dem Programm</li>
+<li>Feature-Liste im Menü Hilfe und als SphereDrive-Feature-Liste.txt</li>
+</ul>
+<h2>Wann welcher Befehl</h2>
+<h3>Tiefer Projektordner als Laufwerk</h3><p>Subst. SphereDrive setzt Bezeichnung, Symbol, Papierkorb und die Wiederherstellung nach dem Neustart.</p>
+<h3>NAS, Server oder bereits freigegebener Ordner</h3><p>net use. Mit „Dauerhaft“ bleibt die Verbindung über /persistent:yes erhalten.</p>
+<h3>Ordner an anderer Stelle, ohne neuen Buchstaben</h3><p>Junction (mklink /J). Für ältere Programme verhält sie sich wie ein physischer Ordner.</p>
+<h3>Nur in PowerShell, Registry oder Zertifikate</h3><p>New-PSDrive. Ohne Profil gilt das Laufwerk nur in der geöffneten Sitzung.</p>
+<h3>Echte Partition oder VHD in einen leeren Ordner</h3><p>Bereitstellungspunkt. Alternativ denselben Schritt in der Datenträgerverwaltung ausführen.</p>
+<h2>Vergleich</h2>
+<table><thead><tr><th>Befehl</th><th>Ziel</th><th>Erstellt</th><th>Neustart</th><th>SphereDrive</th></tr></thead><tbody>
+<tr><td>subst</td><td>Lokaler Ordner</td><td>Virtuelles Laufwerk (z. B. X:)</td><td>Nein</td><td>Autostart, mit Adminrechten zusätzlich DOS Devices</td></tr>
+<tr><td>net use</td><td>Netzwerkfreigabe</td><td>Virtuelles Laufwerk (z. B. X:)</td><td>Ja, mit /persistent:yes</td><td>Dauerhaft schaltbar, Bezeichnung und Symbol</td></tr>
+<tr><td>mklink /D</td><td>Lokaler Ordner</td><td>Symbolischen Ordnerlink</td><td>Ja, im Dateisystem</td><td>Anlegen und Entfernen nur der Verknüpfung</td></tr>
+<tr><td>mklink /J</td><td>Lokaler Ordner</td><td>Junction, wirkt wie ein echter Ordner</td><td>Ja, im Dateisystem</td><td>Ohne Administratorrechte, mit Zielprüfung</td></tr>
+<tr><td>New-PSDrive</td><td>Ordner, Registry, Zertifikate</td><td>PowerShell-Laufwerk</td><td>Nein, nur in der Sitzung</td><td>Eintrag im PowerShell-Profil; -Persist nur bei UNC</td></tr>
+<tr><td>mountvol / diskmgmt</td><td>Partition oder VHD/VHDX</td><td>Buchstaben oder Ordner-Bereitstellung</td><td>Ja, über den Volume-Manager</td><td>Leeren NTFS-Ordner oder Buchstaben, plus diskmgmt.msc</td></tr>
+</tbody></table>
+<h2>Dateien</h2>
+<p>SphereDrive-Hilfe.html und SphereDrive-Feature-Liste.txt liegen neben dem Programm. Der Start und der Installer kopieren sie nach D:\AI_Temp\SphereDrive. Im Programm öffnet das Menü Hilfe dieselben Texte und die Dateien.</p>
+</body></html>

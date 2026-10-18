@@ -17,7 +17,7 @@ if /I not "%SOURCE%"=="%TARGET%\" (
         pause
         exit /b 1
     )
-    robocopy "%SOURCE%." "%TARGET%" SphereDrive.pyw Start-SphereDrive.bat README.md SphereDrive-Setup-1.0.0.exe /NFL /NDL /NJH /NJS /NC /NS /NP >nul
+    robocopy "%SOURCE%." "%TARGET%" SphereDrive.pyw Start-SphereDrive.bat README.md SphereDrive-Setup-1.0.0.exe SphereDrive-Hilfe.html SphereDrive-Feature-Liste.txt /NFL /NDL /NJH /NJS /NC /NS /NP >nul
     robocopy "%SOURCE%assets" "%TARGET%\assets" /E /NFL /NDL /NJH /NJS /NC /NS /NP >nul
     robocopy "%SOURCE%spheredrive" "%TARGET%\spheredrive" /E /XD __pycache__ /XF *.pyc /NFL /NDL /NJH /NJS /NC /NS /NP >nul
     if not exist "%TARGET%\SphereDrive.ico" if exist "%SOURCE%assets\SphereDrive.ico" copy /Y "%SOURCE%assets\SphereDrive.ico" "%TARGET%\SphereDrive.ico" >nul

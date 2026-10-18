@@ -341,6 +341,8 @@ class ServiceTests(unittest.TestCase):
         (source / "assets" / "SphereDrive.ico").write_bytes(b"ICO")
         (source / "assets" / "SphereDrive.png").write_bytes(b"PNG")
         (source / "SphereDrive.pyw").write_text("start", encoding="utf-8")
+        (source / "SphereDrive-Hilfe.html").write_text("hilfe", encoding="utf-8")
+        (source / "SphereDrive-Feature-Liste.txt").write_text("liste", encoding="utf-8")
         (source / "spheredrive").mkdir()
         (source / "spheredrive" / "__init__.py").write_text("", encoding="utf-8")
         cache = source / "spheredrive" / "__pycache__"
@@ -349,6 +351,8 @@ class ServiceTests(unittest.TestCase):
         copied = publish_to(target, source)
         self.assertIn("SphereDrive.pyw", copied)
         self.assertEqual((target / "SphereDrive.pyw").read_text(encoding="utf-8"), "start")
+        self.assertEqual((target / "SphereDrive-Hilfe.html").read_text(encoding="utf-8"), "hilfe")
+        self.assertEqual((target / "SphereDrive-Feature-Liste.txt").read_text(encoding="utf-8"), "liste")
         self.assertTrue((target / "assets" / "SphereDrive.ico").is_file())
         self.assertFalse((target / "spheredrive" / "__pycache__").exists())
         (target / "logo.ico").write_bytes(b"CUSTOM")
@@ -380,6 +384,36 @@ class ServiceTests(unittest.TestCase):
             ],
         )
         self.assertTrue(all(lines for _title, lines in FEATURES))
+        from spheredrive.helptext import (
+            FEATURE_FILE,
+            HELP_FILE,
+            render_feature_text,
+            render_help_html,
+            render_help_text,
+            write_documents,
+        )
+        from spheredrive.paths import package_root
+
+        html_path, feature_path = write_documents(package_root())
+        help_text = render_help_text()
+        feature_text = render_feature_text()
+        html_text = render_help_html()
+        self.assertEqual(html_path.read_text(encoding="utf-8"), html_text)
+        self.assertEqual(feature_path.read_text(encoding="utf-8"), feature_text)
+        self.assertEqual(html_path.name, HELP_FILE)
+        self.assertEqual(feature_path.name, FEATURE_FILE)
+        for title, _lines in FEATURES:
+            self.assertIn(title, help_text)
+            self.assertIn(title, feature_text)
+            self.assertIn(title, html_text)
+        self.assertIn("Freigabe verbinden", help_text)
+        self.assertIn("net use X:", help_text)
+        self.assertIn('<html lang="de">', html_text)
+        bat = Path("Start-SphereDrive.bat").read_text(encoding="utf-8")
+        installer = Path("tools/build_installer.py").read_text(encoding="utf-8")
+        for name in (HELP_FILE, FEATURE_FILE):
+            self.assertIn(name, bat)
+            self.assertIn(name, installer)
 
     def test_folder_tree_includes_subfolders_and_follows_subst(self) -> None:
         svc, host = service(Path("tests") / "_runtime" / "folders")

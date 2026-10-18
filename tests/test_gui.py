@@ -189,6 +189,68 @@ class GuiTests(unittest.TestCase):
         about = next(child for child in app.winfo_children() if isinstance(child, tk.Toplevel))
         self.assertEqual(about.title(), "Info")
         about.destroy()
+        self.assertEqual(
+            app.menu_labels(),
+            ["Datei", "Subst", "net use", "Verknüpfungen", "PowerShell", "Bereitstellung", "Hilfe"],
+        )
+        net_menu = app.menus["net use"]
+        net_labels = [
+            net_menu.entrycget(index, "label")
+            for index in range(net_menu.index("end") + 1)
+            if net_menu.type(index) == "command"
+        ]
+        self.assertEqual(net_labels, ["Seite öffnen", "Freigabe verbinden…", "Ordner freigeben", "Trennen…"])
+        help_labels = [
+            app.menus["Hilfe"].entrycget(index, "label")
+            for index in range(app.menus["Hilfe"].index("end") + 1)
+            if app.menus["Hilfe"].type(index) == "command"
+        ]
+        self.assertEqual(
+            help_labels,
+            ["Hilfe", "Feature-Liste", "Hilfe-Datei öffnen", "Feature-Liste öffnen", "Info"],
+        )
+        app._connect_net()
+        app.update_idletasks()
+        self.assertEqual(app.current, "net")
+        net_dialog = overview._dialog
+        self.assertIsNone(net_dialog.card)
+        self.assertEqual(net_dialog.mode.get(), "net")
+        self.assertTrue(net_dialog.icon.get().lower().endswith("spheredrive.ico"))
+        net_dialog.destroy()
+        fixed_card = next(card for card in overview.cards if card.letter == "C")
+        blocked = overview.open_detail(fixed_card, mode="net")
+        app.update_idletasks()
+        self.assertEqual(blocked.mode.get(), "appearance")
+        opened = overview.open_net_use(fixed_card)
+        app.update_idletasks()
+        self.assertIsNone(opened.card)
+        self.assertEqual(opened.mode.get(), "net")
+        self.assertIn("freien Buchstaben", app.log_box.get("1.0", "end"))
+        opened.destroy()
+        popup = overview.card_menu(next(card for card in overview.cards if card.letter == "P"))
+        popup_labels = [
+            popup.entrycget(index, "label")
+            for index in range(popup.index("end") + 1)
+            if popup.type(index) == "command"
+        ]
+        self.assertEqual(popup_labels, ["Alle Möglichkeiten", "net use…", "Im Explorer öffnen", "Trennen"])
+        popup.destroy()
+        help_window = app.show_help()
+        app.update_idletasks()
+        self.assertEqual(help_window.title(), "Hilfe")
+        self.assertIn("Freigabe verbinden", help_window.text.get("1.0", "end"))
+        self.assertIn("Feature-Liste", help_window.text.get("1.0", "end"))
+        help_window.destroy()
+        feature_window = app.show_features()
+        app.update_idletasks()
+        self.assertEqual(feature_window.title(), "Feature-Liste")
+        self.assertIn("net use", feature_window.text.get("1.0", "end"))
+        feature_window.destroy()
+        app.open_help_file()
+        app.open_feature_file()
+        spawned = [" ".join(item) for item in host.spawned]
+        self.assertTrue(any("SphereDrive-Hilfe.html" in item for item in spawned))
+        self.assertTrue(any("SphereDrive-Feature-Liste.txt" in item for item in spawned))
         # Das Fenster muss gemappt sein, sonst bleibt ein späterer Screenshot leer.
         app.deiconify()
         app.update()

@@ -122,7 +122,14 @@ def publish_to(target: Path, source: Path | None = None) -> list[str]:
     if _same_folder(origin, target):
         return []
     copied: list[str] = []
-    for name in ("SphereDrive.pyw", "Start-SphereDrive.bat", "README.md", "SphereDrive-Setup-1.0.0.exe"):
+    for name in (
+        "SphereDrive.pyw",
+        "Start-SphereDrive.bat",
+        "README.md",
+        "SphereDrive-Setup-1.0.0.exe",
+        "SphereDrive-Hilfe.html",
+        "SphereDrive-Feature-Liste.txt",
+    ):
         src = origin / name
         if not src.is_file():
             continue

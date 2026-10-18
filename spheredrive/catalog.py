@@ -165,6 +165,8 @@ FEATURES: list[tuple[str, list[str]]] = [
             "Vergleich, welcher Befehl wofür gedacht ist",
             "Arbeitsordner D:\\AI_Temp\\SphereDrive, Logo aus diesem Ordner hat Vorrang",
             "Installer mit eingebettetem Python, Wiederherstellung beim Anmelden mit --restore",
+            "Hilfe im Programm und als SphereDrive-Hilfe.html neben dem Programm",
+            "Feature-Liste im Menü Hilfe und als SphereDrive-Feature-Liste.txt",
         ],
     ),
 ]
