@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <title>ShatuIDE Testfenster</title>
+  <link rel="icon" href="/api/icon">
+  <link rel="stylesheet" href="/static/app.css">
+  <style>
+    body { height: 100%; display: flex; flex-direction: column; }
+    header { position: relative; z-index: 2; display: flex; justify-content: space-between; gap: 12px; align-items: center; padding: 8px 12px; background: #141311; border-bottom: 1px solid var(--line); }
+    header p { margin: 0; color: var(--muted); }
+    main { flex: 1; display: flex; flex-direction: column; min-height: 0; padding: 8px; gap: 8px; }
+    textarea, pre, #code, #out { position: static; inset: auto; flex: 1; margin: 0; background: var(--bg); color: var(--text); caret-color: var(--text); border: 1px solid var(--line); border-radius: 4px; padding: 8px; font-family: var(--mono); font-size: 13px; }
+    textarea { resize: none; }
+    pre { overflow: auto; white-space: pre-wrap; }
+    .row { display: flex; gap: 8px; align-items: center; }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <strong id="title">Testfenster</strong>
+      <p id="detail">Warte auf eine Markierung…</p>
+    </div>
+    <div class="row">
+      <button type="button" id="run">Nochmal ausführen</button>
+      <button type="button" id="close">Schließen</button>
+    </div>
+  </header>
+  <main>
+    <textarea id="code" spellcheck="false"></textarea>
+    <pre id="out">Noch keine Ausgabe.</pre>
+  </main>
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const state = { mode: "run", path: "ausschnitt.py", started: false };
+
+    async function api(path, body) {
+      const opt = { credentials: "same-origin", headers: {} };
+      if (body !== undefined) {
+        opt.method = "POST";
+        opt.headers["Content-Type"] = "application/json";
+        opt.body = JSON.stringify(body);
+      }
+      const response = await fetch(path, opt);
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || data.ok === false) throw new Error(data.error || "Fehler");
+      return data;
+    }
+
+    function show(data) {
+      $("title").textContent = data.title || "Testfenster";
+      $("detail").textContent = data.detail || "";
+      $("code").value = data.code || "";
+      state.mode = data.mode || "run";
+      state.path = data.path || "ausschnitt.py";
+      document.title = "Test – " + (data.title || "ShatuIDE");
+    }
+
+    async function execute() {
+      const code = $("code").value;
+      $("out").textContent = "Läuft…\n";
+      try {
+        if (state.mode === "check") {
+          const checked = await api("/api/compile", { mode: "check", content: code, path: state.path });
+          let text = checked.message || "JSON in Ordnung.";
+          try {
+            const formatted = await api("/api/format", { content: code, path: state.path });
+            if (formatted.content) {
+              $("code").value = formatted.content;
+              text += "\n\nFormatiert.";
+            }
+          } catch (err) {
+            text += "\n" + err.message;
+          }
+          $("out").textContent = text;
+          return;
+        }
+        const started = await api("/api/run", { mode: "selection", content: code, path: state.path });
+        let text = "";
+        for (let step = 0; step < 80; step += 1) {
+          const data = await api("/api/session?id=" + started.id + "&from=0");
+          text = (data.lines || []).join("");
+          $("out").textContent = text || "Läuft…\n";
+          if (!data.running) {
+            $("out").textContent = text + "\n[beendet " + data.code + "]\n";
+            return;
+          }
+          await new Promise((resolve) => setTimeout(resolve, 200));
+        }
+      } catch (err) {
+        $("out").textContent = err.message;
+      }
+    }
+
+    function closeThis() {
+      window.open("", "_self");
+      window.close();
+    }
+
+    $("run").onclick = () => execute();
+    $("close").onclick = () => closeThis();
+    window.addEventListener("message", (event) => {
+      if (event.origin !== location.origin) return;
+      if (!event.data || event.data.type !== "shatu-probe") return;
+      if (state.started) return;
+      state.started = true;
+      show(event.data);
+      execute();
+    });
+    if (window.opener) window.opener.postMessage({ type: "shatu-probe-ready" }, location.origin);
+  </script>
+</body>
+</html>
