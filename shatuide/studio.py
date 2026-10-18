@@ -1185,7 +1185,9 @@ def build_msi(
         parent_key = "" if str(parent) == "." else parent.as_posix()
         rows_component.append([f"cmp{index}", component, dir_ids[parent_key], "0", "", f"fil{index}"])
         rows_feature_components.append(["Main", f"cmp{index}"])
-        rows_file.append([f"fil{index}", f"cmp{index}", _msi_token(Path(relative).name), str(path.stat().st_size), "", "", "512", str(index + 1)])
+        # 512 = wichtig, 16384 = komprimiert im Cabinet. Ohne das zweite Bit sucht Windows die Datei
+        # unkomprimiert neben der MSI, zum Beispiel installer\PFiles\ShatuIDE\ShatuIDE.exe.
+        rows_file.append([f"fil{index}", f"cmp{index}", _msi_token(Path(relative).name), str(path.stat().st_size), "", "", "16896", str(index + 1)])
     tables = {
         "Property.idt": _idt(
             "Property",

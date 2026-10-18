@@ -920,6 +920,12 @@ class StudioTests(unittest.TestCase):
                 page = next(path for path in out.rglob("app.js") if path.parent.name == "static")
                 self.assertIn("ShatuIDE", page.read_text(encoding="utf-8"))
                 self.assertTrue(any(path.name == "ShatuIDE.exe" for path in out.rglob("ShatuIDE.exe")))
+            if shutil.which("msiinfo"):
+                exported = subprocess.run(["msiinfo", "export", str(msi), "File"], capture_output=True, text=True)
+                self.assertEqual(exported.returncode, 0, exported.stderr)
+                rows = [line.split("\t") for line in exported.stdout.splitlines()[3:] if line.strip()]
+                self.assertTrue(rows)
+                self.assertTrue(all(row[6] == "16896" for row in rows), rows[0])
 
     def test_debug_other_file(self) -> None:
         from shatuide.shell_debug import ShellDebugSession
