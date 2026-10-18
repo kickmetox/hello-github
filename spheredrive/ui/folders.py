@@ -7,6 +7,7 @@ from collections.abc import Callable
 from tkinter import ttk
 
 from spheredrive.commands import _windows_parts, join_path
+from spheredrive.i18n import t
 from spheredrive.ui.widgets import L, P
 
 
@@ -33,7 +34,7 @@ class FolderBrowser(tk.Frame):
         if choose_drive:
             bar = tk.Frame(self, bg=bg)
             bar.pack(fill="x", pady=(0, 4))
-            tk.Label(bar, text="Laufwerk", bg=bg, fg=L.muted if light else P.muted, font=(P.font, 10)).pack(side="left")
+            tk.Label(bar, text=t("Laufwerk"), bg=bg, fg=L.muted if light else P.muted, font=(P.font, 10)).pack(side="left")
             letters = [f"{item}:\\" for item in self.app.service.drive_letters()] or ["C:\\"]
             if not self.root_path.get():
                 preferred = "C:\\" if "C:\\" in letters else letters[0]

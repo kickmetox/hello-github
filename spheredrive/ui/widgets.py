@@ -5,6 +5,7 @@ from __future__ import annotations
 import tkinter as tk
 from tkinter import ttk
 
+from spheredrive.i18n import t
 from spheredrive.models import OpResult
 
 
@@ -260,7 +261,7 @@ def status_tag(status: str) -> str:
 
 
 def yes_no(flag: bool) -> str:
-    return "Ja" if flag else "Nein"
+    return t("Ja") if flag else t("Nein")
 
 
 def clear_tree(tree: ttk.Treeview) -> None:
@@ -299,8 +300,8 @@ def ask_yes_no(parent: tk.Misc, title: str, text: str) -> bool:
     def reject() -> None:
         dialog.destroy()
 
-    Button(row, "Nein", reject, "ghost").pack(side="right")
-    Button(row, "Ja", accept, "primary").pack(side="right", padx=(0, 8))
+    Button(row, t("Nein"), reject, "ghost").pack(side="right")
+    Button(row, t("Ja"), accept, "primary").pack(side="right", padx=(0, 8))
     dialog.bind("<Escape>", lambda _event: reject())
     dialog.protocol("WM_DELETE_WINDOW", reject)
     dialog.update_idletasks()

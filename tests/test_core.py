@@ -387,6 +387,7 @@ class ServiceTests(unittest.TestCase):
         from spheredrive.helptext import (
             FEATURE_FILE,
             HELP_FILE,
+            render_feature_bundle,
             render_feature_text,
             render_help_html,
             render_help_text,
@@ -396,10 +397,12 @@ class ServiceTests(unittest.TestCase):
 
         html_path, feature_path = write_documents(package_root())
         help_text = render_help_text()
-        feature_text = render_feature_text()
+        feature_text = render_feature_bundle()
         html_text = render_help_html()
         self.assertEqual(html_path.read_text(encoding="utf-8"), html_text)
         self.assertEqual(feature_path.read_text(encoding="utf-8"), feature_text)
+        self.assertIn("English", feature_text)
+        self.assertIn("中文", feature_text)
         self.assertEqual(html_path.name, HELP_FILE)
         self.assertEqual(feature_path.name, FEATURE_FILE)
         for title, _lines in FEATURES:
@@ -425,6 +428,37 @@ class ServiceTests(unittest.TestCase):
         self.assertEqual(map_through_subst(r"P:\Archiv", host.subst), r"C:\Projekte\Archiv")
         self.assertEqual(svc.list_folders(r"P:\\"), ["Archiv", "SphereDrive"])
         self.assertEqual(svc.list_folders(r"P:\SphereDrive"), ["assets"])
+
+    def test_interface_languages(self) -> None:
+        from spheredrive.catalog import DESCRIPTION, FEATURES
+        from spheredrive.i18n import get_language, set_language, t
+        from spheredrive.translations import LANGS, TABLES
+
+        keys = set(TABLES["en"])
+        for lang in LANGS:
+            self.assertEqual(set(TABLES[lang]), keys)
+            self.assertTrue(all(value.strip() for value in TABLES[lang].values()))
+        self.assertIn(DESCRIPTION, keys)
+        for title, lines in FEATURES:
+            self.assertIn(title, keys)
+            for line in lines:
+                self.assertIn(line, keys)
+        previous = get_language()
+        try:
+            self.assertEqual(t("Datei"), "Datei")
+            for code, expected in (
+                ("en", "File"),
+                ("fr", "Fichier"),
+                ("es", "Archivo"),
+                ("pt", "Ficheiro"),
+                ("ru", "Файл"),
+                ("zh", "文件"),
+            ):
+                set_language(code)
+                self.assertEqual(t("Datei"), expected)
+                self.assertEqual(t("Hilfe"), {"en": "Help", "fr": "Aide", "es": "Ayuda", "pt": "Ajuda", "ru": "Справка", "zh": "帮助"}[code])
+        finally:
+            set_language(previous)
 
 
 class CliTests(unittest.TestCase):

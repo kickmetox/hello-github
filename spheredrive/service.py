@@ -53,6 +53,7 @@ from spheredrive.commands import (
     subst_list,
 )
 from spheredrive.host import PreviewHost, RunResult, WindowsHost, make_host
+from spheredrive.i18n import t
 from spheredrive.models import (
     DriveCard,
     LinkEntry,
@@ -81,25 +82,25 @@ FILE_KINDS = {"symlink_file", "hardlink"}
 AUTOSTART_NAME = "SphereDrive"
 
 _KIND_LABEL = {
-    "fixed": "Lokaler Datenträger",
-    "removable": "Wechselmedium",
-    "remote": "Netzlaufwerk",
-    "cdrom": "CD-Laufwerk",
-    "ramdisk": "RAM-Datenträger",
-    "subst": "Virtuelles Laufwerk",
-    "unknown": "Laufwerk",
-    "disconnected": "Nicht verbunden",
+    "fixed": t("Lokaler Datenträger"),
+    "removable": t("Wechselmedium"),
+    "remote": t("Netzlaufwerk"),
+    "cdrom": t("CD-Laufwerk"),
+    "ramdisk": t("RAM-Datenträger"),
+    "subst": t("Virtuelles Laufwerk"),
+    "unknown": t("Laufwerk"),
+    "disconnected": t("Nicht verbunden"),
 }
 
 _KIND_FALLBACK = {
-    "fixed": "Lokaler Datenträger",
-    "removable": "USB-Laufwerk",
-    "remote": "Netzlaufwerk",
-    "cdrom": "CD-Laufwerk",
-    "ramdisk": "RAM-Datenträger",
-    "subst": "Subst",
-    "unknown": "Laufwerk",
-    "disconnected": "Laufwerk",
+    "fixed": t("Lokaler Datenträger"),
+    "removable": t("USB-Laufwerk"),
+    "remote": t("Netzlaufwerk"),
+    "cdrom": t("CD-Laufwerk"),
+    "ramdisk": t("RAM-Datenträger"),
+    "subst": t("Subst"),
+    "unknown": t("Laufwerk"),
+    "disconnected": t("Laufwerk"),
 }
 
 
@@ -142,10 +143,10 @@ class SphereService:
                 results.append(OpResult(False, f"{letter}: ist belegt und wurde nicht ersetzt."))
                 continue
             if not self.host.path_isdir(path):
-                results.append(OpResult(False, f"Ordner für {letter}: fehlt: {path}"))
+                results.append(OpResult(False, t("Ordner für {letter}: fehlt: {path}", letter=letter, path=path)))
                 continue
             result = self.host.run(subst_create(letter, path))
-            results.append(self._from_run(result, f"{letter}: wurde wiederhergestellt.", "subst fehlgeschlagen"))
+            results.append(self._from_run(result, t("{letter}: wurde wiederhergestellt.", letter=letter), t("subst fehlgeschlagen")))
         connected = {item.letter for item in parse_net_use(self.host.run(net_use_list()).stdout)}
         for item in self.store.data["net"]:
             if not item.get("persistent"):
@@ -157,12 +158,12 @@ class SphereService:
             result = self.host.run(
                 net_use_connect(letter, item["remote"], item.get("user") or "", "", True)
             )
-            results.append(self._from_run(result, f"{letter}: wurde erneut verbunden.", "net use fehlgeschlagen"))
+            results.append(self._from_run(result, t("{letter}: wurde erneut verbunden.", letter=letter), t("net use fehlgeschlagen")))
         for item in self.store.data["psdrives"]:
             if not item.get("profile"):
                 continue
             # Profil-Laufwerke entstehen in PowerShell-Sitzungen, nicht in diesem Prozess.
-        return results or [OpResult(True, "Keine dauerhaften Zuordnungen gespeichert.")]
+        return results or [OpResult(True, t("Keine dauerhaften Zuordnungen gespeichert."))]
 
     # --- Subst ----------------------------------------------------------
 
@@ -170,9 +171,9 @@ class SphereService:
         letter = normalize_letter(spec.letter)
         path = (spec.path or "").strip().strip('"')
         if letter is None:
-            return OpResult(False, "Der Laufwerksbuchstabe ist ungültig.")
+            return OpResult(False, t("Der Laufwerksbuchstabe ist ungültig."))
         if not path:
-            return OpResult(False, "Der Ordner fehlt.")
+            return OpResult(False, t("Der Ordner fehlt."))
         warnings: list[str] = []
         live = {item.letter: item.path for item in parse_subst(self.host.run(subst_list()).stdout)}
         if letter in live:
@@ -180,7 +181,7 @@ class SphereService:
                 if not replace:
                     return OpResult(
                         False,
-                        f"{letter}: ist bereits mit {live[letter]} verbunden.",
+                        t("{letter}: ist bereits mit {path} verbunden.", letter=letter, path=live[letter]),
                         code="conflict",
                     )
                 removed = self.remove_subst(letter)
@@ -188,13 +189,13 @@ class SphereService:
                     return removed
                 live.pop(letter, None)
         elif letter in self.host.logical_drives():
-            return OpResult(False, f"{letter}: wird bereits von einem anderen Laufwerk verwendet.", code="occupied")
+            return OpResult(False, t("{letter}: wird bereits von einem anderen Laufwerk verwendet.", letter=letter), code="occupied")
         if letter not in live:
             if not self.host.path_isdir(path):
-                return OpResult(False, "Der Zielordner existiert nicht.")
+                return OpResult(False, t("Der Zielordner existiert nicht."))
             created = self.host.run(subst_create(letter, path))
             if not created.ok:
-                return self._from_run(created, "", "subst konnte das Laufwerk nicht verbinden.")
+                return self._from_run(created, "", t("subst konnte das Laufwerk nicht verbinden."))
         if spec.persistent:
             warning = self._write_dos_device(letter, path)
             if warning:
@@ -203,7 +204,7 @@ class SphereService:
                 self.write_autostart(True)
             else:
                 warnings.append(
-                    "Autostart ist aus. Ohne DOS-Devices-Eintrag verschwindet das Laufwerk beim Neustart."
+                    t("Autostart ist aus. Ohne DOS-Devices-Eintrag verschwindet das Laufwerk beim Neustart.")
                 )
         else:
             self._delete_dos_device(letter)
@@ -238,20 +239,20 @@ class SphereService:
             },
         )
         self.host.notify_shell()
-        message = f"{letter}: ist mit {path} verbunden."
+        message = t("{letter}: ist mit {path} verbunden.", letter=letter, path=path)
         return OpResult(True, message, warnings)
 
     def remove_subst(self, letter: str) -> OpResult:
         normalized = normalize_letter(letter)
         if normalized is None:
-            return OpResult(False, "Der Laufwerksbuchstabe ist ungültig.")
+            return OpResult(False, t("Der Laufwerksbuchstabe ist ungültig."))
         warnings: list[str] = []
         stored = self._existing_subst(normalized)
         result = self.host.run(subst_delete(normalized))
         if not result.ok and "nicht verbunden" not in result.text.lower() and "invalid" not in result.text.lower():
             # Ein bereits fehlendes Laufwerk ist kein Fehler, wenn wir nur die Konfiguration lösen.
             if normalized in {item.letter for item in parse_subst(self.host.run(subst_list()).stdout)}:
-                return self._from_run(result, "", "Das Laufwerk konnte nicht getrennt werden.")
+                return self._from_run(result, "", t("Das Laufwerk konnte nicht getrennt werden."))
         warning = self._delete_dos_device(normalized)
         if warning:
             warnings.append(warning)
@@ -262,7 +263,7 @@ class SphereService:
         self._delete_appearance(normalized)
         self._drop("subst", "letter", normalized)
         self.host.notify_shell()
-        return OpResult(True, f"{normalized}: wurde getrennt.", warnings)
+        return OpResult(True, t("{letter}: wurde getrennt.", letter=normalized), warnings)
 
     # --- net use --------------------------------------------------------
 
@@ -270,13 +271,13 @@ class SphereService:
         letter = normalize_letter(spec.letter)
         remote = (spec.remote or "").strip()
         if letter is None:
-            return OpResult(False, "Der Laufwerksbuchstabe ist ungültig.")
+            return OpResult(False, t("Der Laufwerksbuchstabe ist ungültig."))
         if not remote.startswith("\\\\"):
-            return OpResult(False, "Die Freigabe muss ein UNC-Pfad sein, zum Beispiel \\\\server\\freigabe.")
+            return OpResult(False, t("Die Freigabe muss ein UNC-Pfad sein, zum Beispiel \\\\server\\freigabe."))
         current = {item.letter: item.remote for item in parse_net_use(self.host.run(net_use_list()).stdout)}
         same = letter in current and current[letter].rstrip("\\").lower() == remote.rstrip("\\").lower()
         if letter in self.host.logical_drives() and not same:
-            return OpResult(False, f"{letter}: ist bereits belegt.")
+            return OpResult(False, t("{letter}: ist bereits belegt.", letter=letter))
         if not same:
             result = self.host.run(
                 net_use_connect(letter, remote, spec.user.strip(), spec.password, spec.persistent),
@@ -284,14 +285,14 @@ class SphereService:
                 timeout=45,
             )
             if not result.ok:
-                return self._from_run(result, "", "net use konnte die Freigabe nicht verbinden.")
+                return self._from_run(result, "", t("net use konnte die Freigabe nicht verbinden."))
         warnings: list[str] = []
         self._write_appearance(letter, spec.label, spec.icon, warnings)
         if spec.label.strip():
             try:
                 self.host.registry.set_sz("HKCU", mountpoints2_key(remote), "_LabelFromReg", spec.label.strip())
             except PermissionError:
-                warnings.append("Die Netzwerkbezeichnung konnte nicht geschrieben werden.")
+                warnings.append(t("Die Netzwerkbezeichnung konnte nicht geschrieben werden."))
         self._upsert(
             "net",
             "letter",
@@ -308,16 +309,16 @@ class SphereService:
             self.write_autostart(True)
         self.host.notify_shell()
         if spec.password:
-            warnings.append("Das Kennwort wurde nicht gespeichert.")
-        return OpResult(True, f"{letter}: ist mit {remote} verbunden.", warnings)
+            warnings.append(t("Das Kennwort wurde nicht gespeichert."))
+        return OpResult(True, t("{letter}: ist mit {remote} verbunden.", letter=letter, remote=remote), warnings)
 
     def disconnect_net(self, letter: str) -> OpResult:
         normalized = normalize_letter(letter)
         if normalized is None:
-            return OpResult(False, "Der Laufwerksbuchstabe ist ungültig.")
+            return OpResult(False, t("Der Laufwerksbuchstabe ist ungültig."))
         result = self.host.run(net_use_delete(normalized), input_text="Y\n", timeout=30)
         if not result.ok:
-            return self._from_run(result, "", "Die Netzwerkverbindung konnte nicht getrennt werden.")
+            return self._from_run(result, "", t("Die Netzwerkverbindung konnte nicht getrennt werden."))
         try:
             self.host.registry.delete_value("HKCU", network_key(normalized), "RemotePath")
         except PermissionError:
@@ -325,35 +326,35 @@ class SphereService:
         self._drop("net", "letter", normalized)
         self._delete_appearance(normalized)
         self.host.notify_shell()
-        return OpResult(True, f"{normalized}: wurde getrennt.")
+        return OpResult(True, t("{letter}: wurde getrennt.", letter=normalized))
 
     def create_share(self, spec: ShareSpec) -> OpResult:
         name = spec.name.strip()
         path = spec.path.strip().strip('"')
         if not share_name_ok(name):
-            return OpResult(False, "Der Freigabename ist ungültig. $ am Ende ist administrativen Freigaben vorbehalten.")
+            return OpResult(False, t("Der Freigabename ist ungültig. $ am Ende ist administrativen Freigaben vorbehalten."))
         if not self.host.path_isdir(path):
-            return OpResult(False, "Der freizugebende Ordner existiert nicht.")
+            return OpResult(False, t("Der freizugebende Ordner existiert nicht."))
         principal = spec.principal.strip() or os.environ.get("USERNAME") or os.environ.get("USER") or ""
         result = self.host.run(net_share_create(name, path, spec.permission, principal), timeout=30)
         if not result.ok:
-            return self._from_run(result, "", "Die Freigabe konnte nicht erstellt werden.")
+            return self._from_run(result, "", t("Die Freigabe konnte nicht erstellt werden."))
         self._upsert("shares", "name", {"name": name, "path": path, "permission": spec.permission, "principal": principal})
         return OpResult(
             True,
-            f"Freigabe {name} zeigt auf {path}.",
-            ["Der Ordner ist damit im Netzwerk erreichbar. Verbinde ihn anschließend mit net use."],
+            t("Freigabe {name} zeigt auf {path}.", name=name, path=path),
+            [t("Der Ordner ist damit im Netzwerk erreichbar. Verbinde ihn anschließend mit net use.")],
         )
 
     def delete_share(self, name: str) -> OpResult:
         cleaned = name.strip()
         if not cleaned:
-            return OpResult(False, "Der Freigabename fehlt.")
+            return OpResult(False, t("Der Freigabename fehlt."))
         result = self.host.run(net_share_delete(cleaned), timeout=30)
         if not result.ok:
-            return self._from_run(result, "", "Die Freigabe konnte nicht entfernt werden.")
+            return self._from_run(result, "", t("Die Freigabe konnte nicht entfernt werden."))
         self._drop("shares", "name", cleaned)
-        return OpResult(True, f"Freigabe {cleaned} wurde entfernt. Die Dateien bleiben am Ort.")
+        return OpResult(True, t("Freigabe {cleaned} wurde entfernt. Die Dateien bleiben am Ort.", cleaned=cleaned))
 
     # --- mklink ---------------------------------------------------------
 
@@ -362,37 +363,37 @@ class SphereService:
         link = spec.link.strip().strip('"')
         target = spec.target.strip().strip('"')
         if kind not in DIR_KINDS | FILE_KINDS:
-            return OpResult(False, "Die Verknüpfungsart ist unbekannt.")
+            return OpResult(False, t("Die Verknüpfungsart ist unbekannt."))
         if not link or not target:
-            return OpResult(False, "Link-Pfad und Ziel werden beide benötigt.")
+            return OpResult(False, t("Link-Pfad und Ziel werden beide benötigt."))
         if norm_path(link) == norm_path(target):
-            return OpResult(False, "Link und Ziel dürfen nicht identisch sein.")
+            return OpResult(False, t("Link und Ziel dürfen nicht identisch sein."))
         parent = parent_dir(link)
         if parent and not self.host.path_isdir(parent):
-            return OpResult(False, "Der übergeordnete Ordner des Links existiert nicht.")
+            return OpResult(False, t("Der übergeordnete Ordner des Links existiert nicht."))
         if self.host.path_occupied(link):
-            return OpResult(False, "Am Link-Pfad liegt bereits eine Datei oder ein Ordner.")
+            return OpResult(False, t("Am Link-Pfad liegt bereits eine Datei oder ein Ordner."))
         if kind in DIR_KINDS and not self.host.path_isdir(target):
-            return OpResult(False, "Das Ziel einer Junction oder eines Ordnerlinks muss ein Ordner sein.")
+            return OpResult(False, t("Das Ziel einer Junction oder eines Ordnerlinks muss ein Ordner sein."))
         if kind in FILE_KINDS and not self.host.path_isfile(target):
-            return OpResult(False, "Das Ziel dieser Verknüpfung muss eine Datei sein.")
+            return OpResult(False, t("Das Ziel dieser Verknüpfung muss eine Datei sein."))
         result = self.host.run(mklink_command(kind, link, target))
         if not result.ok:
             warnings = []
             if kind in {"symlink_dir", "symlink_file"}:
                 warnings.append(
-                    "Symbolische Links brauchen Administratorrechte oder den Windows-Entwicklermodus."
+                    t("Symbolische Links brauchen Administratorrechte oder den Windows-Entwicklermodus.")
                 )
-            failure = self._from_run(result, "", "mklink ist fehlgeschlagen.")
+            failure = self._from_run(result, "", t("mklink ist fehlgeschlagen."))
             failure.warnings.extend(warnings)
             return failure
         self._upsert("links", "link", {"kind": kind, "link": link, "target": target})
-        return OpResult(True, f"Verknüpfung angelegt: {link}")
+        return OpResult(True, t("Verknüpfung angelegt: {link}", link=link))
 
     def remove_link(self, link: str) -> OpResult:
         path = link.strip().strip('"')
         if not path:
-            return OpResult(False, "Der Link-Pfad fehlt.")
+            return OpResult(False, t("Der Link-Pfad fehlt."))
         stored = self._find("links", "link", path)
         kind = (stored or {}).get("kind", "")
         if kind == "hardlink":
@@ -401,28 +402,28 @@ class SphereService:
             if not self.host.is_reparse(path):
                 return OpResult(
                     False,
-                    "Der Pfad ist kein symbolischer Link und keine Junction. Es wurde nichts gelöscht.",
+                    t("Der Pfad ist kein symbolischer Link und keine Junction. Es wurde nichts gelöscht."),
                 )
             if kind == "symlink_file" or (not kind and self.host.path_isfile(path)):
                 result = self.host.run(del_command(path))
             else:
                 result = self.host.run(rmdir_command(path))
         if not result.ok:
-            return self._from_run(result, "", "Die Verknüpfung konnte nicht entfernt werden.")
+            return self._from_run(result, "", t("Die Verknüpfung konnte nicht entfernt werden."))
         self._drop_path("links", "link", path)
-        return OpResult(True, "Die Verknüpfung wurde entfernt. Das Ziel bleibt unverändert.")
+        return OpResult(True, t("Die Verknüpfung wurde entfernt. Das Ziel bleibt unverändert."))
 
     def scan_links(self, folder: str) -> OpResult:
         path = folder.strip().strip('"')
         if not self.host.path_isdir(path):
-            return OpResult(False, "Der Ordner existiert nicht.")
+            return OpResult(False, t("Der Ordner existiert nicht."))
         result = self.host.run_powershell(ps_scan_reparse_script(path))
         if not result.ok and not result.stdout.strip():
-            return self._from_run(result, "", "Die Verknüpfungen konnten nicht gelesen werden.")
+            return self._from_run(result, "", t("Die Verknüpfungen konnten nicht gelesen werden."))
         try:
             rows = parse_json_list(result.stdout) if result.stdout.strip() else []
         except Exception:
-            return OpResult(False, "Die Antwort von PowerShell konnte nicht gelesen werden.")
+            return OpResult(False, t("Die Antwort von PowerShell konnte nicht gelesen werden."))
         added = 0
         for row in rows:
             link = str(row.get("Link") or "")
@@ -434,7 +435,7 @@ class SphereService:
                 self.store.data["links"].append({"kind": kind, "link": link, "target": target})
                 added += 1
         self.store.save()
-        return OpResult(True, f"{len(rows)} Verknüpfungen im Ordner, {added} neu in die Liste übernommen.")
+        return OpResult(True, t("{count} Verknüpfungen im Ordner, {added} neu in die Liste übernommen.", count=len(rows), added=added))
 
     # --- New-PSDrive ----------------------------------------------------
 
@@ -443,17 +444,17 @@ class SphereService:
         provider = spec.provider.strip()
         root = spec.root.strip().strip('"')
         if not ps_name_ok(name):
-            return OpResult(False, "Der Laufwerksname muss mit einem Buchstaben beginnen und darf nur Buchstaben, Ziffern und _ enthalten.")
+            return OpResult(False, t("Der Laufwerksname muss mit einem Buchstaben beginnen und darf nur Buchstaben, Ziffern und _ enthalten."))
         if not provider:
-            return OpResult(False, "Der Anbieter fehlt.")
+            return OpResult(False, t("Der Anbieter fehlt."))
         if provider == "FileSystem" and not root.startswith("\\\\") and not self.host.path_isdir(root):
-            return OpResult(False, "Der Stammordner existiert nicht.")
+            return OpResult(False, t("Der Stammordner existiert nicht."))
         if spec.persist_windows and not (provider == "FileSystem" and root.startswith("\\\\")):
-            return OpResult(False, "-Persist gilt nur für UNC-Pfade des FileSystem-Anbieters.")
+            return OpResult(False, t("-Persist gilt nur für UNC-Pfade des FileSystem-Anbieters."))
         script = ps_new_drive_script(name, provider, root, spec.persist_windows)
         result = self.host.run_powershell(script)
         if not result.ok:
-            return self._from_run(result, "", "New-PSDrive ist fehlgeschlagen.")
+            return self._from_run(result, "", t("New-PSDrive ist fehlgeschlagen."))
         self._upsert(
             "psdrives",
             "name",
@@ -468,25 +469,25 @@ class SphereService:
         warnings: list[str] = []
         if spec.profile:
             self._rewrite_profiles()
-            warnings.append("Neue PowerShell-Fenster legen das Laufwerk über das Profil an.")
+            warnings.append(t("Neue PowerShell-Fenster legen das Laufwerk über das Profil an."))
         else:
             self._rewrite_profiles()
-            warnings.append("Das Laufwerk gilt nur in der PowerShell-Sitzung, die es angelegt hat.")
-        return OpResult(True, f"PowerShell-Laufwerk {name}: wurde angelegt.", warnings)
+            warnings.append(t("Das Laufwerk gilt nur in der PowerShell-Sitzung, die es angelegt hat."))
+        return OpResult(True, t("PowerShell-Laufwerk {name}: wurde angelegt.", name=name), warnings)
 
     def remove_psdrive(self, name: str) -> OpResult:
         cleaned = name.strip()
         if not cleaned:
-            return OpResult(False, "Der Laufwerksname fehlt.")
+            return OpResult(False, t("Der Laufwerksname fehlt."))
         result = self.host.run_powershell(ps_remove_drive_script(cleaned))
         stored = self._find("psdrives", "name", cleaned)
         if not result.ok and stored is None:
-            return self._from_run(result, "", "Remove-PSDrive ist fehlgeschlagen.")
+            return self._from_run(result, "", t("Remove-PSDrive ist fehlgeschlagen."))
         self._drop("psdrives", "name", cleaned)
         self._rewrite_profiles()
-        message = f"PowerShell-Laufwerk {cleaned}: wurde entfernt."
+        message = t("PowerShell-Laufwerk {name}: wurde entfernt.", name=cleaned)
         if not result.ok:
-            return OpResult(True, message, ["In dieser Sitzung war es nicht mehr vorhanden. Der Profileintrag ist gelöscht."])
+            return OpResult(True, message, [t("In dieser Sitzung war es nicht mehr vorhanden. Der Profileintrag ist gelöscht.")])
         return OpResult(True, message)
 
     def open_powershell(self, spec: PsSpec) -> OpResult:
@@ -496,8 +497,8 @@ class SphereService:
             ["powershell.exe", "-NoExit", "-ExecutionPolicy", "Bypass", "-Command", script]
         )
         if self.host.preview:
-            return OpResult(True, "Vorschau: Eine PowerShell-Sitzung würde jetzt offen bleiben.")
-        return OpResult(True, "PowerShell wurde geöffnet. Das Laufwerk lebt in diesem Fenster.")
+            return OpResult(True, t("Vorschau: Eine PowerShell-Sitzung würde jetzt offen bleiben."))
+        return OpResult(True, t("PowerShell wurde geöffnet. Das Laufwerk lebt in diesem Fenster."))
 
     # --- Bereitstellungspunkte ------------------------------------------
 
@@ -530,52 +531,52 @@ class SphereService:
         volume = normalize_volume_id(spec.volume)
         target = normalize_mount_target(spec.target)
         if volume is None:
-            return OpResult(False, "Die Volume-GUID ist ungültig.")
+            return OpResult(False, t("Die Volume-GUID ist ungültig."))
         if target is None:
-            return OpResult(False, "Das Bereitstellungsziel fehlt.")
+            return OpResult(False, t("Das Bereitstellungsziel fehlt."))
         known = {item.id.lower() for item in self.list_volumes()}
         if known and volume.lower() not in known:
-            return OpResult(False, "Dieses Volume ist nicht in der Liste.")
+            return OpResult(False, t("Dieses Volume ist nicht in der Liste."))
         if target.endswith(":") and len(target) == 2:
             letter = target[0]
             if letter in self.host.logical_drives():
-                return OpResult(False, f"{letter}: ist bereits belegt.")
+                return OpResult(False, t("{letter}: ist bereits belegt.", letter=letter))
         else:
             if not self.host.path_isdir(target):
-                return OpResult(False, "Der NTFS-Ordner existiert nicht.")
+                return OpResult(False, t("Der NTFS-Ordner existiert nicht."))
             if not self.host.dir_is_empty(target):
-                return OpResult(False, "Der Ordner muss leer sein. mountvol lehnt einen gefüllten Ordner ab.")
+                return OpResult(False, t("Der Ordner muss leer sein. mountvol lehnt einen gefüllten Ordner ab."))
         result = self.host.run(mountvol_assign(target, volume))
         if not result.ok:
-            return self._from_run(result, "", "mountvol konnte das Volume nicht bereitstellen.")
+            return self._from_run(result, "", t("mountvol konnte das Volume nicht bereitstellen."))
         self._upsert("mounts", "target", {"volume": volume, "target": target})
         return OpResult(
             True,
-            f"{volume} ist unter {target} bereitgestellt.",
-            ["Das übersteht einen Neustart. Zum Anlegen einer VHD weiter die Datenträgerverwaltung verwenden."],
+            t("{volume} ist unter {target} bereitgestellt.", volume=volume, target=target),
+            [t("Das übersteht einen Neustart. Zum Anlegen einer VHD weiter die Datenträgerverwaltung verwenden.")],
         )
 
     def unmount_volume(self, target: str) -> OpResult:
         normalized = normalize_mount_target(target)
         if normalized is None:
-            return OpResult(False, "Das Bereitstellungsziel fehlt.")
+            return OpResult(False, t("Das Bereitstellungsziel fehlt."))
         result = self.host.run(mountvol_remove(normalized))
         if not result.ok:
-            return self._from_run(result, "", "Die Bereitstellung konnte nicht aufgehoben werden.")
+            return self._from_run(result, "", t("Die Bereitstellung konnte nicht aufgehoben werden."))
         self._drop_mount(normalized)
-        return OpResult(True, f"Die Bereitstellung {normalized} wurde aufgehoben. Das Volume selbst bleibt erhalten.")
+        return OpResult(True, t("Die Bereitstellung {target} wurde aufgehoben. Das Volume selbst bleibt erhalten.", target=normalized))
 
     def open_diskmgmt(self) -> OpResult:
         self.host.open_msc("diskmgmt.msc")
         if self.host.preview:
-            return OpResult(True, "Vorschau: diskmgmt.msc würde jetzt geöffnet.")
-        return OpResult(True, "Datenträgerverwaltung wird geöffnet.")
+            return OpResult(True, t("Vorschau: diskmgmt.msc würde jetzt geöffnet."))
+        return OpResult(True, t("Datenträgerverwaltung wird geöffnet."))
 
     def open_share_manager(self) -> OpResult:
         self.host.open_msc("fsmgmt.msc")
         if self.host.preview:
-            return OpResult(True, "Vorschau: die Freigabeverwaltung würde jetzt geöffnet.")
-        return OpResult(True, "Freigabeverwaltung wird geöffnet.")
+            return OpResult(True, t("Vorschau: die Freigabeverwaltung würde jetzt geöffnet."))
+        return OpResult(True, t("Freigabeverwaltung wird geöffnet."))
 
     def list_folders(self, path: str) -> list[str]:
         return self.host.list_folders(path)
@@ -586,24 +587,24 @@ class SphereService:
     def open_in_explorer(self, path: str) -> OpResult:
         target = path.strip()
         if not target:
-            return OpResult(False, "Es ist nichts zum Öffnen ausgewählt.")
+            return OpResult(False, t("Es ist nichts zum Öffnen ausgewählt."))
         if not self.host.preview and not self.host.path_exists(target):
-            return OpResult(False, f"Der Pfad kann nicht geöffnet werden: {target}")
+            return OpResult(False, t("Der Pfad kann nicht geöffnet werden: {target}", target=target))
         self.host.open_path(target)
-        return OpResult(True, f"Explorer: {target}")
+        return OpResult(True, t("Explorer: {target}", target=target))
 
     def apply_appearance(self, letter: str, label: str, icon: str) -> OpResult:
         """Nur Bezeichnung und Symbol. Legt kein subst und kein net use an."""
         normalized = normalize_letter(letter)
         if normalized is None:
-            return OpResult(False, "Der Laufwerksbuchstabe ist ungültig.")
+            return OpResult(False, t("Der Laufwerksbuchstabe ist ungültig."))
         known = normalized in self.host.logical_drives()
         known = known or self._find("subst", "letter", normalized) is not None
         known = known or self._find("net", "letter", normalized) is not None
         if not known:
-            return OpResult(False, f"{normalized}: ist nicht vorhanden.")
+            return OpResult(False, t("{letter}: ist nicht vorhanden.", letter=normalized))
         if not label.strip() and not icon.strip():
-            return OpResult(False, "Bezeichnung oder Symbol angeben.")
+            return OpResult(False, t("Bezeichnung oder Symbol angeben."))
         warnings: list[str] = []
         self._write_appearance(normalized, label, icon, warnings)
         for section in ("subst", "net"):
@@ -613,7 +614,7 @@ class SphereService:
                 current["icon"] = icon.strip()
                 self.store.save()
         self.host.notify_shell()
-        return OpResult(True, f"Bezeichnung und Symbol für {normalized}: wurden gespeichert.", warnings)
+        return OpResult(True, t("Bezeichnung und Symbol für {letter}: wurden gespeichert.", letter=normalized), warnings)
 
     def drive_cards(self, include_all: bool = True, snap: Snapshot | None = None) -> list[DriveCard]:
         """Laufwerkskacheln. Ohne include_all nur Subst, net use und von SphereDrive bereitgestellte Buchstaben."""
@@ -668,11 +669,11 @@ class SphereService:
             try:
                 if linked:
                     self.host.registry.set_dword("HKLM", POLICIES_SYSTEM, "EnableLinkedConnections", 1)
-                    warnings.append("EnableLinkedConnections wird erst nach einem Neustart wirksam.")
+                    warnings.append(t("EnableLinkedConnections wird erst nach einem Neustart wirksam."))
                 else:
                     self.host.registry.delete_value("HKLM", POLICIES_SYSTEM, "EnableLinkedConnections")
             except PermissionError:
-                return OpResult(False, "EnableLinkedConnections braucht Administratorrechte.")
+                return OpResult(False, t("EnableLinkedConnections braucht Administratorrechte."))
         self.write_autostart(autostart)
         if elevated_task != self.host.task_exists():
             if elevated_task:
@@ -682,20 +683,20 @@ class SphereService:
                     return self._from_run(
                         created,
                         "",
-                        "Die Anmeldungsaufgabe konnte nicht erstellt werden. Dafür sind Administratorrechte nötig.",
+                        t("Die Anmeldungsaufgabe konnte nicht erstellt werden. Dafür sind Administratorrechte nötig."),
                     )
                 warnings.append(
-                    "Die Aufgabe läuft bei der Anmeldung mit höchsten Rechten und ruft SphereDrive --restore auf."
+                    t("Die Aufgabe läuft bei der Anmeldung mit höchsten Rechten und ruft SphereDrive --restore auf.")
                 )
             else:
                 deleted = self.host.delete_logon_task()
                 if not deleted.ok:
-                    return self._from_run(deleted, "", "Die Anmeldungsaufgabe konnte nicht gelöscht werden.")
+                    return self._from_run(deleted, "", t("Die Anmeldungsaufgabe konnte nicht gelöscht werden."))
         self.store.data["settings"]["linked_connections"] = linked
         self.store.data["settings"]["autostart"] = autostart
         self.store.data["settings"]["elevated_task"] = elevated_task
         self.store.save()
-        return OpResult(True, "Einstellungen wurden übernommen.", warnings)
+        return OpResult(True, t("Einstellungen wurden übernommen."), warnings)
 
     def write_autostart(self, enabled: bool) -> None:
         if enabled:
@@ -711,23 +712,23 @@ class SphereService:
 
     def elevate(self) -> OpResult:
         if self.host.is_admin():
-            return OpResult(True, "SphereDrive läuft bereits mit Administratorrechten.")
+            return OpResult(True, t("SphereDrive läuft bereits mit Administratorrechten."))
         if self.host.preview:
             self.host.elevate()
-            return OpResult(True, "Vorschau: Administratorrechte sind jetzt simuliert.")
+            return OpResult(True, t("Vorschau: Administratorrechte sind jetzt simuliert."))
         self.host.elevate()
-        return OpResult(True, "Die Instanz mit Administratorrechten wird gestartet.", relaunch=True)
+        return OpResult(True, t("Die Instanz mit Administratorrechten wird gestartet."), relaunch=True)
 
     def refresh_shell(self) -> OpResult:
         self.host.notify_shell()
-        return OpResult(True, "Der Explorer wurde zum Neulesen von Bezeichnung und Symbol aufgefordert.")
+        return OpResult(True, t("Der Explorer wurde zum Neulesen von Bezeichnung und Symbol aufgefordert."))
 
     def restart_explorer(self) -> OpResult:
         if self.host.preview:
-            return OpResult(True, "Vorschau: Der Explorer wird hier nicht neu gestartet.")
+            return OpResult(True, t("Vorschau: Der Explorer wird hier nicht neu gestartet."))
         self.host.run(["taskkill", "/F", "/IM", "explorer.exe"], timeout=20)
         self.host.spawn(["explorer.exe"])
-        return OpResult(True, "Der Explorer wurde neu gestartet.")
+        return OpResult(True, t("Der Explorer wurde neu gestartet."))
 
     def open_config_dir(self) -> OpResult:
         self.host.open_path(str(self.store.path.parent))
@@ -759,7 +760,7 @@ class SphereService:
             user = ""
             real_fixed = False
             can_disconnect = True
-            fallback = _win_basename(target) or _KIND_FALLBACK["subst"]
+            fallback = t(_win_basename(target) or _KIND_FALLBACK["subst"])
             capacity = 0
             free = 0
             filesystem = ""
@@ -777,7 +778,7 @@ class SphereService:
             user = net.user
             real_fixed = False
             can_disconnect = True
-            fallback = _win_basename(target) or _KIND_FALLBACK["remote"]
+            fallback = t(_win_basename(target) or _KIND_FALLBACK["remote"])
             capacity = 0
             free = 0
             filesystem = ""
@@ -799,12 +800,13 @@ class SphereService:
                 managed_mount and kind != "remote"
             )
             can_disconnect = bool(managed_mount) or kind == "remote"
-            fallback = _KIND_FALLBACK.get(kind, "Laufwerk")
+            fallback = t(_KIND_FALLBACK.get(kind, "Laufwerk"))
             capacity = volume.capacity if volume else 0
             free = volume.free if volume else 0
             filesystem = volume.filesystem if volume else ""
         display = (label or "").strip() or fallback
-        kind_label = _KIND_LABEL["disconnected"] if status == "getrennt" else _KIND_LABEL.get(kind, "Laufwerk")
+        raw_kind = _KIND_LABEL["disconnected"] if status == "getrennt" else _KIND_LABEL.get(kind, "Laufwerk")
+        kind_label = t(raw_kind)
         return DriveCard(
             letter=letter,
             title=f"{display} ({letter}:)",
@@ -973,13 +975,13 @@ class SphereService:
                 "Der dauerhafte DOS-Devices-Eintrag braucht Administratorrechte. "
                 "Bis dahin stellt der Autostart das Laufwerk nach der Anmeldung wieder her."
             )
-        return "DOS Devices übernimmt das Laufwerk beim nächsten Systemstart, auch für Administratoren."
+        return t("DOS Devices übernimmt das Laufwerk beim nächsten Systemstart, auch für Administratoren.")
 
     def _delete_dos_device(self, letter: str) -> str | None:
         try:
             self.host.registry.delete_value("HKLM", DOS_DEVICES, f"{letter}:")
         except PermissionError:
-            return "Der DOS-Devices-Eintrag konnte ohne Administratorrechte nicht entfernt werden."
+            return t("Der DOS-Devices-Eintrag konnte ohne Administratorrechte nicht entfernt werden.")
         return None
 
     def _dos_device_present(self, letter: str) -> bool:
@@ -999,7 +1001,7 @@ class SphereService:
             except PermissionError:
                 if hive == "HKLM":
                     continue
-                warnings.append("Bezeichnung oder Symbol konnten nicht gespeichert werden.")
+                warnings.append(t("Bezeichnung oder Symbol konnten nicht gespeichert werden."))
 
     def _delete_appearance(self, letter: str) -> None:
         for hive in ("HKCU", "HKLM"):
@@ -1043,11 +1045,13 @@ class SphereService:
                 self.host.registry.set_dword("HKCU", key, "NukeOnDelete", 0)
                 self.host.registry.set_dword("HKCU", key, "MaxCapacity", capacity)
         except PermissionError:
-            return "", "Der Papierkorb für virtuelle Laufwerke braucht Administratorrechte (Known-Folder-Registrierung)."
-        return token, (
-            f"Papierkorb für {letter}: ist registriert ({capacity} MB). "
+            return "", t("Der Papierkorb für virtuelle Laufwerke braucht Administratorrechte (Known-Folder-Registrierung).")
+        return token, t(
+            "Papierkorb für {letter}: ist registriert ({capacity} MB). "
             "Falls der Explorer ihn noch nicht anbietet, einmal ab- und wieder anmelden. "
-            "Die Dateien bleiben auf dem Datenträger des Zielordners."
+            "Die Dateien bleiben auf dem Datenträger des Zielordners.",
+            letter=letter,
+            capacity=capacity,
         )
 
     def _disable_recycle(self, letter: str, guid: str) -> str | None:
@@ -1059,7 +1063,7 @@ class SphereService:
             for base in (BITBUCKET, BITBUCKET_WOW):
                 self.host.registry.delete_tree("HKCU", base + "\\" + token)
         except PermissionError:
-            return "Die Papierkorb-Registrierung konnte ohne Administratorrechte nicht entfernt werden."
+            return t("Die Papierkorb-Registrierung konnte ohne Administratorrechte nicht entfernt werden.")
         return None
 
     def _find_recycle_guid(self, letter: str) -> str | None:
@@ -1087,9 +1091,9 @@ class SphereService:
             created = self.host.create_logon_task(command, arguments)
             if created.ok:
                 self.store.data["settings"]["elevated_task"] = True
-                task_note = " Die Anmeldungsaufgabe mit höchsten Rechten wurde eingerichtet."
+                task_note = t(" Die Anmeldungsaufgabe mit höchsten Rechten wurde eingerichtet.")
         if changed:
-            return "EnableLinkedConnections ist gesetzt und wirkt nach einem Neustart." + task_note
+            return t("EnableLinkedConnections ist gesetzt und wirkt nach einem Neustart.") + task_note
         return task_note.strip() or None
 
     def _rewrite_profiles(self) -> None:
@@ -1152,7 +1156,7 @@ class SphereService:
 
     def _from_run(self, result: RunResult, success: str, fallback: str) -> OpResult:
         if result.ok:
-            return OpResult(True, success or result.stdout.strip() or "Erledigt.")
+            return OpResult(True, success or result.stdout.strip() or t("Erledigt."))
         text = result.text or f"{fallback} (Code {result.code})."
         return OpResult(False, text)
 

@@ -9,6 +9,7 @@ from tkinter import ttk
 
 from spheredrive import __version__
 from spheredrive.catalog import DESCRIPTION, FEATURES, NAV_ITEMS
+from spheredrive.i18n import LANGUAGES, apply_font, choose_initial_language, get_language, set_language, t
 from spheredrive.helptext import (
     FEATURE_FILE,
     HELP_FILE,
@@ -22,7 +23,7 @@ from spheredrive.paths import WORK_DIR, ensure_work_dir, find_icon, find_window_
 from spheredrive.host import system_caption
 from spheredrive.service import SphereService
 from spheredrive.ui.pages import ComparePage, LinkPage, MountPage, NetPage, OverviewPage, PsPage, SettingsPage, SubstPage
-from spheredrive.ui.widgets import Button, L, P, apply_theme, ask_yes_no, load_font
+from spheredrive.ui.widgets import Button, L, P, apply_theme, ask_yes_no
 
 
 class SphereApp(tk.Tk):
@@ -32,7 +33,13 @@ class SphereApp(tk.Tk):
         self.snapshot: Snapshot | None = None
         self.current = "overview"
         self.busy = False
-        load_font(self)
+        set_language(
+            choose_initial_language(
+                service.store.data["settings"].get("language"),
+                service.store.explicit_language,
+            )
+        )
+        apply_font(self)
         apply_theme(self)
         self.title("SphereDrive")
         self.geometry("1280x840")
@@ -74,7 +81,7 @@ class SphereApp(tk.Tk):
         self.grid_rowconfigure(1, weight=1)
         self.banner = tk.Label(
             self,
-            text=(
+            text=t(
                 "Vorschau-Modus: Dieses System ist nicht Windows. "
                 "Aktionen werden simuliert und legen keine Laufwerke an."
             ),
@@ -101,7 +108,7 @@ class SphereApp(tk.Tk):
         titles = tk.Frame(brand, bg=P.sidebar)
         titles.pack(side="left", padx=(10, 0))
         tk.Label(titles, text="SphereDrive", bg=P.sidebar, fg=P.text, font=(P.font, 14, "bold")).pack(anchor="w")
-        tk.Label(titles, text="Laufwerke und Links", bg=P.sidebar, fg=P.faint, font=(P.font, 9)).pack(anchor="w")
+        tk.Label(titles, text=t("Laufwerke und Links"), bg=P.sidebar, fg=P.faint, font=(P.font, 9)).pack(anchor="w")
 
         nav = tk.Frame(sidebar, bg=P.sidebar)
         nav.pack(fill="x", pady=(12, 0))
@@ -113,7 +120,7 @@ class SphereApp(tk.Tk):
             bar.pack(side="left", fill="y")
             button = tk.Button(
                 row,
-                text=label,
+                text=t(label),
                 command=lambda pid=page_id: self.select_page(pid),
                 bg=P.sidebar,
                 fg=P.muted,
@@ -137,7 +144,7 @@ class SphereApp(tk.Tk):
         self.mode_label.pack(anchor="w")
         self.admin_label = tk.Label(footer, text="", bg=P.sidebar, fg=P.muted, font=(P.font, 10), anchor="w")
         self.admin_label.pack(anchor="w", pady=(2, 8))
-        Button(footer, "Aktualisieren", self.refresh_all, "quiet").pack(fill="x")
+        Button(footer, t("Aktualisieren"), self.refresh_all, "quiet").pack(fill="x")
         self.work_label = tk.Label(
             footer,
             text=str(WORK_DIR),
@@ -180,7 +187,7 @@ class SphereApp(tk.Tk):
         log_frame = tk.Frame(content, bg=P.panel, height=118)
         log_frame.grid(row=1, column=0, sticky="ew", padx=20, pady=(0, 12))
         log_frame.grid_propagate(False)
-        tk.Label(log_frame, text="Protokoll", bg=P.panel, fg=P.faint, font=(P.font, 9)).pack(anchor="w", padx=8, pady=(4, 0))
+        tk.Label(log_frame, text=t("Protokoll"), bg=P.panel, fg=P.faint, font=(P.font, 9)).pack(anchor="w", padx=8, pady=(4, 0))
         self.log_box = tk.Text(
             log_frame,
             height=5,
@@ -197,7 +204,7 @@ class SphereApp(tk.Tk):
 
         status = tk.Frame(self, bg=P.sidebar, height=28)
         status.grid(row=2, column=0, columnspan=2, sticky="ew")
-        self.status_var = tk.StringVar(value="Bereit")
+        self.status_var = tk.StringVar(value=t("Bereit"))
         tk.Label(status, textvariable=self.status_var, bg=P.sidebar, fg=P.muted, font=(P.font, 9)).pack(
             side="left", padx=12, pady=4
         )
@@ -208,10 +215,10 @@ class SphereApp(tk.Tk):
         menu = tk.Menu(self, tearoff=0)
         self.menus: dict[str, tk.Menu] = {}
         file_menu = tk.Menu(menu, tearoff=0)
-        file_menu.add_command(label="Aktualisieren", command=self.refresh_all, accelerator="F5")
+        file_menu.add_command(label=t("Aktualisieren"), command=self.refresh_all, accelerator="F5")
         file_menu.add_separator()
-        file_menu.add_command(label="Beenden", command=self.destroy)
-        menu.add_cascade(label="Datei", menu=file_menu)
+        file_menu.add_command(label=t("Beenden"), command=self.destroy)
+        menu.add_cascade(label=t("Datei"), menu=file_menu)
         self.menus["Datei"] = file_menu
         self._tool_menu(
             menu,
@@ -257,6 +264,7 @@ class SphereApp(tk.Tk):
                 ("Datenträgerverwaltung", lambda: self.on_result(self.service.open_diskmgmt())),
             ],
         )
+        self._language_menu(menu)
         self._tool_menu(
             menu,
             "Hilfe",
@@ -297,9 +305,40 @@ class SphereApp(tk.Tk):
                 child.add_separator()
                 continue
             text, command = item
-            child.add_command(label=text, command=command)
-        menu.add_cascade(label=label, menu=child)
+            child.add_command(label=t(text), command=command)
+        menu.add_cascade(label=t(label), menu=child)
         self.menus[label] = child
+
+    def _language_menu(self, menu: tk.Menu) -> None:
+        child = tk.Menu(menu, tearoff=0)
+        self.lang_var = tk.StringVar(value=get_language())
+        for code, name in LANGUAGES:
+            child.add_radiobutton(
+                label=name,
+                value=code,
+                variable=self.lang_var,
+                command=lambda selected=code: self.apply_language(selected),
+            )
+        menu.add_cascade(label=t("Sprache"), menu=child)
+        self.menus["Sprache"] = child
+
+    def apply_language(self, code: str) -> None:
+        if code == get_language():
+            return
+        set_language(code)
+        self.service.store.data["settings"]["language"] = code
+        self.service.store.explicit_language = True
+        self.service.store.save()
+        self.after_idle(self.rebuild)
+
+    def rebuild(self) -> None:
+        for child in list(self.winfo_children()):
+            child.destroy()
+        self.configure(menu="")
+        apply_font(self)
+        apply_theme(self)
+        self._build()
+        self.refresh_all()
 
     def menu_labels(self) -> list[str]:
         menu = self.nametowidget(self["menu"])
@@ -332,7 +371,7 @@ class SphereApp(tk.Tk):
         if page.tree.selection():
             page.disconnect()
             return
-        self.log("Zuerst ein Laufwerk in der Liste auswählen, dann Trennen.")
+        self.log(t("Zuerst ein Laufwerk in der Liste auswählen, dann Trennen."))
 
     def select_page(self, page_id: str) -> None:
         self.current = page_id
@@ -372,9 +411,9 @@ class SphereApp(tk.Tk):
         self.run_bg(work, done)
 
     def _update_chrome(self, snap: Snapshot) -> None:
-        self.mode_label.configure(text="Vorschau" if snap.preview else system_caption())
+        self.mode_label.configure(text=t("Vorschau") if snap.preview else system_caption())
         self.admin_label.configure(
-            text="Administrator" if snap.admin else "Standardbenutzer",
+            text=t("Administrator") if snap.admin else t("Standardbenutzer"),
             fg=P.teal if snap.admin else P.muted,
         )
 
@@ -439,10 +478,10 @@ class SphereApp(tk.Tk):
         self.on_result(self.service.open_in_explorer(str(WORK_DIR)))
 
     def show_help(self) -> tk.Toplevel:
-        return self._text_window("Hilfe", render_help_text())
+        return self._text_window(t("Hilfe"), render_help_text())
 
     def show_features(self) -> tk.Toplevel:
-        return self._text_window("Feature-Liste", render_feature_text())
+        return self._text_window(t("Feature-Liste"), render_feature_text())
 
     def open_help_file(self) -> None:
         self._open_named_document(HELP_FILE)
@@ -454,7 +493,7 @@ class SphereApp(tk.Tk):
         ensure_documents()
         path = locate_document(name)
         if path is None:
-            self.log(f"Die Datei fehlt: {name}")
+            self.log(t("Die Datei fehlt: {name}", name=name))
             return
         self.on_result(self.service.open_in_explorer(str(path)))
 
@@ -488,13 +527,13 @@ class SphereApp(tk.Tk):
         box.configure(state="disabled")
         dialog.text = box
         dialog.bind("<Escape>", lambda _event: dialog.destroy())
-        Button(dialog, "Schließen", dialog.destroy, "primary").pack(pady=(0, 16))
+        Button(dialog, t("Schließen"), dialog.destroy, "primary").pack(pady=(0, 16))
         return dialog
 
     def show_about(self) -> None:
         icon = find_icon()
         dialog = tk.Toplevel(self)
-        dialog.title("Info")
+        dialog.title(t("Info"))
         dialog.configure(bg=P.panel)
         dialog.transient(self)
         dialog.resizable(True, True)
@@ -536,7 +575,7 @@ class SphereApp(tk.Tk):
         canvas.bind("<Configure>", stretch)
         tk.Label(
             body,
-            text="Beschreibung",
+            text=t("Beschreibung"),
             bg=P.panel,
             fg=P.text,
             font=(P.font, 12, "bold"),
@@ -544,7 +583,7 @@ class SphereApp(tk.Tk):
         ).pack(anchor="w", pady=(0, 4))
         tk.Label(
             body,
-            text=DESCRIPTION,
+            text=t(DESCRIPTION),
             bg=P.panel,
             fg=P.muted,
             font=(P.font, 10),
@@ -552,15 +591,15 @@ class SphereApp(tk.Tk):
             anchor="w",
             wraplength=560,
         ).pack(anchor="w", pady=(0, 12))
-        tk.Label(body, text="Feature-Liste", bg=P.panel, fg=P.text, font=(P.font, 12, "bold"), anchor="w").pack(anchor="w")
+        tk.Label(body, text=t("Feature-Liste"), bg=P.panel, fg=P.text, font=(P.font, 12, "bold"), anchor="w").pack(anchor="w")
         for title, lines in FEATURES:
-            tk.Label(body, text=title, bg=P.panel, fg=P.text, font=(P.font, 11, "bold"), anchor="w").pack(
+            tk.Label(body, text=t(title), bg=P.panel, fg=P.text, font=(P.font, 11, "bold"), anchor="w").pack(
                 anchor="w", pady=(10, 2)
             )
             for line in lines:
                 tk.Label(
                     body,
-                    text="•  " + line,
+                    text="•  " + t(line),
                     bg=P.panel,
                     fg=P.muted,
                     font=(P.font, 10),
@@ -571,11 +610,11 @@ class SphereApp(tk.Tk):
         tk.Label(
             body,
             text=(
-                f"Arbeitsordner: {WORK_DIR}\n"
-                f"Symbol: {icon or 'keins gefunden'}\n"
-                f"Konfiguration: {self.service.store.path}\n"
-                f"Hilfe: {HELP_FILE}\n"
-                f"Feature-Liste: {FEATURE_FILE}"
+                f"{t('Arbeitsordner')}: {WORK_DIR}\n"
+                f"{t('Symbol')}: {icon or t('keins gefunden')}\n"
+                f"{t('Konfiguration')}: {self.service.store.path}\n"
+                f"{t('Hilfe')}: {HELP_FILE}\n"
+                f"{t('Feature-Liste')}: {FEATURE_FILE}"
             ),
             bg=P.panel,
             fg=P.faint,
@@ -583,4 +622,4 @@ class SphereApp(tk.Tk):
             justify="left",
             anchor="w",
         ).pack(anchor="w", pady=(16, 8))
-        Button(dialog, "Schließen", dialog.destroy, "primary").pack(pady=(8, 16))
+        Button(dialog, t("Schließen"), dialog.destroy, "primary").pack(pady=(8, 16))

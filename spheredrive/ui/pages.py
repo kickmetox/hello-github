@@ -6,7 +6,8 @@ import os
 import tkinter as tk
 from tkinter import filedialog, ttk
 
-from spheredrive.catalog import COMPARISON, LINK_KINDS, PERMISSIONS, PS_PROVIDERS
+from spheredrive.catalog import COMPARISON, LINK_KINDS, LINK_KIND_LABEL, PERMISSIONS, PS_PROVIDERS
+from spheredrive.i18n import LANGUAGES, get_language, t
 from spheredrive.commands import build_unc, normalize_letter, suggest_letter
 from spheredrive.models import DriveCard, LinkSpec, MountSpec, NetSpec, OpResult, PsSpec, ShareSpec, Snapshot, SubstSpec
 from spheredrive.paths import WORK_DIR, browse_directory, default_drive_icon
@@ -52,8 +53,8 @@ class OverviewPage(Page):
         super().__init__(
             master,
             app,
-            "Laufwerkszuordnungen",
-            "Kachel anklicken zeigt alle Möglichkeiten für dieses Laufwerk.",
+            t("Laufwerkszuordnungen"),
+            t("Kachel anklicken zeigt alle Möglichkeiten für dieses Laufwerk."),
             surface="light",
             show_heading=False,
         )
@@ -68,7 +69,7 @@ class OverviewPage(Page):
         self._build_toolbar()
         self.empty = tk.Label(
             self.body,
-            text="Keine virtuellen Laufwerke. „Hinzufügen“ legt ein Subst- oder Netzlaufwerk an.",
+            text=t("Keine virtuellen Laufwerke. „Hinzufügen“ legt ein Subst- oder Netzlaufwerk an."),
             bg=L.bg,
             fg=L.muted,
             font=(P.font, 11),
@@ -99,11 +100,11 @@ class OverviewPage(Page):
     def _build_toolbar(self) -> None:
         bar = tk.Frame(self.body, bg=L.bg)
         bar.pack(fill="x", pady=(0, 8))
-        self._tool(bar, "+ Hinzufügen", self.open_add, primary=True).pack(side="left")
-        self._tool(bar, "Aktualisieren", self.app.refresh_all).pack(side="left", padx=(8, 14))
+        self._tool(bar, t("+ Hinzufügen"), self.open_add, primary=True).pack(side="left")
+        self._tool(bar, t("Aktualisieren"), self.app.refresh_all).pack(side="left", padx=(8, 14))
         tk.Checkbutton(
             bar,
-            text="Alle Laufwerke anzeigen",
+            text=t("Alle Laufwerke anzeigen"),
             variable=self.show_all,
             bg=L.bg,
             fg=L.text,
@@ -115,8 +116,8 @@ class OverviewPage(Page):
         ).pack(side="left")
         views = tk.Frame(bar, bg=L.bg)
         views.pack(side="right")
-        self.list_button = self._tool(views, "Liste", lambda: self._set_view("list"))
-        self.grid_button = self._tool(views, "Kacheln", lambda: self._set_view("grid"))
+        self.list_button = self._tool(views, t("Liste"), lambda: self._set_view("list"))
+        self.grid_button = self._tool(views, t("Kacheln"), lambda: self._set_view("grid"))
         self.grid_button.pack(side="right")
         self.list_button.pack(side="right", padx=(0, 6))
         self._mark_view()
@@ -133,11 +134,11 @@ class OverviewPage(Page):
             style="Drive.Treeview",
         )
         headings = (
-            ("title", "Laufwerk", 220),
-            ("kind", "Art", 180),
-            ("target", "Ziel", 320),
-            ("status", "Status", 120),
-            ("persistent", "Dauerhaft", 100),
+            ("title", t("Laufwerk"), 220),
+            ("kind", t("Art"), 180),
+            ("target", t("Ziel"), 320),
+            ("status", t("Status"), 120),
+            ("persistent", t("Dauerhaft"), 100),
         )
         for index, (cid, heading, width) in enumerate(headings):
             self.tree.heading(cid, text=heading, anchor="w")
@@ -216,7 +217,7 @@ class OverviewPage(Page):
                 "",
                 "end",
                 iid=card.letter,
-                values=(card.title, card.kind_label, card.target, card.status, _durable(card)),
+                values=(card.title, card.kind_label, card.target, t(card.status), _durable(card)),
                 tags=(status_tag(card.status),),
             )
 
@@ -290,11 +291,11 @@ class OverviewPage(Page):
         menu.tk_popup(widget.winfo_rootx(), widget.winfo_rooty() + widget.winfo_height())
 
     def _fill_card_menu(self, menu: tk.Menu, card: DriveCard) -> None:
-        menu.add_command(label="Alle Möglichkeiten", command=lambda: self.open_detail(card))
-        menu.add_command(label="net use…", command=lambda: self.open_net_use(card))
-        menu.add_command(label="Im Explorer öffnen", command=lambda: self._explorer(card))
+        menu.add_command(label=t("Alle Möglichkeiten"), command=lambda: self.open_detail(card))
+        menu.add_command(label=t("net use…"), command=lambda: self.open_net_use(card))
+        menu.add_command(label=t("Im Explorer öffnen"), command=lambda: self._explorer(card))
         if card.can_disconnect:
-            menu.add_command(label="Trennen", command=lambda: self._disconnect(card))
+            menu.add_command(label=t("Trennen"), command=lambda: self._disconnect(card))
 
     def card_menu(self, card: DriveCard) -> tk.Menu:
         menu = tk.Menu(self, tearoff=0)
@@ -339,7 +340,7 @@ class OverviewPage(Page):
 
     def open_net_use(self, card: DriveCard | None) -> DriveDialog:
         if card is not None and card.real_fixed:
-            self.app.log(f"{card.letter}: ist ein echter Datenträger. net use verwendet einen freien Buchstaben.")
+            self.app.log(t("{letter}: ist ein echter Datenträger. net use verwendet einen freien Buchstaben.", letter=card.letter))
             return self.open_detail(None, mode="net")
         return self.open_detail(card, mode="net")
 
@@ -347,7 +348,7 @@ class OverviewPage(Page):
         self.app.on_result(self.app.service.open_in_explorer(explorer_target(card)))
 
     def _disconnect(self, card: DriveCard) -> None:
-        if not self.app.confirm("Trennen", f"{card.letter}: wirklich trennen?"):
+        if not self.app.confirm(t("Trennen"), t("{letter}: wirklich trennen?", letter=card.letter)):
             return
         self.app.on_result(disconnect_card(self.app.service, card))
 
@@ -369,9 +370,11 @@ class SubstPage(Page):
         super().__init__(
             master,
             app,
-            "Subst",
-            "Lokale Ordner — auch OneDrive, Google Drive oder Dropbox — als eigenes Laufwerk. "
-            "Bezeichnung, Symbol und Papierkorb setzt Windows mit subst allein nicht.",
+            t("Subst"),
+            t(
+                "Lokale Ordner — auch OneDrive, Google Drive oder Dropbox — als eigenes Laufwerk. "
+                "Bezeichnung, Symbol und Papierkorb setzt Windows mit subst allein nicht."
+            ),
         )
         self.letter = tk.StringVar()
         self.path = tk.StringVar()
@@ -385,18 +388,18 @@ class SubstPage(Page):
         form = self.form()
         form.pack(fill="x")
         self.place_field(
-            form, 0, "Laufwerk", combo(form, self.letter, list("ABCDEFGHIJKLMNOPQRSTUVWXYZ"), 6), sticky="w"
+            form, 0, t("Laufwerk"), combo(form, self.letter, list("ABCDEFGHIJKLMNOPQRSTUVWXYZ"), 6), sticky="w"
         )
         self.letter.trace_add("write", self._touch_letter)
-        self.place_field(form, 1, "Ordner", entry(form, self.path), Button(form, "Durchsuchen", self.browse_path, "ghost"))
-        self.place_field(form, 2, "Bezeichnung", entry(form, self.label))
-        self.place_field(form, 3, "Symbol (.ico)", entry(form, self.icon), Button(form, "Durchsuchen", self.browse_icon, "ghost"))
+        self.place_field(form, 1, t("Ordner"), entry(form, self.path), Button(form, t("Durchsuchen"), self.browse_path, "ghost"))
+        self.place_field(form, 2, t("Bezeichnung"), entry(form, self.label))
+        self.place_field(form, 3, t("Symbol (.ico)"), entry(form, self.icon), Button(form, t("Durchsuchen"), self.browse_icon, "ghost"))
         checks = tk.Frame(form, bg=P.bg)
         checks.grid(row=4, column=1, columnspan=2, sticky="w", pady=(2, 0))
-        checkbox(checks, "Dauerhaft", self.persistent).pack(side="left", padx=(0, 14))
-        checkbox(checks, "Für Administratoren sichtbar", self.uac).pack(side="left", padx=(0, 14))
-        checkbox(checks, "Papierkorb", self.recycle, self._toggle_mb).pack(side="left")
-        caption = tk.Label(checks, text="MB", bg=P.bg, fg=P.muted, font=(P.font, 10))
+        checkbox(checks, t("Dauerhaft"), self.persistent).pack(side="left", padx=(0, 14))
+        checkbox(checks, t("Für Administratoren sichtbar"), self.uac).pack(side="left", padx=(0, 14))
+        checkbox(checks, t("Papierkorb"), self.recycle, self._toggle_mb).pack(side="left")
+        caption = tk.Label(checks, text=t("MB"), bg=P.bg, fg=P.muted, font=(P.font, 10))
         caption.pack(side="left", padx=(10, 4))
         self.mb_entry = entry(checks, self.recycle_mb)
         self.mb_entry.configure(width=8)
@@ -404,29 +407,31 @@ class SubstPage(Page):
         self._toggle_mb()
         hint(
             self.body,
-            "Dauerhaft schreibt den Autostart und, mit Administratorrechten, ein DOS-Device. "
-            "Das DOS-Device gilt nach dem Neustart auch für Programme, die als Administrator laufen. "
-            "Zusätzlich setzt „Für Administratoren sichtbar“ EnableLinkedConnections und eine erhöhte Anmeldungsaufgabe. "
-            "Der Papierkorb ist eine Known-Folder-Registrierung und braucht ebenfalls Administratorrechte.",
+            t(
+                "Dauerhaft schreibt den Autostart und, mit Administratorrechten, ein DOS-Device. "
+                "Das DOS-Device gilt nach dem Neustart auch für Programme, die als Administrator laufen. "
+                "Zusätzlich setzt „Für Administratoren sichtbar“ EnableLinkedConnections und eine erhöhte Anmeldungsaufgabe. "
+                "Der Papierkorb ist eine Known-Folder-Registrierung und braucht ebenfalls Administratorrechte."
+            ),
         ).pack(anchor="w", pady=(6, 4))
-        tk.Label(self.body, text="Ordner und Unterordner", bg=P.bg, fg=P.text, font=(P.font, 11, "bold")).pack(anchor="w")
+        tk.Label(self.body, text=t("Ordner und Unterordner"), bg=P.bg, fg=P.text, font=(P.font, 11, "bold")).pack(anchor="w")
         self.folders = FolderBrowser(self.body, self.app, self._pick_folder, choose_drive=True, height=6)
         self.folders.pack(fill="x", pady=(2, 8))
         row = buttons(self.body)
         row.pack(anchor="w", pady=(0, 8))
-        Button(row, "Verbinden", self.connect, "primary").pack(side="left")
-        Button(row, "Trennen", self.disconnect, "danger").pack(side="left", padx=8)
-        Button(row, "Explorer", self.open_selected, "ghost").pack(side="left")
+        Button(row, t("Verbinden"), self.connect, "primary").pack(side="left")
+        Button(row, t("Trennen"), self.disconnect, "danger").pack(side="left", padx=8)
+        Button(row, t("Explorer"), self.open_selected, "ghost").pack(side="left")
         holder, self.tree = mount_tree(
             self.body,
             [
-                ("letter", "Laufwerk", 90),
-                ("path", "Ordner", 280),
-                ("label", "Bezeichnung", 140),
-                ("status", "Status", 130),
-                ("persistent", "Dauerhaft", 90),
-                ("uac", "UAC", 70),
-                ("recycle", "Papierkorb", 90),
+                ("letter", t("Laufwerk"), 90),
+                ("path", t("Ordner"), 280),
+                ("label", t("Bezeichnung"), 140),
+                ("status", t("Status"), 130),
+                ("persistent", t("Dauerhaft"), 90),
+                ("uac", t("UAC"), 70),
+                ("recycle", t("Papierkorb"), 90),
             ],
         )
         holder.pack(fill="both", expand=True)
@@ -456,7 +461,7 @@ class SubstPage(Page):
                     f"{item.letter}:",
                     item.path,
                     item.label,
-                    item.status,
+                    t(item.status),
                     yes_no(item.persistent),
                     yes_no(item.uac),
                     yes_no(item.recycle),
@@ -501,8 +506,11 @@ class SubstPage(Page):
 
         def done(result: OpResult) -> None:
             if result.code == "conflict" and self.app.confirm(
-                "Laufwerk ersetzen",
-                f"{normalize_letter(spec.letter) or spec.letter}: ist schon verbunden. Durch den neuen Ordner ersetzen?",
+                t("Laufwerk ersetzen"),
+                t(
+                    "{letter}: ist schon verbunden. Durch den neuen Ordner ersetzen?",
+                    letter=normalize_letter(spec.letter) or spec.letter,
+                ),
             ):
                 self.app.run_bg(lambda: self.app.service.apply_subst(spec, replace=True), self.app.on_result)
                 return
@@ -513,11 +521,11 @@ class SubstPage(Page):
     def disconnect(self) -> None:
         letter = self.letter.get()
         if not normalize_letter(letter):
-            self.show_feedback(OpResult(False, "Kein Laufwerk ausgewählt."))
+            self.show_feedback(OpResult(False, t("Kein Laufwerk ausgewählt.")))
             return
         if not self.app.confirm(
-            "Laufwerk trennen",
-            f"{letter}: trennen? Bezeichnung, Symbol und Papierkorb-Registrierung werden mit entfernt.",
+            t("Laufwerk trennen"),
+            t("{letter}: trennen? Bezeichnung, Symbol und Papierkorb-Registrierung werden mit entfernt.", letter=letter),
         ):
             return
         self.app.run_bg(lambda: self.app.service.remove_subst(letter), self.app.on_result)
@@ -543,7 +551,7 @@ class SubstPage(Page):
         chosen = filedialog.askopenfilename(
             parent=self.app,
             initialdir=_initial_dir(),
-            filetypes=[("Symbole", "*.ico"), ("Alle Dateien", "*.*")],
+            filetypes=[(t("Symbole"), "*.ico"), (t("Alle Dateien"), "*.*")],
         )
         if chosen:
             self.icon.set(chosen)
@@ -554,9 +562,11 @@ class NetPage(Page):
         super().__init__(
             master,
             app,
-            "Netzlaufwerke",
-            "net use verbindet eine Freigabe als Laufwerk. Mit „Dauerhaft“ bleibt sie über /persistent:yes erhalten. "
-            "Ein lokaler Ordner geht denselben Weg, sobald er freigegeben ist.",
+            t("Netzlaufwerke"),
+            t(
+                "net use verbindet eine Freigabe als Laufwerk. Mit „Dauerhaft“ bleibt sie über /persistent:yes erhalten. "
+                "Ein lokaler Ordner geht denselben Weg, sobald er freigegeben ist."
+            ),
         )
         self.letter = tk.StringVar()
         self.mode = tk.StringVar(value="unc")
@@ -570,74 +580,76 @@ class NetPage(Page):
         self.icon = tk.StringVar(value=default_drive_icon())
         self.share_name = tk.StringVar()
         self.share_path = tk.StringVar()
-        self.permission = tk.StringVar(value="Lesen")
+        self.permission = tk.StringVar(value=t("Lesen"))
         self.principal = tk.StringVar(value=os.environ.get("USERNAME") or os.environ.get("USER") or "")
         self.letter_touched = False
         form = self.form()
         form.pack(fill="x")
         self.place_field(
-            form, 0, "Laufwerk", combo(form, self.letter, list("ABCDEFGHIJKLMNOPQRSTUVWXYZ"), 6), sticky="w"
+            form, 0, t("Laufwerk"), combo(form, self.letter, list("ABCDEFGHIJKLMNOPQRSTUVWXYZ"), 6), sticky="w"
         )
         self.letter.trace_add("write", lambda *_args: setattr(self, "letter_touched", True))
         mode = tk.Frame(form, bg=P.bg)
-        radio(mode, "UNC-Freigabe", self.mode, "unc").pack(side="left")
-        radio(mode, "Vorhandene Freigabe eines Computers", self.mode, "local").pack(side="left", padx=(12, 0))
-        self.place_field(form, 1, "Art", mode)
+        radio(mode, t("UNC-Freigabe"), self.mode, "unc").pack(side="left")
+        radio(mode, t("Vorhandene Freigabe eines Computers"), self.mode, "local").pack(side="left", padx=(12, 0))
+        self.place_field(form, 1, t("Art"), mode)
         self.place_field(form, 2, "UNC", entry(form, self.remote))
         host = tk.Frame(form, bg=P.bg)
         entry(host, self.computer).pack(side="left", fill="x", expand=True)
-        tk.Label(host, text="Freigabe", bg=P.bg, fg=P.muted, font=(P.font, 10)).pack(side="left", padx=8)
+        tk.Label(host, text=t("Freigabe"), bg=P.bg, fg=P.muted, font=(P.font, 10)).pack(side="left", padx=8)
         entry(host, self.share).pack(side="left", fill="x", expand=True)
-        self.place_field(form, 3, "Computer", host)
-        self.place_field(form, 4, "Benutzer", entry(form, self.user))
-        self.place_field(form, 5, "Kennwort", entry(form, self.password, show="*"))
-        self.place_field(form, 6, "Bezeichnung", entry(form, self.label))
+        self.place_field(form, 3, t("Computer"), host)
+        self.place_field(form, 4, t("Benutzer"), entry(form, self.user))
+        self.place_field(form, 5, t("Kennwort"), entry(form, self.password, show="*"))
+        self.place_field(form, 6, t("Bezeichnung"), entry(form, self.label))
         checks = tk.Frame(form, bg=P.bg)
         checks.grid(row=7, column=1, sticky="w")
-        checkbox(checks, "Dauerhaft (/persistent:yes)", self.persistent).pack(side="left")
+        checkbox(checks, t("Dauerhaft (/persistent:yes)"), self.persistent).pack(side="left")
         hint(
             self.body,
-            "Das Kennwort wird nicht gespeichert. Bei leerem Kennwort und gesetztem Benutzer verwendet Windows /savecred. "
-            "Administrative Freigaben wie \\\\localhost\\C$\\Ordner brauchen Administratorrechte.",
+            t(
+                "Das Kennwort wird nicht gespeichert. Bei leerem Kennwort und gesetztem Benutzer verwendet Windows /savecred. "
+                "Administrative Freigaben wie \\\\localhost\\C$\\Ordner brauchen Administratorrechte."
+            ),
         ).pack(anchor="w", pady=(4, 4))
         row = buttons(self.body)
         row.pack(anchor="w", pady=(0, 6))
-        Button(row, "Verbinden", self.connect, "primary").pack(side="left")
-        Button(row, "Trennen", self.disconnect, "danger").pack(side="left", padx=8)
-        Button(row, "Explorer", self.open_selected, "ghost").pack(side="left")
+        Button(row, t("Verbinden"), self.connect, "primary").pack(side="left")
+        Button(row, t("Trennen"), self.disconnect, "danger").pack(side="left", padx=8)
+        Button(row, t("Explorer"), self.open_selected, "ghost").pack(side="left")
         holder, self.tree = mount_tree(
             self.body,
             [
-                ("letter", "Laufwerk", 90),
-                ("remote", "Freigabe", 320),
-                ("status", "Status", 140),
-                ("persistent", "Dauerhaft", 90),
-                ("label", "Bezeichnung", 160),
+                ("letter", t("Laufwerk"), 90),
+                ("remote", t("Freigabe"), 320),
+                ("status", t("Status"), 140),
+                ("persistent", t("Dauerhaft"), 90),
+                ("label", t("Bezeichnung"), 160),
             ],
             height=4,
         )
         holder.pack(fill="both", expand=True)
         self.tree.bind("<<TreeviewSelect>>", self.on_select)
-        section(self.body, "Ordner freigeben").pack(anchor="w", pady=(10, 4))
+        section(self.body, t("Ordner freigeben")).pack(anchor="w", pady=(10, 4))
         share_form = self.form()
         share_form.pack(fill="x")
-        self.place_field(share_form, 0, "Name", entry(share_form, self.share_name))
+        self.place_field(share_form, 0, t("Name"), entry(share_form, self.share_name))
         self.place_field(
-            share_form, 1, "Ordner", entry(share_form, self.share_path), Button(share_form, "Durchsuchen", self.browse_share, "ghost")
+            share_form, 1, t("Ordner"), entry(share_form, self.share_path), Button(share_form, t("Durchsuchen"), self.browse_share, "ghost")
         )
         perm_row = tk.Frame(share_form, bg=P.bg)
-        combo(perm_row, self.permission, [label for _key, label in PERMISSIONS], 16).pack(side="left")
-        tk.Label(perm_row, text="Konto", bg=P.bg, fg=P.muted, font=(P.font, 10)).pack(side="left", padx=8)
+        combo(perm_row, self.permission, [t(label) for _key, label in PERMISSIONS], 16).pack(side="left")
+        tk.Label(perm_row, text=t("Konto"), bg=P.bg, fg=P.muted, font=(P.font, 10)).pack(side="left", padx=8)
         entry(perm_row, self.principal).pack(side="left", fill="x", expand=True)
-        self.place_field(share_form, 2, "Rechte", perm_row)
+        self.place_field(share_form, 2, t("Rechte"), perm_row)
         share_buttons = buttons(self.body)
         share_buttons.pack(anchor="w", pady=(4, 4))
-        Button(share_buttons, "Freigabe erstellen", self.create_share, "primary").pack(side="left")
-        Button(share_buttons, "Freigabe entfernen", self.delete_share, "danger").pack(side="left", padx=8)
-        Button(share_buttons, "Freigabeverwaltung", self.open_manager, "ghost").pack(side="left")
+        Button(share_buttons, t("Freigabe erstellen"), self.create_share, "primary").pack(side="left")
+        Button(share_buttons, t("Freigabe entfernen"), self.delete_share, "danger").pack(side="left", padx=8)
+        Button(share_buttons, t("Freigabeverwaltung"), self.open_manager, "ghost").pack(side="left")
         holder2, self.shares = mount_tree(
             self.body,
-            [("name", "Freigabe", 160), ("path", "Pfad", 360), ("remark", "Bemerkung", 220)],
+            [("name", t("Freigabe"), 160), ("path", "Pfad", 360), ("remark", "Bemerkung", 220)],
             height=4,
         )
         holder2.pack(fill="both", expand=True, pady=(4, 0))
@@ -655,7 +667,7 @@ class NetPage(Page):
                 "",
                 "end",
                 iid=item.letter,
-                values=(f"{item.letter}:", item.remote, item.status, yes_no(item.persistent), item.label),
+                values=(f"{item.letter}:", item.remote, t(item.status), yes_no(item.persistent), item.label),
                 tags=(status_tag(item.status),),
             )
         for index, item in enumerate(snap.shares):
@@ -692,7 +704,7 @@ class NetPage(Page):
     def connect(self) -> None:
         remote = self._remote()
         if not remote:
-            self.show_feedback(OpResult(False, "Die Freigabe ist unvollständig."))
+            self.show_feedback(OpResult(False, t("Die Freigabe ist unvollständig.")))
             return
         spec = NetSpec(
             self.letter.get(),
@@ -708,7 +720,7 @@ class NetPage(Page):
 
     def disconnect(self) -> None:
         letter = self.letter.get()
-        if not self.app.confirm("Trennen", f"Netzlaufwerk {letter}: trennen?"):
+        if not self.app.confirm(t("Trennen"), t("Netzlaufwerk {letter}: trennen?", letter=letter)):
             return
         self.app.run_bg(lambda: self.app.service.disconnect_net(letter), self.app.on_result)
 
@@ -719,13 +731,13 @@ class NetPage(Page):
 
     def create_share(self) -> None:
         if not self.app.confirm(
-            "Freigabe erstellen",
-            "Der Ordner wird im Netzwerk erreichbar. Die Dateien bleiben an ihrem Ort. Fortfahren?",
+            t("Freigabe erstellen"),
+            t("Der Ordner wird im Netzwerk erreichbar. Die Dateien bleiben an ihrem Ort. Fortfahren?"),
         ):
             return
         permission = "READ"
         for key, label in PERMISSIONS:
-            if label == self.permission.get():
+            if label == self.permission.get() or t(label) == self.permission.get():
                 permission = key
         spec = ShareSpec(self.share_name.get(), self.share_path.get(), permission, self.principal.get())
         self.app.run_bg(lambda: self.app.service.create_share(spec), self.app.on_result)
@@ -733,9 +745,9 @@ class NetPage(Page):
     def delete_share(self) -> None:
         name = self.share_name.get().strip()
         if not name:
-            self.show_feedback(OpResult(False, "Keine Freigabe ausgewählt."))
+            self.show_feedback(OpResult(False, t("Keine Freigabe ausgewählt.")))
             return
-        if not self.app.confirm("Freigabe entfernen", f"Freigabe {name} entfernen? Dateien werden nicht gelöscht."):
+        if not self.app.confirm(t("Freigabe entfernen"), t("Freigabe {name} entfernen? Dateien werden nicht gelöscht.", name=name)):
             return
         self.app.run_bg(lambda: self.app.service.delete_share(name), self.app.on_result)
 
@@ -753,36 +765,40 @@ class LinkPage(Page):
         super().__init__(
             master,
             app,
-            "Verknüpfungen",
-            "mklink legt den Verweis im NTFS-Dateisystem ab. Eine Junction braucht keine Administratorrechte "
-            "und übersteht Neustarts ohne Autostart.",
+            t("Verknüpfungen"),
+            t(
+                "mklink legt den Verweis im NTFS-Dateisystem ab. Eine Junction braucht keine Administratorrechte "
+                "und übersteht Neustarts ohne Autostart."
+            ),
         )
-        self.kind = tk.StringVar(value=LINK_KINDS[0][1])
+        self.kind = tk.StringVar(value=t(LINK_KINDS[0][1]))
         self.link = tk.StringVar()
         self.target = tk.StringVar()
         self.scan_folder = tk.StringVar()
         form = self.form()
         form.pack(fill="x")
-        self.place_field(form, 0, "Art", combo(form, self.kind, [label for _key, label in LINK_KINDS], 42))
-        self.place_field(form, 1, "Link-Pfad", entry(form, self.link), Button(form, "Durchsuchen", self.browse_link, "ghost"))
-        self.place_field(form, 2, "Ziel", entry(form, self.target), Button(form, "Durchsuchen", self.browse_target, "ghost"))
+        self.place_field(form, 0, t("Art"), combo(form, self.kind, [t(label) for _key, label in LINK_KINDS], 42))
+        self.place_field(form, 1, t("Link-Pfad"), entry(form, self.link), Button(form, t("Durchsuchen"), self.browse_link, "ghost"))
+        self.place_field(form, 2, t("Ziel"), entry(form, self.target), Button(form, t("Durchsuchen"), self.browse_target, "ghost"))
         hint(
             self.body,
-            "Entfernen löscht nur die Verknüpfung, nicht das Ziel. Symbolische Links brauchen Administratorrechte "
-            "oder den Entwicklermodus. Harte Links sind weitere Namen derselben Datei.",
+            t(
+                "Entfernen löscht nur die Verknüpfung, nicht das Ziel. Symbolische Links brauchen Administratorrechte "
+                "oder den Entwicklermodus. Harte Links sind weitere Namen derselben Datei."
+            ),
         ).pack(anchor="w", pady=(6, 4))
         row = buttons(self.body)
         row.pack(anchor="w", pady=(0, 8))
-        Button(row, "Erstellen", self.create, "primary").pack(side="left")
-        Button(row, "Nur Link entfernen", self.remove, "danger").pack(side="left", padx=8)
-        Button(row, "Ziel öffnen", self.open_target, "ghost").pack(side="left")
+        Button(row, t("Erstellen"), self.create, "primary").pack(side="left")
+        Button(row, t("Nur Link entfernen"), self.remove, "danger").pack(side="left", padx=8)
+        Button(row, t("Ziel öffnen"), self.open_target, "ghost").pack(side="left")
         holder, self.tree = mount_tree(
             self.body,
             [
-                ("kind", "Art", 260),
-                ("link", "Link", 280),
-                ("target", "Ziel", 280),
-                ("status", "Status", 100),
+                ("kind", t("Art"), 260),
+                ("link", t("Link"), 280),
+                ("target", t("Ziel"), 280),
+                ("status", t("Status"), 100),
             ],
         )
         holder.pack(fill="both", expand=True)
@@ -790,16 +806,16 @@ class LinkPage(Page):
         scan = tk.Frame(self.body, bg=P.bg)
         scan.pack(fill="x", pady=(8, 0))
         scan.columnconfigure(1, weight=1)
-        tk.Label(scan, text="Ordner durchsuchen", bg=P.bg, fg=P.muted, font=(P.font, 10)).grid(row=0, column=0, padx=(0, 12))
+        tk.Label(scan, text=t("Ordner durchsuchen"), bg=P.bg, fg=P.muted, font=(P.font, 10)).grid(row=0, column=0, padx=(0, 12))
         entry(scan, self.scan_folder).grid(row=0, column=1, sticky="ew")
-        Button(scan, "Durchsuchen", self.browse_scan, "ghost").grid(row=0, column=2, padx=8)
-        Button(scan, "Links übernehmen", self.scan, "primary").grid(row=0, column=3)
+        Button(scan, t("Durchsuchen"), self.browse_scan, "ghost").grid(row=0, column=2, padx=8)
+        Button(scan, t("Links übernehmen"), self.scan, "primary").grid(row=0, column=3)
         self._rows = {}
 
     def _kind_key(self) -> str:
         label = self.kind.get()
         for key, text in LINK_KINDS:
-            if text == label:
+            if text == label or t(text) == label:
                 return key
         return "junction"
 
@@ -815,7 +831,7 @@ class LinkPage(Page):
                 "",
                 "end",
                 iid=iid,
-                values=(LINK_KIND_LABEL.get(item.kind, item.kind), item.link, item.target, item.status),
+                values=(t(LINK_KIND_LABEL.get(item.kind, item.kind)), item.link, item.target, t(item.status)),
                 tags=(status_tag(item.status),),
             )
 
@@ -826,7 +842,7 @@ class LinkPage(Page):
         item = self._rows[selected[0]]
         from spheredrive.catalog import LINK_KIND_LABEL
 
-        self.kind.set(LINK_KIND_LABEL.get(item.kind, LINK_KINDS[0][1]))
+        self.kind.set(t(LINK_KIND_LABEL.get(item.kind, LINK_KINDS[0][1])))
         self.link.set(item.link)
         self.target.set(item.target)
 
@@ -837,15 +853,15 @@ class LinkPage(Page):
     def remove(self) -> None:
         path = self.link.get().strip()
         if not path:
-            self.show_feedback(OpResult(False, "Kein Link ausgewählt."))
+            self.show_feedback(OpResult(False, t("Kein Link ausgewählt.")))
             return
-        text = "Nur die Verknüpfung entfernen? Das Ziel bleibt erhalten."
+        text = t("Nur die Verknüpfung entfernen? Das Ziel bleibt erhalten.")
         if self._kind_key() == "hardlink":
             text = (
                 "Diesen Hardlink-Namen entfernen? Die Datei bleibt erhalten, solange mindestens ein weiterer Name existiert. "
                 "Ist es der letzte Name, löscht Windows die Datei."
             )
-        if not self.app.confirm("Verknüpfung entfernen", text):
+        if not self.app.confirm(t("Verknüpfung entfernen"), text):
             return
         self.app.run_bg(lambda: self.app.service.remove_link(path), self.app.on_result)
 
@@ -882,9 +898,11 @@ class PsPage(Page):
         super().__init__(
             master,
             app,
-            "PowerShell",
-            "New-PSDrive kann Ordner, die Registrierung und Zertifikatspeicher als Laufwerk anlegen. "
-            "Ohne Profil existiert es nur in der PowerShell-Sitzung.",
+            t("PowerShell"),
+            t(
+                "New-PSDrive kann Ordner, die Registrierung und Zertifikatspeicher als Laufwerk anlegen. "
+                "Ohne Profil existiert es nur in der PowerShell-Sitzung."
+            ),
         )
         self.name = tk.StringVar()
         self.provider = tk.StringVar(value="FileSystem")
@@ -893,31 +911,31 @@ class PsPage(Page):
         self.persist = tk.BooleanVar(value=False)
         form = self.form()
         form.pack(fill="x")
-        self.place_field(form, 0, "Name", entry(form, self.name))
-        self.place_field(form, 1, "Anbieter", combo(form, self.provider, [item[0] for item in PS_PROVIDERS], 24))
+        self.place_field(form, 0, t("Name"), entry(form, self.name))
+        self.place_field(form, 1, t("Anbieter"), combo(form, self.provider, [item[0] for item in PS_PROVIDERS], 24))
         self.provider.trace_add("write", lambda *_args: self._show_hint())
-        self.place_field(form, 2, "Stamm", entry(form, self.root), Button(form, "Durchsuchen", self.browse_root, "ghost"))
+        self.place_field(form, 2, t("Stamm"), entry(form, self.root), Button(form, t("Durchsuchen"), self.browse_root, "ghost"))
         checks = tk.Frame(form, bg=P.bg)
         checks.grid(row=3, column=1, sticky="w")
-        checkbox(checks, "In jedes neue PowerShell-Fenster (Profil)", self.profile).pack(side="left", padx=(0, 12))
-        checkbox(checks, "-Persist (nur UNC)", self.persist).pack(side="left")
+        checkbox(checks, t("In jedes neue PowerShell-Fenster (Profil)"), self.profile).pack(side="left", padx=(0, 12))
+        checkbox(checks, t("-Persist (nur UNC)"), self.persist).pack(side="left")
         self.provider_hint = hint(self.body, "")
         self.provider_hint.pack(anchor="w", pady=(6, 4))
         self._show_hint()
         row = buttons(self.body)
         row.pack(anchor="w", pady=(0, 8))
-        Button(row, "Anlegen", self.create, "primary").pack(side="left")
-        Button(row, "Entfernen", self.remove, "danger").pack(side="left", padx=8)
-        Button(row, "PowerShell öffnen", self.open_console, "ghost").pack(side="left")
-        Button(row, "Stamm öffnen", self.open_root, "ghost").pack(side="left", padx=8)
+        Button(row, t("Anlegen"), self.create, "primary").pack(side="left")
+        Button(row, t("Entfernen"), self.remove, "danger").pack(side="left", padx=8)
+        Button(row, t("PowerShell öffnen"), self.open_console, "ghost").pack(side="left")
+        Button(row, t("Stamm öffnen"), self.open_root, "ghost").pack(side="left", padx=8)
         holder, self.tree = mount_tree(
             self.body,
             [
-                ("name", "Name", 140),
-                ("provider", "Anbieter", 140),
-                ("root", "Stamm", 320),
-                ("profile", "Profil", 80),
-                ("status", "Status", 120),
+                ("name", t("Name"), 140),
+                ("provider", t("Anbieter"), 140),
+                ("root", t("Stamm"), 320),
+                ("profile", t("Profil"), 80),
+                ("status", t("Status"), 120),
             ],
         )
         holder.pack(fill="both", expand=True)
@@ -927,7 +945,7 @@ class PsPage(Page):
     def _show_hint(self) -> None:
         for name, _label, text in PS_PROVIDERS:
             if name == self.provider.get():
-                self.provider_hint.configure(text=text)
+                self.provider_hint.configure(text=t(text))
                 return
 
     def refresh(self, snap: Snapshot) -> None:
@@ -939,7 +957,7 @@ class PsPage(Page):
                 "",
                 "end",
                 iid=item.name,
-                values=(item.name, item.provider, item.root, yes_no(item.profile), item.status),
+                values=(item.name, item.provider, item.root, yes_no(item.profile), t(item.status)),
                 tags=(status_tag(item.status),),
             )
 
@@ -964,9 +982,9 @@ class PsPage(Page):
     def remove(self) -> None:
         name = self.name.get().strip()
         if not name:
-            self.show_feedback(OpResult(False, "Kein PowerShell-Laufwerk ausgewählt."))
+            self.show_feedback(OpResult(False, t("Kein PowerShell-Laufwerk ausgewählt.")))
             return
-        if not self.app.confirm("Entfernen", f"PowerShell-Laufwerk {name} entfernen?"):
+        if not self.app.confirm(t("Entfernen"), t("PowerShell-Laufwerk {name} entfernen?", name=name)):
             return
         self.app.run_bg(lambda: self.app.service.remove_psdrive(name), self.app.on_result)
 
@@ -992,9 +1010,11 @@ class MountPage(Page):
         super().__init__(
             master,
             app,
-            "Bereitstellung",
-            "Partitionen und virtuelle Festplatten (VHD/VHDX) lassen sich auf einen Buchstaben oder in einen leeren "
-            "NTFS-Ordner legen. Das bleibt über den Volume-Manager erhalten.",
+            t("Bereitstellung"),
+            t(
+                "Partitionen und virtuelle Festplatten (VHD/VHDX) lassen sich auf einen Buchstaben oder in einen leeren "
+                "NTFS-Ordner legen. Das bleibt über den Volume-Manager erhalten."
+            ),
         )
         self.volume = tk.StringVar()
         self.mode = tk.StringVar(value="folder")
@@ -1002,37 +1022,39 @@ class MountPage(Page):
         self.folder = tk.StringVar()
         form = self.form()
         form.pack(fill="x")
-        self.place_field(form, 0, "Volume", entry(form, self.volume))
+        self.place_field(form, 0, t("Volume"), entry(form, self.volume))
         mode = tk.Frame(form, bg=P.bg)
-        radio(mode, "Laufwerksbuchstabe", self.mode, "letter").pack(side="left")
+        radio(mode, t("Laufwerksbuchstabe"), self.mode, "letter").pack(side="left")
         combo(mode, self.letter, list("ABCDEFGHIJKLMNOPQRSTUVWXYZ"), 4).pack(side="left", padx=(8, 16))
-        radio(mode, "Leerer NTFS-Ordner", self.mode, "folder").pack(side="left")
-        self.place_field(form, 1, "Ziel", mode)
-        self.place_field(form, 2, "Ordner", entry(form, self.folder), Button(form, "Durchsuchen", self.browse, "ghost"))
+        radio(mode, t("Leerer NTFS-Ordner"), self.mode, "folder").pack(side="left")
+        self.place_field(form, 1, t("Ziel"), mode)
+        self.place_field(form, 2, t("Ordner"), entry(form, self.folder), Button(form, t("Durchsuchen"), self.browse, "ghost"))
         hint(
             self.body,
-            "Der Ordner muss leer sein. Eine VHD legst du in der Datenträgerverwaltung an "
-            "(Aktion, Virtuelle Festplatte erstellen) und stellst sie danach hier oder dort in einen Ordner bereit. "
-            "Aufheben entfernt nur den Bereitstellungspunkt, nicht das Volume. "
-            "Im Baum darunter kann ein Unterordner des Laufwerks das Ziel sein.",
+            t(
+                "Der Ordner muss leer sein. Eine VHD legst du in der Datenträgerverwaltung an "
+                "(Aktion, Virtuelle Festplatte erstellen) und stellst sie danach hier oder dort in einen Ordner bereit. "
+                "Aufheben entfernt nur den Bereitstellungspunkt, nicht das Volume. "
+                "Im Baum darunter kann ein Unterordner des Laufwerks das Ziel sein."
+            ),
         ).pack(anchor="w", pady=(6, 4))
-        tk.Label(self.body, text="Ordner und Unterordner", bg=P.bg, fg=P.text, font=(P.font, 11, "bold")).pack(anchor="w")
+        tk.Label(self.body, text=t("Ordner und Unterordner"), bg=P.bg, fg=P.text, font=(P.font, 11, "bold")).pack(anchor="w")
         self.folders = FolderBrowser(self.body, self.app, self._pick_mount_folder, choose_drive=True, height=6)
         self.folders.pack(fill="x", pady=(2, 8))
         row = buttons(self.body)
         row.pack(anchor="w", pady=(0, 8))
-        Button(row, "Bereitstellen", self.mount, "primary").pack(side="left")
-        Button(row, "Bereitstellung aufheben", self.unmount, "danger").pack(side="left", padx=8)
-        Button(row, "Datenträgerverwaltung", self.diskmgmt, "ghost").pack(side="left")
+        Button(row, t("Bereitstellen"), self.mount, "primary").pack(side="left")
+        Button(row, t("Bereitstellung aufheben"), self.unmount, "danger").pack(side="left", padx=8)
+        Button(row, t("Datenträgerverwaltung"), self.diskmgmt, "ghost").pack(side="left")
         holder, self.tree = mount_tree(
             self.body,
             [
-                ("id", "Volume", 280),
-                ("label", "Bezeichnung", 120),
-                ("fs", "Dateisystem", 90),
-                ("size", "Größe", 90),
-                ("free", "Frei", 90),
-                ("mounts", "Bereitstellung", 220),
+                ("id", t("Volume"), 280),
+                ("label", t("Bezeichnung"), 120),
+                ("fs", t("Dateisystem"), 90),
+                ("size", t("Größe"), 90),
+                ("free", t("Frei"), 90),
+                ("mounts", t("Bereitstellung"), 220),
             ],
         )
         holder.pack(fill="both", expand=True)
@@ -1053,7 +1075,7 @@ class MountPage(Page):
                     item.filesystem,
                     format_bytes(item.capacity) if item.capacity else "",
                     format_bytes(item.free) if item.free else "",
-                    ", ".join(item.mounts) if item.mounts else "nicht bereitgestellt",
+                    ", ".join(item.mounts) if item.mounts else t("nicht bereitgestellt"),
                 ),
             )
 
@@ -1065,7 +1087,7 @@ class MountPage(Page):
         if values:
             self.volume.set(values[0])
             mounts = values[5]
-            if mounts and mounts != "nicht bereitgestellt":
+            if mounts and mounts != t("nicht bereitgestellt"):
                 first = mounts.split(",")[0].strip()
                 if len(first) >= 2 and first[1] == ":":
                     self.mode.set("letter")
@@ -1083,9 +1105,9 @@ class MountPage(Page):
         target = self._target().strip()
         volume = self.volume.get().strip()
         if not volume or not target:
-            self.show_feedback(OpResult(False, "Volume und Ziel werden beide benötigt."))
+            self.show_feedback(OpResult(False, t("Volume und Ziel werden beide benötigt.")))
             return
-        if not self.app.confirm("Volume bereitstellen", f"{volume}\nunter {target} bereitstellen?"):
+        if not self.app.confirm(t("Volume bereitstellen"), t("{volume}\nunter {target} bereitstellen?", volume=volume, target=target)):
             return
         spec = MountSpec(volume, target)
         self.app.run_bg(lambda: self.app.service.mount_volume(spec), self.app.on_result)
@@ -1093,9 +1115,9 @@ class MountPage(Page):
     def unmount(self) -> None:
         target = self._target().strip()
         if not target:
-            self.show_feedback(OpResult(False, "Kein Bereitstellungsziel ausgewählt."))
+            self.show_feedback(OpResult(False, t("Kein Bereitstellungsziel ausgewählt.")))
             return
-        if not self.app.confirm("Bereitstellung aufheben", f"{target} trennen? Das Volume bleibt erhalten."):
+        if not self.app.confirm(t("Bereitstellung aufheben"), t("{target} trennen? Das Volume bleibt erhalten.", target=target)):
             return
         self.app.run_bg(lambda: self.app.service.unmount_volume(target), self.app.on_result)
 
@@ -1118,16 +1140,16 @@ class ComparePage(Page):
         super().__init__(
             master,
             app,
-            "Vergleich",
-            "Welcher Befehl wohin gehört. SphereDrive spricht sie an, ändert aber ihre Eigenschaften nicht.",
+            t("Vergleich"),
+            t("Welcher Befehl wohin gehört. SphereDrive spricht sie an, ändert aber ihre Eigenschaften nicht."),
         )
         holder, self.tree = mount_tree(
             self.body,
             [
-                ("befehl", "Befehl", 170),
-                ("ziel", "Ziel-Typ", 180),
-                ("erstellt", "Erstellt", 230),
-                ("neustart", "Übersteht Neustart?", 170),
+                ("befehl", t("Befehl"), 170),
+                ("ziel", t("Ziel-Typ"), 180),
+                ("erstellt", t("Erstellt"), 230),
+                ("neustart", t("Übersteht Neustart?"), 170),
                 ("sphere", "SphereDrive", 280),
             ],
             height=8,
@@ -1138,11 +1160,11 @@ class ComparePage(Page):
                 "",
                 "end",
                 iid=f"cmp-{index}",
-                values=(row["befehl"], row["ziel"], row["erstellt"], row["neustart"], row["spheredrive"]),
+                values=(row["befehl"], t(row["ziel"]), t(row["erstellt"]), t(row["neustart"]), t(row["spheredrive"])),
             )
         tk.Label(
             self.body,
-            text=(
+            text=t(
                 "Subst-Laufwerke sind nach einem Neustart weg, löschen Dateien sofort und bleiben Programmen "
                 "mit Administratorrechten verborgen. Dagegen helfen Autostart, DOS Devices, EnableLinkedConnections "
                 "und die Known-Folder-Registrierung für den Papierkorb. net use ist der Weg über das Netzwerk. "
@@ -1166,9 +1188,11 @@ class SettingsPage(Page):
         super().__init__(
             master,
             app,
-            "Einstellungen",
-            "Diese Schalter gelten für alle Zuordnungen. Administratorrechte sind für die Maschinenrichtlinie, "
-            "den Papierkorb und die erhöhte Anmeldungsaufgabe nötig.",
+            t("Einstellungen"),
+            t(
+                "Diese Schalter gelten für alle Zuordnungen. Administratorrechte sind für die Maschinenrichtlinie, "
+                "den Papierkorb und die erhöhte Anmeldungsaufgabe nötig."
+            ),
         )
         self.linked = tk.BooleanVar()
         self.autostart = tk.BooleanVar(value=True)
@@ -1178,29 +1202,42 @@ class SettingsPage(Page):
         box.pack(fill="x", pady=(0, 10))
         inner = tk.Frame(box, bg=P.card)
         inner.pack(fill="x", padx=14, pady=12)
-        checkbox(inner, "EnableLinkedConnections (Laufwerke in erhöhten Programmen sichtbar)", self.linked, bg=P.card).pack(anchor="w")
+        lang_row = tk.Frame(inner, bg=P.card)
+        lang_row.pack(fill="x", pady=(0, 10))
+        tk.Label(lang_row, text=t("Sprache"), bg=P.card, fg=P.text, font=(P.font, 11, "bold")).pack(side="left")
+        self.language_name = tk.StringVar(value=dict(LANGUAGES).get(get_language(), "Deutsch"))
+        picker = ttk.Combobox(
+            lang_row,
+            textvariable=self.language_name,
+            values=[name for _code, name in LANGUAGES],
+            state="readonly",
+            width=18,
+        )
+        picker.pack(side="left", padx=(12, 0))
+        picker.bind("<<ComboboxSelected>>", self._choose_language)
+        checkbox(inner, t("EnableLinkedConnections (Laufwerke in erhöhten Programmen sichtbar)"), self.linked, bg=P.card).pack(anchor="w")
         tk.Label(
             inner,
-            text="Registrierungswert unter Policies\\System. Wirkt nach einem Neustart. Behebt die Lücke von subst und net use.",
+            text=t("Registrierungswert unter Policies\\System. Wirkt nach einem Neustart. Behebt die Lücke von subst und net use."),
             bg=P.card,
             fg=P.faint,
             font=(P.font, 9),
             wraplength=820,
             justify="left",
         ).pack(anchor="w", pady=(0, 8))
-        checkbox(inner, "SphereDrive bei der Anmeldung starten und Zuordnungen wiederherstellen", self.autostart, bg=P.card).pack(anchor="w")
+        checkbox(inner, t("SphereDrive bei der Anmeldung starten und Zuordnungen wiederherstellen"), self.autostart, bg=P.card).pack(anchor="w")
         tk.Label(
             inner,
-            text="Schreibt HKCU\\...\\Run. Der Start erfolgt ohne Fenster über SphereDrive.pyw --restore.",
+            text=t("Schreibt HKCU\\...\\Run. Der Start erfolgt ohne Fenster über SphereDrive.pyw --restore."),
             bg=P.card,
             fg=P.faint,
             font=(P.font, 9),
             justify="left",
         ).pack(anchor="w", pady=(0, 8))
-        checkbox(inner, "Anmeldungsaufgabe mit höchsten Rechten", self.task, bg=P.card).pack(anchor="w")
+        checkbox(inner, t("Anmeldungsaufgabe mit höchsten Rechten"), self.task, bg=P.card).pack(anchor="w")
         tk.Label(
             inner,
-            text="Die Aufgabe wird einmal angelegt und ruft danach ohne erneute Rückfrage --restore auf, damit auch die erhöhte Sitzung die Laufwerke sieht.",
+            text=t("Die Aufgabe wird einmal angelegt und ruft danach ohne erneute Rückfrage --restore auf, damit auch die erhöhte Sitzung die Laufwerke sieht."),
             bg=P.card,
             fg=P.faint,
             font=(P.font, 9),
@@ -1209,15 +1246,22 @@ class SettingsPage(Page):
         ).pack(anchor="w")
         row = buttons(self.body)
         row.pack(anchor="w", pady=(0, 8))
-        Button(row, "Einstellungen speichern", self.apply, "primary").pack(side="left")
-        Button(row, "Jetzt wiederherstellen", self.restore, "ghost").pack(side="left", padx=8)
-        Button(row, "Explorer-Ansicht aktualisieren", self.refresh_shell, "ghost").pack(side="left")
+        Button(row, t("Einstellungen speichern"), self.apply, "primary").pack(side="left")
+        Button(row, t("Jetzt wiederherstellen"), self.restore, "ghost").pack(side="left", padx=8)
+        Button(row, t("Explorer-Ansicht aktualisieren"), self.refresh_shell, "ghost").pack(side="left")
         row2 = buttons(self.body)
         row2.pack(anchor="w", pady=(0, 8))
-        Button(row2, "Als Administrator neu starten", self.elevate, "primary").pack(side="left")
-        Button(row2, "Explorer neu starten", self.restart_explorer, "danger").pack(side="left", padx=8)
-        Button(row2, "Konfigurationsordner", self.open_config, "ghost").pack(side="left")
+        Button(row2, t("Als Administrator neu starten"), self.elevate, "primary").pack(side="left")
+        Button(row2, t("Explorer neu starten"), self.restart_explorer, "danger").pack(side="left", padx=8)
+        Button(row2, t("Konfigurationsordner"), self.open_config, "ghost").pack(side="left")
         tk.Label(self.body, textvariable=self.config_path, bg=P.bg, fg=P.faint, font=(P.font, 9), anchor="w").pack(anchor="w")
+
+    def _choose_language(self, _event=None) -> None:
+        name = self.language_name.get()
+        for code, label in LANGUAGES:
+            if label == name:
+                self.app.apply_language(code)
+                return
 
     def refresh(self, snap: Snapshot) -> None:
         self.linked.set(snap.linked_connections)
@@ -1239,7 +1283,7 @@ class SettingsPage(Page):
             results = self.app.service.restore_persistent()
             failed = [item for item in results if not item.ok]
             text = "\n".join(item.text() for item in results)
-            return OpResult(not failed, text or "Nichts wiederherzustellen.")
+            return OpResult(not failed, text or t("Nichts wiederherzustellen."))
 
         self.app.run_bg(work, self.app.on_result)
 
@@ -1247,7 +1291,7 @@ class SettingsPage(Page):
         self.app.run_bg(self.app.service.refresh_shell, self.app.on_result)
 
     def restart_explorer(self) -> None:
-        if not self.app.confirm("Explorer neu starten", "Alle Explorer-Fenster werden geschlossen und neu geöffnet."):
+        if not self.app.confirm(t("Explorer neu starten"), t("Alle Explorer-Fenster werden geschlossen und neu geöffnet.")):
             return
         self.app.run_bg(self.app.service.restart_explorer, self.app.on_result)
 

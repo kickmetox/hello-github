@@ -167,6 +167,7 @@ FEATURES: list[tuple[str, list[str]]] = [
             "Installer mit eingebettetem Python, Wiederherstellung beim Anmelden mit --restore",
             "Hilfe im Programm und als SphereDrive-Hilfe.html neben dem Programm",
             "Feature-Liste im Menü Hilfe und als SphereDrive-Feature-Liste.txt",
+            "Bedienung auf Deutsch, Englisch, Französisch, Spanisch, Portugiesisch, Russisch und Chinesisch",
         ],
     ),
 ]

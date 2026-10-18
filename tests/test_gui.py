@@ -191,7 +191,7 @@ class GuiTests(unittest.TestCase):
         about.destroy()
         self.assertEqual(
             app.menu_labels(),
-            ["Datei", "Subst", "net use", "Verknüpfungen", "PowerShell", "Bereitstellung", "Hilfe"],
+            ["Datei", "Subst", "net use", "Verknüpfungen", "PowerShell", "Bereitstellung", "Sprache", "Hilfe"],
         )
         net_menu = app.menus["net use"]
         net_labels = [
@@ -254,6 +254,33 @@ class GuiTests(unittest.TestCase):
         # Das Fenster muss gemappt sein, sonst bleibt ein späterer Screenshot leer.
         app.deiconify()
         app.update()
+
+    def test_language_switch_rebuilds_the_menus(self) -> None:
+        from spheredrive.ui.app import SphereApp
+
+        root = Path(tempfile.mkdtemp(prefix="spheredrive-lang-"))
+        self.addCleanup(lambda: __import__("shutil").rmtree(root, ignore_errors=True))
+        host = PreviewHost(root=root / "home")
+        app = SphereApp(SphereService(host=host, store_path=root / "config.json"))
+        self.addCleanup(app.destroy)
+        app.update()
+        app.apply_language("en")
+        app.update()
+        self.assertEqual(
+            app.menu_labels(),
+            ["File", "Subst", "net use", "Shortcuts", "PowerShell", "Mount", "Language", "Help"],
+        )
+        app.apply_language("zh")
+        app.update()
+        self.assertIn("文件", app.menu_labels())
+        self.assertIn("帮助", app.menu_labels())
+        app.apply_language("ru")
+        app.update()
+        self.assertIn("Файл", app.menu_labels())
+        app.apply_language("de")
+        app.update()
+        self.assertIn("Datei", app.menu_labels())
+        self.assertEqual(app.service.store.data["settings"]["language"], "de")
 
 
 if __name__ == "__main__":

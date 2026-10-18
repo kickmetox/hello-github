@@ -6,6 +6,7 @@ import tkinter as tk
 from tkinter import filedialog, ttk
 
 from spheredrive.commands import format_bytes, suggest_letter
+from spheredrive.i18n import t
 from spheredrive.models import DriveCard, NetSpec, OpResult, ShareSpec, SubstSpec
 from spheredrive.paths import browse_directory, default_drive_icon
 from spheredrive.ui.folders import FolderBrowser
@@ -20,14 +21,14 @@ def explorer_target(card: DriveCard) -> str:
 
 def disconnect_card(service, card: DriveCard) -> OpResult:
     if not card.can_disconnect:
-        return OpResult(False, f"{card.letter}: ist ein echter Datenträger und wird nicht getrennt.")
+        return OpResult(False, t("{letter}: ist ein echter Datenträger und wird nicht getrennt.", letter=card.letter))
     if card.origin == "subst":
         return service.remove_subst(card.letter)
     if card.origin == "net" or card.kind == "remote":
         return service.disconnect_net(card.letter)
     if card.origin == "mount":
         return service.unmount_volume(f"{card.letter}:")
-    return OpResult(False, "Dieses Laufwerk kann nicht getrennt werden.")
+    return OpResult(False, t("Dieses Laufwerk kann nicht getrennt werden."))
 
 
 class DriveDialog(tk.Toplevel):
@@ -37,7 +38,7 @@ class DriveDialog(tk.Toplevel):
         self.card = card
         self.used = set(used)
         self._requested_mode = mode if mode in {"appearance", "subst", "net"} else None
-        self.title("Laufwerk hinzufügen" if card is None else card.title)
+        self.title(t("Laufwerk hinzufügen") if card is None else card.title)
         self.configure(bg=L.bg)
         self.transient(app)
         self.minsize(680, 560)
@@ -121,7 +122,7 @@ class DriveDialog(tk.Toplevel):
         paint_drive(icon, kind, letter)
         text = tk.Frame(header, bg=L.paper)
         text.pack(side="left", fill="x", expand=True, pady=12)
-        title = "Neues virtuelles Laufwerk" if self.card is None else self.card.title
+        title = t("Neues virtuelles Laufwerk") if self.card is None else self.card.title
         tk.Label(text, text=title, bg=L.paper, fg=L.text, font=(P.font, 16, "bold"), anchor="w").pack(anchor="w")
         self.header_meta = tk.Label(
             text,
@@ -136,7 +137,7 @@ class DriveDialog(tk.Toplevel):
 
     def _meta(self) -> str:
         if self.card is None:
-            return "Subst für einen lokalen Ordner oder net use für eine Freigabe."
+            return t("Subst für einen lokalen Ordner oder net use für eine Freigabe.")
         parts = [self.card.kind_label]
         if self.card.status:
             parts.append(self.card.status)
@@ -151,27 +152,27 @@ class DriveDialog(tk.Toplevel):
     def _form(self, body: tk.Frame) -> None:
         if self.card is None:
             row = self._row(body)
-            tk.Label(row, text="Buchstabe", bg=L.bg, fg=L.muted, font=(P.font, 10), width=16, anchor="w").pack(side="left")
+            tk.Label(row, text=t("Buchstabe"), bg=L.bg, fg=L.muted, font=(P.font, 10), width=16, anchor="w").pack(side="left")
             letters = list("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
             ttk.Combobox(row, textvariable=self.letter, values=letters, state="readonly", width=6).pack(side="left")
 
-        self._labeled_entry(body, "Bezeichnung", self.label)
+        self._labeled_entry(body, t("Bezeichnung"), self.label)
         icon_row = self._row(body)
-        tk.Label(icon_row, text="Symbol (.ico)", bg=L.bg, fg=L.muted, font=(P.font, 10), width=16, anchor="w").pack(
+        tk.Label(icon_row, text=t("Symbol (.ico)"), bg=L.bg, fg=L.muted, font=(P.font, 10), width=16, anchor="w").pack(
             side="left"
         )
         self._entry(icon_row, self.icon).pack(side="left", fill="x", expand=True)
-        self._button(icon_row, "Durchsuchen", self._browse_icon, "ghost").pack(side="left", padx=(8, 0))
+        self._button(icon_row, t("Durchsuchen"), self._browse_icon, "ghost").pack(side="left", padx=(8, 0))
 
         box = tk.Frame(body, bg=L.paper, highlightthickness=1, highlightbackground=L.line)
         box.pack(fill="x", pady=(12, 0))
-        tk.Label(box, text="Möglichkeiten", bg=L.paper, fg=L.text, font=(P.font, 12, "bold")).pack(
+        tk.Label(box, text=t("Möglichkeiten"), bg=L.paper, fg=L.text, font=(P.font, 12, "bold")).pack(
             anchor="w", padx=12, pady=(10, 4)
         )
         locked = bool(self.card and self.card.real_fixed)
-        self.subst_radio = self._radio(box, "Subst — lokaler Ordner als Laufwerk", "subst")
-        self.net_radio = self._radio(box, "net use — Netzwerkfreigabe", "net")
-        self.appearance_radio = self._radio(box, "Nur Bezeichnung und Symbol", "appearance")
+        self.subst_radio = self._radio(box, t("Subst — lokaler Ordner als Laufwerk"), "subst")
+        self.net_radio = self._radio(box, t("net use — Netzwerkfreigabe"), "net")
+        self.appearance_radio = self._radio(box, t("Nur Bezeichnung und Symbol"), "appearance")
         for radio in (self.subst_radio, self.net_radio, self.appearance_radio):
             radio.pack(anchor="w", padx=12, pady=1)
         if locked:
@@ -181,7 +182,7 @@ class DriveDialog(tk.Toplevel):
         if self.card is None:
             tk.Label(
                 box,
-                text="Ordner und Unterordner eines Laufwerks",
+                text=t("Ordner und Unterordner eines Laufwerks"),
                 bg=L.paper,
                 fg=L.text,
                 font=(P.font, 10, "bold"),
@@ -189,39 +190,39 @@ class DriveDialog(tk.Toplevel):
             self.folders = FolderBrowser(box, self.app, self._pick_new_folder, choose_drive=True, light=True, height=6)
             self.folders.pack(fill="x", padx=12, pady=(0, 8))
         path_row = self._row(box, L.paper)
-        tk.Label(path_row, text="Ordner", bg=L.paper, fg=L.muted, font=(P.font, 10), width=16, anchor="w").pack(side="left")
+        tk.Label(path_row, text=t("Ordner"), bg=L.paper, fg=L.muted, font=(P.font, 10), width=16, anchor="w").pack(side="left")
         self.path_entry = self._entry(path_row, self.path)
         self.path_entry.pack(side="left", fill="x", expand=True)
-        self.browse_path = self._button(path_row, "Durchsuchen", self._browse_path, "ghost")
+        self.browse_path = self._button(path_row, t("Durchsuchen"), self._browse_path, "ghost")
         self.browse_path.pack(side="left", padx=(8, 0))
 
         remote_row = self._row(box, L.paper)
-        tk.Label(remote_row, text="Freigabe", bg=L.paper, fg=L.muted, font=(P.font, 10), width=16, anchor="w").pack(
+        tk.Label(remote_row, text=t("Freigabe"), bg=L.paper, fg=L.muted, font=(P.font, 10), width=16, anchor="w").pack(
             side="left"
         )
         self.remote_entry = self._entry(remote_row, self.remote)
         self.remote_entry.pack(side="left", fill="x", expand=True)
 
         user_row = self._row(box, L.paper)
-        tk.Label(user_row, text="Benutzer", bg=L.paper, fg=L.muted, font=(P.font, 10), width=16, anchor="w").pack(
+        tk.Label(user_row, text=t("Benutzer"), bg=L.paper, fg=L.muted, font=(P.font, 10), width=16, anchor="w").pack(
             side="left"
         )
         self.user_entry = self._entry(user_row, self.user)
         self.user_entry.pack(side="left", fill="x", expand=True, padx=(0, 8))
-        tk.Label(user_row, text="Kennwort", bg=L.paper, fg=L.muted, font=(P.font, 10)).pack(side="left")
+        tk.Label(user_row, text=t("Kennwort"), bg=L.paper, fg=L.muted, font=(P.font, 10)).pack(side="left")
         self.password_entry = self._entry(user_row, self.password, show="*")
         self.password_entry.configure(width=16)
         self.password_entry.pack(side="left", padx=(6, 0))
 
         checks = tk.Frame(box, bg=L.paper)
         checks.pack(anchor="w", padx=12, pady=(4, 12))
-        self.persistent_box = self._check(checks, "Dauerhaft", self.persistent)
+        self.persistent_box = self._check(checks, t("Dauerhaft"), self.persistent)
         self.persistent_box.pack(side="left", padx=(0, 12))
-        self.uac_box = self._check(checks, "Für Administratoren sichtbar", self.uac)
+        self.uac_box = self._check(checks, t("Für Administratoren sichtbar"), self.uac)
         self.uac_box.pack(side="left", padx=(0, 12))
-        self.recycle_box = self._check(checks, "Papierkorb", self.recycle, self._apply_mode)
+        self.recycle_box = self._check(checks, t("Papierkorb"), self.recycle, self._apply_mode)
         self.recycle_box.pack(side="left")
-        tk.Label(checks, text="MB", bg=L.paper, fg=L.muted, font=(P.font, 10)).pack(side="left", padx=(8, 4))
+        tk.Label(checks, text=t("MB"), bg=L.paper, fg=L.muted, font=(P.font, 10)).pack(side="left", padx=(8, 4))
         self.mb_entry = self._entry(checks, self.recycle_mb)
         self.mb_entry.configure(width=8)
         self.mb_entry.pack(side="left")
@@ -248,14 +249,14 @@ class DriveDialog(tk.Toplevel):
         box.pack(fill="x", pady=(12, 0))
         tk.Label(
             box,
-            text="Ordner dieses Laufwerks als neues virtuelles Laufwerk",
+            text=t("Ordner dieses Laufwerks als neues virtuelles Laufwerk"),
             bg=L.paper,
             fg=L.text,
             font=(P.font, 11, "bold"),
         ).pack(anchor="w", padx=12, pady=(10, 4))
         tk.Label(
             box,
-            text="Aufklappen zeigt die Unterordner. Ein Klick übernimmt den Ordner als neues Laufwerk.",
+            text=t("Aufklappen zeigt die Unterordner. Ein Klick übernimmt den Ordner als neues Laufwerk."),
             bg=L.paper,
             fg=L.muted,
             font=(P.font, 9),
@@ -263,24 +264,24 @@ class DriveDialog(tk.Toplevel):
             justify="left",
         ).pack(anchor="w", padx=12, pady=(0, 4))
         row = self._row(box, L.paper)
-        tk.Label(row, text="Ordner", bg=L.paper, fg=L.muted, font=(P.font, 10), width=16, anchor="w").pack(side="left")
+        tk.Label(row, text=t("Ordner"), bg=L.paper, fg=L.muted, font=(P.font, 10), width=16, anchor="w").pack(side="left")
         self._entry(row, self.spawn_path).pack(side="left", fill="x", expand=True)
-        self._button(row, "Durchsuchen", self._browse_spawn, "ghost").pack(side="left", padx=(8, 0))
+        self._button(row, t("Durchsuchen"), self._browse_spawn, "ghost").pack(side="left", padx=(8, 0))
         letter_row = self._row(box, L.paper)
-        tk.Label(letter_row, text="Neuer Buchstabe", bg=L.paper, fg=L.muted, font=(P.font, 10), width=16, anchor="w").pack(
+        tk.Label(letter_row, text=t("Neuer Buchstabe"), bg=L.paper, fg=L.muted, font=(P.font, 10), width=16, anchor="w").pack(
             side="left"
         )
         free = [item for item in "ABCDEFGHIJKLMNOPQRSTUVWXYZ" if item not in self.used]
         ttk.Combobox(letter_row, textvariable=self.spawn_letter, values=free or ["Z"], state="readonly", width=6).pack(
             side="left"
         )
-        self.spawn_button = self._button(letter_row, "Anlegen", self.spawn, "primary")
+        self.spawn_button = self._button(letter_row, t("Anlegen"), self.spawn, "primary")
         self.spawn_button.pack(side="left", padx=(8, 0))
         flags = tk.Frame(box, bg=L.paper)
         flags.pack(anchor="w", padx=12, pady=(0, 6))
-        self._check(flags, "Dauerhaft", self.spawn_persistent).pack(side="left", padx=(0, 12))
-        self._check(flags, "Für Administratoren sichtbar", self.spawn_uac).pack(side="left", padx=(0, 12))
-        self._check(flags, "Papierkorb", self.spawn_recycle).pack(side="left")
+        self._check(flags, t("Dauerhaft"), self.spawn_persistent).pack(side="left", padx=(0, 12))
+        self._check(flags, t("Für Administratoren sichtbar"), self.spawn_uac).pack(side="left", padx=(0, 12))
+        self._check(flags, t("Papierkorb"), self.spawn_recycle).pack(side="left")
         self.folders = FolderBrowser(
             box,
             self.app,
@@ -294,31 +295,31 @@ class DriveDialog(tk.Toplevel):
     def _share_section(self, body: tk.Frame) -> None:
         box = tk.Frame(body, bg=L.paper, highlightthickness=1, highlightbackground=L.line)
         box.pack(fill="x", pady=(12, 0))
-        tk.Label(box, text="Ordner freigeben", bg=L.paper, fg=L.text, font=(P.font, 11, "bold")).pack(
+        tk.Label(box, text=t("Ordner freigeben"), bg=L.paper, fg=L.text, font=(P.font, 11, "bold")).pack(
             anchor="w", padx=12, pady=(10, 4)
         )
         row = self._row(box, L.paper)
-        tk.Label(row, text="Freigabename", bg=L.paper, fg=L.muted, font=(P.font, 10), width=16, anchor="w").pack(
+        tk.Label(row, text=t("Freigabename"), bg=L.paper, fg=L.muted, font=(P.font, 10), width=16, anchor="w").pack(
             side="left"
         )
         self._entry(row, self.share_name).pack(side="left", fill="x", expand=True)
-        self.share_button = self._button(row, "Freigabe anlegen", self.share, "ghost")
+        self.share_button = self._button(row, t("Freigabe anlegen"), self.share, "ghost")
         self.share_button.pack(side="left", padx=(8, 0), pady=(0, 12))
 
     def _footer(self, footer: tk.Frame) -> None:
-        self.save_button = self._button(footer, "Speichern", self.save, "primary")
+        self.save_button = self._button(footer, t("Speichern"), self.save, "primary")
         self.save_button.pack(side="left")
-        self.explorer_button = self._button(footer, "Explorer", self.explorer, "ghost")
+        self.explorer_button = self._button(footer, t("Explorer"), self.explorer, "ghost")
         self.explorer_button.pack(side="left", padx=6)
-        self.disconnect_button = self._button(footer, "Trennen", self.disconnect, "danger")
+        self.disconnect_button = self._button(footer, t("Trennen"), self.disconnect, "danger")
         self.disconnect_button.pack(side="left", padx=(0, 6))
         if self.card is None or not self.card.can_disconnect:
             self._mute(self.disconnect_button)
         if self.card is None:
             self._mute(self.explorer_button)
-        self._button(footer, "Datenträgerverwaltung", self.diskmgmt, "ghost").pack(side="left", padx=(0, 6))
-        self._button(footer, "Vergleich", self.compare, "ghost").pack(side="left", padx=(0, 6))
-        self._button(footer, "Schließen", self.destroy, "ghost").pack(side="right")
+        self._button(footer, t("Datenträgerverwaltung"), self.diskmgmt, "ghost").pack(side="left", padx=(0, 6))
+        self._button(footer, t("Vergleich"), self.compare, "ghost").pack(side="left", padx=(0, 6))
+        self._button(footer, t("Schließen"), self.destroy, "ghost").pack(side="right")
 
     def _apply_mode(self) -> None:
         mode = self.mode.get()
@@ -337,27 +338,28 @@ class DriveDialog(tk.Toplevel):
 
     def _hint_text(self) -> str:
         if self.card and self.card.real_fixed:
-            return (
-                f"{self.card.letter}: ist ein echter Datenträger. "
+            return t(
+                "{letter}: ist ein echter Datenträger. "
                 "subst oder net use auf diesen Buchstaben würde ihn verdecken und wird deshalb nicht angeboten. "
                 "Bezeichnung und Symbol können gesetzt werden. "
                 "Ein Ordner auf diesem Laufwerk kann einen neuen Buchstaben bekommen. "
-                "Trennen gilt nur für Subst, net use und von SphereDrive gesetzte Bereitstellungen."
+                "Trennen gilt nur für Subst, net use und von SphereDrive gesetzte Bereitstellungen.",
+                letter=self.card.letter,
             )
         mode = self.mode.get()
         if mode == "subst":
-            return (
+            return t(
                 "Subst bildet einen Ordner als Laufwerk ab. Dauerhaft schreibt den Autostart und, "
                 "mit Administratorrechten, einen DOS-Devices-Eintrag. "
                 "„Für Administratoren sichtbar“ setzt EnableLinkedConnections und die erhöhte Anmeldungsaufgabe. "
                 "Der Papierkorb ist eine Known-Folder-Registrierung. Das Kennwort eines Netzlaufwerks wird nie gespeichert."
             )
         if mode == "net":
-            return (
+            return t(
                 "net use verbindet eine Freigabe. Dauerhaft entspricht /persistent:yes. "
                 "Das Kennwort wird für den Aufruf verwendet und danach nicht gespeichert."
             )
-        return "Es werden nur Bezeichnung und Symbol geschrieben. Die bestehende Zuordnung bleibt unverändert."
+        return t("Es werden nur Bezeichnung und Symbol geschrieben. Die bestehende Zuordnung bleibt unverändert.")
 
     def save(self) -> OpResult:
         result = self._apply()
@@ -370,34 +372,34 @@ class DriveDialog(tk.Toplevel):
         mode = self.mode.get()
         letter = self.letter.get()
         if self.card and self.card.real_fixed and mode in {"subst", "net"}:
-            return OpResult(False, f"{self.card.letter}: ist ein echter Datenträger und wird nicht überdeckt.")
+            return OpResult(False, t("{letter}: ist ein echter Datenträger und wird nicht überdeckt.", letter=self.card.letter))
         if mode == "appearance":
             if self.card is None:
-                return OpResult(False, "Ein neues Laufwerk braucht Subst oder net use.")
+                return OpResult(False, t("Ein neues Laufwerk braucht Subst oder net use."))
             return self.app.service.apply_appearance(self.card.letter, self.label.get(), self.icon.get())
         if mode == "subst":
             return self._apply_subst(letter, self.path.get(), self.persistent.get(), self.uac.get(), self.recycle.get(), self.recycle_mb.get())
         if mode == "net":
             return self._apply_net(letter)
-        return OpResult(False, "Die Aktion ist unbekannt.")
+        return OpResult(False, t("Die Aktion ist unbekannt."))
 
     def _apply_subst(self, letter: str, path: str, persistent: bool, uac: bool, recycle: bool, capacity: str) -> OpResult:
         if self.card and self.card.origin == "net":
-            if not self.app.confirm("Zuordnung ersetzen", f"{letter}: ist ein Netzlaufwerk. Zuerst trennen und als Subst neu anlegen?"):
-                return OpResult(False, "Nicht geändert.")
+            if not self.app.confirm(t("Zuordnung ersetzen"), t("{letter}: ist ein Netzlaufwerk. Zuerst trennen und als Subst neu anlegen?", letter=letter)):
+                return OpResult(False, t("Nicht geändert."))
             removed = self.app.service.disconnect_net(letter)
             if not removed.ok:
                 return removed
         spec = SubstSpec(letter, path, self.label.get(), self.icon.get(), persistent, uac, recycle, _capacity(capacity))
         result = self.app.service.apply_subst(spec)
-        if result.code == "conflict" and self.app.confirm("Laufwerk ersetzen", result.message + "\n\nDie bestehende Zuordnung ersetzen?"):
+        if result.code == "conflict" and self.app.confirm(t("Laufwerk ersetzen"), result.message + "\n\nDie bestehende Zuordnung ersetzen?"):
             result = self.app.service.apply_subst(spec, replace=True)
         return result
 
     def _apply_net(self, letter: str) -> OpResult:
         if self.card and self.card.origin == "subst":
-            if not self.app.confirm("Zuordnung ersetzen", f"{letter}: ist ein Subst-Laufwerk. Zuerst trennen und als Netzlaufwerk verbinden?"):
-                return OpResult(False, "Nicht geändert.")
+            if not self.app.confirm(t("Zuordnung ersetzen"), t("{letter}: ist ein Subst-Laufwerk. Zuerst trennen und als Netzlaufwerk verbinden?", letter=letter)):
+                return OpResult(False, t("Nicht geändert."))
             removed = self.app.service.remove_subst(letter)
             if not removed.ok:
                 return removed
@@ -441,7 +443,7 @@ class DriveDialog(tk.Toplevel):
         )
         result = self.app.service.apply_subst(spec)
         if result.code == "conflict" and self.app.confirm(
-            "Laufwerk ersetzen", result.message + "\n\nDie bestehende Zuordnung ersetzen?"
+            t("Laufwerk ersetzen"), result.message + "\n\nDie bestehende Zuordnung ersetzen?"
         ):
             result = self.app.service.apply_subst(spec, replace=True)
         self.app.on_result(result)
@@ -461,7 +463,7 @@ class DriveDialog(tk.Toplevel):
     def disconnect(self) -> None:
         if self.card is None or not self.card.can_disconnect:
             return
-        if not self.app.confirm("Trennen", f"{self.card.letter}: wirklich trennen?"):
+        if not self.app.confirm(t("Trennen"), t("{letter}: wirklich trennen?", letter=self.card.letter)):
             return
         result = disconnect_card(self.app.service, self.card)
         if result.ok:
@@ -476,22 +478,22 @@ class DriveDialog(tk.Toplevel):
         self.app.select_page("compare")
 
     def _browse_path(self) -> None:
-        selected = filedialog.askdirectory(parent=self, title="Ordner für Subst", initialdir=browse_directory() or None)
+        selected = filedialog.askdirectory(parent=self, title=t("Ordner für Subst"), initialdir=browse_directory() or None)
         if selected:
             self.path.set(selected)
 
     def _browse_icon(self) -> None:
         selected = filedialog.askopenfilename(
             parent=self,
-            title="Laufwerkssymbol",
+            title=t("Laufwerkssymbol"),
             initialdir=browse_directory() or None,
-            filetypes=[("Symbole", "*.ico"), ("Alle Dateien", "*.*")],
+            filetypes=[(t("Symbole"), "*.ico"), (t("Alle Dateien"), "*.*")],
         )
         if selected:
             self.icon.set(selected)
 
     def _browse_spawn(self) -> None:
-        selected = filedialog.askdirectory(parent=self, title="Ordner auf diesem Laufwerk", initialdir=browse_directory() or None)
+        selected = filedialog.askdirectory(parent=self, title=t("Ordner auf diesem Laufwerk"), initialdir=browse_directory() or None)
         if selected:
             self.spawn_path.set(selected)
 

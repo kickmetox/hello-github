@@ -723,7 +723,9 @@ def system_caption(build: int | None = None) -> str:
     """Name des laufenden Systems. Windows 11 beginnt bei Build 22000."""
     if build is None:
         if sys.platform != "win32":
-            return "Vorschau"
+            from spheredrive.i18n import t
+
+            return t("Vorschau")
         try:
             build = int(sys.getwindowsversion().build)
         except (AttributeError, OSError, ValueError):

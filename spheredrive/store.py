@@ -20,6 +20,7 @@ DEFAULTS: dict[str, Any] = {
         "autostart": True,
         "elevated_task": False,
         "linked_connections": False,
+        "language": "de",
     },
 }
 
@@ -28,11 +29,13 @@ class Store:
     def __init__(self, path: Path) -> None:
         self.path = Path(path)
         self.data = deepcopy(DEFAULTS)
+        self.explicit_language = False
         if self.path.is_file():
             self.load()
 
     def load(self) -> None:
         raw = json.loads(self.path.read_text(encoding="utf-8"))
+        self.explicit_language = False
         data = deepcopy(DEFAULTS)
         if isinstance(raw, dict):
             for key in ("version", "subst", "net", "shares", "links", "psdrives", "mounts"):
@@ -40,6 +43,7 @@ class Store:
                     data[key] = raw[key]
             if isinstance(raw.get("settings"), dict):
                 data["settings"] = {**DEFAULTS["settings"], **raw["settings"]}
+                self.explicit_language = "language" in raw["settings"]
         self.data = data
 
     def save(self) -> None:
