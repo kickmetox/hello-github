@@ -1321,6 +1321,75 @@ class CreatorTests(unittest.TestCase):
             tmp.cleanup()
 
 
+class GuideTests(unittest.TestCase):
+    def test_command_lists_and_share_document(self) -> None:
+        from shatuide.guide import catalog, share_document
+
+        required = {
+            "powershell": ["Get-ChildItem", "Get-Help", "foreach", "Set-Content"],
+            "shell": ["grep", "if", "bash -n", "chmod"],
+            "batch": ["goto", "set", "%~dp0", "if exist"],
+        }
+        for kind, names in required.items():
+            data = catalog(kind)
+            self.assertTrue(data["ok"], data)
+            commands = [item["name"] for group in data["groups"] for item in group["commands"]]
+            for name in names:
+                self.assertIn(name, commands)
+            for group in data["groups"]:
+                self.assertTrue(group["text"])
+                for command in group["commands"]:
+                    self.assertTrue(command["syntax"] and command["text"] and command["example"])
+            self.assertIn(names[0], data["document"])
+            self.assertIn("Feature-Liste", data["share"])
+        features = catalog("features")
+        self.assertTrue(features["ok"], features)
+        self.assertIn("Andreas Meyer", features["document"])
+        self.assertIn("PowerShell", features["document"])
+        self.assertIn("Windows-Batch", features["document"])
+        self.assertGreater(len(features["share"]), len(features["document"]))
+        self.assertIn("Get-Help", features["share"])
+        self.assertIn("bash -n", features["share"])
+        self.assertIn("%~dp0", features["share"])
+        self.assertFalse(catalog("cobol")["ok"])
+        info = ROOT / "INFO.md"
+        self.assertEqual(info.read_text(encoding="utf-8"), share_document())
+
+    def test_guide_api_and_saved_handout(self) -> None:
+        tmp = tempfile.TemporaryDirectory()
+        httpd, app = create_server("127.0.0.1", 0, tmp.name)
+        thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+        thread.start()
+        host, port = httpd.server_address[:2]
+        base = f"http://{host}:{port}"
+
+        def request(path: str, payload: dict | None = None) -> dict:
+            data = None if payload is None else json.dumps(payload).encode("utf-8")
+            req = urllib.request.Request(base + path, data=data, method="POST" if payload is not None else "GET")
+            req.add_header("X-Shatu-Token", app.token)
+            req.add_header("Host", "127.0.0.1")
+            if payload is not None:
+                req.add_header("Content-Type", "application/json")
+            with urllib.request.urlopen(req, timeout=20) as response:
+                return json.loads(response.read().decode("utf-8"))
+
+        try:
+            listed = request("/api/studio?action=guide&kind=batch")
+            self.assertTrue(listed["ok"], listed)
+            self.assertEqual(listed["kind"], "batch")
+            self.assertIn("cmd.exe", listed["intro"])
+            saved = request("/api/studio", {"action": "guide-save"})
+            self.assertTrue(saved["ok"], saved)
+            text = Path(saved["path"]).read_text(encoding="utf-8")
+            self.assertIn("Feature-Liste", text)
+            self.assertIn("Get-ChildItem", text)
+            self.assertTrue(str(Path(saved["path"]).resolve()).startswith(str(Path(tmp.name).resolve())))
+        finally:
+            httpd.shutdown()
+            httpd.server_close()
+            tmp.cleanup()
+
+
 class KitTests(unittest.TestCase):
     def test_modules_build_a_running_script(self) -> None:
         import sqlite3

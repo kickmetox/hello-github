@@ -28,7 +28,7 @@ from shatuide.formatter import format_source
 from shatuide.icon_util import load_icon_bytes
 from shatuide.paths import SKIP_DIRS, STATIC, default_workspace, inside, meta_dir
 from shatuide.probe import prepare as prepare_probe
-from shatuide import creator, kit, studio
+from shatuide import creator, guide, kit, studio
 
 MAX_READ = 2_000_000
 
@@ -1062,6 +1062,8 @@ class Handler(BaseHTTPRequestHandler):
             return studio.recovery_list(workspace)
         if action == "help":
             return studio.powershell_help(self._q(query, "topic") or "Get-Help")
+        if action == "guide":
+            return guide.catalog(self._q(query, "kind") or "features")
         if action == "compilers":
             return studio.compiler_status()
         if action == "kit":
@@ -1081,6 +1083,10 @@ class Handler(BaseHTTPRequestHandler):
     def _studio(self, payload: dict) -> dict:
         action = str(payload.get("action") or "")
         workspace = Path(self.app.workspace)
+        if action == "guide-save":
+            path = studio.output_dir(workspace) / "ShatuIDE-Info.md"
+            path.write_text(guide.share_document(), encoding="utf-8")
+            return {"ok": True, "path": str(path), "message": "Info liegt in ausgabe/ShatuIDE-Info.md."}
         if action == "recovery":
             return studio.recovery_store(workspace, str(payload.get("path") or ""), str(payload.get("content") or ""))
         if action == "recovery-read":

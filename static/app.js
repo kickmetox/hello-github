@@ -25,6 +25,7 @@ const S = {
   dock: "functions",
   symbol: null,
   faults: {},
+  guideKind: "powershell",
 };
 
 const BOTTOM = [
@@ -45,6 +46,7 @@ const BOTTOM = [
   ["vars", "Variablen"],
   ["remote", "Remote"],
   ["studio", "Studio"],
+  ["guide", "Hilfe"],
 ];
 
 const $ = (id) => document.getElementById(id);
@@ -970,6 +972,7 @@ function toggleBottom(name) {
 function renderPanel() {
   const host = $("panel");
   host.innerHTML = "";
+  host.classList.toggle("plain", S.bottom === "guide");
   const builders = {
     output: renderOutput,
     problems: renderProblems,
@@ -988,6 +991,7 @@ function renderPanel() {
     vars: renderVars,
     remote: renderRemote,
     studio: renderStudio,
+    guide: renderGuide,
   };
   (builders[S.bottom] || renderOutput)(host);
 }
@@ -3126,6 +3130,147 @@ function openKit() {
   }).catch((err) => toast(err.message));
 }
 
+function guideText(node, text) {
+  node.textContent = text || "";
+}
+
+function renderGuide(host) {
+  const tools = document.createElement("div");
+  tools.className = "guide-tools";
+  const kinds = [
+    ["powershell", "PowerShell"],
+    ["shell", "Linux-Shell"],
+    ["batch", "Batch"],
+    ["features", "Feature-Liste"],
+  ];
+  const query = document.createElement("input");
+  query.placeholder = "Befehl oder Erklärung suchen";
+  query.spellcheck = false;
+  const view = document.createElement("div");
+  view.className = "guide";
+  const copy = document.createElement("button");
+  copy.type = "button";
+  copy.textContent = "Kopieren";
+  const share = document.createElement("button");
+  share.type = "button";
+  share.textContent = "Alles zur Weitergabe";
+  const save = document.createElement("button");
+  save.type = "button";
+  save.textContent = "Speichern";
+  let payload = null;
+
+  function paint() {
+    view.innerHTML = "";
+    if (!payload || payload.ok === false) {
+      guideText(view, payload && payload.error ? payload.error : "Hilfe wird geladen.");
+      return;
+    }
+    const needle = query.value.trim().toLowerCase();
+    const title = document.createElement("h3");
+    guideText(title, payload.title);
+    view.appendChild(title);
+    const intro = document.createElement("p");
+    intro.className = "hint";
+    guideText(intro, payload.intro);
+    view.appendChild(intro);
+    if (payload.kind === "features") {
+      (payload.sections || []).forEach((section) => {
+        const items = (section.items || []).filter((item) => !needle || (section.title + " " + item).toLowerCase().includes(needle));
+        if (!items.length) return;
+        const heading = document.createElement("h3");
+        guideText(heading, section.title);
+        const list = document.createElement("ul");
+        items.forEach((item) => {
+          const line = document.createElement("li");
+          guideText(line, item);
+          list.appendChild(line);
+        });
+        view.appendChild(heading);
+        view.appendChild(list);
+      });
+      return;
+    }
+    (payload.groups || []).forEach((group) => {
+      const commands = (group.commands || []).filter((command) => {
+        if (!needle) return true;
+        const blob = [command.name, command.alias, command.syntax, command.text, command.example, group.title].join(" ").toLowerCase();
+        return blob.includes(needle);
+      });
+      if (!commands.length) return;
+      const heading = document.createElement("h3");
+      guideText(heading, group.title);
+      view.appendChild(heading);
+      const lead = document.createElement("p");
+      lead.className = "hint";
+      guideText(lead, group.text);
+      view.appendChild(lead);
+      commands.forEach((command) => {
+        const card = document.createElement("div");
+        card.className = "guide-cmd";
+        const name = document.createElement("div");
+        const strong = document.createElement("b");
+        guideText(strong, command.name);
+        name.appendChild(strong);
+        if (command.alias) {
+          const alias = document.createElement("span");
+          alias.className = "alias";
+          guideText(alias, "  " + command.alias);
+          name.appendChild(alias);
+        }
+        const text = document.createElement("div");
+        guideText(text, command.text);
+        const syntax = document.createElement("div");
+        const code = document.createElement("code");
+        guideText(code, command.syntax);
+        syntax.appendChild(code);
+        const example = document.createElement("pre");
+        guideText(example, command.example);
+        card.append(name, text, syntax, example);
+        view.appendChild(card);
+      });
+    });
+  }
+
+  function load(kind) {
+    S.guideKind = kind;
+    tools.querySelectorAll("button[data-kind]").forEach((button) => button.classList.toggle("on", button.dataset.kind === kind));
+    apiGet("/api/studio?action=guide&kind=" + encodeURIComponent(kind)).then((data) => {
+      payload = data;
+      paint();
+    }).catch((err) => {
+      payload = { ok: false, error: err.message };
+      paint();
+    });
+  }
+
+  kinds.forEach(([kind, label]) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.dataset.kind = kind;
+    button.textContent = label;
+    button.onclick = () => load(kind);
+    tools.appendChild(button);
+  });
+  query.oninput = paint;
+  copy.onclick = () => {
+    if (!payload || !payload.document) return;
+    copyText(payload.document);
+    toast(payload.kind === "features" ? "Feature-Liste kopiert" : "Befehlsliste kopiert");
+  };
+  share.onclick = () => {
+    const text = payload && (payload.share || (payload.kind === "features" ? payload.document : ""));
+    if (!text) return;
+    copyText(text);
+    toast("Info und Feature-Liste kopiert");
+  };
+  save.onclick = () => {
+    api("/api/studio", { action: "guide-save" }).then((saved) => toast(saved.message || "Gespeichert")).catch((err) => toast(err.message));
+  };
+  tools.append(query, copy, share, save);
+  host.append(tools, view);
+  load(S.guideKind || "powershell");
+}
+
 function renderStudio(host) {
   const row = document.createElement("div");
   row.className = "row";
@@ -3280,6 +3425,11 @@ function buildMenus() {
       ["Fenster schließen", closeWindow],
     ]],
     ["Hilfe", [
+      ["Befehlslisten", () => { S.guideKind = "powershell"; setBottom("guide"); }],
+      ["PowerShell", () => { S.guideKind = "powershell"; setBottom("guide"); }],
+      ["Linux-Shell", () => { S.guideKind = "shell"; setBottom("guide"); }],
+      ["Batch", () => { S.guideKind = "batch"; setBottom("guide"); }],
+      ["Feature-Liste", () => { S.guideKind = "features"; setBottom("guide"); }],
       ["PS-Hilfe", () => setBottom("studio")],
       ["Tastatur", showKeys],
       ["Über ShatuIDE", about],
@@ -3937,13 +4087,13 @@ async function startCollab() {
 
 function showKeys() {
   const body = document.createElement("pre");
-  body.textContent = "Strg+S Speichern\nStrg+W Datei schließen\nEscape Dialog schließen\nStrg+Z Rückgängig\nStrg+Y Wiederholen\nStrg+X Ausschneiden\nStrg+C Kopieren\nStrg+V Einfügen\nStrg+F Suchen\nStrg+H Ersetzen\nStrg+/ Zeile kommentieren\nStrg+D Nächstes Vorkommen\nAlt+↑/↓ Zeile verschieben\nUmschalt+Alt+↓ Zeile duplizieren\nStrg+Umschalt+K Zeile löschen\nStrg+G Gehe zu Zeile\nStrg+F5 Ausführen\nAlt+F5 Markierung im Fenster\nUmschalt+Alt+F5 Funktion im Fenster\nF5 Debug/Weiter\nF9 Haltepunkt\nF10 Schritt über\nF11 Schritt hinein\nF12 Definition\nStrg+K Inline-KI\nStrg+Eingabe Prompt senden\nStrg+Leertaste Vervollständigen\nStrg+Umschalt+F Suche\nStrg+Umschalt+H In Dateien ersetzen\nStudio Baukasten, Skript, Datenbank, EXE, MSI, Modul, GUI, Dienst, Messen, PS-Hilfe";
+  body.textContent = "Strg+S Speichern\nStrg+W Datei schließen\nEscape Dialog schließen\nStrg+Z Rückgängig\nStrg+Y Wiederholen\nStrg+X Ausschneiden\nStrg+C Kopieren\nStrg+V Einfügen\nStrg+F Suchen\nStrg+H Ersetzen\nStrg+/ Zeile kommentieren\nStrg+D Nächstes Vorkommen\nAlt+↑/↓ Zeile verschieben\nUmschalt+Alt+↓ Zeile duplizieren\nStrg+Umschalt+K Zeile löschen\nStrg+G Gehe zu Zeile\nStrg+F5 Ausführen\nAlt+F5 Markierung im Fenster\nUmschalt+Alt+F5 Funktion im Fenster\nF5 Debug/Weiter\nF9 Haltepunkt\nF10 Schritt über\nF11 Schritt hinein\nF12 Definition\nStrg+K Inline-KI\nStrg+Eingabe Prompt senden\nStrg+Leertaste Vervollständigen\nStrg+Umschalt+F Suche\nStrg+Umschalt+H In Dateien ersetzen\nHilfe Befehlslisten für PowerShell, Linux-Shell und Batch, Feature-Liste zum Weitergeben\nStudio Baukasten, Skript, Datenbank, EXE, MSI, Modul, GUI, Dienst, Messen, PS-Hilfe";
   modal("Tastatur", body, [{ label: "Schließen", run: () => {} }]);
 }
 
 function about() {
   const body = document.createElement("div");
-  body.innerHTML = "<p><b>ShatuIDE</b> 1.0</p><p>Andreas Meyer<br>ame@sellerbach.de</p><p>Lokale Python-IDE. Workspace mit vollem Dateizugriff, Standard unter Windows: D:\\AI_Temp\\ShatuIDE. shatuide.jpg, icon.png oder die Mitte einer Grafik wird automatisch verwendet.</p>";
+  body.innerHTML = "<p><b>ShatuIDE</b> 1.0</p><p>Andreas Meyer<br>ame@sellerbach.de</p><p>Lokale IDE für Python, PowerShell, Linux-Shell und Windows-Batch. Workspace mit vollem Dateizugriff, Standard unter Windows: D:\\AI_Temp\\ShatuIDE. Hilfe enthält die Befehlslisten und die Feature-Liste zur Weitergabe.</p>";
   modal("Über", body, [{ label: "Schließen", run: () => {} }]);
 }
 
@@ -4073,6 +4223,7 @@ async function boot() {
   bindClick("btn-view-output", () => toggleBottom("output"));
   bindClick("btn-view-terminal", () => toggleBottom("terminal"));
   bindClick("btn-view-ai", () => toggleDock("ai"));
+  bindClick("btn-guide", () => setBottom("guide"));
   bindClick("btn-close-window", closeWindow);
   bindClick("close-left", () => setPane("left", false));
   bindClick("close-right", () => setPane("right", false));
