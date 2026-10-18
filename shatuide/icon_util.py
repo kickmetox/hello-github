@@ -14,6 +14,7 @@ from pathlib import Path
 from shatuide.paths import ASSETS, ROOT, WINDOWS_HOME
 
 ICON_NAME_PARTS = ("icon", "logo", "grafik", "graphic", "bild", "app", "programm")
+EXACT_ICON_NAMES = {"shatuide", "shatu-ide"}
 ICON_SUFFIXES = {".png", ".ico", ".jpg", ".jpeg", ".webp", ".gif", ".bmp"}
 
 
@@ -202,8 +203,20 @@ def _candidate_dirs() -> list[Path]:
     return dirs
 
 
+def icon_priority(path: Path) -> tuple[int, int, int] | None:
+    """Niedrigere Werte gewinnen. shatuide.jpg steht vor icon.png und grafik.png."""
+    if path.suffix.lower() not in ICON_SUFFIXES:
+        return None
+    low = path.stem.lower()
+    if low not in EXACT_ICON_NAMES and not any(part in low for part in ICON_NAME_PARTS):
+        return None
+    exact = 0 if low in EXACT_ICON_NAMES else 1
+    named = 0 if "icon" in low else 1
+    return (exact, named, len(path.name))
+
+
 def find_user_icon() -> Path | None:
-    found: list[Path] = []
+    found: list[tuple[tuple[int, int, int], Path]] = []
     for directory in _candidate_dirs():
         if not directory.is_dir():
             continue
@@ -214,16 +227,13 @@ def find_user_icon() -> Path | None:
         for entry in entries:
             if not entry.is_file():
                 continue
-            if entry.suffix.lower() not in ICON_SUFFIXES:
-                continue
-            low = entry.stem.lower()
-            if any(part in low for part in ICON_NAME_PARTS):
-                found.append(entry)
+            rank = icon_priority(entry)
+            if rank is not None:
+                found.append((rank, entry))
     if not found:
         return None
-    # Bevorzugt explizite Icon-Dateien vor einer allgemeinen Grafik.
-    found.sort(key=lambda p: (0 if "icon" in p.stem.lower() else 1, len(p.name)))
-    return found[0]
+    found.sort(key=lambda item: item[0])
+    return found[0][1]
 
 
 def load_icon_bytes() -> tuple[bytes, str]:

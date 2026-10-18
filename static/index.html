@@ -107,6 +107,7 @@
             <button type="button" id="btn-view-output">Ausgabe</button>
             <button type="button" id="btn-view-terminal">Terminal</button>
             <button type="button" id="btn-view-ai">KI</button>
+            <button type="button" id="btn-close-window" title="Dieses Fenster schließen">Schließen</button>
           </div>
           <div class="ribbon-caption">Fenster</div>
         </div>
@@ -124,6 +125,7 @@
         <div class="side-tabs">
           <button type="button" data-side="tree" class="on">Projekt</button>
           <button type="button" data-side="outline">Gliederung</button>
+          <button type="button" id="close-left" class="pane-x" title="Projektfenster schließen">×</button>
         </div>
         <div id="tree" class="side-pane"></div>
         <div id="outline" class="side-pane hidden"></div>
@@ -157,6 +159,7 @@
         <div class="side-tabs">
           <button type="button" data-dock="functions" class="on">Funktionen</button>
           <button type="button" data-dock="ai">KI</button>
+          <button type="button" id="close-right" class="pane-x" title="Funktionsfenster schließen">×</button>
         </div>
         <div id="dock-functions" class="dock-pane">
           <input id="fn-filter" placeholder="Funktion suchen" spellcheck="false" autocomplete="off">
@@ -181,7 +184,10 @@
     </div>
     <div id="bottom-resizer" class="resizer horizontal"></div>
     <section id="bottom">
-      <div id="bottom-tabs"></div>
+      <div id="bottom-bar">
+        <div id="bottom-tabs"></div>
+        <button type="button" id="close-bottom" class="pane-x" title="Ausgabefenster schließen">×</button>
+      </div>
       <div id="panel"></div>
     </section>
     <footer id="status">

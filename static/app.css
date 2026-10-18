@@ -54,7 +54,11 @@ button:hover, button.on { border-color: var(--amber); color: var(--amber-2); }
 #left, #right { background: var(--panel); display: flex; flex-direction: column; min-width: 160px; min-height: 0; }
 #left { width: var(--left); }
 #right { width: var(--right); }
-.side-tabs { display: flex; gap: 4px; padding: 4px; border-bottom: 1px solid var(--line); }
+.side-tabs, #bottom-bar { display: flex; gap: 4px; align-items: center; padding: 4px; border-bottom: 1px solid var(--line); }
+.pane-x { margin-left: auto; background: transparent; border-color: transparent; color: var(--muted); padding: 2px 8px; font-size: 16px; line-height: 1; }
+.pane-x:hover { color: var(--red); }
+#left.collapsed, #right.collapsed, #bottom.collapsed,
+#left-resizer.collapsed, #right-resizer.collapsed, #bottom-resizer.collapsed { display: none !important; }
 .side-pane { overflow: auto; padding: 4px; flex: 1; }
 .hidden { display: none !important; }
 .tree-item, .outline-item, .hit, .problem { display: block; width: 100%; text-align: left; border: 0; background: transparent; padding: 3px 6px; border-radius: 3px; }
@@ -62,8 +66,12 @@ button:hover, button.on { border-color: var(--amber); color: var(--amber-2); }
 .tree-children { margin-left: 12px; }
 #center { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 #tabs { display: flex; gap: 2px; overflow: auto; background: #161513; min-height: 32px; }
-.tab { border: 0; border-right: 1px solid var(--line); background: transparent; border-radius: 0; padding: 6px 10px; color: var(--muted); }
+.tab { display: flex; align-items: stretch; border-right: 1px solid var(--line); background: transparent; color: var(--muted); }
 .tab.on { color: var(--text); background: var(--bg); box-shadow: inset 0 -2px 0 var(--amber); }
+.tab-name, .tab-close { background: transparent; border: 0; border-radius: 0; color: inherit; }
+.tab-name { padding: 6px 4px 6px 10px; }
+.tab-close { padding: 0 8px; color: var(--muted); }
+.tab-close:hover { color: var(--red); }
 #findbar { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; padding: 4px 8px; background: #1c1a17; border-bottom: 1px solid var(--line); }
 #findbar input { width: 180px; background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 3px 6px; }
 #findbar button.on { border-color: var(--amber); color: var(--amber-2); }
@@ -96,7 +104,7 @@ button:hover, button.on { border-color: var(--amber); color: var(--amber-2); }
 .op { color: #d7cfc3; }
 .errline { text-decoration: underline wavy var(--red); }
 #bottom { height: var(--bottom); background: var(--panel); border-top: 1px solid var(--line); display: flex; flex-direction: column; min-height: 80px; }
-#bottom-tabs { display: flex; gap: 2px; overflow: auto; padding: 2px 4px; }
+#bottom-tabs { display: flex; gap: 2px; overflow: auto; flex: 1; padding: 0; }
 #bottom-tabs button { background: transparent; border-color: transparent; color: var(--muted); }
 #bottom-tabs button.on { color: var(--amber-2); }
 #panel { flex: 1; overflow: auto; padding: 8px; font-family: var(--mono); font-size: 12.5px; white-space: pre-wrap; }
@@ -134,7 +142,10 @@ button:hover, button.on { border-color: var(--amber); color: var(--amber-2); }
 .kit-card h3 { margin: 0 0 6px; font-size: 14px; }
 .kit-card .row { margin-top: 6px; }
 @media (max-width: 800px) { .kit { grid-template-columns: 1fr; } }
-#modal h2 { margin: 0 0 8px; font-size: 18px; }
+.modal-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.modal-x { background: transparent; border-color: transparent; font-size: 20px; line-height: 1; padding: 0 6px; }
+.modal-x:hover { color: var(--red); }
+#modal h2 { margin: 0; font-size: 18px; }
 #modal label { display: block; margin: 8px 0 4px; color: var(--muted); }
 #modal label.inline { display: flex; gap: 8px; align-items: center; color: var(--text); }
 #modal label.inline input { width: auto; }

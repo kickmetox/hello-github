@@ -21,7 +21,7 @@ sys.path.insert(0, str(ROOT))
 from shatuide import analysis, ai, history, http_client, integrations, notebook, refactor, tools
 from shatuide.debug_session import DebugSession
 from shatuide.formatter import fallback_format
-from shatuide.icon_util import crop_center_square, decode_png, encode_png, generated_icon_png
+from shatuide.icon_util import crop_center_square, decode_png, encode_png, generated_icon_png, icon_priority
 from shatuide.kernel_worker import main as kernel_main  # noqa: F401  (Importpfad)
 from shatuide.runner import compile_file
 from shatuide.server import KernelSession, create_server
@@ -130,6 +130,13 @@ class ToolTests(unittest.TestCase):
         self.assertGreater(rgba[center], 200)
         self.assertLess(rgba[center + 2], 40)
         self.assertTrue(generated_icon_png().startswith(b"\x89PNG"))
+        shatu = icon_priority(Path("shatuide.jpg"))
+        graphic = icon_priority(Path("grafik.png"))
+        self.assertIsNotNone(shatu)
+        self.assertIsNotNone(graphic)
+        assert shatu is not None and graphic is not None
+        self.assertLess(shatu, graphic)
+        self.assertIsNone(icon_priority(Path("readme.md")))
 
 
 class HistoryHttpNotebookTests(unittest.TestCase):

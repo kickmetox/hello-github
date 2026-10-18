@@ -12,7 +12,7 @@ python3 shatuide.py
 
 Unter Windows: `ShatuIDE.bat` oder `py -3 shatuide.py`.
 
-**Datei → Öffnen** lädt vorhandene Python-Skripte und andere Textdateien aus dem Workspace, aus darüberliegenden Ordnern oder vom Home-Verzeichnis. Dateien außerhalb des Workspace sind nur lesbar. **Datei laden** übernimmt Dateien aus der Dateiauswahl; Speichern schreibt sie in den Workspace. **Bearbeiten** schneidet aus, kopiert die Markierung oder einen Zeilenbereich und fügt ein. **Fenster → Zweites Fenster** öffnet eine weitere IDE-Ansicht.
+**Datei → Öffnen** lädt vorhandene Python-Skripte und andere Textdateien aus dem Workspace, aus darüberliegenden Ordnern oder vom Home-Verzeichnis. Dateien außerhalb des Workspace sind nur lesbar. **Datei laden** übernimmt Dateien aus der Dateiauswahl; Speichern schreibt sie in den Workspace. **Bearbeiten** schneidet aus, kopiert die Markierung oder einen Zeilenbereich und fügt ein. **Fenster → Zweites Fenster** öffnet eine weitere IDE-Ansicht. Jeder Dateireiter, jeder Dialog und das Testfenster haben **Schließen**. Die Bereiche Projekt, Funktionen und Ausgabe lassen sich mit **×** zuklappen und über **Ansicht** wieder öffnen. **Fenster → Fenster schließen** schließt ein zweites Fenster.
 
 Das Menüband hat die Reiter **Start**, **Entwurf**, **Erzeugen** und **Ansicht**. Darunter liegen Zwischenablage, Starten, Debug, Baukasten, GUI, EXE, MSI und die Fenster. Rechts listet **Funktionen** die Funktionen, Methoden, Shell-Funktionen oder Sprungmarken der offenen Datei. **Eigenschaften** zeigt Name, Art und Zeile. Ein Klick springt an die Stelle, **Im Fenster prüfen** startet die Funktion getrennt von der Datei. Die KI bleibt im selben Bereich als Reiter.
 
@@ -42,7 +42,7 @@ Auf diesem Linux-System gibt es kein Laufwerk `D:`. `install.py` kopiert erst un
 
 ## Icon
 
-Liegt im Programmordner bereits `icon.png`, `icon.ico`, `logo.png` oder `grafik.png`, wird diese Datei verwendet. Eine nicht quadratische PNG wird auf das Quadrat in der Mitte zugeschnitten. Sonst gilt `assets/icon.png`.
+Liegt im Programmordner `shatuide.jpg`, `icon.png`, `icon.ico`, `logo.png` oder `grafik.png`, wird diese Datei verwendet. `shatuide.jpg` hat Vorrang. Eine nicht quadratische PNG wird auf das Quadrat in der Mitte zugeschnitten. Sonst gilt `assets/icon.png`.
 
 ## Funktionen
 

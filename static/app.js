@@ -476,7 +476,7 @@ function renderGutter() {
     const classes = ["gutter-line"];
     if (breaks[line] !== undefined) classes.push("bp");
     if (S.debugFile && current && S.debugFile === current.path && S.debugLine === line) classes.push("current");
-    if ((current.problems || []).some((item) => item.line === line && item.severity !== "info")) classes.push("err");
+    if (current && (current.problems || []).some((item) => item.line === line && item.severity !== "info")) classes.push("err");
     const mark = covered && covered.missing && covered.missing.includes(line) ? "·" : "";
     html += `<div class="${classes.join(" ")}" data-line="${line}">${mark}${line}</div>`;
   }
@@ -486,14 +486,52 @@ function renderGutter() {
 function renderTabs() {
   $("tabs").innerHTML = "";
   S.tabs.forEach((item, index) => {
+    const tabNode = document.createElement("div");
+    tabNode.className = "tab" + (index === S.active ? " on" : "");
     const button = document.createElement("button");
     button.type = "button";
-    button.className = "tab" + (index === S.active ? " on" : "");
+    button.className = "tab-name";
     const name = item.path.split(/[\\/]/).pop();
     button.textContent = (item.dirty ? "● " : "") + name;
     button.onclick = () => activate(index);
-    $("tabs").appendChild(button);
+    const close = document.createElement("button");
+    close.type = "button";
+    close.className = "tab-close";
+    close.title = "Datei schließen";
+    close.textContent = "×";
+    close.onclick = (event) => {
+      event.stopPropagation();
+      closeTab(index);
+    };
+    tabNode.appendChild(button);
+    tabNode.appendChild(close);
+    $("tabs").appendChild(tabNode);
   });
+}
+
+function closeTab(index) {
+  const item = S.tabs[index];
+  if (!item) return;
+  const finish = () => {
+    S.tabs.splice(index, 1);
+    if (!S.tabs.length) S.active = -1;
+    else if (S.active > index) S.active -= 1;
+    else if (S.active === index) S.active = Math.min(index, S.tabs.length - 1);
+    const current = tab();
+    codeEl().value = current ? current.content : "";
+    renderEditor();
+    updateStatus(current ? current.path : "Bereit");
+  };
+  if (!item.dirty) {
+    finish();
+    return;
+  }
+  const body = document.createElement("p");
+  body.textContent = item.path.split(/[\\/]/).pop() + " ist nicht gespeichert.";
+  modal("Datei schließen", body, [
+    { label: "Abbrechen", run: () => {} },
+    { label: "Schließen", run: finish },
+  ]);
 }
 
 function syncScroll() {
@@ -865,7 +903,20 @@ function showRibbon(name) {
   });
 }
 
+function paneOpen(id) {
+  const node = $(id);
+  return !!node && !node.classList.contains("collapsed");
+}
+
+function setPane(id, open) {
+  const node = $(id);
+  if (node) node.classList.toggle("collapsed", !open);
+  const resizer = $(id + "-resizer");
+  if (resizer) resizer.classList.toggle("collapsed", !open);
+}
+
 function showDock(name) {
+  setPane("right", true);
   S.dock = name;
   const functions = $("dock-functions");
   const ai = $("dock-ai");
@@ -874,12 +925,23 @@ function showDock(name) {
   document.querySelectorAll("[data-dock]").forEach((button) => button.classList.toggle("on", button.dataset.dock === name));
 }
 
+function toggleDock(name) {
+  if (paneOpen("right") && S.dock === name) setPane("right", false);
+  else showDock(name);
+}
+
 function setBottom(name) {
+  setPane("bottom", true);
   S.bottom = name;
   document.querySelectorAll("#bottom-tabs button").forEach((button) => {
     button.classList.toggle("on", button.dataset.panel === name);
   });
   renderPanel();
+}
+
+function toggleBottom(name) {
+  if (paneOpen("bottom") && S.bottom === name) setPane("bottom", false);
+  else setBottom(name);
 }
 
 function renderPanel() {
@@ -1734,16 +1796,33 @@ function replaceSelection(text) {
   area.selectionEnd = start + text.length;
 }
 
+function closeModal() {
+  $("modal").classList.add("hidden");
+}
+
 function modal(title, body, buttons) {
   const root = $("modal");
   root.classList.remove("hidden");
   root.innerHTML = "";
   const box = document.createElement("div");
   box.className = "box";
+  const head = document.createElement("div");
+  head.className = "modal-head";
   const heading = document.createElement("h2");
   heading.textContent = title;
-  box.appendChild(heading);
+  const close = document.createElement("button");
+  close.type = "button";
+  close.className = "modal-x";
+  close.title = "Schließen";
+  close.textContent = "×";
+  close.onclick = () => closeModal();
+  head.appendChild(heading);
+  head.appendChild(close);
+  box.appendChild(head);
   box.appendChild(body);
+  root.onclick = (event) => {
+    if (event.target === root) closeModal();
+  };
   const row = document.createElement("div");
   row.className = "row";
   buttons.forEach((item) => {
@@ -3095,6 +3174,7 @@ function buildMenus() {
     ["Fenster", [
       ["Zweites Fenster", secondWindow],
       ["Testfenster", () => probeWindow("mark")],
+      ["Fenster schließen", closeWindow],
     ]],
     ["Hilfe", [
       ["PS-Hilfe", () => setBottom("studio")],
@@ -3221,6 +3301,12 @@ function copyRange() {
 function secondWindow() {
   const opened = window.open(location.href, "shatu-" + Date.now(), "popup=yes,width=1280,height=860,left=80,top=40");
   if (!opened) toast("Zweites Fenster wurde blockiert");
+}
+
+function closeWindow() {
+  const child = !!window.opener;
+  window.close();
+  if (!child) toast("Das Hauptfenster schließt der Browser über seinen eigenen Rahmen");
 }
 
 function loadPickedFiles() {
@@ -3744,21 +3830,27 @@ async function startCollab() {
 
 function showKeys() {
   const body = document.createElement("pre");
-  body.textContent = "Strg+S Speichern\nStrg+Z Rückgängig\nStrg+Y Wiederholen\nStrg+X Ausschneiden\nStrg+C Kopieren\nStrg+V Einfügen\nStrg+F Suchen\nStrg+H Ersetzen\nStrg+/ Zeile kommentieren\nStrg+D Nächstes Vorkommen\nAlt+↑/↓ Zeile verschieben\nUmschalt+Alt+↓ Zeile duplizieren\nStrg+Umschalt+K Zeile löschen\nStrg+G Gehe zu Zeile\nStrg+F5 Ausführen\nAlt+F5 Markierung im Fenster\nUmschalt+Alt+F5 Funktion im Fenster\nF5 Debug/Weiter\nF9 Haltepunkt\nF10 Schritt über\nF11 Schritt hinein\nF12 Definition\nStrg+K Inline-KI\nStrg+Eingabe Prompt senden\nStrg+Leertaste Vervollständigen\nStrg+Umschalt+F Suche\nStrg+Umschalt+H In Dateien ersetzen\nStudio Baukasten, Skript, Datenbank, EXE, MSI, Modul, GUI, Dienst, Messen, PS-Hilfe";
+  body.textContent = "Strg+S Speichern\nStrg+W Datei schließen\nEscape Dialog schließen\nStrg+Z Rückgängig\nStrg+Y Wiederholen\nStrg+X Ausschneiden\nStrg+C Kopieren\nStrg+V Einfügen\nStrg+F Suchen\nStrg+H Ersetzen\nStrg+/ Zeile kommentieren\nStrg+D Nächstes Vorkommen\nAlt+↑/↓ Zeile verschieben\nUmschalt+Alt+↓ Zeile duplizieren\nStrg+Umschalt+K Zeile löschen\nStrg+G Gehe zu Zeile\nStrg+F5 Ausführen\nAlt+F5 Markierung im Fenster\nUmschalt+Alt+F5 Funktion im Fenster\nF5 Debug/Weiter\nF9 Haltepunkt\nF10 Schritt über\nF11 Schritt hinein\nF12 Definition\nStrg+K Inline-KI\nStrg+Eingabe Prompt senden\nStrg+Leertaste Vervollständigen\nStrg+Umschalt+F Suche\nStrg+Umschalt+H In Dateien ersetzen\nStudio Baukasten, Skript, Datenbank, EXE, MSI, Modul, GUI, Dienst, Messen, PS-Hilfe";
   modal("Tastatur", body, [{ label: "Schließen", run: () => {} }]);
 }
 
 function about() {
   const body = document.createElement("div");
-  body.innerHTML = "<p><b>ShatuIDE</b> 1.0</p><p>Andreas Meyer<br>ame@sellerbach.de</p><p>Lokale Python-IDE. Workspace mit vollem Dateizugriff, Standard unter Windows: D:\\AI_Temp\\ShatuIDE. Ein vorhandenes Icon oder die Mitte einer Grafik (grafik.png / icon.png) wird automatisch verwendet.</p>";
+  body.innerHTML = "<p><b>ShatuIDE</b> 1.0</p><p>Andreas Meyer<br>ame@sellerbach.de</p><p>Lokale Python-IDE. Workspace mit vollem Dateizugriff, Standard unter Windows: D:\\AI_Temp\\ShatuIDE. shatuide.jpg, icon.png oder die Mitte einer Grafik wird automatisch verwendet.</p>";
   modal("Über", body, [{ label: "Schließen", run: () => {} }]);
 }
 
 function showSide(name) {
+  setPane("left", true);
   S.side = name;
   $("tree").classList.toggle("hidden", name !== "tree");
   $("outline").classList.toggle("hidden", name !== "outline");
   document.querySelectorAll("[data-side]").forEach((button) => button.classList.toggle("on", button.dataset.side === name));
+}
+
+function toggleSide(name) {
+  if (paneOpen("left") && S.side === name) setPane("left", false);
+  else showSide(name);
 }
 
 function onKey(event) {
@@ -3795,7 +3887,11 @@ function onKey(event) {
   else if (event.altKey && !event.ctrlKey && key === "z") { event.preventDefault(); toggleWrap(); }
   else if (event.ctrlKey && !event.shiftKey && key === "z") { event.preventDefault(); editorHistory(false); }
   else if ((event.ctrlKey && key === "y") || (event.ctrlKey && event.shiftKey && key === "z")) { event.preventDefault(); editorHistory(true); }
-  else if (event.key === "Escape") hidePopup();
+  else if (event.key === "Escape") {
+    if (!$("modal").classList.contains("hidden")) closeModal();
+    else hidePopup();
+  }
+  else if (event.ctrlKey && !event.shiftKey && key === "w") { event.preventDefault(); closeTab(S.active); }
 }
 
 function moveComplete(delta) {
@@ -3865,11 +3961,15 @@ async function boot() {
   bindClick("btn-msi", buildMsi);
   bindClick("btn-service", buildService);
   bindClick("btn-measure", measureFile);
-  bindClick("btn-view-tree", () => showSide("tree"));
-  bindClick("btn-view-outline", () => showSide("outline"));
-  bindClick("btn-view-output", () => setBottom("output"));
-  bindClick("btn-view-terminal", () => setBottom("terminal"));
-  bindClick("btn-view-ai", () => showDock("ai"));
+  bindClick("btn-view-tree", () => toggleSide("tree"));
+  bindClick("btn-view-outline", () => toggleSide("outline"));
+  bindClick("btn-view-output", () => toggleBottom("output"));
+  bindClick("btn-view-terminal", () => toggleBottom("terminal"));
+  bindClick("btn-view-ai", () => toggleDock("ai"));
+  bindClick("btn-close-window", closeWindow);
+  bindClick("close-left", () => setPane("left", false));
+  bindClick("close-right", () => setPane("right", false));
+  bindClick("close-bottom", () => setPane("bottom", false));
   if ($("fn-filter")) $("fn-filter").addEventListener("input", () => renderFunctions());
   $("ai-connect").onclick = () => aiSettings($("ai-input").value).catch((err) => toast(err.message));
   $("ai-send").onclick = () => sendAi(false).catch((err) => toast(err.message));
@@ -3910,8 +4010,14 @@ async function boot() {
     if (line) toggleBreak(Number(line));
   });
   document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !$("modal").classList.contains("hidden")) {
+      event.preventDefault();
+      closeModal();
+      return;
+    }
     if (event.target === area) return;
     if (event.ctrlKey && event.key.toLowerCase() === "s") { event.preventDefault(); saveTab(); }
+    if (event.ctrlKey && !event.shiftKey && event.key.toLowerCase() === "w") { event.preventDefault(); closeTab(S.active); }
   });
   bindResize("left-resizer", (event) => { document.documentElement.style.setProperty("--left", Math.max(160, event.clientX) + "px"); });
   bindResize("right-resizer", (event) => { document.documentElement.style.setProperty("--right", Math.max(200, window.innerWidth - event.clientX) + "px"); });

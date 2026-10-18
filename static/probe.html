@@ -22,7 +22,10 @@
       <strong id="title">Testfenster</strong>
       <p id="detail">Warte auf eine Markierung…</p>
     </div>
-    <button type="button" id="run">Nochmal ausführen</button>
+    <div class="row">
+      <button type="button" id="run">Nochmal ausführen</button>
+      <button type="button" id="close">Schließen</button>
+    </div>
   </header>
   <main>
     <textarea id="code" spellcheck="false"></textarea>
@@ -91,6 +94,7 @@
     }
 
     $("run").onclick = () => execute();
+    $("close").onclick = () => window.close();
     window.addEventListener("message", (event) => {
       if (event.origin !== location.origin) return;
       if (!event.data || event.data.type !== "shatu-probe") return;
