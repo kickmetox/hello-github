@@ -9,3 +9,5 @@ cpcm-settings.json
 *.cpcm
 build/
 dist/
+# Heruntergeladenes Windows-Python, nur Build-Input für CPCM-Setup.exe
+python-*-embed-*.zip

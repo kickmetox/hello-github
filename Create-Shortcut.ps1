@@ -3,14 +3,19 @@ $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $MyInvocation.MyCommand.Path
 $Python = $null
 $Arguments = "`"$Root\cpcm.py`" serve"
-$py = Get-Command py -ErrorAction SilentlyContinue
-if ($py) {
-    $Python = $py.Source
-    $Arguments = "-3 $Arguments"
+$Bundled = Join-Path $Root "python\python.exe"
+if (Test-Path $Bundled) {
+    $Python = $Bundled
 } else {
-    $python = Get-Command python -ErrorAction SilentlyContinue
-    if (-not $python) { throw "Python 3 wurde nicht gefunden." }
-    $Python = $python.Source
+    $py = Get-Command py -ErrorAction SilentlyContinue
+    if ($py) {
+        $Python = $py.Source
+        $Arguments = "-3 $Arguments"
+    } else {
+        $python = Get-Command python -ErrorAction SilentlyContinue
+        if (-not $python) { throw "Python 3 wurde nicht gefunden." }
+        $Python = $python.Source
+    }
 }
 $Shell = New-Object -ComObject WScript.Shell
 $Shortcut = $Shell.CreateShortcut((Join-Path $env:USERPROFILE "Desktop\CPCM.lnk"))

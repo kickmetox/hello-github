@@ -27,9 +27,13 @@ Linux:
 
 Die Oberfläche bindet nur an `127.0.0.1:8765`.
 
+## Windows-Setup
+
+Normaler Weg: `CPCM-Setup.exe` doppelklicken. Python 3.12 ist enthalten. Zielordner standardmäßig `D:\AI_Temp\CPCM`, im Assistenten änderbar. Details: [docs/WINDOWS-ANLEITUNG.md](docs/WINDOWS-ANLEITUNG.md).
+
 ## Nach `D:\AI_Temp\CPCM` legen
 
-Auf dem Windows-Rechner, im entpackten Programmordner:
+Alternative für den Quellordner, wenn Python 3.11 oder neuer schon installiert ist. Auf dem Windows-Rechner, im entpackten Programmordner:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\Install-CPCM.ps1

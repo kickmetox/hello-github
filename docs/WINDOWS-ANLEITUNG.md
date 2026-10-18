@@ -7,6 +7,12 @@ Diese Fassung ist die Referenz. Die Linux-Fassung wird daraus später nachgebaut
 
 Zielordner: `D:\AI_Temp\CPCM`
 
+## Setup
+
+Normaler Weg: `CPCM-Setup.exe` doppelklicken. Python 3.12 (64-bit) ist im Setup enthalten, ein separates Python ist nicht nötig. Der Assistent schlägt `D:\AI_Temp\CPCM` vor. Der Ordner lässt sich ändern. Das Setup legt eine Desktop-Verknüpfung und einen Startmenü-Eintrag an. Beide starten die mitgelieferte `python.exe` mit `cpcm.py serve`, Arbeitsverzeichnis ist der Installationsordner, Icon `cpcm.ico`. Die Deinstallation steht in der Windows-Softwareliste. `vault\` und `cpcm-settings.json` werden beim Aktualisieren und beim Deinstallieren nicht gelöscht. `AUTOR.txt` nennt die Rolle Windows-Referenz, Andreas Meyer, ame@sellerbach.de.
+
+`Install-CPCM.ps1` ist die Alternative, wenn der Quellordner schon vorliegt. Dafür gilt der folgende Ablauf, inklusive selbst installiertem Python.
+
 ## 1. Python
 
 Python 3.11 oder neuer von https://www.python.org/downloads/windows/ installieren. Beim Installer „Add python.exe to PATH“ aktivieren. Der Starter `py` muss in einer neuen Eingabeaufforderung antworten:
@@ -39,6 +45,8 @@ Liegt der Ordner schon in `D:\AI_Temp\CPCM`, denselben Befehl dort ausführen. R
 `CPCM.bat` oder die Desktop-Verknüpfung. Der Browser öffnet `http://127.0.0.1:8765/`. In der Kopfzeile stehen Vault-Pfad und „Andreas Meyer · ame@sellerbach.de“.
 
 Installer dieser Referenz bleibt `Install-CPCM.ps1`. Eine `CPCM.exe` wird nicht mitgeliefert; der Start bleibt `CPCM.bat` bzw. `Desktop\CPCM.lnk` mit installiertem Python 3.11 oder neuer.
+
+Der normale Weg ist `CPCM-Setup.exe` im Abschnitt Setup. `Install-CPCM.ps1` bleibt die Alternative für den Quellordner.
 
 Ohne Browserfenster:
 
