@@ -18,6 +18,7 @@ async function refreshStatus() {
   status = await api("/api/status");
   $("world-pill").textContent = "läuft unter " + status.world;
   $("vault-line").textContent = "Vault " + status.vault;
+  $("author-line").textContent = (status.author || "") + " · " + (status.author_email || "");
   $("home-linux").value = status.homes.linux;
   $("home-windows").value = status.homes.windows;
   $("vault-path").value = status.vault;

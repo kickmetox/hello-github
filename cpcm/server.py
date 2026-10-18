@@ -8,6 +8,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 import os
 
+from cpcm import AUTHOR_EMAIL, AUTHOR_NAME, LINUX_INSTALL_DIR, __version__
 from cpcm.backup import create_snapshot, delete_snapshot, export_snapshot, import_snapshot, list_snapshots, load_snapshot, restore_snapshot
 from cpcm.catalog import MANAGERS, detect_installed, plan
 from cpcm.diagnose import analyze, lint_user_script, script_for
@@ -130,9 +131,12 @@ def make_handler(app: App):
                 host, other = app.identities()
                 settings = app.settings()
                 return {
-                    "name": "CPCM", "world": host.world.value, "home": str(host.home), "user": host.user,
+                    "name": "CPCM", "version": __version__, "world": host.world.value, "home": str(host.home), "user": host.user,
+                    "author": AUTHOR_NAME, "author_email": AUTHOR_EMAIL,
                     "vault": str(app.vault()), "homes": settings["homes"],
-                    "install_dir_windows": settings["install_dir_windows"], "counterpart_home": str(other.home),
+                    "install_dir_windows": settings["install_dir_windows"],
+                    "install_dir_linux": LINUX_INSTALL_DIR,
+                    "counterpart_home": str(other.home),
                     "managers": {world.value: list(names) for world, names in MANAGERS.items()},
                 }
             if path == "/api/browse":

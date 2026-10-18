@@ -29,6 +29,9 @@ class ApiTests(unittest.TestCase):
                 self.assertTrue(report["restored"])
                 status = self._get(base + "/api/status")
                 self.assertEqual(status["install_dir_windows"], r"D:\AI_Temp\CPCM")
+                self.assertEqual(status["author"], "Andreas Meyer")
+                self.assertEqual(status["author_email"], "ame@sellerbach.de")
+                self.assertEqual(status["install_dir_linux"], "~/AI_Temp/CPCM")
                 page = urllib.request.urlopen(base + "/").read()
                 self.assertIn(b"Cross Platform Config Manager", page)
             finally:

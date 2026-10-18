@@ -2,7 +2,12 @@
 
 CPCM sichert selbst gewählte Dateien und Ordner in einen gemeinsamen Vault, liest denselben Vault unter Windows und Linux und stellt die Dateien in den passenden Ordnern wieder her. Konfigurationen, Programmlisten, Logs und Leistungsprofile liegen in derselben Oberfläche.
 
-Installationsort unter Windows: `D:\AI_Temp\CPCM`.
+Andreas Meyer, ame@sellerbach.de.
+
+Die Windows-Fassung in `D:\AI_Temp\CPCM` ist die Referenz. Die Linux-Fassung wird daraus später nachgebaut.
+
+- Windows, zuerst: [docs/WINDOWS-ANLEITUNG.md](docs/WINDOWS-ANLEITUNG.md)
+- Linux, danach: [docs/LINUX-ANLEITUNG.md](docs/LINUX-ANLEITUNG.md)
 
 ## Start
 

@@ -7,5 +7,13 @@ New-Item -ItemType Directory -Force -Path $Target | Out-Null
 if ($LASTEXITCODE -ge 8) {
     throw "Kopieren nach $Target fehlgeschlagen (robocopy $LASTEXITCODE)"
 }
+@'
+CPCM 1.0.0
+Andreas Meyer
+ame@sellerbach.de
+Rolle: Windows-Referenz
+Pfad: D:\AI_Temp\CPCM
+'@ | Set-Content -Encoding utf8 -Path (Join-Path $Target "AUTOR.txt")
 & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $Target "Create-Shortcut.ps1")
 Write-Host "CPCM liegt in $Target"
+Write-Host "Andreas Meyer  ame@sellerbach.de"

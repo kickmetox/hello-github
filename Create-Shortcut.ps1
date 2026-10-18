@@ -18,6 +18,6 @@ $Shortcut.TargetPath = $Python
 $Shortcut.Arguments = $Arguments
 $Shortcut.WorkingDirectory = $Root
 $Shortcut.IconLocation = Join-Path $Root "cpcm.ico"
-$Shortcut.Description = "Cross Platform Config Manager"
+$Shortcut.Description = "CPCM – Andreas Meyer, ame@sellerbach.de"
 $Shortcut.Save()
 Write-Host "Verknüpfung: $env:USERPROFILE\Desktop\CPCM.lnk"
