@@ -812,25 +812,8 @@ class MainWindow(QMainWindow):
                     self.canvas.set_presentation(self.presentation, 0)
             elif action == "inspect":
                 self.inspect_model()
-            elif action == "online":
-                data = draft_deck(self._online_settings(), dialog.prompt.text())
-                from officedisplay.ai.offline_design import deck_from_outline
-
-                self._push()
-                self.presentation = deck_from_outline(data["slides"], dialog.prompt.text()[:80] or "Online")
-                self.canvas.set_presentation(self.presentation, 0)
-            elif action == "rewrite":
-                objects = [obj for obj in self.selected_objects() if obj.kind == "text"]
-                if objects:
-                    text = rewrite_text(
-                        self._online_settings(),
-                        str(objects[0].props.get("text") or ""),
-                        dialog.command.text() or "kürzer",
-                    )
-                    self._push()
-                    objects[0].props["text"] = text.strip()
-            elif action == "image":
-                self._store_generated_image(generate_image(self._online_settings(), dialog.prompt.text()))
+            elif action in {"online", "rewrite", "image"}:
+                show_text(self, "Offline", "Office Display erzeugt Folien nur lokal. Es gibt keine Cloud-KI.")
         except (OnlineAIError, OSError, ValueError, KeyError) as exc:
             show_text(self, "KI", str(exc))
         self.refresh_thumbs()
@@ -855,27 +838,9 @@ class MainWindow(QMainWindow):
             save_secrets(self.secrets)
             self._pointer("Maus")
 
-    def _store_generated_image(self, payload: dict) -> None:
-        import base64
-        import urllib.request
+    def _store_generated_image(self, _payload: dict) -> None:
+        show_text(self, "Offline", "Bilddienste im Netz sind nicht enthalten.")
 
-        data = (payload.get("data") or [{}])[0]
-        raw = None
-        if data.get("b64_json"):
-            raw = base64.b64decode(data["b64_json"])
-        elif data.get("url"):
-            url = str(data["url"])
-            if not url.startswith("https://"):
-                raise OnlineAIError("Bild-URL ist nicht HTTPS.")
-            with urllib.request.urlopen(url, timeout=60) as response:
-                raw = response.read()
-        if not raw:
-            raise OnlineAIError("Keine Bilddaten in der Antwort.")
-        self._push()
-        folder = media_folder(self.path)
-        target = folder / f"{new_id()}.png"
-        target.write_bytes(raw)
-        place_on_slide(self.current_slide(), str(target), 0.15, 0.15)
 
     def inspect_model(self) -> None:
         show_text(self, "Modell inspizieren", inspect_model())

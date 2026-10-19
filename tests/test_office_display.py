@@ -135,67 +135,27 @@ class IoTests(unittest.TestCase):
 
 class ApiTests(unittest.TestCase):
     def test_online_guard_and_request(self):
-        from officedisplay.ai.online_ai import OnlineAIError, OnlineAISettings, chat_completion, validate_endpoint
+        from officedisplay.ai.online_ai import OnlineAIError, chat_completion, validate_endpoint
 
-        validate_endpoint("https://api.openai.com/v1/chat/completions")
-        validate_endpoint("http://127.0.0.1:11434/v1/chat/completions")
+        called = {"n": 0}
+
+        def opener(*_args, **_kwargs):
+            called["n"] += 1
+            raise AssertionError("Netzwerk darf nicht geöffnet werden")
+
         with self.assertRaises(OnlineAIError):
-            validate_endpoint("http://example.com/v1/chat/completions")
-        settings = OnlineAISettings(enabled=False, api_key="geheim")
+            validate_endpoint("https://api.openai.com/v1/chat/completions")
         with self.assertRaises(OnlineAIError):
-            chat_completion(settings, [])
-        captured = {}
-
-        class Response:
-            def read(self):
-                return b'{"choices":[{"message":{"content":"{\\"slides\\":[{\\"title\\":\\"A\\",\\"bullets\\":[\\"B\\"]}]}"}}]}'
-
-            def __enter__(self):
-                return self
-
-            def __exit__(self, *args):
-                return False
-
-        def opener(request, timeout=0):
-            captured["url"] = request.full_url
-            captured["auth"] = request.get_header("Authorization")
-            return Response()
-
-        settings = OnlineAISettings(enabled=True, api_key="test-key", base_url="https://example.ai/v1")
-        text = chat_completion(settings, [{"role": "user", "content": "Hallo"}], opener=opener)
-        self.assertIn("slides", text)
-        self.assertTrue(captured["url"].startswith("https://example.ai/v1/chat/completions"))
-        self.assertIn("test-key", captured["auth"])
+            chat_completion(None, [{"role": "user", "content": "Hallo"}], opener=opener)
+        self.assertEqual(called["n"], 0)
 
     def test_canva_request_shape(self):
-        from officedisplay.ai.canva_api import CanvaClient, authorize_url
+        from officedisplay.ai.canva_api import CanvaAPIError, CanvaClient, authorize_url
 
-        url = authorize_url("cid", "https://local/callback", "state", "challenge")
-        self.assertIn("api/oauth/authorize", url)
-        self.assertIn("code_challenge_method=S256", url)
-        seen = {}
-
-        class Response:
-            def read(self):
-                return b'{"job":{"id":"1"}}'
-
-            def __enter__(self):
-                return self
-
-            def __exit__(self, *args):
-                return False
-
-        def opener(request, timeout=0):
-            seen["url"] = request.full_url
-            seen["body"] = request.data
-            return Response()
-
-        client = CanvaClient("token", opener=opener)
-        client.create_autofill("DA123", {"Titel": {"type": "text", "text": "Hallo"}}, "Entwurf")
-        self.assertTrue(seen["url"].endswith("/autofills"))
-        self.assertIn(b"create_from_brand_template", seen["body"])
-        client.create_export("DAV1", "pptx")
-        self.assertIn(b'"type": "pptx"', seen["body"])
+        with self.assertRaises(CanvaAPIError):
+            authorize_url("cid", "https://local/callback", "state", "challenge")
+        with self.assertRaises(CanvaAPIError):
+            CanvaClient("token")
 
 
 class NativeTests(unittest.TestCase):
