@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PySide6.QtCore import QEvent, QMimeData, QPointF, QRectF, Qt, Signal
+from PySide6.QtCore import QEvent, QMimeData, QPoint, QPointF, QRectF, Qt, Signal
 from PySide6.QtGui import QColor, QDrag, QPainter, QPen
 from PySide6.QtWidgets import QPlainTextEdit, QWidget
 
@@ -28,6 +28,7 @@ class SlideCanvas(QWidget):
     statusMessage = Signal(str)
     filesDropped = Signal(list, float, float)
     textDropped = Signal(str, float, float)
+    shapeContext = Signal(str, QPoint)
 
     def __init__(self) -> None:
         super().__init__()
@@ -502,6 +503,9 @@ class SlideCanvas(QWidget):
         self.changed.emit()
 
     def mousePressEvent(self, event) -> None:
+        if event.button() == Qt.MouseButton.RightButton:
+            self._right_click(event)
+            return
         if self._tablet:
             return
         kind = self._kind_from_device(event)
@@ -510,6 +514,8 @@ class SlideCanvas(QWidget):
         self.pointer_event(kind, "press", event.position().x(), event.position().y(), self._pressure(event), bool(event.modifiers() & Qt.KeyboardModifier.ShiftModifier))
 
     def mouseMoveEvent(self, event) -> None:
+        if event.buttons() & Qt.MouseButton.RightButton and not (event.buttons() & Qt.MouseButton.LeftButton):
+            return
         if self._tablet:
             return
         kind = self._kind_from_device(event)
@@ -522,11 +528,27 @@ class SlideCanvas(QWidget):
         self.pointer_event(kind, "move", event.position().x(), event.position().y(), self._pressure(event), bool(event.modifiers() & Qt.KeyboardModifier.ShiftModifier))
 
     def mouseReleaseEvent(self, event) -> None:
+        if event.button() == Qt.MouseButton.RightButton:
+            return
         if self._tablet:
             self._tablet = False
             return
         kind = self._kind_from_device(event)
         self.pointer_event(kind, "release", event.position().x(), event.position().y(), self._pressure(event), False)
+
+    def _right_click(self, event) -> None:
+        """Kontext der Form unter dem Zeiger. Die Auswahl bleibt unverändert."""
+        kept = list(self.selected)
+        nx, ny = self.w2n(event.position().x(), event.position().y())
+        hit = self._hit(nx, ny)
+        self.selected = kept
+        if hit is None or hit.kind != "shape":
+            return
+        pos = event.globalPosition().toPoint() if hasattr(event, "globalPosition") else event.globalPos()
+        self.shapeContext.emit(hit.id, pos)
+
+    def contextMenuEvent(self, event) -> None:
+        event.accept()
 
     def mouseDoubleClickEvent(self, event) -> None:
         nx, ny = self.w2n(event.position().x(), event.position().y())

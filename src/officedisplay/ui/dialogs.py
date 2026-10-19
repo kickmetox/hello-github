@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import json
 
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QPixmap
+from PySide6.QtCore import QEvent, Qt, QUrl
+from PySide6.QtGui import QColor, QImage, QPainter, QPixmap
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
     QListWidget,
     QMessageBox,
     QPushButton,
+    QStackedWidget,
     QTextBrowser,
     QTextEdit,
     QVBoxLayout,
@@ -309,63 +310,341 @@ class ThreeDialog(QDialog):
             self.obj.setText(path)
 
 
-class PresenterDialog(QDialog):
-    def __init__(self, parent, window) -> None:
-        super().__init__(parent)
-        self.setWindowTitle("Präsentieren")
-        self.resize(980, 680)
-        self.window = window
-        self.index = window.canvas.slide_index
-        self.label = QLabel()
-        self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.notes = QTextEdit()
-        self.notes.setReadOnly(True)
-        self.notes.setMaximumHeight(120)
-        buttons = QHBoxLayout()
-        prev = QPushButton("Zurück")
-        nxt = QPushButton("Weiter")
-        prev.clicked.connect(lambda: self.go(-1))
-        nxt.clicked.connect(lambda: self.go(1))
-        buttons.addWidget(prev)
-        buttons.addWidget(nxt)
-        layout = QVBoxLayout(self)
-        layout.addWidget(self.label, stretch=1)
-        layout.addWidget(self.notes)
-        layout.addLayout(buttons)
-        self.window.dwell.enter(self.index)
-        self.refresh()
+class _FrameView(QWidget):
+    """Folie oder Bild, seitenfüllend mit schwarzem Rand."""
 
-    def go(self, step: int) -> None:
-        slides = self.window.presentation.slides
-        self.index = max(0, min(len(slides) - 1, self.index + step))
-        self.window.dwell.enter(self.index)
-        self.refresh()
+    def __init__(self, owner: "PresenterDialog") -> None:
+        super().__init__(owner)
+        self.owner = owner
+        self.image: QImage | None = None
+        self.blank = ""
+        self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
 
-    def refresh(self) -> None:
-        from officedisplay.ui.render import render_thumb
-
-        slide = self.window.presentation.slides[self.index]
-        image = render_thumb(self.window.presentation, slide, 900)
-        self.label.setPixmap(QPixmap.fromImage(image))
-        self.notes.setPlainText(slide.notes or "")
+    def paintEvent(self, _event) -> None:
+        painter = QPainter(self)
+        if self.blank == "white":
+            painter.fillRect(self.rect(), QColor("#FFFFFF"))
+            painter.end()
+            return
+        painter.fillRect(self.rect(), QColor("#000000"))
+        if self.blank != "black" and self.image is not None and not self.image.isNull():
+            scaled = self.image.scaled(
+                self.size(),
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
+            )
+            x = (self.width() - scaled.width()) // 2
+            y = (self.height() - scaled.height()) // 2
+            painter.drawImage(x, y, scaled)
+        painter.end()
 
     def mousePressEvent(self, event) -> None:
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.owner.apply_key("click")
+            return
+        super().mousePressEvent(event)
+
+
+class _PassiveText(QTextEdit):
+    def __init__(self, owner: "PresenterDialog") -> None:
+        super().__init__()
+        self.owner = owner
+        self.setReadOnly(True)
+        self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.setFrameStyle(0)
+
+    def keyPressEvent(self, event) -> None:
+        self.owner.keyPressEvent(event)
+
+    def mousePressEvent(self, event) -> None:
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.owner.apply_key("click")
+            return
+        super().mousePressEvent(event)
+
+
+class PresenterDialog(QDialog):
+    """Vollbild-Player für die Präsentation oder eine Slideshow."""
+
+    def __init__(self, parent, window, slideshow=None) -> None:
+        super().__init__(parent)
+        self.window = window
+        self.slideshow = slideshow
+        self.index = 0 if slideshow is not None else window.canvas.slide_index
+        self.blank = ""
+        self.notes_visible = True
+        self._player = None
+        self._audio = None
+        self._video = None
+        self._fullscreen_set = False
+        self.setWindowTitle("Slideshow" if slideshow is not None else "Präsentieren")
+        self.resize(1280, 720)
+        self.setStyleSheet(
+            "QDialog { background:#000000; }"
+            "QLabel#playerNotes { background:#1B1F2A; color:#FFFFFF; padding:8px 14px; font-size:15px; }"
+            "QTextEdit { background:#F4F6FB; color:#1B1F2A; font-size:28px; padding:40px; }"
+        )
+        self.frame = _FrameView(self)
+        self.text_page = QWidget()
+        text_layout = QVBoxLayout(self.text_page)
+        text_layout.setContentsMargins(0, 0, 0, 0)
+        text_layout.setSpacing(0)
+        self.text_image = QLabel()
+        self.text_image.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.text_image.setStyleSheet("background:#000000;")
+        self.text_image.setMinimumHeight(180)
+        self.text_view = _PassiveText(self)
+        text_layout.addWidget(self.text_image, 2)
+        text_layout.addWidget(self.text_view, 3)
+        self.video_page = QWidget()
+        self.video_page.setStyleSheet("background:#000000;")
+        self.video_layout = QVBoxLayout(self.video_page)
+        self.video_layout.setContentsMargins(0, 0, 0, 0)
+        self.fallback = QLabel()
+        self.fallback.setWordWrap(True)
+        self.fallback.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.fallback.setStyleSheet("background:#000000; color:#FFFFFF; font-size:22px; padding:48px;")
+        self.fallback.mousePressEvent = lambda event: self.apply_key("click")  # type: ignore[method-assign]
+        self.text_image.mousePressEvent = lambda event: self.apply_key("click")  # type: ignore[method-assign]
+        self.stack = QStackedWidget()
+        self.stack.addWidget(self.frame)
+        self.stack.addWidget(self.text_page)
+        self.stack.addWidget(self.video_page)
+        self.stack.addWidget(self.fallback)
+        self.bar = QLabel()
+        self.bar.setObjectName("playerNotes")
+        self.bar.setWordWrap(True)
+        self.bar.setFixedHeight(56)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        layout.addWidget(self.stack, stretch=1)
+        layout.addWidget(self.bar)
+        if slideshow is None:
+            self.window.dwell.enter(self.index)
+        self.refresh()
+
+    def showEvent(self, event) -> None:
+        super().showEvent(event)
+        if not self._fullscreen_set:
+            self._fullscreen_set = True
+            self.showFullScreen()
+        self.setFocus()
+
+    def _count(self) -> int:
+        if self.slideshow is not None:
+            return len(self.slideshow.entries)
+        return len(self.window.presentation.slides)
+
+    def apply_key(self, key: str) -> None:
+        from officedisplay.player_nav import navigate_player
+
+        state = navigate_player(self.index, self._count(), self.blank, key)
+        if state["exit"]:
+            self.close()
+            return
+        if state["toggle_notes"]:
+            self.notes_visible = not self.notes_visible
+            if not self.blank:
+                self.bar.setVisible(self.notes_visible)
+            return
+        self.blank = state["blank"]
+        if state["run_click"] and self._run_click_action():
+            return
+        if state["run_click"]:
+            state = navigate_player(self.index, self._count(), self.blank, "next")
+            self.blank = state["blank"]
+        if self.slideshow is None and state["index"] != self.index:
+            self.window.dwell.enter(state["index"])
+        self.index = state["index"]
+        self.refresh()
+
+    def _run_click_action(self) -> bool:
+        if self.slideshow is not None or self.blank:
+            return False
         slide = self.window.presentation.slides[self.index]
-        # Klickbare Aktionen liegen in den Objekt-Eigenschaften.
         for obj in slide.objects:
             action = obj.props.get("action") or {}
             if action.get("type") == "goto":
                 self.index = max(0, min(len(self.window.presentation.slides) - 1, int(action.get("target") or 0)))
                 self.window.dwell.enter(self.index)
                 self.refresh()
-                return
+                return True
             if action.get("type") == "popup":
                 QMessageBox.information(self, "Info", str(action.get("text") or ""))
+                return True
+        return False
+
+    def refresh(self) -> None:
+        self._stop_media()
+        count = self._count()
+        if count <= 0:
+            return
+        self.index = max(0, min(self.index, count - 1))
+        if self.blank in {"black", "white"}:
+            self.frame.blank = self.blank
+            self.frame.image = None
+            self.stack.setCurrentWidget(self.frame)
+            self.bar.setVisible(False)
+            self.frame.update()
+            return
+        self.bar.setVisible(self.notes_visible)
+        note = ""
+        if self.slideshow is None:
+            from officedisplay.ui.render import render_thumb
+
+            slide = self.window.presentation.slides[self.index]
+            note = slide.notes or ""
+            width = max(1280, self.frame.width() or self.width() or 1280)
+            self.frame.blank = ""
+            self.frame.image = render_thumb(self.window.presentation, slide, width)
+            self.stack.setCurrentWidget(self.frame)
+            self.frame.update()
+        else:
+            entry = self.slideshow.entries[self.index]
+            note = entry.title or ""
+            if entry.text and entry.kind == "video":
+                note = entry.text
+            if entry.kind == "text":
+                self._show_text(entry)
+            elif entry.kind == "video":
+                self._show_video(entry)
+            else:
+                self._show_image(entry.path or "", entry.title)
+        self.bar.setText(f"{self.index + 1} / {count}    {note}".rstrip())
+
+    def _show_image(self, path: str, title: str) -> None:
+        image = QImage(path) if path else QImage()
+        if image.isNull():
+            self.fallback.setText(f"Bild nicht lesbar.\n{path or title}")
+            self.stack.setCurrentWidget(self.fallback)
+            return
+        self.frame.blank = ""
+        self.frame.image = image
+        self.stack.setCurrentWidget(self.frame)
+        self.frame.update()
+
+    def _show_text(self, entry) -> None:
+        image = QImage(entry.path) if entry.path else QImage()
+        if not image.isNull():
+            pixmap = QPixmap.fromImage(image).scaled(
+                1200,
+                420,
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
+            )
+            self.text_image.setPixmap(pixmap)
+            self.text_image.show()
+        else:
+            self.text_image.hide()
+        self.text_view.setPlainText(entry.text or entry.title or "")
+        self.stack.setCurrentWidget(self.text_page)
+
+    def _show_video(self, entry) -> None:
+        path = entry.path or ""
+        try:
+            from PySide6.QtMultimedia import QAudioOutput, QMediaPlayer
+            from PySide6.QtMultimediaWidgets import QVideoWidget
+        except Exception:
+            self._show_video_fallback(path)
+            return
+        try:
+            self._video = QVideoWidget(self.video_page)
+            self._video.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+            self._video.setStyleSheet("background:#000000;")
+            self.video_layout.addWidget(self._video)
+            self._player = QMediaPlayer(self)
+            self._audio = QAudioOutput(self)
+            self._audio.setVolume(1.0)
+            self._player.setAudioOutput(self._audio)
+            self._player.setVideoOutput(self._video)
+            self._video.installEventFilter(self)
+            self._player.errorOccurred.connect(lambda *_args, media=path: self._show_video_fallback(media))
+            self._player.setSource(QUrl.fromLocalFile(path))
+            if self._player is None or self._player.error() != QMediaPlayer.Error.NoError:
+                self._show_video_fallback(path)
                 return
-        self.go(1)
+            self.stack.setCurrentWidget(self.video_page)
+            self._player.play()
+        except Exception:
+            self._show_video_fallback(path)
+
+    def eventFilter(self, watched, event) -> bool:
+        if watched is self._video and event.type() == QEvent.Type.MouseButtonPress:
+            if event.button() == Qt.MouseButton.LeftButton:
+                self.apply_key("click")
+            return True
+        if watched is self._video and event.type() == QEvent.Type.KeyPress:
+            self.keyPressEvent(event)
+            return True
+        return super().eventFilter(watched, event)
+
+    def _show_video_fallback(self, path: str) -> None:
+        if getattr(self, "_in_fallback", False):
+            return
+        self._in_fallback = True
+        try:
+            self._stop_media()
+            self.fallback.setText(
+                "Qt Multimedia kann dieses Format nicht abspielen.\n"
+                f"{path}\n"
+                "Die Datei bleibt als Pfad sichtbar."
+            )
+            self.stack.setCurrentWidget(self.fallback)
+        finally:
+            self._in_fallback = False
+
+    def _stop_media(self) -> None:
+        if self._player is not None:
+            self._player.stop()
+            try:
+                self._player.setSource(QUrl())
+            except Exception:
+                pass
+            self._player.deleteLater()
+            self._player = None
+        if self._audio is not None:
+            self._audio.deleteLater()
+            self._audio = None
+        if self._video is not None:
+            self.video_layout.removeWidget(self._video)
+            self._video.hide()
+            self._video.deleteLater()
+            self._video = None
+
+    def keyPressEvent(self, event) -> None:
+        mapping = {
+            Qt.Key.Key_Right: "right",
+            Qt.Key.Key_Left: "left",
+            Qt.Key.Key_Space: "space",
+            Qt.Key.Key_PageDown: "pagedown",
+            Qt.Key.Key_PageUp: "pageup",
+            Qt.Key.Key_Home: "home",
+            Qt.Key.Key_End: "end",
+            Qt.Key.Key_Escape: "escape",
+            Qt.Key.Key_N: "n",
+            Qt.Key.Key_B: "b",
+            Qt.Key.Key_W: "w",
+            Qt.Key.Key_Period: "period",
+        }
+        command = mapping.get(event.key())
+        if command is None and event.text() == ".":
+            command = "period"
+        if command is None:
+            super().keyPressEvent(event)
+            return
+        self.apply_key(command)
+
+    def mousePressEvent(self, event) -> None:
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.apply_key("click")
+            return
+        super().mousePressEvent(event)
 
     def closeEvent(self, event) -> None:
-        self.window.dwell.leave()
+        self._stop_media()
+        if self.slideshow is None:
+            self.window.dwell.leave()
         super().closeEvent(event)
 
 

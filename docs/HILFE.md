@@ -10,14 +10,14 @@ Standard ist offline. Die Statuszeile zeigt „Offline · kein Tracking“, sola
 
 - Mitte: die aktuelle Folie.
 - Rechts: Miniaturen. Ein Klick lädt die Folie. Darunter die Folienaktionen.
-- Oben: Werkzeuge, Schrift, Fett, Kursiv, Unterstrichen, Farbe, Thema, Touch-Modus, Stiftstärke, Druckkurve, Glättung.
+- Oben: Leisten Auswahl, Text, Grafik/Foto, Video und Player. Menü Ansicht schaltet Text, Grafik/Foto, Video und Player ein und aus. Der Zustand bleibt in den Programmeinstellungen. Auswahl und Folienaktionen bleiben sichtbar.
 - Unten: Zeigerart (Maus, Stift, Radierer, Touch).
 
 Themen: hell, dunkel, farbe, graustufen.
 
 ## Objekte
 
-Werkzeuge: Auswahl, Text, Rechteck, Ellipse, Rahmen, Pfeil, Stern, Linie, Stift, Marker, Radierer, Diagramm, Verschieben. Zusätzlich Bild, Video und 3D.
+Werkzeuge: Auswahl, Text, Rechteck, Ellipse, Rahmen, Pfeil, Stern, Linie, Stift, Marker, Radierer, Diagramm, Verschieben. Zusätzlich Bild, Video, Kamera und 3D. Die Textleiste setzt Schrift, Größe, Fett, Kursiv, Unterstrichen, Farbe und Ausrichtung. Die Grafikleiste trägt Formen, Stift, Stärke, Druck, Glättung, Bild und Filter. Die Videoleiste fügt ein Video ein oder öffnet die Kamera. Die Playerleiste startet Präsentieren, Slideshow, Leinwand, Morph und den Eingangseffekt.
 
 Text doppelklicken und tippen. Schriftart, Größe, Fett, Kursiv, Unterstrichen und Farbe gelten für den gewählten Text. Ist die Marke gesperrt, bleiben nur die erlaubten Schriften und Farben.
 
@@ -27,7 +27,9 @@ Objekt auf eine andere Folie: das Objekt mit Umschalt gedrückt auf eine Miniatu
 
 Bilder, Videos, Texte, PDF, CSV, PPTX und ODP können aus dem Dateidialog oder per Drag-and-drop auf die Folie. Lange Texte werden zu Folien, kurze zu einem Textfeld. CSV und Excel werden zu einem Diagramm.
 
-Hintergründe: volle Fläche als Farbe, Verlauf oder Bild. Die Anpassung ist cover, contain oder kacheln, dazu Deckkraft.
+Hintergründe: volle Fläche als Farbe, Verlauf oder Bild. Die Anpassung ist cover, contain oder kacheln. „Gestalten → Deckkraft Hintergrund“ setzt die Deckkraft des Hintergrundbilds in Prozent. 100 ist deckend, 0 ist durchsichtig; darunter bleibt die Folienfarbe. Miniatur und Player nutzen denselben Wert `background.opacity`.
+
+Rechtsklick auf Rechteck, Ellipse, Rahmen, Pfeil, Stern, Linie oder Fläche öffnet ein Menü: Füllfarbe ändern, Linienfarbe ändern, Bild laden, als Folienhintergrund übernehmen. Das Bild füllt die Form. Als Hintergrund übernimmt es die aktuelle Deckkraft. Die Auswahl bleibt bestehen. Linksklick verschiebt und wählt wie bisher.
 
 Das Diagramm-Werkzeug setzt beschriftete Beispielwerte `[3, 5, 4]`. Die Reihe ist als Platzhalter benannt und ersetzt die Quelle nicht. „KI → Text zu Folien“ und der Befehl „diagramm“ übernehmen nur Zahlen, die im Text stehen.
 
@@ -47,6 +49,7 @@ Ohne angeschlossenes Tablett bleibt alles mit der Maus bedienbar.
 - Speichern: `.odisp` (Zip mit `presentation.json` und Medien).
 - Export PPTX und ODP über das Menü Datei.
 - Öffnen liest `.odisp`, `.pptx` und `.odp`.
+- Slideshow: Datei → Slideshow öffnen, speichern, aus Dateien anlegen, als Präsentation exportieren. Das Paket ist `.oshow` (Zip mit `slideshow.json` und Medien). Einträge sind Bild, Video oder Text (TXT, MD, PDF). Der Export `.odisp` macht aus jedem Eintrag eine Folie. Öffnen einer `.odisp` oder `.pptx` legt je Folie einen Eintrag an, als Text mit erstem Bild, als Video oder als gerenderte Vorschau.
 - Tabelle verbinden liest XLSX oder CSV und merkt sich den Dateipfad. Daten aktualisieren liest neu.
 
 ## Lokale Gestaltung
@@ -85,7 +88,8 @@ Vorlagen: Pitch, Unterricht, Kennzahlen, Zitat, Vergleich, Team, Titel. Größe 
 - 3D rendert Würfel, Pyramide oder eine OBJ-Datei und legt das Bild auf die Folie.
 - Fotofilter: aufhellen, Graustufen, weichzeichnen, schärfen, spiegeln, Eckfarbe freistellen.
 - Makro: eine lokale `.py` mit `def run(api)`. Vor dem Lauf kommt eine Rückfrage. `macros/beispiel.py` zeigt die Form.
-- Präsentieren zeigt die Folie groß, Notizen darunter, Klick blättert. Objekte können eine Aktion „gehe zu Folie“ oder „Hinweis“ tragen.
+- Präsentieren (Menü Präsentieren oder F5) öffnet den Vollbild-Player. Die Folie füllt den Schirm. Weiter: Klick, Pfeil rechts, Leertaste, Bild ab. Zurück: Pfeil links, Bild auf. Pos1 erste Folie, Ende letzte, Escape beendet. B oder Punkt legt eine schwarze Blende, W eine weiße; dieselbe Taste hebt sie auf. N blendet die schmale Leiste mit Foliennummer und Sprechernotiz ein und aus. Klick-Aktionen „gehe zu Folie“ und „Hinweis“ laufen nur ohne Blende.
+- Slideshow abspielen nutzt denselben Player. Bilder liegen seitenfüllend im schwarzen Rand (contain). Video spielt, wenn Qt Multimedia das Format kann, sonst stehen Pfad und Hinweis. Text ist scrollbar.
 - Leinwand zoomt alle Folien. Ein Klick öffnet die gewählte Folie.
 - Morph-Vorschau bewegt gleich benannte Objekte zur nächsten Folie. Eingangseffekte sind Einblenden, Einfliegen und Zoom.
 - Kamera-Einblendung nutzt ein lokales Aufnahmegerät, wenn Qt eines findet. Sonst erscheint der Hinweis, dass keine Kamera da ist. Einen Videochat gibt es nicht.
@@ -97,4 +101,5 @@ Vorlagen: Pitch, Unterricht, Kennzahlen, Zitat, Vergleich, Team, Titel. Größe 
 - Strg+N neu, Strg+O öffnen, Strg+S speichern
 - Strg+Z rückgängig, Strg+Y wiederholen
 - Strg+G gruppieren, Strg+Umschalt+G lösen, Strg+D duplizieren, Entf löschen
-- F1 Hilfe
+- F1 Hilfe, F5 Präsentieren
+- Im Player: Pfeile, Leertaste, Bild auf/ab, Pos1, Ende, Escape, B, Punkt, W, N

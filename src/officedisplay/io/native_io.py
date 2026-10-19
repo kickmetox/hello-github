@@ -31,7 +31,7 @@ def save_odisp(presentation: Presentation, path: str | Path) -> None:
 def _collect(objects, media: list[str]) -> None:
     for obj in objects:
         props = obj.get("props") or {}
-        for key in ("path", "render_path"):
+        for key in ("path", "render_path", "image"):
             if props.get(key):
                 media.append(props[key])
         _collect(obj.get("children") or [], media)
@@ -76,7 +76,7 @@ def referenced_files(presentation: Presentation) -> list[str]:
         if slide.background.image:
             files.append(slide.background.image)
         for obj in iter_objects(slide):
-            for key in ("path", "render_path"):
+            for key in ("path", "render_path", "image"):
                 if obj.props.get(key):
                     files.append(obj.props[key])
     return files

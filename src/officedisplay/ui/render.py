@@ -4,7 +4,7 @@ import math
 from pathlib import Path
 
 from PySide6.QtCore import QPointF, QRectF, Qt
-from PySide6.QtGui import QColor, QFont, QImage, QLinearGradient, QPainter, QPen, QPolygonF, QBrush
+from PySide6.QtGui import QBrush, QColor, QFont, QImage, QLinearGradient, QPainter, QPainterPath, QPen, QPolygonF
 
 from officedisplay.input.pointer import stroke_width
 
@@ -41,7 +41,10 @@ def render_thumb(presentation, slide, width: int = 220):
 
 def _background(painter: QPainter, slide, rect: QRectF) -> None:
     bg = slide.background
-    painter.setOpacity(max(0.05, min(bg.opacity, 1)))
+    opacity = max(0.0, min(float(bg.opacity), 1.0))
+    has_image = bool(bg.image) and Path(bg.image).is_file()
+    painter.save()
+    painter.setOpacity(1.0 if has_image else max(0.05, min(opacity, 1.0)))
     if bg.mode == "gradient":
         angle = math.radians(bg.angle)
         center = rect.center()
@@ -54,11 +57,12 @@ def _background(painter: QPainter, slide, rect: QRectF) -> None:
         painter.fillRect(rect, gradient)
     else:
         painter.fillRect(rect, qcolor(bg.color, "#FFFFFF"))
-    if bg.image and Path(bg.image).is_file():
+    if has_image:
         image = _image(bg.image)
         if image is not None:
+            painter.setOpacity(opacity)
             _draw_fit(painter, image, rect, bg.fit, bg.offset_x, bg.offset_y)
-    painter.setOpacity(1)
+    painter.restore()
 
 
 def _draw_fit(painter, image: QImage, rect: QRectF, fit: str, ox: float, oy: float) -> None:
@@ -152,12 +156,49 @@ def _text(painter: QPainter, obj, box: QRectF, scale: float = 1.0) -> None:
     painter.drawText(box, align | Qt.AlignmentFlag.AlignTop | Qt.TextFlag.TextWordWrap, str(obj.props.get("text") or ""))
 
 
+def _shape_clip(kind: str, box: QRectF) -> QPainterPath:
+    path = QPainterPath()
+    if kind == "ellipse":
+        path.addEllipse(box)
+    elif kind == "roundrect":
+        path.addRoundedRect(box, 16, 16)
+    elif kind == "triangle":
+        path.addPolygon(QPolygonF([box.center() + QPointF(0, -box.height() / 2), box.bottomRight(), box.bottomLeft()]))
+    elif kind == "diamond":
+        path.addPolygon(
+            QPolygonF(
+                [
+                    QPointF(box.center().x(), box.top()),
+                    QPointF(box.right(), box.center().y()),
+                    QPointF(box.center().x(), box.bottom()),
+                    QPointF(box.left(), box.center().y()),
+                ]
+            )
+        )
+    elif kind == "star":
+        path.addPolygon(_star(box))
+    else:
+        path.addRect(box)
+    return path
+
+
 def _shape(painter: QPainter, obj, box: QRectF) -> None:
-    painter.setBrush(QBrush(qcolor(obj.props.get("fill"), "#0B63E5")))
+    kind = obj.props.get("shape") or "rect"
+    image = _image(obj.props.get("image"))
+    if image is not None and kind != "line":
+        painter.save()
+        painter.setClipPath(_shape_clip(kind, box))
+        painter.drawImage(box, image)
+        painter.restore()
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+    elif image is not None and kind == "line":
+        painter.drawImage(box, image)
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+    else:
+        painter.setBrush(QBrush(qcolor(obj.props.get("fill"), "#0B63E5")))
     stroke = obj.props.get("stroke") or "#00000000"
     width = int(obj.props.get("stroke_width") or 0)
     painter.setPen(QPen(qcolor(stroke), width) if width else Qt.PenStyle.NoPen)
-    kind = obj.props.get("shape") or "rect"
     if kind == "ellipse":
         painter.drawEllipse(box)
     elif kind == "roundrect":

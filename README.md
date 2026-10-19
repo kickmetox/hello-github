@@ -10,7 +10,7 @@ Der Programmordner ist das Repository, also das Verzeichnis dieser Datei. Auf di
 
 ## Kurzbeschreibung
 
-Eine Folie liegt in der Mitte. Rechts stehen die Miniaturen der angelegten Folien; ein Klick lädt die Folie in den Editor. Texte, Bilder, Formen, Stiftstriche, Diagramme und Videos bleiben Objekte und lassen sich auswählen, verschieben, skalieren und gruppieren. Eine Auswahl mit Umschalt auf eine Miniatur ziehen legt das Objekt auf diese Folie.
+Eine Folie liegt in der Mitte. Rechts stehen die Miniaturen der angelegten Folien; ein Klick lädt die Folie in den Editor. Präsentieren startet den Vollbild-Player; Bilder, Videos und Texte lassen sich zusätzlich als Slideshow (`.oshow`) abspielen. Texte, Bilder, Formen, Stiftstriche, Diagramme und Videos bleiben Objekte und lassen sich auswählen, verschieben, skalieren und gruppieren. Eine Auswahl mit Umschalt auf eine Miniatur ziehen legt das Objekt auf diese Folie.
 
 Stift, Grafiktablett und Touch sind eigene Zeiger. Der Stift zeichnet mit Druck, die Radiererseite radiert, Touch verschiebt oder zeichnet je nach Schalter. Ohne Tablett bleibt die Maus bedienbar.
 

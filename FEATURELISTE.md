@@ -5,8 +5,10 @@ Stand der Umsetzung in diesem Programmordner. Standard ist lokal, ohne Tracking.
 ## Editor
 
 - Werkzeuge: Auswahl, Text, Formen, Stift, Marker, Radierer, Diagramm, Bild, Video, 3D.
+- Vier Leisten über Menü Ansicht: Text (Schrift, Größe, Fett, Kursiv, Unterstrichen, Farbe, Ausrichtung), Grafik/Foto (Formen, Stift, Marker, Radierer, Stärke, Druck, Glättung, Bild, Filter), Video (Video, Kamera), Player (Präsentieren, Slideshow, Leinwand, Morph, Eingangseffekt). Sichtbarkeit liegt in QSettings. Auswahl und Folienaktionen bleiben erreichbar.
+- Rechtsklick auf Formen: Füllfarbe, Linienfarbe, Bild in die Form, Formbild als Folienhintergrund mit der aktuellen Deckkraft. Die Auswahl bleibt.
 - Text: Schriftfamilie, Größe, fett, kursiv, unterstrichen, Farbe, Ausrichtung. Markensperre begrenzt Schrift und Farbe.
-- Hintergründe: Farbe, Verlauf, Bild, volle Fläche, Deckkraft, cover, contain, kacheln.
+- Hintergründe: Farbe, Verlauf, Bild, volle Fläche, Deckkraft in Prozent (`background.opacity`), cover, contain, kacheln. Die Bilddeckkraft ist in der Miniatur und im Player sichtbar.
 - Rechts die Folienminiaturen. Ein Klick lädt die Folie. Objekte lassen sich per Ziehen oder Menü auf eine andere Folie legen.
 - Gruppieren und Gruppierung aufheben. Drag-and-drop von Bild, Video, Text und Dateien auf die Fläche.
 - Themen: hell, dunkel, farbe, graustufen.
@@ -28,7 +30,9 @@ Stand der Umsetzung in diesem Programmordner. Standard ist lokal, ohne Tracking.
 - Excel und CSV: lokale Datei an ein Diagramm binden und erneut einlesen (openpyxl).
 - TXT, Markdown und PDF (pypdf) werden nur aus dem Quelltext in Folien zerlegt. Die Notiz nennt die Quelle. Es werden keine Fakten ergänzt.
 - Makros: bestätigte Python-Dateien aus `macros/` mit `def run(api)` und einer kleinen API.
-- Kommentare, Folienstatus und Verweildauer liegen in der Datei bzw. in einer lokalen JSON. Präsentationsmodus zeigt Folie und Notiz.
+- Kommentare, Folienstatus und Verweildauer liegen in der Datei bzw. in einer lokalen JSON.
+- Präsentationsplayer: Vollbild, Folie füllt den Schirm. Weiter und Zurück über Klick, Pfeile, Leertaste, Bild auf/ab, Pos1 und Ende. Escape beendet. Schwarze Blende mit B oder Punkt, weiße mit W. Leiste mit Foliennummer und Sprechernotiz, Taste N. Klickaktionen laufen, solange keine Blende liegt.
+- Slideshow (`.oshow`): geordnete Einträge Bild, Video, Text. Speichern und Laden als Zip. Export nach `.odisp` mit einer Folie je Eintrag. Import aus `.odisp` und `.pptx`. Derselbe Player, Bilder mit contain und schwarzem Rand, Video über Qt Multimedia oder Pfadhinweis, Text scrollbar.
 - Ordner-Sync schreibt `deck.json` und liest sie bei geänderter Zeit neu. Das ist ein lokaler Dateiabgleich, kein Server und kein Videochat.
 - Kamera: Qt Multimedia, wenn ein Gerät da ist. Sonst eine Meldung, dass keine Kamera und kein Cloud-Videochat vorhanden sind.
 
