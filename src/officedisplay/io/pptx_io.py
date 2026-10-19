@@ -151,6 +151,7 @@ def import_pptx(path: str | Path, media_dir: str | Path | None = None) -> Presen
             shapes = list(page.shapes)
         except Exception:
             shapes = []
+        shapes.extend(_alternate_shapes(getattr(page, "shapes", None)))
         for shape in shapes:
             _take_shape(shape, slide, slide_w, slide_h, media)
         presentation.slides.append(slide)
@@ -159,7 +160,7 @@ def import_pptx(path: str | Path, media_dir: str | Path | None = None) -> Presen
     return presentation
 
 
-def _take_shape(shape, slide: Slide, slide_w: float, slide_h: float, media: dict) -> None:
+def _take_shape(shape, slide: Slide, slide_w: float, slide_h: float, media: dict, transforms=()) -> None:
     """Eine Form übernehmen. Unbekannte oder defekte Formen werden übersprungen."""
     from pptx.enum.shapes import MSO_SHAPE_TYPE
 
@@ -171,11 +172,14 @@ def _take_shape(shape, slide: Slide, slide_w: float, slide_h: float, media: dict
         try:
             children = list(shape.shapes)
         except Exception:
-            return
+            children = []
+        children.extend(_alternate_shapes(getattr(shape, "shapes", None)))
+        frame = _group_frame(shape)
+        nested = transforms + (frame,) if frame is not None else transforms
         for child in children:
-            _take_shape(child, slide, slide_w, slide_h, media)
+            _take_shape(child, slide, slide_w, slide_h, media, nested)
         return
-    box = _box(shape, slide_w, slide_h)
+    box = _box(shape, slide_w, slide_h, transforms)
     if kind == MSO_SHAPE_TYPE.PICTURE:
         if box is not None:
             _take_picture(shape, slide, box, media)
@@ -185,10 +189,18 @@ def _take_shape(shape, slide: Slide, slide_w: float, slide_h: float, media: dict
             _take_table(shape, slide, box)
         return
     text = _shape_text(shape)
-    if kind in {MSO_SHAPE_TYPE.TEXT_BOX, MSO_SHAPE_TYPE.PLACEHOLDER}:
+    if kind == MSO_SHAPE_TYPE.TEXT_BOX:
         if text and box is not None:
             slide.objects.append(_text_object(shape, box, text))
-        elif box is not None and kind == MSO_SHAPE_TYPE.PLACEHOLDER:
+        return
+    if kind == MSO_SHAPE_TYPE.PLACEHOLDER or getattr(shape, "is_placeholder", False):
+        # PowerPoint lässt die Maße oft weg. python-pptx liefert dann None,
+        # der Text steht aber im Platzhalter. Ohne Kasten bleibt die Folie leer.
+        if box is None and text:
+            box = _placeholder_fallback(shape)
+        if text and box is not None:
+            slide.objects.append(_text_object(shape, box, text))
+        elif box is not None:
             _take_picture(shape, slide, box, media)
         return
     if kind in {MSO_SHAPE_TYPE.AUTO_SHAPE, MSO_SHAPE_TYPE.FREEFORM, MSO_SHAPE_TYPE.LINE}:
@@ -203,7 +215,7 @@ def _take_shape(shape, slide: Slide, slide_w: float, slide_h: float, media: dict
         slide.objects.append(_text_object(shape, box, text))
 
 
-def _box(shape, slide_w: float, slide_h: float):
+def _box(shape, slide_w: float, slide_h: float, transforms=()):
     try:
         left, top, width, height = shape.left, shape.top, shape.width, shape.height
     except Exception:
@@ -212,12 +224,106 @@ def _box(shape, slide_w: float, slide_h: float):
         return None
     if slide_w <= 0 or slide_h <= 0:
         return None
+    x, y, w, h = float(left), float(top), float(width), float(height)
+    for off_x, off_y, ch_x, ch_y, scale_x, scale_y in reversed(tuple(transforms)):
+        x = off_x + (x - ch_x) * scale_x
+        y = off_y + (y - ch_y) * scale_y
+        w = abs(w * scale_x)
+        h = abs(h * scale_y)
     return (
-        float(left) / slide_w,
-        float(top) / slide_h,
-        max(0.01, float(width) / slide_w),
-        max(0.01, float(height) / slide_h),
+        x / slide_w,
+        y / slide_h,
+        max(0.01, w / slide_w),
+        max(0.01, h / slide_h),
     )
+
+
+def _group_frame(shape):
+    """Gruppenkinder stehen im lokalen chOff/chExt-Raum, nicht in Folien-EMUs."""
+    element = getattr(shape, "_element", None)
+    xfrm = getattr(element, "xfrm", None) if element is not None else None
+    if xfrm is None:
+        props = getattr(element, "grpSpPr", None)
+        xfrm = getattr(props, "xfrm", None) if props is not None else None
+    if xfrm is None:
+        return None
+
+    def num(value) -> float:
+        if value is None:
+            return 0.0
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return 0.0
+
+    off_x, off_y = num(getattr(xfrm, "x", None)), num(getattr(xfrm, "y", None))
+    ext_cx, ext_cy = num(getattr(xfrm, "cx", None)), num(getattr(xfrm, "cy", None))
+    ch_off, ch_ext = getattr(xfrm, "chOff", None), getattr(xfrm, "chExt", None)
+    ch_x = num(getattr(ch_off, "x", None)) if ch_off is not None else 0.0
+    ch_y = num(getattr(ch_off, "y", None)) if ch_off is not None else 0.0
+    ch_cx = num(getattr(ch_ext, "cx", None)) if ch_ext is not None else 0.0
+    ch_cy = num(getattr(ch_ext, "cy", None)) if ch_ext is not None else 0.0
+    if ext_cx <= 0 or ext_cy <= 0 or ch_cx <= 0 or ch_cy <= 0:
+        return None
+    return (off_x, off_y, ch_x, ch_y, ext_cx / ch_cx, ext_cy / ch_cy)
+
+
+def _placeholder_fallback(shape) -> tuple[float, float, float, float]:
+    ph_type = None
+    index = 0
+    try:
+        fmt = shape.placeholder_format
+        ph_type = fmt.type
+        index = int(getattr(fmt, "idx", 0) or 0)
+    except Exception:
+        ph_type = None
+    try:
+        from pptx.enum.shapes import PP_PLACEHOLDER
+
+        if ph_type in {PP_PLACEHOLDER.TITLE, PP_PLACEHOLDER.CENTER_TITLE, PP_PLACEHOLDER.VERTICAL_TITLE}:
+            return (0.06, 0.12, 0.88, 0.22)
+        if ph_type == PP_PLACEHOLDER.SUBTITLE:
+            return (0.08, 0.38, 0.84, 0.16)
+    except Exception:
+        pass
+    return (0.08, min(0.72, 0.36 + max(0, index - 1) * 0.06), 0.84, 0.46)
+
+
+def _alternate_shapes(collection) -> list:
+    """python-pptx überspringt AlternateContent. Fallback-Formen trotzdem lesen."""
+    if collection is None:
+        return []
+    try:
+        from pptx.oxml.ns import qn
+
+        tree = collection._spTree
+        factory = collection._shape_factory
+        alternate = qn("ve:AlternateContent")
+        fallback = qn("ve:Fallback")
+        choice = qn("ve:Choice")
+        tags = {qn("p:sp"), qn("p:grpSp"), qn("p:graphicFrame"), qn("p:cxnSp"), qn("p:pic")}
+        found = []
+        for child in list(tree):
+            if child.tag != alternate:
+                continue
+            holder = None
+            for name in (fallback, choice):
+                candidate = child.find(name)
+                if candidate is not None and any(element.tag in tags for element in candidate):
+                    holder = candidate
+                    break
+            if holder is None:
+                continue
+            for element in holder:
+                if element.tag not in tags:
+                    continue
+                try:
+                    found.append(factory(element))
+                except Exception:
+                    continue
+        return found
+    except Exception:
+        return []
 
 
 def _shape_text(shape) -> str:
@@ -311,12 +417,14 @@ def _take_picture(shape, slide: Slide, box, media: dict) -> None:
         blob = image.blob
         ext = image.ext or "png"
     except Exception:
+        _picture_stand_in(shape, slide, box)
         return
     folder = _media_folder(media)
     file_path = folder / f"{new_id()}.{ext}"
     try:
         file_path.write_bytes(blob)
     except OSError:
+        _picture_stand_in(shape, slide, box)
         return
     x, y, w, h = box
     slide.objects.append(
@@ -329,6 +437,23 @@ def _take_picture(shape, slide: Slide, box, media: dict) -> None:
             h=h,
             name=getattr(shape, "name", "") or "",
             props={"path": str(file_path)},
+        )
+    )
+
+
+def _picture_stand_in(shape, slide: Slide, box) -> None:
+    """Bild ohne Blob bleibt als Fläche sichtbar, die Folie wird nicht leer."""
+    x, y, w, h = box
+    slide.objects.append(
+        SlideObject(
+            id=new_id(),
+            kind="shape",
+            x=x,
+            y=y,
+            w=w,
+            h=h,
+            name=getattr(shape, "name", "") or "bild",
+            props={"shape": "rect", "fill": "#E8EEF8", "stroke": "#0B63E5", "stroke_width": 2},
         )
     )
 

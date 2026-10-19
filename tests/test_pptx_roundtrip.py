@@ -201,6 +201,137 @@ class OpenPptxTest(unittest.TestCase):
             ui.show_text = original
             window.close()
 
+    def test_title_placeholder_reaches_editor(self):
+        from pptx import Presentation
+        from pptx.enum.shapes import MSO_SHAPE
+        from pptx.util import Inches
+
+        from officedisplay.io.pptx_io import import_pptx
+        from officedisplay.ui.main_window import MainWindow
+        from officedisplay.ui.render import render_thumb
+
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            package = Presentation()
+            slide = package.slides.add_slide(package.slide_layouts[1])
+            slide.shapes.title.text = "Titelplatzhalter Nord"
+            frame = slide.placeholders[1].text_frame
+            frame.text = "Erster Punkt"
+            frame.add_paragraph().text = "Zweiter Punkt"
+            slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(6.2), Inches(4.5), Inches(2.2), Inches(1.2))
+            path = root / "titel.pptx"
+            package.save(path)
+            loaded = import_pptx(path)
+            texts = [obj.props.get("text", "") for slide in loaded.slides for obj in slide.objects if obj.kind == "text"]
+            self.assertTrue(any("Titelplatzhalter Nord" in text for text in texts))
+            self.assertTrue(any(obj.kind == "shape" for slide in loaded.slides for obj in slide.objects))
+
+            bare = Presentation()
+            drawing = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
+
+            def strip(shapes):
+                for shape in shapes:
+                    props = getattr(shape._element, "spPr", None)
+                    if props is None:
+                        continue
+                    transform = props.find(f"{drawing}xfrm")
+                    if transform is not None:
+                        props.remove(transform)
+
+            strip(bare.slide_master.shapes)
+            for layout in bare.slide_layouts:
+                strip(layout.shapes)
+            empty = bare.slides.add_slide(bare.slide_layouts[1])
+            empty.shapes.title.text = "Titel ohne Mass"
+            empty.placeholders[1].text = "Punkt ohne Mass"
+            bare_path = root / "ohne_mass.pptx"
+            bare.save(bare_path)
+            inherited = import_pptx(bare_path)
+            blob = " ".join(obj.props.get("text", "") for slide in inherited.slides for obj in slide.objects)
+            self.assertIn("Titel ohne Mass", blob)
+            self.assertIn("Punkt ohne Mass", blob)
+            self.assertTrue(all(0 <= obj.x <= 1 and obj.w >= 0.1 for slide in inherited.slides for obj in slide.objects))
+
+            window = MainWindow()
+            try:
+                window.load_path(path)
+                self.assertEqual(window.canvas.slide_index, 0)
+                self.assertGreaterEqual(len(window.presentation.slides), 1)
+                self.assertGreaterEqual(window.strip.count(), 1)
+                current = window.presentation.slides[window.canvas.slide_index]
+                self.assertTrue(any("Titelplatzhalter Nord" in str(obj.props.get("text") or "") for obj in current.objects))
+                thumb = render_thumb(window.presentation, current, 320)
+                ink = 0
+                for y in range(0, thumb.height(), 2):
+                    for x in range(0, thumb.width(), 2):
+                        color = thumb.pixelColor(x, y)
+                        if color.red() < 240 or color.green() < 240 or color.blue() < 240:
+                            ink += 1
+                self.assertGreater(ink, 30)
+            finally:
+                window.close()
+
+    def test_group_children_use_slide_space(self):
+        from pptx import Presentation
+        from pptx.oxml import parse_xml
+        from pptx.oxml.ns import nsdecls
+
+        from officedisplay.io.pptx_io import import_pptx
+
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            package = Presentation()
+            package.slides.add_slide(package.slide_layouts[6])
+            target = root / "gruppe.pptx"
+            package.save(target)
+            package = Presentation(str(target))
+            xml = f'''
+            <p:grpSp {nsdecls("a", "p", "r")}>
+              <p:nvGrpSpPr>
+                <p:cNvPr id="20" name="Gruppe"/>
+                <p:cNvGrpSpPr/>
+                <p:nvPr/>
+              </p:nvGrpSpPr>
+              <p:grpSpPr>
+                <a:xfrm>
+                  <a:off x="914400" y="685800"/>
+                  <a:ext cx="6400800" cy="4114800"/>
+                  <a:chOff x="0" y="0"/>
+                  <a:chExt cx="100000" cy="100000"/>
+                </a:xfrm>
+              </p:grpSpPr>
+              <p:sp>
+                <p:nvSpPr>
+                  <p:cNvPr id="21" name="Titel in Gruppe"/>
+                  <p:cNvSpPr txBox="1"/>
+                  <p:nvPr/>
+                </p:nvSpPr>
+                <p:spPr>
+                  <a:xfrm>
+                    <a:off x="5000" y="8000"/>
+                    <a:ext cx="80000" cy="20000"/>
+                  </a:xfrm>
+                  <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+                </p:spPr>
+                <p:txBody>
+                  <a:bodyPr/>
+                  <a:lstStyle/>
+                  <a:p><a:r><a:t>Gruppentitel Sichtbar</a:t></a:r></a:p>
+                </p:txBody>
+              </p:sp>
+            </p:grpSp>
+            '''
+            package.slides[0].shapes._spTree.append(parse_xml(xml))
+            package.save(target)
+            loaded = import_pptx(target)
+            texts = [obj for slide in loaded.slides for obj in slide.objects if obj.kind == "text"]
+            self.assertTrue(texts)
+            title = next(obj for obj in texts if "Gruppentitel" in str(obj.props.get("text") or ""))
+            self.assertGreater(title.w, 0.2)
+            self.assertGreater(title.h, 0.05)
+            self.assertLess(title.x, 1)
+            self.assertGreater(title.x, 0.02)
+
 
 class ToolbarStartTest(unittest.TestCase):
     @classmethod
