@@ -10,7 +10,7 @@ Standard ist offline. Die Statuszeile zeigt „Offline · kein Tracking“, sola
 
 - Mitte: die aktuelle Folie.
 - Rechts: Miniaturen. Ein Klick lädt die Folie. Darunter die Folienaktionen.
-- Oben: Leisten Auswahl, Text, Grafik/Foto, Video und Player. Menü Ansicht schaltet Text, Grafik/Foto, Video und Player ein und aus. Der Zustand bleibt in den Programmeinstellungen. Auswahl und Folienaktionen bleiben sichtbar.
+- Oben: Leisten Auswahl, Text, Grafik/Foto, Video und Player. Menü Ansicht schaltet jede Leiste ein und aus. „Alle Leisten anzeigen“ setzt sie alle an. Der Zustand bleibt in den Programmeinstellungen. Die Folienaktionen bleiben sichtbar.
 - Unten: Zeigerart (Maus, Stift, Radierer, Touch).
 
 Themen: hell, dunkel, farbe, graustufen.
@@ -48,7 +48,7 @@ Ohne angeschlossenes Tablett bleibt alles mit der Maus bedienbar.
 
 - Speichern: `.odisp` (Zip mit `presentation.json` und Medien).
 - Export PPTX und ODP über das Menü Datei.
-- Öffnen liest `.odisp`, `.pptx` und `.odp`.
+- Öffnen und Import PPTX lesen `.pptx` (auch neben `.odisp` und `.odp` im ersten Filter). Folien, Texte, Bilder und einfache Formen werden übernommen. Eine defekte Datei bleibt liegen; es erscheint eine Meldung, die Präsentation wird nicht geleert. Ziehen einer `.pptx` auf die Fläche hängt die Folien an.
 - Slideshow: Datei → Slideshow öffnen, speichern, aus Dateien anlegen, als Präsentation exportieren. Das Paket ist `.oshow` (Zip mit `slideshow.json` und Medien). Einträge sind Bild, Video oder Text (TXT, MD, PDF). Der Export `.odisp` macht aus jedem Eintrag eine Folie. Öffnen einer `.odisp` oder `.pptx` legt je Folie einen Eintrag an, als Text mit erstem Bild, als Video oder als gerenderte Vorschau.
 - Tabelle verbinden liest XLSX oder CSV und merkt sich den Dateipfad. Daten aktualisieren liest neu.
 

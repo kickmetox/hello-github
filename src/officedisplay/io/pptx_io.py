@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import tempfile
 from pathlib import Path
 
 from officedisplay.model.presentation import (
@@ -120,18 +121,25 @@ def _chart(page, obj, left, top, width, height) -> None:
     page.shapes.add_chart(chart_type, left, top, width, height, data)
 
 
+class PptxReadError(ValueError):
+    """Die Datei ist keine lesbare PowerPoint-Präsentation."""
+
+
 def import_pptx(path: str | Path, media_dir: str | Path | None = None) -> Presentation:
     from pptx import Presentation as PptxPresentation
-    from pptx.enum.shapes import MSO_SHAPE_TYPE
 
-    package = PptxPresentation(str(path))
-    width = max(1, int(package.slide_width / EMU_PER_PIXEL))
-    height = max(1, int(package.slide_height / EMU_PER_PIXEL))
-    presentation = Presentation(title=Path(path).stem, width=width, height=height)
+    source = Path(path)
+    try:
+        package = PptxPresentation(str(source))
+    except Exception as exc:
+        raise PptxReadError(f"Die PowerPoint-Datei lässt sich nicht laden: {source.name}") from exc
+    slide_w = float(package.slide_width or 12192000)
+    slide_h = float(package.slide_height or 6858000)
+    width = max(1, int(slide_w / EMU_PER_PIXEL))
+    height = max(1, int(slide_h / EMU_PER_PIXEL))
+    presentation = Presentation(title=source.stem, width=width, height=height)
     presentation.slides = []
-    folder = Path(media_dir) if media_dir else Path(path).with_suffix("") 
-    folder = Path(str(folder) + "_media")
-    folder.mkdir(parents=True, exist_ok=True)
+    media = {"folder": None, "hint": media_dir, "source": source}
     for index, page in enumerate(package.slides, start=1):
         slide = Slide(id=new_id(), name=f"Folie {index}", background=Background(color="#FFFFFF"))
         try:
@@ -139,42 +147,228 @@ def import_pptx(path: str | Path, media_dir: str | Path | None = None) -> Presen
             slide.notes = notes or ""
         except Exception:
             slide.notes = ""
-        for shape in page.shapes:
-            x = shape.left / package.slide_width
-            y = shape.top / package.slide_height
-            w = shape.width / package.slide_width
-            h = shape.height / package.slide_height
-            if shape.has_text_frame and shape.shape_type != MSO_SHAPE_TYPE.PICTURE:
-                text = "\n".join(paragraph.text for paragraph in shape.text_frame.paragraphs)
-                slide.objects.append(
-                    SlideObject(
-                        id=new_id(),
-                        kind="text",
-                        x=x,
-                        y=y,
-                        w=w,
-                        h=h,
-                        name=shape.name or "",
-                        props={"text": text, "font_size": 18, "color": "#1B1F2A", "font_family": "Calibri"},
-                    )
-                )
-            elif shape.shape_type == MSO_SHAPE_TYPE.PICTURE:
-                image = shape.image
-                file_path = folder / f"{new_id()}.{image.ext}"
-                file_path.write_bytes(image.blob)
-                slide.objects.append(
-                    SlideObject(
-                        id=new_id(),
-                        kind="image",
-                        x=x,
-                        y=y,
-                        w=w,
-                        h=h,
-                        name=shape.name or "",
-                        props={"path": str(file_path)},
-                    )
-                )
+        try:
+            shapes = list(page.shapes)
+        except Exception:
+            shapes = []
+        for shape in shapes:
+            _take_shape(shape, slide, slide_w, slide_h, media)
         presentation.slides.append(slide)
     if not presentation.slides:
         presentation.slides.append(Slide(id=new_id(), name="Folie 1"))
     return presentation
+
+
+def _take_shape(shape, slide: Slide, slide_w: float, slide_h: float, media: dict) -> None:
+    """Eine Form übernehmen. Unbekannte oder defekte Formen werden übersprungen."""
+    from pptx.enum.shapes import MSO_SHAPE_TYPE
+
+    try:
+        kind = shape.shape_type
+    except Exception:
+        return
+    if kind == MSO_SHAPE_TYPE.GROUP:
+        try:
+            children = list(shape.shapes)
+        except Exception:
+            return
+        for child in children:
+            _take_shape(child, slide, slide_w, slide_h, media)
+        return
+    box = _box(shape, slide_w, slide_h)
+    if kind == MSO_SHAPE_TYPE.PICTURE:
+        if box is not None:
+            _take_picture(shape, slide, box, media)
+        return
+    if getattr(shape, "has_table", False):
+        if box is not None:
+            _take_table(shape, slide, box)
+        return
+    text = _shape_text(shape)
+    if kind in {MSO_SHAPE_TYPE.TEXT_BOX, MSO_SHAPE_TYPE.PLACEHOLDER}:
+        if text and box is not None:
+            slide.objects.append(_text_object(shape, box, text))
+        elif box is not None and kind == MSO_SHAPE_TYPE.PLACEHOLDER:
+            _take_picture(shape, slide, box, media)
+        return
+    if kind in {MSO_SHAPE_TYPE.AUTO_SHAPE, MSO_SHAPE_TYPE.FREEFORM, MSO_SHAPE_TYPE.LINE}:
+        if box is None:
+            return
+        preset = "line" if kind == MSO_SHAPE_TYPE.LINE else _auto_kind(shape)
+        slide.objects.append(_shape_object(shape, box, preset))
+        if text:
+            slide.objects.append(_text_object(shape, box, text))
+        return
+    if text and box is not None:
+        slide.objects.append(_text_object(shape, box, text))
+
+
+def _box(shape, slide_w: float, slide_h: float):
+    try:
+        left, top, width, height = shape.left, shape.top, shape.width, shape.height
+    except Exception:
+        return None
+    if left is None or top is None or width is None or height is None:
+        return None
+    if slide_w <= 0 or slide_h <= 0:
+        return None
+    return (
+        float(left) / slide_w,
+        float(top) / slide_h,
+        max(0.01, float(width) / slide_w),
+        max(0.01, float(height) / slide_h),
+    )
+
+
+def _shape_text(shape) -> str:
+    try:
+        if not shape.has_text_frame:
+            return ""
+        return "\n".join(paragraph.text for paragraph in shape.text_frame.paragraphs).strip()
+    except Exception:
+        return ""
+
+
+def _font_size(shape) -> int:
+    try:
+        size = shape.text_frame.paragraphs[0].font.size
+        if size is not None:
+            return max(8, min(int(size.pt), 96))
+    except Exception:
+        pass
+    return 18
+
+
+def _text_object(shape, box, text: str) -> SlideObject:
+    x, y, w, h = box
+    return SlideObject(
+        id=new_id(),
+        kind="text",
+        x=x,
+        y=y,
+        w=w,
+        h=h,
+        name=getattr(shape, "name", "") or "",
+        props={"text": text, "font_size": _font_size(shape), "color": "#1B1F2A", "font_family": "Calibri"},
+    )
+
+
+def _auto_kind(shape) -> str:
+    try:
+        from pptx.enum.shapes import MSO_SHAPE
+
+        preset = shape.auto_shape_type
+    except Exception:
+        return "rect"
+    pairs = (
+        ("RECTANGLE", "rect"),
+        ("ROUNDED_RECTANGLE", "roundrect"),
+        ("OVAL", "ellipse"),
+        ("ISOSCELES_TRIANGLE", "triangle"),
+        ("DIAMOND", "diamond"),
+        ("RIGHT_ARROW", "arrow"),
+        ("STAR_5_POINT", "star"),
+        ("LINE_INVERSE", "line"),
+        ("STRAIGHT_CONNECTOR_1", "line"),
+    )
+    for enum_name, kind in pairs:
+        member = getattr(MSO_SHAPE, enum_name, None)
+        if member is not None and preset == member:
+            return kind
+    return "rect"
+
+
+def _fill_hex(shape) -> str:
+    try:
+        from pptx.enum.dml import MSO_FILL
+
+        fill = shape.fill
+        if fill.type != MSO_FILL.SOLID:
+            return "#0B63E5"
+        rgb = fill.fore_color.rgb
+        return "#{:02X}{:02X}{:02X}".format(int(rgb[0]), int(rgb[1]), int(rgb[2]))
+    except Exception:
+        return "#0B63E5"
+
+
+def _shape_object(shape, box, preset: str) -> SlideObject:
+    x, y, w, h = box
+    return SlideObject(
+        id=new_id(),
+        kind="shape",
+        x=x,
+        y=y,
+        w=w,
+        h=h,
+        name=getattr(shape, "name", "") or preset,
+        props={"shape": preset, "fill": _fill_hex(shape), "stroke": "#00000000", "stroke_width": 0},
+    )
+
+
+def _take_picture(shape, slide: Slide, box, media: dict) -> None:
+    try:
+        image = shape.image
+        blob = image.blob
+        ext = image.ext or "png"
+    except Exception:
+        return
+    folder = _media_folder(media)
+    file_path = folder / f"{new_id()}.{ext}"
+    try:
+        file_path.write_bytes(blob)
+    except OSError:
+        return
+    x, y, w, h = box
+    slide.objects.append(
+        SlideObject(
+            id=new_id(),
+            kind="image",
+            x=x,
+            y=y,
+            w=w,
+            h=h,
+            name=getattr(shape, "name", "") or "",
+            props={"path": str(file_path)},
+        )
+    )
+
+
+def _take_table(shape, slide: Slide, box) -> None:
+    lines = []
+    try:
+        for row in shape.table.rows:
+            cells = []
+            for cell in row.cells:
+                cells.append((cell.text or "").strip())
+            if any(cells):
+                lines.append(" | ".join(cells))
+    except Exception:
+        return
+    text = "\n".join(lines).strip()
+    if text:
+        slide.objects.append(_text_object(shape, box, text))
+
+
+def _media_folder(media: dict) -> Path:
+    if media.get("folder") is not None:
+        return media["folder"]
+    hint = media.get("hint")
+    source = Path(media["source"])
+    candidates = []
+    if hint:
+        candidates.append(Path(hint))
+    else:
+        candidates.append(Path(str(source.with_suffix("")) + "_media"))
+    for folder in candidates:
+        try:
+            folder.mkdir(parents=True, exist_ok=True)
+            probe = folder / ".od-write"
+            probe.write_bytes(b"ok")
+            probe.unlink()
+            media["folder"] = folder
+            return folder
+        except OSError:
+            continue
+    folder = Path(tempfile.mkdtemp(prefix="officedisplay-pptx-"))
+    media["folder"] = folder
+    return folder

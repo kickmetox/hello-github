@@ -87,5 +87,164 @@ class RoundtripTest(unittest.TestCase):
             self.assertEqual(loaded.title, "Runde")
 
 
+class OpenPptxTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        import os
+
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        from PySide6.QtWidgets import QApplication
+
+        cls.app = QApplication.instance() or QApplication([])
+
+    def _sample(self, folder: Path) -> Path:
+        from pptx import Presentation
+        from pptx.enum.shapes import MSO_SHAPE
+        from pptx.util import Inches
+
+        image = folder / "bild.png"
+        Image.new("RGB", (48, 24), (20, 90, 200)).save(image)
+        package = Presentation()
+        title = package.slides.add_slide(package.slide_layouts[0])
+        title.shapes.title.text = "Quartal Nord"
+        title.placeholders[1].text = "Untertitel im Saal"
+        body = package.slides.add_slide(package.slide_layouts[1])
+        body.shapes.title.text = "Punkte"
+        frame = body.placeholders[1].text_frame
+        frame.text = "Erster Satz."
+        frame.add_paragraph().text = "Zweiter Satz."
+        body.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(6), Inches(2), Inches(2), Inches(1))
+        broken = body.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(0.4), Inches(4), Inches(1), Inches(0.6))
+        transform = broken._element.spPr.find("{http://schemas.openxmlformats.org/drawingml/2006/main}xfrm")
+        if transform is not None:
+            broken._element.spPr.remove(transform)
+        picture = package.slides.add_slide(package.slide_layouts[6])
+        box = picture.shapes.add_textbox(Inches(0.4), Inches(0.3), Inches(5), Inches(0.7))
+        box.text_frame.paragraphs[0].text = "Bleibt stehen"
+        picture.shapes.add_picture(str(image), Inches(0.4), Inches(1.4), Inches(3), Inches(1.6))
+        target = folder / "real.pptx"
+        package.save(target)
+        return target
+
+    def test_import_keeps_slides_text_shape_and_image(self):
+        from officedisplay.io.pptx_io import PptxReadError, import_pptx
+
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            loaded = import_pptx(self._sample(root))
+            self.assertGreaterEqual(len(loaded.slides), 3)
+            blob = " ".join(obj.props.get("text", "") for slide in loaded.slides for obj in slide.objects if obj.kind == "text")
+            self.assertIn("Quartal Nord", blob)
+            self.assertIn("Erster Satz.", blob)
+            self.assertIn("Bleibt stehen", blob)
+            shapes = [obj for slide in loaded.slides for obj in slide.objects if obj.kind == "shape"]
+            self.assertTrue(any(obj.props.get("shape") == "roundrect" for obj in shapes))
+            images = [obj for slide in loaded.slides for obj in slide.objects if obj.kind == "image"]
+            self.assertTrue(images)
+            self.assertTrue(Path(images[0].props["path"]).is_file())
+            bad = root / "kaputt.pptx"
+            bad.write_text("keine pptx", encoding="utf-8")
+            with self.assertRaises(PptxReadError) as caught:
+                import_pptx(bad)
+            self.assertIn("lässt sich nicht laden", str(caught.exception))
+
+    def test_import_from_readonly_directory(self):
+        import os
+
+        from officedisplay.io.pptx_io import import_pptx
+
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            sample = self._sample(root)
+            locked = root / "nurlesen"
+            locked.mkdir()
+            target = locked / "deck.pptx"
+            target.write_bytes(sample.read_bytes())
+            os.chmod(locked, 0o555)
+            try:
+                loaded = import_pptx(target)
+            finally:
+                os.chmod(locked, 0o755)
+            self.assertGreaterEqual(len(loaded.slides), 3)
+            images = [obj for slide in loaded.slides for obj in slide.objects if obj.kind == "image"]
+            self.assertTrue(images)
+            self.assertTrue(Path(images[0].props["path"]).is_file())
+
+    def test_open_path_drop_and_error_keeps_deck(self):
+        from officedisplay.ui import main_window as ui
+        from officedisplay.ui.main_window import OPEN_FILTER, PPTX_FILTER, MainWindow
+
+        self.assertIn("*.pptx", OPEN_FILTER)
+        self.assertIn("*.pptx", PPTX_FILTER)
+        messages = []
+        original = ui.show_text
+        ui.show_text = lambda _parent, _title, text: messages.append(text)
+        window = MainWindow()
+        try:
+            with tempfile.TemporaryDirectory() as folder:
+                root = Path(folder)
+                sample = self._sample(root)
+                window.load_path(sample)
+                blob = " ".join(obj.props.get("text", "") for slide in window.presentation.slides for obj in slide.objects)
+                self.assertIn("Quartal Nord", blob)
+                kept = len(window.presentation.slides)
+                before_drop = kept
+                window._drop_files([str(sample)], 0.1, 0.1)
+                self.assertGreater(len(window.presentation.slides), before_drop)
+                bad = root / "kaputt.pptx"
+                bad.write_text("keine pptx", encoding="utf-8")
+                window.load_path(bad)
+                self.assertEqual(len(window.presentation.slides), kept + 3)
+                self.assertTrue(messages)
+                self.assertIn("lässt sich nicht laden", messages[-1])
+        finally:
+            ui.show_text = original
+            window.close()
+
+
+class ToolbarStartTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        import os
+
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        from PySide6.QtWidgets import QApplication
+
+        cls.app = QApplication.instance() or QApplication([])
+
+    def test_toolbars_visible_and_reset_once(self):
+        from PySide6.QtCore import QSettings
+
+        from officedisplay.ui.main_window import TOOLBAR_KEYS, MainWindow
+        from officedisplay.ui.theme import stylesheet
+
+        self.assertIn("min-height: 40px", stylesheet("farbe"))
+        self.assertNotIn("height: 0", stylesheet("farbe"))
+        settings = QSettings("Sellerbach", "OfficeDisplay")
+        settings.setValue("toolbar/force_visible_v1", False)
+        for key in TOOLBAR_KEYS:
+            settings.setValue(f"toolbar/{key}", False)
+        window = MainWindow()
+        try:
+            for key in TOOLBAR_KEYS:
+                self.assertTrue(window._toolbars[key].isVisible(), key)
+                self.assertGreaterEqual(window._toolbars[key].minimumHeight(), 40)
+            window._toolbar_actions["grafik"].setChecked(False)
+            self.assertFalse(window._toolbars["grafik"].isVisible())
+            again = MainWindow()
+            try:
+                self.assertFalse(again._toolbars["grafik"].isVisible())
+                self.assertTrue(again._toolbars["text"].isVisible())
+                self.assertTrue(again._toolbars["auswahl"].isVisible())
+                again.show_all_toolbars()
+                for key in TOOLBAR_KEYS:
+                    self.assertTrue(again._toolbars[key].isVisible(), key)
+            finally:
+                again.close()
+        finally:
+            window.show_all_toolbars()
+            window.close()
+
+
 if __name__ == "__main__":
     unittest.main()

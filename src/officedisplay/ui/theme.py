@@ -57,7 +57,8 @@ def stylesheet(name: str) -> str:
     QWidget {{ color: {theme['ink']}; font-family: "Segoe UI", "Noto Sans", sans-serif; font-size: 13px; }}
     QMenuBar, QMenu {{ background: {theme['panel']}; color: {theme['ink']}; }}
     QMenu::item:selected {{ background: {theme['accent']}; color: {theme['accent_ink']}; }}
-    QToolBar {{ background: {theme['panel']}; border: 0; border-bottom: 1px solid {theme['line']}; spacing: 4px; padding: 4px; }}
+    QToolBar {{ background: {theme['panel']}; border: 0; border-bottom: 1px solid {theme['line']}; spacing: 4px; padding: 4px; min-height: 40px; }}
+    QToolBar QToolButton {{ min-height: 24px; padding: 4px 8px; }}
     QDockWidget {{ color: {theme['ink']}; titlebar-close-icon: none; }}
     QDockWidget::title {{ background: {theme['panel']}; padding: 6px; border: 1px solid {theme['line']}; }}
     QListWidget, QPlainTextEdit, QLineEdit, QComboBox, QSpinBox, QTextBrowser {{

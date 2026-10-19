@@ -5,7 +5,7 @@ Stand der Umsetzung in diesem Programmordner. Standard ist lokal, ohne Tracking.
 ## Editor
 
 - Werkzeuge: Auswahl, Text, Formen, Stift, Marker, Radierer, Diagramm, Bild, Video, 3D.
-- Vier Leisten über Menü Ansicht: Text (Schrift, Größe, Fett, Kursiv, Unterstrichen, Farbe, Ausrichtung), Grafik/Foto (Formen, Stift, Marker, Radierer, Stärke, Druck, Glättung, Bild, Filter), Video (Video, Kamera), Player (Präsentieren, Slideshow, Leinwand, Morph, Eingangseffekt). Sichtbarkeit liegt in QSettings. Auswahl und Folienaktionen bleiben erreichbar.
+- Fünf Leisten über Menü Ansicht: Auswahl, Text (Schrift, Größe, Fett, Kursiv, Unterstrichen, Farbe, Ausrichtung), Grafik/Foto (Formen, Stift, Marker, Radierer, Stärke, Druck, Glättung, Bild, Filter), Video (Video, Kamera), Player (Präsentieren, Slideshow, Leinwand, Morph, Eingangseffekt). Jede Leiste lässt sich einzeln schalten, „Alle Leisten anzeigen“ setzt sie an. Sichtbarkeit liegt in QSettings. Die Folienaktionen bleiben erreichbar.
 - Rechtsklick auf Formen: Füllfarbe, Linienfarbe, Bild in die Form, Formbild als Folienhintergrund mit der aktuellen Deckkraft. Die Auswahl bleibt.
 - Text: Schriftfamilie, Größe, fett, kursiv, unterstrichen, Farbe, Ausrichtung. Markensperre begrenzt Schrift und Farbe.
 - Hintergründe: Farbe, Verlauf, Bild, volle Fläche, Deckkraft in Prozent (`background.opacity`), cover, contain, kacheln. Die Bilddeckkraft ist in der Miniatur und im Player sichtbar.
@@ -24,7 +24,7 @@ Stand der Umsetzung in diesem Programmordner. Standard ist lokal, ohne Tracking.
 
 ## Dateien und Daten
 
-- `.pptx` über python-pptx. Texte und Bilder bleiben nach dem Rundweg editierbar. Gruppen werden beim Export flach geschrieben.
+- `.pptx` über python-pptx. Öffnen und Import lesen Folien, Texte, Bilder und einfache Formen. Eine Form ohne Position oder ein unbekanntes Shape bricht den Import nicht ab. Ist die Datei selbst kaputt, bleibt die Präsentation und es kommt eine Meldung. Gruppen werden beim Export flach geschrieben.
 - `.odp` mit grundlegender `content.xml` für Textinhalte.
 - `.odisp`: Zip mit `presentation.json` und Medien.
 - Excel und CSV: lokale Datei an ein Diagramm binden und erneut einlesen (openpyxl).

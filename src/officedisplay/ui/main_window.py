@@ -84,6 +84,10 @@ from officedisplay.ui.render import clear_image_cache, render_thumb
 from officedisplay.ui.theme import stylesheet
 from officedisplay.design.palette import constrain_color, constrain_font
 
+OPEN_FILTER = "Präsentationen (*.odisp *.pptx *.PPTX *.odp *.ODP);;Office Display (*.odisp);;PowerPoint (*.pptx *.PPTX);;OpenDocument (*.odp *.ODP);;Alle Dateien (*)"
+PPTX_FILTER = "PowerPoint (*.pptx *.PPTX);;Alle Dateien (*)"
+TOOLBAR_KEYS = ("auswahl", "text", "grafik", "video", "player")
+
 
 class SlideStrip(QListWidget):
     def __init__(self, owner: "MainWindow") -> None:
@@ -155,6 +159,7 @@ class MainWindow(QMainWindow):
         self.apply_theme(self.prefs.get("theme") or "farbe")
         self.refresh_thumbs()
         self.statusBar().showMessage("Andreas Meyer · ame@sellerbach.de · Zeiger: Maus · Offline · kein Tracking")
+        self.show()
 
     def _load_prefs(self) -> dict:
         raw = self.settings.value("prefs", "")
@@ -366,13 +371,23 @@ class MainWindow(QMainWindow):
         self._plain_action(player, "Morph", self.preview_morph)
         self._plain_action(player, "Eingangseffekt", self.preview_entrance)
 
+        for bar in (auswahl, text_bar, grafik, video, player):
+            bar.setMinimumHeight(40)
         self.addToolBar(auswahl)
         self.addToolBar(text_bar)
         self.addToolBar(grafik)
         self.addToolBar(video)
         self.addToolBar(player)
-        self._toolbars = {"text": text_bar, "grafik": grafik, "video": video, "player": player}
+        self._toolbars = {
+            "auswahl": auswahl,
+            "text": text_bar,
+            "grafik": grafik,
+            "video": video,
+            "player": player,
+        }
+        self._ensure_toolbars_visible_once()
         for key, title in (
+            ("auswahl", "Auswahl"),
             ("text", "Text"),
             ("grafik", "Grafik/Foto"),
             ("video", "Video"),
@@ -387,6 +402,8 @@ class MainWindow(QMainWindow):
             self._toolbars[key].visibilityChanged.connect(lambda on, name=key: self._remember_toolbar(name, bool(on)))
             self.view_menu.addAction(action)
             self._toolbar_actions[key] = action
+        self.view_menu.addSeparator()
+        self._add(self.view_menu, "Alle Leisten anzeigen", self.show_all_toolbars)
 
         side = QWidget()
         layout = QVBoxLayout(side)
@@ -401,6 +418,26 @@ class MainWindow(QMainWindow):
         dock = QDockWidget("Folienaktionen", self)
         dock.setWidget(side)
         self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, dock)
+
+    def _ensure_toolbars_visible_once(self) -> None:
+        """Ein früher gespeicherter Aus-Zustand hat die Leisten verschluckt. Einmal zurücksetzen."""
+        if self._settings_bool("toolbar/force_visible_v1", False):
+            return
+        for key in TOOLBAR_KEYS:
+            self.settings.setValue(f"toolbar/{key}", True)
+        self.settings.setValue("toolbar/force_visible_v1", True)
+
+    def show_all_toolbars(self) -> None:
+        for key in TOOLBAR_KEYS:
+            bar = self._toolbars.get(key)
+            action = self._toolbar_actions.get(key)
+            if bar is not None:
+                bar.setVisible(True)
+            if action is not None and not action.isChecked():
+                action.blockSignals(True)
+                action.setChecked(True)
+                action.blockSignals(False)
+            self.settings.setValue(f"toolbar/{key}", True)
 
     def _settings_bool(self, key: str, default: bool = True) -> bool:
         value = self.settings.value(key, default)
@@ -510,19 +547,34 @@ class MainWindow(QMainWindow):
         self.refresh_thumbs()
 
     def open_file(self) -> None:
-        path, _ = QFileDialog.getOpenFileName(self, "Öffnen", "", "Office Display (*.odisp);;PowerPoint (*.pptx);;OpenDocument (*.odp)")
+        path, _ = QFileDialog.getOpenFileName(self, "Öffnen", "", OPEN_FILTER)
         if not path:
             return
         self.load_path(Path(path))
 
     def load_path(self, path: Path) -> None:
-        if path.suffix.lower() == ".pptx":
-            self.presentation = import_pptx(path)
-        elif path.suffix.lower() == ".odp":
-            self.presentation = import_odp(path)
-        else:
-            self.presentation = load_odisp(path)
-        self.path = path if path.suffix.lower() == ".odisp" else None
+        suffix = path.suffix.lower()
+        try:
+            if suffix == ".pptx":
+                presentation = import_pptx(path)
+            elif suffix == ".odp":
+                presentation = import_odp(path)
+            elif suffix == ".odisp":
+                presentation = load_odisp(path)
+            else:
+                show_text(self, "Öffnen", "Diese Datei lässt sich nicht laden. Erwartet wird .odisp, .pptx oder .odp.")
+                return
+        except Exception as exc:
+            message = str(exc).strip()
+            if "lässt sich nicht laden" not in message:
+                message = f"Die Datei lässt sich nicht laden.\n{path.name}"
+            show_text(self, "Öffnen", message)
+            return
+        if not presentation.slides:
+            show_text(self, "Öffnen", "Die Datei enthält keine Folien.")
+            return
+        self.presentation = presentation
+        self.path = path if suffix == ".odisp" else None
         self.canvas.set_presentation(self.presentation, 0)
         self.refresh_thumbs()
 
@@ -542,7 +594,7 @@ class MainWindow(QMainWindow):
         save_odisp(self.presentation, self.path)
 
     def import_pptx_file(self) -> None:
-        path, _ = QFileDialog.getOpenFileName(self, "PPTX", "", "PowerPoint (*.pptx)")
+        path, _ = QFileDialog.getOpenFileName(self, "PPTX", "", PPTX_FILTER)
         if path:
             self.load_path(Path(path))
 
@@ -820,10 +872,21 @@ class MainWindow(QMainWindow):
         for path in paths:
             kind = classify(path)
             if kind == "pptx":
-                imported = import_pptx(path)
+                try:
+                    imported = import_pptx(path)
+                except Exception as exc:
+                    message = str(exc).strip()
+                    if "lässt sich nicht laden" not in message:
+                        message = "Die PowerPoint-Datei lässt sich nicht laden."
+                    show_text(self, "Öffnen", message)
+                    continue
                 self.presentation.slides.extend(imported.slides)
             elif kind == "odp":
-                imported = import_odp(path)
+                try:
+                    imported = import_odp(path)
+                except Exception:
+                    show_text(self, "Öffnen", "Die OpenDocument-Datei lässt sich nicht laden.")
+                    continue
                 self.presentation.slides.extend(imported.slides)
             elif kind == "text" and Path(path).stat().st_size > 800:
                 text = read_text_file(path)
