@@ -94,10 +94,11 @@ class SlideStrip(QListWidget):
     def __init__(self, owner: "MainWindow") -> None:
         super().__init__()
         self.owner = owner
-        self.setIconSize(QSize(200, 120))
+        self.setIconSize(QSize(168, 94))
         self.setSpacing(8)
         self.setAcceptDrops(True)
-        self.setMinimumWidth(230)
+        self.setMinimumWidth(380)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
 
     def dragEnterEvent(self, event) -> None:
         if event.mimeData().hasFormat("application/x-officedisplay-object"):
@@ -359,7 +360,10 @@ class MainWindow(QMainWindow):
         grafik.addWidget(self.pen_curve)
         grafik.addWidget(QLabel("Glättung"))
         grafik.addWidget(self.pen_smooth)
-        self._plain_action(grafik, "Bild einfügen", self.insert_image)
+        grafik_foto = QToolBar("Grafik/Foto")
+        grafik_foto.setMovable(False)
+        grafik_foto.setFloatable(False)
+        self._plain_action(grafik_foto, "Bild einfügen", self.insert_image)
         for label, mode in (
             ("Aufhellen", "bright"),
             ("Grau", "gray"),
@@ -368,7 +372,7 @@ class MainWindow(QMainWindow):
             ("Spiegeln", "flip"),
             ("Freistellen", "knockout"),
         ):
-            self._plain_action(grafik, label, lambda _checked=False, name=mode: self.filter_image(name))
+            self._plain_action(grafik_foto, label, lambda _checked=False, name=mode: self.filter_image(name))
 
         self._plain_action(video, "Video einfügen", self.insert_video)
         self._plain_action(video, "Kamera-Einblendung", self.open_camera)
@@ -379,11 +383,16 @@ class MainWindow(QMainWindow):
         self._plain_action(player, "Morph", self.preview_morph)
         self._plain_action(player, "Eingangseffekt", self.preview_entrance)
 
-        for bar in (auswahl, text_bar, grafik, video, player):
+        for bar in (auswahl, text_bar, grafik, grafik_foto, video, player):
             bar.setMinimumHeight(40)
         self.addToolBar(auswahl)
+        self.addToolBarBreak()
         self.addToolBar(text_bar)
+        self.addToolBarBreak()
         self.addToolBar(grafik)
+        self.addToolBarBreak()
+        self.addToolBar(grafik_foto)
+        self.addToolBarBreak()
         self.addToolBar(video)
         self.addToolBar(player)
         self._toolbars = {
@@ -393,6 +402,7 @@ class MainWindow(QMainWindow):
             "video": video,
             "player": player,
         }
+        self._toolbar_extra = {"grafik": [grafik_foto]}
         self._ensure_toolbars_visible_once()
         for key, title in (
             ("auswahl", "Auswahl"),
@@ -405,9 +415,10 @@ class MainWindow(QMainWindow):
             action.setCheckable(True)
             visible = self._settings_bool(f"toolbar/{key}", True)
             action.setChecked(visible)
-            self._toolbars[key].setVisible(visible)
-            action.toggled.connect(lambda on, name=key: self._toolbars[name].setVisible(bool(on)))
-            self._toolbars[key].visibilityChanged.connect(lambda on, name=key: self._remember_toolbar(name, bool(on)))
+            self._show_toolbar(key, visible)
+            action.toggled.connect(lambda on, name=key: self._show_toolbar(name, bool(on)))
+            for bar in self._bars(key):
+                bar.visibilityChanged.connect(lambda on, name=key: self._remember_toolbar(name, bool(on)))
             self.view_menu.addAction(action)
             self._toolbar_actions[key] = action
         self.view_menu.addSeparator()
@@ -435,12 +446,24 @@ class MainWindow(QMainWindow):
             self.settings.setValue(f"toolbar/{key}", True)
         self.settings.setValue("toolbar/force_visible_v1", True)
 
+    def _bars(self, name: str) -> list:
+        bars = []
+        main = self._toolbars.get(name)
+        if main is not None:
+            bars.append(main)
+        bars.extend(self._toolbar_extra.get(name, []))
+        return bars
+
+    def _show_toolbar(self, name: str, on: bool) -> None:
+        # isVisible() ist falsch, solange das Fenster noch zu ist.
+        # setVisible muss den Wunsch trotzdem speichern.
+        for bar in self._bars(name):
+            bar.setVisible(bool(on))
+
     def show_all_toolbars(self) -> None:
         for key in TOOLBAR_KEYS:
-            bar = self._toolbars.get(key)
             action = self._toolbar_actions.get(key)
-            if bar is not None:
-                bar.setVisible(True)
+            self._show_toolbar(key, True)
             if action is not None and not action.isChecked():
                 action.blockSignals(True)
                 action.setChecked(True)

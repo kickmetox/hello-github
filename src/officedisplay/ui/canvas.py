@@ -521,7 +521,10 @@ class SlideCanvas(QWidget):
             return
         obj = self._find(self._editing_id)
         if obj is not None:
-            obj.props["text"] = self.editor.toPlainText()
+            new_text = self.editor.toPlainText()
+            if str(obj.props.get("text") or "") != new_text:
+                self.gestureStarted.emit()
+                obj.props["text"] = new_text
         self._editing_id = None
         self.editor.hide()
         self.changed.emit()

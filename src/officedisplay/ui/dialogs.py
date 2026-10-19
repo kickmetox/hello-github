@@ -32,6 +32,7 @@ class SettingsDialog(QDialog):
     def __init__(self, parent, prefs: dict, secrets: dict) -> None:
         super().__init__(parent)
         self.setWindowTitle("Einstellungen – Online-KI und Canva")
+        self.setMinimumWidth(720)
         form = QFormLayout()
         self.online = QCheckBox("Online-KI auf ausdrücklichen Klick erlauben")
         self.online.setChecked(bool(prefs.get("online_enabled")))
@@ -53,6 +54,9 @@ class SettingsDialog(QDialog):
         form.addRow("API-Schlüssel", self.key)
         form.addRow("Canva-Token", self.canva)
         form.addRow("Canva-Basis", self.canva_base)
+        for field in (self.base, self.model, self.image_model, self.key, self.canva, self.canva_base):
+            field.setMinimumWidth(340)
+            field.setCursorPosition(0)
         note = QLabel(
             "Ohne Haken verlässt nichts den Rechner. Schlüssel liegen unter ~/.config/officedisplay/secrets.json, Modus 600."
         )
