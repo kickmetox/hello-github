@@ -19,9 +19,13 @@ from officedisplay.model.presentation import (
 from officedisplay.model.slideshow import ShowEntry, Slideshow
 
 
-IMAGE_EXT = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif"}
-VIDEO_EXT = {".mp4", ".mov", ".webm", ".mkv", ".avi", ".m4v"}
-TEXT_EXT = {".txt", ".md", ".markdown", ".pdf"}
+from officedisplay.io.media import IMAGE_EXT as _IMAGE_EXT
+from officedisplay.io.media import VIDEO_EXT as _VIDEO_EXT
+from officedisplay.io.media import prepare_image
+
+IMAGE_EXT = set(_IMAGE_EXT)
+VIDEO_EXT = set(_VIDEO_EXT) | {".m4v"}
+TEXT_EXT = {".txt", ".md", ".markdown", ".pdf", ".rtx"}
 MEDIA_KEYS = ("path", "image", "render_path")
 
 
@@ -86,7 +90,13 @@ def entries_from_paths(paths: list[str]) -> list[ShowEntry]:
         suffix = file_path.suffix.lower()
         title = file_path.stem or file_path.name
         if suffix in IMAGE_EXT:
-            entries.append(ShowEntry(id=new_id(), kind="image", title=title, path=str(file_path)))
+            usable, hint, use_text = prepare_image(str(file_path))
+            if usable:
+                entries.append(ShowEntry(id=new_id(), kind="image", title=title, path=usable))
+            elif use_text or suffix in TEXT_EXT:
+                entries.append(ShowEntry(id=new_id(), kind="text", title=title, text=read_text_file(str(file_path))))
+            else:
+                entries.append(ShowEntry(id=new_id(), kind="text", title=title, text=hint or file_path.name))
         elif suffix in VIDEO_EXT:
             entries.append(ShowEntry(id=new_id(), kind="video", title=title, path=str(file_path)))
         elif suffix in TEXT_EXT:

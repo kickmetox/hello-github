@@ -156,6 +156,41 @@ def _team(presentation) -> None:
     presentation.slides.append(slide)
 
 
+SLIDE_LAYOUTS = (
+    ("title", "Titel"),
+    ("title_body", "Titel+Inhalt"),
+    ("two", "Zwei Spalten"),
+    ("quote", "Zitat"),
+    ("blank", "Leer"),
+)
+
+
+def apply_slide_layout(slide: Slide, key: str) -> None:
+    """Setzt nur die Objekte dieser Folie. Die übrigen Folien bleiben."""
+    slide.objects = _layout_objects(key)
+
+
+def _layout_objects(key: str) -> list[SlideObject]:
+    if key in {"blank", "leer"}:
+        return []
+    if key in {"title_body", "titel_inhalt"}:
+        return [
+            _text(0.06, 0.08, 0.88, 0.14, "Titel", 36, "#1B1F2A", True, "titel"),
+            _text(0.08, 0.28, 0.84, 0.58, "Inhalt", 24, "#243044", name="inhalt"),
+        ]
+    if key in {"two", "zwei"}:
+        return [
+            _text(0.06, 0.06, 0.88, 0.12, "Titel", 34, "#1B1F2A", True, "titel"),
+            _text(0.06, 0.24, 0.42, 0.64, "Spalte links", 22, "#243044", name="links"),
+            _text(0.52, 0.24, 0.42, 0.64, "Spalte rechts", 22, "#243044", name="rechts"),
+        ]
+    if key in {"quote", "zitat"}:
+        quote = _text(0.1, 0.32, 0.8, 0.28, "Zitat", 36, "#1B1F2A", False, "zitat")
+        quote.props["italic"] = True
+        return [quote]
+    return [_text(0.08, 0.36, 0.84, 0.18, "Titel", 48, "#1B1F2A", True, "titel")]
+
+
 def element(kind: str) -> SlideObject:
     catalog = {
         "Rahmen": _shape(0.08, 0.08, 0.3, 0.3, "roundrect", "#00000000"),

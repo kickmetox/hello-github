@@ -316,8 +316,10 @@ def _image(path: str | None) -> QImage | None:
     cached = _PIXMAPS.get(path)
     if cached is not None:
         return cached
-    image = QImage(path)
-    if image.isNull():
+    from officedisplay.io.media import load_qimage
+
+    image, _hint = load_qimage(path)
+    if image is None or image.isNull():
         return None
     _PIXMAPS[path] = image
     return image

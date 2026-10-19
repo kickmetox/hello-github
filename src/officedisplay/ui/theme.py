@@ -83,6 +83,7 @@ def stylesheet(name: str) -> str:
         dialog_buttons = f"QDialog QPushButton {{ border: 1px solid {theme['accent']}; }}"
     return f"""
     QMainWindow {{ background: {theme['window']}; color: {theme['ink']}; }}
+    SlideCanvas {{ background: {theme['canvas']}; }}
     QDialog {{ background: {dialog_bg}; color: {theme['ink']}; }}
     QWidget {{ color: {theme['ink']}; font-family: "Segoe UI", "Noto Sans", sans-serif; font-size: 13px; }}
     QMenuBar, QMenu {{ background: {theme['panel']}; color: {theme['ink']}; }}
@@ -111,6 +112,8 @@ def stylesheet(name: str) -> str:
     }}
     QPushButton:checked, QPushButton:hover {{ background: {theme['accent']}; color: {theme['accent_ink']}; }}
     {dialog_buttons}
-    QStatusBar {{ background: {theme['panel']}; color: {theme['muted']}; }}
+    QStatusBar {{ background: {theme['panel']}; color: {theme['ink']}; }}
+    QStatusBar QLabel {{ color: {theme['ink']}; }}
+    QLabel#groupHeading {{ color: {theme['ink']}; font-weight: 700; background: transparent; padding: 0 6px; min-width: 76px; }}
     QLabel#muted {{ color: {theme['muted']}; }}
     """

@@ -555,9 +555,11 @@ class PresenterDialog(QDialog):
         self.bar.setText(f"{self.index + 1} / {count}    {note}".rstrip())
 
     def _show_image(self, path: str, title: str) -> None:
-        image = QImage(path) if path else QImage()
-        if image.isNull():
-            self.fallback.setText(f"Bild nicht lesbar.\n{path or title}")
+        from officedisplay.io.media import load_qimage
+
+        image, hint = load_qimage(path) if path else (QImage(), None)
+        if image is None or image.isNull():
+            self.fallback.setText(hint or f"Bild nicht lesbar.\n{path or title}")
             self.stack.setCurrentWidget(self.fallback)
             return
         self.frame.blank = ""

@@ -2,22 +2,28 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from officedisplay.io.media import IMAGE_EXT, VIDEO_EXT, prepare_image
+from officedisplay.io.open_file import DECK_EXT
 from officedisplay.model.presentation import SlideObject, new_id
 
 
-IMAGES = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".tif", ".tiff"}
-VIDEOS = {".mp4", ".mov", ".avi", ".mkv", ".webm", ".wmv"}
-TEXTS = {".txt", ".md", ".markdown", ".pdf"}
+IMAGES = set(IMAGE_EXT)
+VIDEOS = set(VIDEO_EXT)
+TEXTS = {".txt", ".md", ".markdown", ".pdf", ".rtx"}
 
 
 def classify(path: str) -> str:
     suffix = Path(path).suffix.lower()
+    if suffix in {".pdf"}:
+        return "image"
     if suffix in IMAGES:
         return "image"
     if suffix in VIDEOS:
         return "video"
     if suffix == ".pptx":
         return "pptx"
+    if suffix in DECK_EXT and suffix not in {".odp", ".odisp", ".pptx"}:
+        return "deck"
     if suffix == ".odp":
         return "odp"
     if suffix == ".odisp":
@@ -34,6 +40,11 @@ def classify(path: str) -> str:
 def place_on_slide(slide, path: str, x: float, y: float) -> str:
     kind = classify(path)
     if kind == "image":
+        usable, hint, use_text = prepare_image(path)
+        if use_text:
+            return "textfile"
+        if not usable:
+            return "hint:" + (hint or "Das Bild lässt sich nicht lesen.")
         slide.objects.append(
             SlideObject(
                 id=new_id(),
@@ -43,7 +54,7 @@ def place_on_slide(slide, path: str, x: float, y: float) -> str:
                 w=0.36,
                 h=0.28,
                 name=Path(path).stem,
-                props={"path": path},
+                props={"path": usable, "source": path},
             )
         )
     elif kind == "video":

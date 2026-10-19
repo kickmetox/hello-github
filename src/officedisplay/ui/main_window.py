@@ -3,8 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from PySide6.QtCore import QSettings, QSize, Qt
-from PySide6.QtGui import QAction, QCursor, QIcon, QKeySequence, QPixmap
+from PySide6.QtCore import QEvent, QSettings, QSize, Qt
+from PySide6.QtGui import QAction, QCursor, QIcon, QKeySequence, QPixmap, QShortcut
 from PySide6.QtWidgets import (
     QColorDialog,
     QComboBox,
@@ -18,6 +18,8 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QMenu,
     QMessageBox,
+    QPlainTextEdit,
+    QPushButton,
     QSpinBox,
     QToolBar,
     QVBoxLayout,
@@ -36,13 +38,15 @@ from officedisplay.design.animate import morph_slide
 from officedisplay.design.palette import dotnet_palette
 from officedisplay.design.photo import adjust, color_filter, knockout_corners
 from officedisplay.design.resize import RESIZE_PRESETS, align_objects, magic_resize
-from officedisplay.design.templates import apply_template, element
+from officedisplay.design.templates import SLIDE_LAYOUTS, apply_slide_layout, apply_template, element
 from officedisplay.design.threed import render_png
 from officedisplay.io.data_bind import bind_chart, refresh_bindings
 from officedisplay.io.incoming import classify, place_on_slide
+from officedisplay.io.media import IMAGE_EXT, VIDEO_EXT
 from officedisplay.io.native_io import load_odisp, save_odisp
 from officedisplay.io.odp_io import export_odp, import_odp
-from officedisplay.io.pptx_io import PptxReadError, export_pptx, import_pptx
+from officedisplay.io.open_file import FormatReadError, load_presentation
+from officedisplay.io.pptx_io import PptxReadError, export_pptx
 from officedisplay.io.slideshow_io import (
     entries_from_paths,
     export_slideshow_odisp,
@@ -85,14 +89,29 @@ from officedisplay.ui.render import clear_image_cache, render_thumb
 from officedisplay.ui.theme import stylesheet
 from officedisplay.design.palette import constrain_color, constrain_font
 
-OPEN_FILTER = "Präsentationen (*.odisp *.pptx *.PPTX *.odp *.ODP);;Office Display (*.odisp);;PowerPoint (*.pptx *.PPTX);;OpenDocument (*.odp *.ODP);;Alle Dateien (*)"
-PPTX_FILTER = "PowerPoint (*.pptx *.PPTX);;Alle Dateien (*)"
+_IMAGE_GLOBS = " ".join(f"*{ext}" for ext in sorted(IMAGE_EXT))
+_VIDEO_GLOBS = " ".join(f"*{ext}" for ext in sorted(VIDEO_EXT))
+_DECK_GLOBS = "*.odisp *.pptx *.PPTX *.potx *.ppsx *.pdrx *.prdx *.prsx *.prvx *.rtx *.ppt *.odp *.ODP"
+OPEN_FILTER = (
+    f"Präsentationen ({_DECK_GLOBS});;"
+    "Office Display (*.odisp);;"
+    "PowerPoint (*.pptx *.PPTX *.potx *.ppsx *.ppt *.pdrx *.prdx *.prsx *.prvx *.rtx);;"
+    "OpenDocument (*.odp *.ODP);;"
+    f"Bilder ({_IMAGE_GLOBS});;"
+    f"Video ({_VIDEO_GLOBS});;"
+    "Alle Dateien (*)"
+)
+PPTX_FILTER = "PowerPoint (*.pptx *.PPTX *.potx *.ppsx *.ppt *.pdrx *.prdx *.prsx *.prvx *.rtx);;Alle Dateien (*)"
+IMAGE_FILTER = f"Bilder ({_IMAGE_GLOBS});;Alle Dateien (*)"
+VIDEO_FILTER = f"Video ({_VIDEO_GLOBS});;Alle Dateien (*)"
+SLIDESHOW_FILTER = f"Slideshow (*.oshow);;Präsentation ({_DECK_GLOBS});;Medien ({_IMAGE_GLOBS} {_VIDEO_GLOBS} *.txt *.md *.pdf *.rtx)"
+SLIDESHOW_MEDIA_FILTER = f"Medien ({_IMAGE_GLOBS} {_VIDEO_GLOBS} *.txt *.md *.pdf *.rtx);;Alle Dateien (*)"
 
 
 def describe_open_error(exc: Exception, name: str) -> str:
     """Konkrete Importmeldung behalten. Nur Unbekanntes wird zur Sammelzeile."""
     message = str(exc).strip()
-    if isinstance(exc, PptxReadError) or "verschlüsselt" in message or "lässt sich nicht laden" in message:
+    if isinstance(exc, (PptxReadError, FormatReadError)) or "verschlüsselt" in message or "lässt sich nicht laden" in message:
         return message or f"Die Datei lässt sich nicht laden.\n{name}"
     return f"Die Datei lässt sich nicht laden.\n{name}"
 
@@ -107,7 +126,7 @@ class SlideStrip(QListWidget):
         self.setIconSize(QSize(168, 94))
         self.setSpacing(8)
         self.setAcceptDrops(True)
-        self.setMinimumWidth(380)
+        self.setMinimumWidth(400)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
 
     def dragEnterEvent(self, event) -> None:
@@ -158,17 +177,40 @@ class MainWindow(QMainWindow):
         self.canvas.textDropped.connect(self._drop_text)
         self.canvas.statusMessage.connect(self._video_message)
         self.canvas.shapeContext.connect(self.open_shape_menu)
+        self.canvas.viewChanged.connect(self._update_status_counts)
         self.slideshow: Slideshow | None = None
         self.slideshow_path: Path | None = None
-        self.setCentralWidget(self.canvas)
+        self.notes_edit = QPlainTextEdit()
+        self.notes_edit.setObjectName("notesLine")
+        self.notes_edit.setPlaceholderText("Notizen")
+        self.notes_edit.setFixedHeight(72)
+        self.notes_edit.installEventFilter(self)
+        center = QWidget()
+        column = QVBoxLayout(center)
+        column.setContentsMargins(0, 0, 0, 0)
+        column.setSpacing(0)
+        column.addWidget(self.canvas, 1)
+        column.addWidget(self.notes_edit)
+        self.setCentralWidget(center)
         self.strip = SlideStrip(self)
         self.strip.currentRowChanged.connect(self._thumb_clicked)
-        dock = QDockWidget("Folien", self)
-        dock.setWidget(self.strip)
-        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, dock)
+        slide_dock = QDockWidget("Folien", self)
+        slide_dock.setWidget(self.strip)
+        self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, slide_dock)
+        self.layout_list = QListWidget()
+        self.layout_list.setMaximumWidth(168)
+        self.layout_list.setMinimumWidth(132)
+        for _key, label in SLIDE_LAYOUTS:
+            self.layout_list.addItem(label)
+        self.layout_list.itemClicked.connect(lambda _item: self.apply_current_layout())
+        layout_dock = QDockWidget("Layout", self)
+        layout_dock.setWidget(self.layout_list)
+        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, layout_dock)
         self._build_actions()
         self._build_toolbar()
+        self._build_status()
         self.apply_theme(self.prefs.get("theme") or "farbe")
+        self._restore_menu_bar()
         self.refresh_thumbs()
         self.statusBar().showMessage("Andreas Meyer · ame@sellerbach.de · Zeiger: Maus · Offline · kein Tracking")
         self.show()
@@ -268,6 +310,14 @@ class MainWindow(QMainWindow):
         self._add(edit_menu, "Aktion beim Klick…", self.edit_action)
         self._add(help_menu, "Hilfe", self.open_help, "F1")
         self._add(help_menu, "Info", self.open_about)
+        self.menu_bar_action = QAction("Menüleiste", self)
+        self.menu_bar_action.setCheckable(True)
+        self.menu_bar_action.setChecked(True)
+        self.menu_bar_action.triggered.connect(self.set_menu_bar)
+        self.view_menu.addAction(self.menu_bar_action)
+        self._alt_shortcut = QShortcut(QKeySequence(Qt.Key.Key_Alt), self)
+        self._alt_shortcut.setContext(Qt.ShortcutContext.ApplicationShortcut)
+        self._alt_shortcut.activated.connect(self.show_menu_bar)
 
     def _add(self, menu, title, slot, shortcut: str | None = None) -> None:
         action = QAction(title, self)
@@ -276,48 +326,67 @@ class MainWindow(QMainWindow):
         action.triggered.connect(slot)
         menu.addAction(action)
 
-    def _tool_action(self, bar: QToolBar, key: str, label: str) -> None:
+    def _tool_action(self, bar: QToolBar, key: str, label: str, tip: str | None = None) -> None:
         action = QAction(label, self)
+        action.setToolTip(tip or label)
+        action.setStatusTip(tip or label)
         action.setCheckable(True)
         action.triggered.connect(lambda _checked=False, name=key: self.set_tool(name))
         bar.addAction(action)
         self.tool_buttons[key] = action
 
-    def _plain_action(self, bar: QToolBar, label: str, slot) -> None:
+    def _plain_action(self, bar: QToolBar, label: str, slot, tip: str | None = None) -> None:
         action = QAction(label, self)
+        action.setToolTip(tip or label)
+        action.setStatusTip(tip or label)
         action.triggered.connect(slot)
         bar.addAction(action)
+
+    def _group_bar(self, title: str) -> QToolBar:
+        bar = QToolBar(title)
+        bar.setMovable(False)
+        bar.setFloatable(False)
+        bar.setMinimumHeight(40)
+        bar.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextOnly)
+        heading = QLabel(title)
+        heading.setObjectName("groupHeading")
+        bar.addWidget(heading)
+        return bar
 
     def _build_toolbar(self) -> None:
         self.tool_buttons = {}
         self._toolbars = {}
         self._toolbar_actions = {}
-        auswahl = QToolBar("Auswahl")
-        text_bar = QToolBar("Text")
-        grafik = QToolBar("Grafik/Foto")
-        video = QToolBar("Video")
-        player = QToolBar("Player")
-        for bar in (auswahl, text_bar, grafik, video, player):
-            bar.setMovable(False)
-            bar.setFloatable(False)
-        self._tool_action(auswahl, "select", "Auswahl")
-        self._tool_action(auswahl, "text", "Text")
-        self._tool_action(auswahl, "chart", "Diagramm")
-        self._tool_action(auswahl, "pan", "Verschieben")
-        self._plain_action(auswahl, "3D", self.insert_3d)
+        folie = self._group_bar("Folie")
+        schrift = self._group_bar("Schrift")
+        absatz = self._group_bar("Absatz")
+        zeichnen = self._group_bar("Zeichnen")
+        objekte = self._group_bar("Objekte")
+        video = self._group_bar("Video")
+        player = self._group_bar("Player")
+        self._plain_action(folie, "＋", self.add_slide, "Neue Folie")
+        self._plain_action(folie, "−", self.delete_slide, "Folie löschen")
+        self._plain_action(folie, "⧉", self.duplicate_slide, "Folie duplizieren")
+        self._plain_action(folie, "↑", lambda _checked=False: self.move_slide(-1), "Folie nach oben")
+        self._plain_action(folie, "↓", lambda _checked=False: self.move_slide(1), "Folie nach unten")
+        self._tool_action(folie, "pan", "✥", "Verschieben")
         self.theme_box = QComboBox()
         self.theme_box.addItems(["hell", "dunkel", "farbe", "graustufen"])
         self.theme_box.setCurrentText(self.prefs.get("theme") or "farbe")
+        self.theme_box.setToolTip("Thema")
+        self.theme_box.setMaximumWidth(120)
         self.theme_box.currentTextChanged.connect(self.apply_theme)
-        auswahl.addWidget(self.theme_box)
+        folie.addWidget(self.theme_box)
         self.touch_box = QComboBox()
-        self.touch_box.addItems(["Touch: verschieben", "Touch: zeichnen"])
+        self.touch_box.addItems(["Touch schieben", "Touch zeichnen"])
+        self.touch_box.setToolTip("Touch: verschieben oder zeichnen")
+        self.touch_box.setMaximumWidth(140)
         self.touch_box.currentIndexChanged.connect(self._touch_mode)
-        auswahl.addWidget(self.touch_box)
-        self.tool_buttons["select"].setChecked(True)
+        folie.addWidget(self.touch_box)
 
-        self._plain_action(text_bar, "Textfeld", self.insert_text_box)
         self.font_box = QFontComboBox()
+        self.font_box.setMaximumWidth(160)
+        self.font_box.setToolTip("Schriftart")
         self.font_box.currentFontChanged.connect(self.apply_font)
         self.size_box = QSpinBox()
         self.size_box.setRange(8, 120)
@@ -325,108 +394,105 @@ class MainWindow(QMainWindow):
         self.size_box.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.size_box.setKeyboardTracking(True)
         self.size_box.setAccelerated(True)
+        self.size_box.setToolTip("Schriftgröße")
+        self.size_box.setMaximumWidth(72)
         self.size_box.valueChanged.connect(self.apply_size)
-        text_bar.addWidget(self.font_box)
-        text_bar.addWidget(QLabel("Größe"))
-        text_bar.addWidget(self.size_box)
-        for label, slot in (
-            ("Fett", self.toggle_bold),
-            ("Kursiv", self.toggle_italic),
-            ("Unterstrichen", self.toggle_underline),
-            ("Farbe", self.pick_color),
-            ("Links", lambda: self._align_text("left")),
-            ("Zentriert", lambda: self._align_text("center")),
-            ("Rechts", lambda: self._align_text("right")),
-        ):
-            self._plain_action(text_bar, label, slot)
+        schrift.addWidget(self.font_box)
+        schrift.addWidget(self.size_box)
+        self._plain_action(schrift, "T", self.insert_text_box, "Textfeld einfügen")
+        self._plain_action(schrift, "F", self.toggle_bold, "Fett")
+        self._plain_action(schrift, "K", self.toggle_italic, "Kursiv")
+        self._plain_action(schrift, "U", self.toggle_underline, "Unterstrichen")
+        self._plain_action(schrift, "A", self.pick_color, "Schriftfarbe")
 
-        for key, label in (
-            ("rect", "Rechteck"),
-            ("ellipse", "Ellipse"),
-            ("roundrect", "Rahmen"),
-            ("arrow", "Pfeil"),
-            ("star", "Stern"),
-            ("line", "Linie"),
-            ("pen", "Stift"),
-            ("highlighter", "Marker"),
-            ("eraser", "Radierer"),
+        self._plain_action(absatz, "⬅", lambda _checked=False: self._align_text("left"), "Linksbündig")
+        self._plain_action(absatz, "↔", lambda _checked=False: self._align_text("center"), "Zentriert")
+        self._plain_action(absatz, "➡", lambda _checked=False: self._align_text("right"), "Rechtsbündig")
+
+        for key, symbol, tip in (
+            ("rect", "▭", "Rechteck"),
+            ("ellipse", "◯", "Ellipse"),
+            ("roundrect", "▢", "Rahmen"),
+            ("arrow", "→", "Pfeil"),
+            ("star", "★", "Stern"),
+            ("line", "／", "Linie"),
+            ("pen", "✎", "Stift"),
+            ("highlighter", "🖍", "Marker"),
+            ("eraser", "⌫", "Radierer"),
         ):
-            self._tool_action(grafik, key, label)
+            self._tool_action(zeichnen, key, symbol, tip)
         self.pen_width = QSpinBox()
         self.pen_width.setRange(1, 48)
         self.pen_width.setValue(6)
+        self.pen_width.setMaximumWidth(64)
+        self.pen_width.setToolTip("Stärke")
         self.pen_width.valueChanged.connect(self._pen)
         self.pen_curve = QSpinBox()
         self.pen_curve.setRange(2, 40)
         self.pen_curve.setValue(10)
+        self.pen_curve.setMaximumWidth(64)
+        self.pen_curve.setToolTip("Druck")
         self.pen_curve.valueChanged.connect(self._pen)
         self.pen_smooth = QSpinBox()
         self.pen_smooth.setRange(0, 4)
         self.pen_smooth.setValue(1)
+        self.pen_smooth.setMaximumWidth(64)
+        self.pen_smooth.setToolTip("Glättung")
         self.pen_smooth.valueChanged.connect(self._pen)
-        grafik.addWidget(QLabel("Stärke"))
-        grafik.addWidget(self.pen_width)
-        grafik.addWidget(QLabel("Druck"))
-        grafik.addWidget(self.pen_curve)
-        grafik.addWidget(QLabel("Glättung"))
-        grafik.addWidget(self.pen_smooth)
-        grafik_foto = QToolBar("Grafik/Foto")
-        grafik_foto.setMovable(False)
-        grafik_foto.setFloatable(False)
-        self._plain_action(grafik_foto, "Bild einfügen", self.insert_image)
-        for label, mode in (
-            ("Aufhellen", "bright"),
-            ("Grau", "gray"),
-            ("Weich", "blur"),
-            ("Scharf", "sharpen"),
-            ("Spiegeln", "flip"),
-            ("Freistellen", "knockout"),
+        zeichnen.addWidget(self.pen_width)
+        zeichnen.addWidget(self.pen_curve)
+        zeichnen.addWidget(self.pen_smooth)
+        self._tool_action(objekte, "select", "⌖", "Auswahl")
+        self._tool_action(objekte, "text", "T", "Text")
+        self._tool_action(objekte, "chart", "▦", "Diagramm")
+        self.tool_buttons["select"].setChecked(True)
+        self._plain_action(objekte, "🖼", self.insert_image, "Bild einfügen")
+        self._plain_action(objekte, "▶", self.insert_video, "Video einfügen")
+        self._plain_action(objekte, "▣", self.insert_3d, "3D-Modell")
+        self._plain_action(objekte, "⧉", self.group_selected, "Gruppieren")
+        self._plain_action(objekte, "▢", self.ungroup_selected, "Gruppierung aufheben")
+        for symbol, mode, tip in (
+            ("☀", "bright", "Aufhellen"),
+            ("◐", "gray", "Graustufen"),
+            ("○", "blur", "Weichzeichnen"),
+            ("✦", "sharpen", "Schärfen"),
+            ("⇄", "flip", "Spiegeln"),
+            ("✂", "knockout", "Eckfarbe freistellen"),
         ):
-            self._plain_action(grafik_foto, label, lambda _checked=False, name=mode: self.filter_image(name))
+            self._plain_action(objekte, symbol, lambda _checked=False, name=mode: self.filter_image(name), tip)
 
-        self._plain_action(video, "Video einfügen", self.insert_video)
-        self._plain_action(video, "Kamera-Einblendung", self.open_camera)
+        self._plain_action(video, "▶", self.insert_video, "Video einfügen")
+        self._plain_action(video, "📷", self.open_camera, "Kamera-Einblendung")
+        self._plain_action(player, "▶", self.present, "Präsentieren")
+        self._plain_action(player, "⏯", self.play_slideshow, "Slideshow abspielen")
+        self._plain_action(player, "⊞", self.open_zui, "Leinwand")
+        self._plain_action(player, "↝", self.preview_morph, "Morph-Vorschau")
+        self._plain_action(player, "✧", self.preview_entrance, "Eingangseffekt")
 
-        self._plain_action(player, "Präsentieren", self.present)
-        self._plain_action(player, "Slideshow", self.play_slideshow)
-        self._plain_action(player, "Leinwand", self.open_zui)
-        self._plain_action(player, "Morph", self.preview_morph)
-        self._plain_action(player, "Eingangseffekt", self.preview_entrance)
-
-        for bar in (auswahl, text_bar, grafik, grafik_foto, video, player):
-            bar.setMinimumHeight(40)
-        self.addToolBar(auswahl)
-        self.addToolBarBreak()
-        self.addToolBar(text_bar)
-        self.addToolBarBreak()
-        self.addToolBar(grafik)
-        self.addToolBarBreak()
-        self.addToolBar(grafik_foto)
-        self.addToolBarBreak()
-        self.addToolBar(video)
-        self.addToolBar(player)
-        self._toolbars = {
-            "auswahl": auswahl,
-            "text": text_bar,
-            "grafik": grafik,
-            "video": video,
-            "player": player,
-        }
-        self._toolbar_extra = {"grafik": [grafik_foto]}
+        rows = (
+            ("auswahl", folie, "Folie"),
+            ("text", schrift, "Schrift"),
+            ("grafik", zeichnen, "Zeichnen"),
+            ("video", video, "Video"),
+            ("player", player, "Player"),
+        )
+        self._toolbars = {key: bar for key, bar, _title in rows}
+        self._toolbar_extra = {"text": [absatz], "grafik": [objekte]}
+        for key, bar, _title in rows:
+            self.addToolBar(bar)
+            self.addToolBarBreak()
+            for extra in self._toolbar_extra.get(key, []):
+                self.addToolBar(extra)
+                self.addToolBarBreak()
         self._ensure_toolbars_visible_once()
-        for key, title in (
-            ("auswahl", "Auswahl"),
-            ("text", "Text"),
-            ("grafik", "Grafik/Foto"),
-            ("video", "Video"),
-            ("player", "Player"),
-        ):
+        for key, _bar, title in rows:
             action = QAction(title, self)
             action.setCheckable(True)
             visible = self._settings_bool(f"toolbar/{key}", True)
             action.setChecked(visible)
             self._show_toolbar(key, visible)
             action.toggled.connect(lambda on, name=key: self._show_toolbar(name, bool(on)))
+            action.triggered.connect(lambda on, name=key: self._show_toolbar(name, bool(on)))
             for bar in self._bars(key):
                 bar.visibilityChanged.connect(lambda on, name=key: self._remember_toolbar(name, bool(on)))
             self.view_menu.addAction(action)
@@ -434,19 +500,82 @@ class MainWindow(QMainWindow):
         self.view_menu.addSeparator()
         self._add(self.view_menu, "Alle Leisten anzeigen", self.show_all_toolbars)
 
-        side = QWidget()
-        layout = QVBoxLayout(side)
-        layout.setContentsMargins(8, 8, 8, 8)
-        for label, slot in (("Folie +", self.add_slide), ("Folie −", self.delete_slide), ("Nach oben", lambda: self.move_slide(-1)), ("Nach unten", lambda: self.move_slide(1))):
-            from PySide6.QtWidgets import QPushButton
+    def _build_status(self) -> None:
+        self.menu_button = QPushButton("Menü")
+        self.menu_button.setToolTip("Menüleiste einblenden")
+        self.menu_button.clicked.connect(self.show_menu_bar)
+        self.slide_pos = QLabel("Folie 1 von 1")
+        self.zoom_label = QLabel("100 %")
+        self.statusBar().addWidget(self.menu_button)
+        self.statusBar().addPermanentWidget(self.slide_pos)
+        self.statusBar().addPermanentWidget(self.zoom_label)
 
-            button = QPushButton(label)
-            button.clicked.connect(slot)
-            layout.addWidget(button)
-        layout.addStretch(1)
-        dock = QDockWidget("Folienaktionen", self)
-        dock.setWidget(side)
-        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, dock)
+    def _restore_menu_bar(self) -> None:
+        visible = self._settings_bool("menubar/visible", True)
+        self.set_menu_bar(visible)
+
+    def set_menu_bar(self, on: bool) -> None:
+        self.menuBar().setVisible(bool(on))
+        self.settings.setValue("menubar/visible", bool(on))
+        action = getattr(self, "menu_bar_action", None)
+        if action is not None and action.isChecked() != bool(on):
+            action.blockSignals(True)
+            action.setChecked(bool(on))
+            action.blockSignals(False)
+
+    def show_menu_bar(self) -> None:
+        self.set_menu_bar(True)
+
+    def hide_menu_bar(self) -> None:
+        self.set_menu_bar(False)
+
+    def apply_current_layout(self) -> None:
+        row = self.layout_list.currentRow()
+        if row < 0 or row >= len(SLIDE_LAYOUTS):
+            return
+        self._push()
+        apply_slide_layout(self.current_slide(), SLIDE_LAYOUTS[row][0])
+        self.refresh_thumbs()
+
+    def commit_notes(self) -> None:
+        if not self.presentation.slides:
+            return
+        text = self.notes_edit.toPlainText()
+        slide = self.current_slide()
+        if slide.notes == text:
+            return
+        self._push()
+        slide.notes = text
+        self.refresh_thumbs()
+
+    def _load_notes(self) -> None:
+        text = self.current_slide().notes if self.presentation.slides else ""
+        if self.notes_edit.toPlainText() == text:
+            return
+        self.notes_edit.blockSignals(True)
+        self.notes_edit.setPlainText(text)
+        self.notes_edit.blockSignals(False)
+
+    def _update_status_counts(self) -> None:
+        count = len(self.presentation.slides) if self.presentation else 0
+        index = self.canvas.slide_index + 1 if count else 0
+        if hasattr(self, "slide_pos"):
+            self.slide_pos.setText(f"Folie {index} von {count}")
+            percent = int(round(self.canvas.view_scale * 100))
+            self.zoom_label.setText(f"{percent} %")
+
+    def keyReleaseEvent(self, event) -> None:
+        if event.key() == Qt.Key.Key_Alt and not event.isAutoRepeat():
+            self.show_menu_bar()
+        super().keyReleaseEvent(event)
+
+    def eventFilter(self, watched, event) -> bool:
+        if watched is getattr(self, "notes_edit", None) and event.type() == QEvent.Type.FocusOut:
+            self.commit_notes()
+        if event.type() == QEvent.Type.KeyRelease and event.key() == Qt.Key.Key_Alt:
+            if not (event.modifiers() & (Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.ShiftModifier)):
+                self.show_menu_bar()
+        return super().eventFilter(watched, event)
 
     def _ensure_toolbars_visible_once(self) -> None:
         """Ein früher gespeicherter Aus-Zustand hat die Leisten verschluckt. Einmal zurücksetzen."""
@@ -543,12 +672,18 @@ class MainWindow(QMainWindow):
         if self.presentation.slides:
             self.strip.setCurrentRow(max(0, min(row, len(self.presentation.slides) - 1)))
         self.strip.blockSignals(False)
+        self._update_status_counts()
+        if not self.notes_edit.hasFocus():
+            self._load_notes()
         self.canvas.update()
 
     def _thumb_clicked(self, row: int) -> None:
         if row < 0:
             return
+        self.commit_notes()
         self.canvas.set_index(row)
+        self._load_notes()
+        self._update_status_counts()
 
     def current_slide(self) -> Slide:
         return self.presentation.slides[self.canvas.slide_index]
@@ -598,14 +733,14 @@ class MainWindow(QMainWindow):
     def load_path(self, path: Path) -> None:
         suffix = path.suffix.lower()
         try:
-            if suffix == ".pptx":
-                presentation = import_pptx(path)
+            if suffix == ".pptx" or suffix in {".potx", ".ppsx", ".pdrx", ".prdx", ".prsx", ".prvx", ".rtx", ".ppt"}:
+                presentation = load_presentation(path)
             elif suffix == ".odp":
                 presentation = import_odp(path)
             elif suffix == ".odisp":
                 presentation = load_odisp(path)
             else:
-                show_text(self, "Öffnen", "Diese Datei lässt sich nicht laden. Erwartet wird .odisp, .pptx oder .odp.")
+                show_text(self, "Öffnen", "Diese Datei lässt sich nicht laden. Erwartet wird .odisp, .pptx, .potx, .ppsx, .ppt, .odp oder ein Bild oder Video.")
                 return
         except Exception as exc:
             show_text(self, "Öffnen", describe_open_error(exc, path.name))
@@ -658,7 +793,7 @@ class MainWindow(QMainWindow):
             self,
             "Slideshow öffnen",
             "",
-            "Slideshow (*.oshow);;Präsentation (*.odisp *.pptx *.odp)",
+            SLIDESHOW_FILTER,
         )
         if not path:
             return
@@ -698,7 +833,7 @@ class MainWindow(QMainWindow):
             self,
             "Slideshow aus Dateien",
             "",
-            "Medien (*.png *.jpg *.jpeg *.webp *.bmp *.gif *.mp4 *.mov *.webm *.mkv *.avi *.txt *.md *.pdf)",
+            SLIDESHOW_MEDIA_FILTER,
         )
         if not paths:
             return
@@ -731,6 +866,16 @@ class MainWindow(QMainWindow):
             show_text(self, "Slideshow", "Keine Slideshow. Datei → Slideshow aus Dateien oder Slideshow öffnen.")
             return
         PresenterDialog(self, self, slideshow=self.slideshow).exec()
+
+    def duplicate_slide(self) -> None:
+        self._push()
+        copy = self.current_slide().clone()
+        copy.id = new_id()
+        copy.name = f"{copy.name} Kopie"
+        index = self.canvas.slide_index + 1
+        self.presentation.slides.insert(index, copy)
+        self.canvas.set_index(index)
+        self.refresh_thumbs()
 
     def add_slide(self) -> None:
         self._push()
@@ -906,13 +1051,16 @@ class MainWindow(QMainWindow):
         self.refresh_thumbs()
 
     def background_image(self) -> None:
-        path, _ = QFileDialog.getOpenFileName(self, "Hintergrund", "", "Bilder (*.png *.jpg *.jpeg *.webp)")
+        path, _ = QFileDialog.getOpenFileName(self, "Hintergrund", "", IMAGE_FILTER)
         if not path:
+            return
+        usable = self._usable_image(path)
+        if not usable:
             return
         self._push()
         slide = self.current_slide()
         slide.background.mode = "image"
-        slide.background.image = path
+        slide.background.image = usable
         slide.background.fit = "cover"
         slide.background.opacity = 1
         self.refresh_thumbs()
@@ -947,15 +1095,46 @@ class MainWindow(QMainWindow):
         self.canvas.editor.selectAll()
         self.statusBar().showMessage("Textfeld eingefügt")
 
+    def _place_media(self, path: str, x: float, y: float) -> None:
+        self._push()
+        result = place_on_slide(self.current_slide(), path, x, y)
+        if result == "textfile":
+            text = read_text_file(path)
+            if len(text) > 800:
+                self.presentation.slides.extend(slides_from_text(text, Path(path).stem).slides)
+            else:
+                self.current_slide().objects.append(
+                    SlideObject(
+                        id=new_id(),
+                        kind="text",
+                        x=x,
+                        y=y,
+                        w=0.4,
+                        h=0.3,
+                        name="import",
+                        props={"text": text[:2000] or Path(path).name, "font_size": 18, "color": "#1B1F2A", "font_family": "Segoe UI"},
+                    )
+                )
+        elif isinstance(result, str) and result.startswith("hint:"):
+            show_text(self, "Bild", result.split(":", 1)[1])
+        self.refresh_thumbs()
+
+    def _usable_image(self, path: str) -> str | None:
+        from officedisplay.io.media import prepare_image
+
+        usable, hint, use_text = prepare_image(path)
+        if usable:
+            return usable
+        show_text(self, "Bild", hint or "Die Datei lässt sich nicht als Bild lesen. Der Textweg bleibt über Einfügen → Text- oder PDF-Datei.")
+        return None
+
     def insert_image(self) -> None:
-        path, _ = QFileDialog.getOpenFileName(self, "Bild", "", "Bilder (*.png *.jpg *.jpeg *.webp *.bmp)")
+        path, _ = QFileDialog.getOpenFileName(self, "Bild", "", IMAGE_FILTER)
         if path:
-            self._push()
-            place_on_slide(self.current_slide(), path, 0.1, 0.1)
-            self.refresh_thumbs()
+            self._place_media(path, 0.1, 0.1)
 
     def insert_video(self) -> None:
-        path, _ = QFileDialog.getOpenFileName(self, "Video", "", "Video (*.mp4 *.mov *.webm *.mkv)")
+        path, _ = QFileDialog.getOpenFileName(self, "Video", "", VIDEO_FILTER)
         if path:
             self._push()
             place_on_slide(self.current_slide(), path, 0.12, 0.12)
@@ -975,9 +1154,9 @@ class MainWindow(QMainWindow):
         self._push()
         for path in paths:
             kind = classify(path)
-            if kind == "pptx":
+            if kind in {"pptx", "deck"}:
                 try:
-                    imported = import_pptx(path)
+                    imported = load_presentation(path)
                 except Exception as exc:
                     show_text(self, "Öffnen", describe_open_error(exc, Path(path).name))
                     continue
@@ -1000,7 +1179,26 @@ class MainWindow(QMainWindow):
                 png = render_png(obj_text=Path(path).read_text(encoding="utf-8", errors="replace"))
                 self._insert_png(png, "modell")
             else:
-                place_on_slide(self.current_slide(), path, x, y)
+                result = place_on_slide(self.current_slide(), path, x, y)
+                if result == "textfile":
+                    text = read_text_file(path)
+                    if len(text) > 800:
+                        self.presentation.slides.extend(slides_from_text(text, Path(path).stem).slides)
+                    else:
+                        self.current_slide().objects.append(
+                            SlideObject(
+                                id=new_id(),
+                                kind="text",
+                                x=x,
+                                y=y,
+                                w=0.4,
+                                h=0.3,
+                                name="import",
+                                props={"text": text[:2000] or Path(path).name, "font_size": 18, "color": "#1B1F2A", "font_family": "Segoe UI"},
+                            )
+                        )
+                elif isinstance(result, str) and result.startswith("hint:"):
+                    show_text(self, "Bild", result.split(":", 1)[1])
         self.refresh_thumbs()
 
     def _drop_text(self, text: str, x: float, y: float) -> None:
@@ -1023,8 +1221,52 @@ class MainWindow(QMainWindow):
         self.refresh_thumbs()
 
     def _video_message(self, message: str) -> None:
-        if message.startswith("video:"):
-            show_text(self, "Video", "Datei: " + message[6:] + "\nDie Wiedergabe nutzt den Systemplayer, sobald Qt Multimedia verfügbar ist.")
+        if not message.startswith("video:"):
+            return
+        hint = self._play_clip(message[6:])
+        if hint:
+            show_text(self, "Video", hint)
+
+    def _stop_clip(self) -> None:
+        player = getattr(self, "_clip_player", None)
+        if player is not None:
+            try:
+                player.stop()
+            except Exception:
+                pass
+            player.deleteLater()
+            self._clip_player = None
+        audio = getattr(self, "_clip_audio", None)
+        if audio is not None:
+            audio.deleteLater()
+            self._clip_audio = None
+
+    def _play_clip(self, path: str) -> str:
+        """Spielt über Qt. Fehlt der Codec, kommt Pfad und Hinweis, kein Abbruch."""
+        try:
+            from PySide6.QtCore import QUrl
+            from PySide6.QtMultimedia import QAudioOutput, QMediaPlayer
+        except Exception:
+            return f"Qt kann dieses Video nicht abspielen.\n{path}"
+        try:
+            self._stop_clip()
+            player = QMediaPlayer(self)
+            audio = QAudioOutput(self)
+            player.setAudioOutput(audio)
+            player.setSource(QUrl.fromLocalFile(path))
+            self._clip_player = player
+            self._clip_audio = audio
+
+            def failed(*_args, media=path) -> None:
+                show_text(self, "Video", f"Der Codec fehlt oder die Datei lässt sich nicht abspielen.\n{media}")
+
+            player.errorOccurred.connect(failed)
+            if player.error() != QMediaPlayer.Error.NoError:
+                return f"Der Codec fehlt oder die Datei lässt sich nicht abspielen.\n{path}"
+            player.play()
+            return ""
+        except Exception:
+            return f"Der Codec fehlt oder die Datei lässt sich nicht abspielen.\n{path}"
 
     def filter_image(self, mode: str) -> None:
         objects = [obj for obj in self.selected_objects() if obj.kind == "image" and obj.props.get("path")]
@@ -1350,9 +1592,13 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage("Bitte eine Form auswählen.")
             return
         if not path:
-            path, _ = QFileDialog.getOpenFileName(self, "Bild in die Form", "", "Bilder (*.png *.jpg *.jpeg *.webp *.bmp)")
+            path, _ = QFileDialog.getOpenFileName(self, "Bild in die Form", "", IMAGE_FILTER)
             if not path:
                 return
+        usable = self._usable_image(path)
+        if not usable:
+            return
+        path = usable
         self._push()
         target.props["image"] = path
         target.props["content"] = "image"

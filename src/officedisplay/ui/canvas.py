@@ -26,6 +26,7 @@ class SlideCanvas(QWidget):
     pointerKindChanged = Signal(str)
     selectionChanged = Signal(list)
     statusMessage = Signal(str)
+    viewChanged = Signal()
     filesDropped = Signal(list, float, float)
     textDropped = Signal(str, float, float)
     shapeContext = Signal(str, QPoint)
@@ -614,6 +615,7 @@ class SlideCanvas(QWidget):
             if pinch is not None and pinch.changeFlags() & pinch.ChangeFlag.ScaleFactorChanged:
                 self.view_scale = max(0.3, min(4.0, self.view_scale * pinch.scaleFactor()))
                 self.pointerKindChanged.emit("Touch")
+                self.viewChanged.emit()
                 self.update()
                 return True
         return super().event(event)
@@ -627,6 +629,7 @@ class SlideCanvas(QWidget):
             if self._pinch_distance:
                 factor = distance / self._pinch_distance if self._pinch_distance else 1
                 self.view_scale = max(0.3, min(4.0, self.view_scale * factor))
+                self.viewChanged.emit()
             self._pinch_distance = distance
             if event.type() == QEvent.Type.TouchEnd:
                 self._pinch_distance = None
@@ -649,6 +652,7 @@ class SlideCanvas(QWidget):
         if event.modifiers() & Qt.KeyboardModifier.ControlModifier:
             delta = event.angleDelta().y()
             self.view_scale = max(0.3, min(4.0, self.view_scale * (1.1 if delta > 0 else 0.9)))
+            self.viewChanged.emit()
             self.update()
         else:
             super().wheelEvent(event)

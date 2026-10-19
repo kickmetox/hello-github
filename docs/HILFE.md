@@ -8,10 +8,15 @@ Standard ist offline. Die Statuszeile zeigt „Offline · kein Tracking“, sola
 
 ## Fläche
 
-- Mitte: die aktuelle Folie.
-- Rechts: Miniaturen. Ein Klick lädt die Folie. Darunter die Folienaktionen.
-- Oben: Leisten Auswahl, Text, Grafik/Foto, Video und Player. Menü Ansicht schaltet jede Leiste ein und aus. „Alle Leisten anzeigen“ setzt sie alle an. Der Zustand bleibt in den Programmeinstellungen. Die Folienaktionen bleiben sichtbar.
-- Unten: Zeigerart (Maus, Stift, Radierer, Touch).
+- Mitte: die aktuelle Folie mit ihrer eigenen Hintergrundfarbe. Darunter die Notizzeile, gebunden an die Sprechernotiz.
+- Links: Folienminiaturen. Ein Klick lädt die Folie.
+- Rechts: schmale Layout-Leiste. Ein Klick setzt Titel, Titel+Inhalt, zwei Spalten, Zitat oder leer nur auf der aktuellen Folie.
+- Oben: Gruppen Folie, Schrift, Absatz, Zeichnen und Objekte, jeweils in einer eigenen Zeile, dazu Video und Player. Ansicht schaltet die Leisten. „Menü“ und Alt holen die Menüleiste zurück. Der Zustand bleibt gespeichert.
+- Unten: „Folie n von m“, Zoom und die Zeigerart.
+
+## Formate
+
+Öffnen, Import, Bild, Video, Hintergrund, Slideshow und Ziehen kennen diese Endungen. `.pptx`, `.potx` und `.ppsx` sind dasselbe Office-Paket. `.pdrx`, `.prdx`, `.prsx` und `.prvx` werden gelesen, wenn sie ein ZIP mit `ppt/presentation.xml` sind. `.rtx` ebenso, sonst als Text oder RTF zu Folien. `.ppt` nur, wenn `soffice` schon da ist; sonst eine Meldung, ohne LibreOffice nachzuinstallieren. Bilder: jpg, jpeg, png, tif, tiff, bmp über Pillow. HEIC nur mit pillow-heif, RAW nur mit einem vorhandenen Paket wie rawpy, sonst ein Hinweis. svg über Qt Svg, ai und eps als erste Seite, wenn Pillow oder Qt sie lesen, sonst ein Hinweis. pdf wird die erste Seite als Bild, wenn Qt Pdf das kann, sonst der bisherige Textweg. Video mp4, mov, mkv, webm und avi legt ein Objekt an und spielt über Qt; fehlt der Codec, bleiben Pfad und Hinweis.
 
 Themen: hell, dunkel, farbe, graustufen.
 
