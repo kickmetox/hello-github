@@ -42,7 +42,7 @@ from officedisplay.io.data_bind import bind_chart, refresh_bindings
 from officedisplay.io.incoming import classify, place_on_slide
 from officedisplay.io.native_io import load_odisp, save_odisp
 from officedisplay.io.odp_io import export_odp, import_odp
-from officedisplay.io.pptx_io import export_pptx, import_pptx
+from officedisplay.io.pptx_io import PptxReadError, export_pptx, import_pptx
 from officedisplay.io.slideshow_io import (
     entries_from_paths,
     export_slideshow_odisp,
@@ -87,6 +87,16 @@ from officedisplay.design.palette import constrain_color, constrain_font
 
 OPEN_FILTER = "Präsentationen (*.odisp *.pptx *.PPTX *.odp *.ODP);;Office Display (*.odisp);;PowerPoint (*.pptx *.PPTX);;OpenDocument (*.odp *.ODP);;Alle Dateien (*)"
 PPTX_FILTER = "PowerPoint (*.pptx *.PPTX);;Alle Dateien (*)"
+
+
+def describe_open_error(exc: Exception, name: str) -> str:
+    """Konkrete Importmeldung behalten. Nur Unbekanntes wird zur Sammelzeile."""
+    message = str(exc).strip()
+    if isinstance(exc, PptxReadError) or "verschlüsselt" in message or "lässt sich nicht laden" in message:
+        return message or f"Die Datei lässt sich nicht laden.\n{name}"
+    return f"Die Datei lässt sich nicht laden.\n{name}"
+
+
 TOOLBAR_KEYS = ("auswahl", "text", "grafik", "video", "player")
 
 
@@ -598,10 +608,7 @@ class MainWindow(QMainWindow):
                 show_text(self, "Öffnen", "Diese Datei lässt sich nicht laden. Erwartet wird .odisp, .pptx oder .odp.")
                 return
         except Exception as exc:
-            message = str(exc).strip()
-            if "lässt sich nicht laden" not in message:
-                message = f"Die Datei lässt sich nicht laden.\n{path.name}"
-            show_text(self, "Öffnen", message)
+            show_text(self, "Öffnen", describe_open_error(exc, path.name))
             return
         if not presentation.slides:
             show_text(self, "Öffnen", "Die Datei enthält keine Folien.")
@@ -972,10 +979,7 @@ class MainWindow(QMainWindow):
                 try:
                     imported = import_pptx(path)
                 except Exception as exc:
-                    message = str(exc).strip()
-                    if "lässt sich nicht laden" not in message:
-                        message = "Die PowerPoint-Datei lässt sich nicht laden."
-                    show_text(self, "Öffnen", message)
+                    show_text(self, "Öffnen", describe_open_error(exc, Path(path).name))
                     continue
                 self.presentation.slides.extend(imported.slides)
             elif kind == "odp":
