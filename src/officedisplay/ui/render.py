@@ -153,7 +153,18 @@ def _text(painter: QPainter, obj, box: QRectF, scale: float = 1.0) -> None:
         "center": Qt.AlignmentFlag.AlignHCenter,
         "right": Qt.AlignmentFlag.AlignRight,
     }.get(obj.props.get("align") or "left", Qt.AlignmentFlag.AlignLeft)
-    painter.drawText(box, align | Qt.AlignmentFlag.AlignTop | Qt.TextFlag.TextWordWrap, str(obj.props.get("text") or ""))
+    text = str(obj.props.get("text") or "")
+    valign = obj.props.get("valign") or "top"
+    if valign == "top":
+        painter.drawText(box, align | Qt.AlignmentFlag.AlignTop | Qt.TextFlag.TextWordWrap, text)
+        return
+    measured = painter.boundingRect(QRectF(0, 0, box.width(), 100000), align | Qt.TextFlag.TextWordWrap, text)
+    extra = box.height() - measured.height()
+    if extra > 0 and valign == "middle":
+        box = box.adjusted(0, extra / 2, 0, 0)
+    elif extra > 0 and valign == "bottom":
+        box = box.adjusted(0, extra, 0, 0)
+    painter.drawText(box, align | Qt.AlignmentFlag.AlignTop | Qt.TextFlag.TextWordWrap, text)
 
 
 def _shape_clip(kind: str, box: QRectF) -> QPainterPath:

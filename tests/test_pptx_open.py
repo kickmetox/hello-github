@@ -284,5 +284,131 @@ class PptxOpenTest(unittest.TestCase):
                 window.close()
 
 
+    def test_cover_photo_logo_and_title_keep_their_place(self):
+        from pptx import Presentation
+        from pptx.enum.text import MSO_ANCHOR, PP_ALIGN
+        from pptx.util import Emu, Pt
+
+        from officedisplay.io.pptx_io import import_pptx
+        from officedisplay.ui.main_window import MainWindow
+        from officedisplay.ui.render import render_thumb
+
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            wide = root / "himmel.png"
+            logo = root / "logo.png"
+            Image.new("RGB", (64, 36), (220, 20, 20)).save(wide)
+            Image.new("RGB", (16, 16), (20, 40, 180)).save(logo)
+            package = Presentation()
+            package.slide_width = Emu(12192000)
+            package.slide_height = Emu(6858000)
+            slide = package.slides.add_slide(package.slide_layouts[6])
+            width, height = int(package.slide_width), int(package.slide_height)
+            slide.shapes.add_picture(str(wide), Emu(0), Emu(0), package.slide_width, package.slide_height)
+            slide.shapes.add_picture(
+                str(logo),
+                Emu(int(width * 0.05)),
+                Emu(int(height * 0.06)),
+                Emu(int(width * 0.16)),
+                Emu(int(height * 0.22)),
+            )
+            box = slide.shapes.add_textbox(
+                Emu(int(width * 0.18)),
+                Emu(int(height * 0.36)),
+                Emu(int(width * 0.64)),
+                Emu(int(height * 0.28)),
+            )
+            frame = box.text_frame
+            frame.word_wrap = True
+            paragraph = frame.paragraphs[0]
+            paragraph.alignment = PP_ALIGN.CENTER
+            run = paragraph.add_run()
+            run.text = "Impact"
+            run.font.size = Pt(40)
+            frame.add_paragraph().text = "Zeile"
+            frame.vertical_anchor = MSO_ANCHOR.MIDDLE
+            path = root / "impact.pptx"
+            package.save(path)
+            loaded = import_pptx(path)
+            page = loaded.slides[0]
+            images = [obj for obj in page.objects if obj.kind == "image"]
+            cover = page.background.mode == "image" and bool(page.background.image)
+            self.assertTrue(
+                cover
+                or any(obj.x < 0.05 and obj.y < 0.05 and obj.w > 0.9 and obj.h > 0.9 for obj in images)
+            )
+            small = [obj for obj in images if obj.x < 0.3 and (obj.w < 0.9 or obj.h < 0.9)]
+            self.assertTrue(small)
+            text = next(obj for obj in page.objects if obj.kind == "text" and "Impact" in str(obj.props.get("text") or ""))
+            self.assertGreaterEqual(int(text.props.get("font_size") or 0), 28)
+            self.assertIn("Zeile", str(text.props.get("text") or ""))
+            self.assertEqual(text.props.get("align"), "center")
+            self.assertEqual(text.props.get("valign"), "middle")
+            self.assertGreater(text.y, 0.2)
+            thumb = render_thumb(loaded, page, 160)
+            red = 0
+            for y in range(0, thumb.height(), 3):
+                for x in range(0, thumb.width(), 3):
+                    color = thumb.pixelColor(x, y)
+                    if color.red() > 180 and color.green() < 80:
+                        red += 1
+            self.assertGreater(red, 20)
+            window = MainWindow()
+            try:
+                window.load_path(path)
+                self.assertEqual(window.canvas.slide_index, 0)
+                self.assertGreaterEqual(window.strip.count(), 1)
+                current = window.presentation.slides[0]
+                self.assertTrue(any("Impact" in str(obj.props.get("text") or "") for obj in current.objects))
+            finally:
+                window.close()
+
+    def test_layout_background_image_reaches_the_slide(self):
+        from pptx import Presentation
+        from pptx.oxml import parse_xml
+        from pptx.util import Emu
+
+        from officedisplay.io.pptx_io import import_pptx
+        from officedisplay.ui.render import render_thumb
+
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            image = root / "layout.png"
+            Image.new("RGB", (80, 45), (0, 0, 220)).save(image)
+            package = Presentation()
+            package.slide_width = Emu(12192000)
+            package.slide_height = Emu(6858000)
+            layout = package.slide_layouts[6]
+            package.slides.add_slide(layout)
+            _part, rid = layout.part.get_or_add_image_part(str(image))
+            xml = (
+                '<p:bg xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" '
+                'xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" '
+                'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+                f'<p:bgPr><a:blipFill><a:blip r:embed="{rid}"><a:alphaModFix amt="50000"/></a:blip>'
+                "<a:stretch><a:fillRect/></a:stretch></a:blipFill></p:bgPr></p:bg>"
+            )
+            common = layout._element.cSld
+            if common.bg is not None:
+                common._remove_bg()
+            common.spTree.addprevious(parse_xml(xml))
+            path = root / "layout-hintergrund.pptx"
+            package.save(path)
+            loaded = import_pptx(path)
+            page = loaded.slides[0]
+            images = [obj for obj in page.objects if obj.kind == "image"]
+            full = any(obj.x < 0.05 and obj.y < 0.05 and obj.w > 0.9 and obj.h > 0.9 for obj in images)
+            self.assertTrue(bool(page.background.image) or full)
+            self.assertAlmostEqual(page.background.opacity, 0.5, places=2)
+            self.assertNotIn("Click to edit", _texts(loaded))
+            thumb = render_thumb(loaded, page, 120)
+            ink = 0
+            for y in range(0, thumb.height(), 4):
+                color = thumb.pixelColor(thumb.width() // 2, y)
+                if color.blue() > color.red() + 20:
+                    ink += 1
+            self.assertGreater(ink, 3)
+
+
 if __name__ == "__main__":
     unittest.main()
