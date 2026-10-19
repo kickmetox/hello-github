@@ -4,7 +4,7 @@ import unittest
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtCore import QPoint
-from PySide6.QtWidgets import QApplication, QLabel, QToolButton
+from PySide6.QtWidgets import QApplication, QLabel, QToolBar, QToolButton
 
 from officedisplay.model.presentation import SlideObject, new_id
 from officedisplay.ui.dialogs import MagicDesignDialog, SettingsDialog
@@ -53,6 +53,35 @@ class AppearanceTest(unittest.TestCase):
             for bar in window._bars("grafik"):
                 self.assertFalse(bar.isVisible())
             self.assertTrue(window._toolbars["text"].isVisible())
+        finally:
+            window.show_all_toolbars()
+            window.close()
+
+    def test_one_toolbar_row_leaves_the_slide(self):
+        window = self._window(1360)
+        try:
+            window.show_menu_bar()
+            window.show_all_toolbars()
+            window.resize(1360, 860)
+            self.app.processEvents()
+            self.assertEqual(window.width(), 1360)
+            self.assertEqual(window.height(), 860)
+            bars = [bar for bar in window.findChildren(QToolBar) if bar.isVisible()]
+            self.assertEqual(len(bars), 1)
+            total = sum(bar.height() for bar in bars)
+            self.assertLess(total, 120)
+            self.assertLessEqual(bars[0].height(), 72)
+            self.assertGreater(window.canvas.height(), 500)
+            self.assertLessEqual(window.notes_edit.height(), 40)
+            bar = bars[0]
+            for tip in ("Fett", "Stift", "Bild einfügen", "Präsentieren"):
+                matches = [button for button in bar.findChildren(QToolButton) if button.toolTip() == tip]
+                self.assertTrue(matches, tip)
+                button = matches[0]
+                self.assertTrue(button.isVisible(), tip)
+                point = button.mapTo(bar, QPoint(1, 1))
+                self.assertGreaterEqual(point.x(), 0, tip)
+                self.assertLess(point.x(), bar.width(), tip)
         finally:
             window.show_all_toolbars()
             window.close()

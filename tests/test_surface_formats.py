@@ -107,6 +107,8 @@ class SurfaceFormatTest(unittest.TestCase):
     def test_menu_layout_and_notes(self):
         from PySide6.QtCore import QSettings
 
+        from PySide6.QtWidgets import QWidget
+
         from officedisplay.model.presentation import Slide, new_id
         from officedisplay.ui.main_window import MainWindow
 
@@ -143,9 +145,9 @@ class SurfaceFormatTest(unittest.TestCase):
             self.assertEqual(window.current_slide().notes, "")
             self.assertIn("Folie", window.slide_pos.text())
             self.assertIn("%", window.zoom_label.text())
-            headings = [label.text() for label in window.findChildren(type(window.slide_pos)) if label.objectName() == "groupHeading"]
+            titles = [widget.property("groupTitle") for widget in window.findChildren(QWidget)]
             for name in ("Folie", "Schrift", "Absatz", "Zeichnen", "Objekte"):
-                self.assertIn(name, headings)
+                self.assertIn(name, titles)
         finally:
             window.show_menu_bar()
             window.show_all_toolbars()

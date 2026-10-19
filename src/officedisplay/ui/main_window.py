@@ -11,6 +11,8 @@ from PySide6.QtWidgets import (
     QDockWidget,
     QFileDialog,
     QFontComboBox,
+    QFrame,
+    QHBoxLayout,
     QInputDialog,
     QLabel,
     QListWidget,
@@ -20,10 +22,13 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPlainTextEdit,
     QPushButton,
+    QSizePolicy,
     QSpinBox,
     QToolBar,
+    QToolButton,
     QVBoxLayout,
     QWidget,
+    QWidgetAction,
 )
 
 from officedisplay.ai.canva_api import CanvaAPIError, CanvaClient, request_canva_magic
@@ -183,7 +188,10 @@ class MainWindow(QMainWindow):
         self.notes_edit = QPlainTextEdit()
         self.notes_edit.setObjectName("notesLine")
         self.notes_edit.setPlaceholderText("Notizen")
-        self.notes_edit.setFixedHeight(72)
+        self.notes_edit.setFixedHeight(32)
+        self.notes_edit.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.notes_edit.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
+        self.notes_edit.document().setDocumentMargin(1)
         self.notes_edit.installEventFilter(self)
         center = QWidget()
         column = QVBoxLayout(center)
@@ -326,177 +334,267 @@ class MainWindow(QMainWindow):
         action.triggered.connect(slot)
         menu.addAction(action)
 
-    def _tool_action(self, bar: QToolBar, key: str, label: str, tip: str | None = None) -> None:
+    def _symbol(self, layout: QHBoxLayout, label: str, slot, tip: str) -> QToolButton:
         action = QAction(label, self)
-        action.setToolTip(tip or label)
-        action.setStatusTip(tip or label)
+        action.setToolTip(tip)
+        action.setStatusTip(tip)
+        action.triggered.connect(slot)
+        button = QToolButton()
+        button.setDefaultAction(action)
+        button.setToolTip(tip)
+        button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextOnly)
+        layout.addWidget(button)
+        return button
+
+    def _tool(self, layout: QHBoxLayout, key: str, label: str, tip: str) -> QToolButton:
+        action = QAction(label, self)
+        action.setToolTip(tip)
+        action.setStatusTip(tip)
         action.setCheckable(True)
         action.triggered.connect(lambda _checked=False, name=key: self.set_tool(name))
-        bar.addAction(action)
+        button = QToolButton()
+        button.setDefaultAction(action)
+        button.setToolTip(tip)
+        button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextOnly)
+        layout.addWidget(button)
         self.tool_buttons[key] = action
+        return button
 
-    def _plain_action(self, bar: QToolBar, label: str, slot, tip: str | None = None) -> None:
+    def _menu_item(self, menu: QMenu, label: str, slot) -> QAction:
         action = QAction(label, self)
-        action.setToolTip(tip or label)
-        action.setStatusTip(tip or label)
+        action.setToolTip(label)
+        action.setStatusTip(label)
         action.triggered.connect(slot)
-        bar.addAction(action)
+        menu.addAction(action)
+        return action
 
-    def _group_bar(self, title: str) -> QToolBar:
-        bar = QToolBar(title)
-        bar.setMovable(False)
-        bar.setFloatable(False)
-        bar.setMinimumHeight(40)
-        bar.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextOnly)
-        heading = QLabel(title)
-        heading.setObjectName("groupHeading")
-        bar.addWidget(heading)
-        return bar
+    def _menu_tool(self, menu: QMenu, key: str, label: str, tip: str) -> QAction:
+        action = QAction(label, self)
+        action.setToolTip(tip)
+        action.setStatusTip(tip)
+        action.setCheckable(True)
+        action.triggered.connect(lambda _checked=False, name=key: self.set_tool(name))
+        menu.addAction(action)
+        self.tool_buttons[key] = action
+        return action
+
+    def _menu_field(self, menu: QMenu, label: str, widget: QWidget) -> None:
+        row = QWidget()
+        row_layout = QHBoxLayout(row)
+        row_layout.setContentsMargins(8, 4, 8, 4)
+        row_layout.setSpacing(8)
+        caption = QLabel(label)
+        caption.setMinimumWidth(72)
+        widget.setMinimumWidth(140)
+        row_layout.addWidget(caption)
+        row_layout.addWidget(widget, 1)
+        action = QWidgetAction(self)
+        action.setDefaultWidget(row)
+        menu.addAction(action)
+
+    def _new_group(self, title: str) -> tuple[QWidget, QHBoxLayout]:
+        widget = QWidget()
+        widget.setObjectName("toolGroup")
+        widget.setProperty("groupTitle", title)
+        widget.setWindowTitle(title)
+        widget.setMinimumHeight(40)
+        widget.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        layout = QHBoxLayout(widget)
+        layout.setContentsMargins(1, 0, 1, 0)
+        layout.setSpacing(2)
+        lead = None
+        lead_action = None
+        if self._toolbar_started:
+            lead = QFrame()
+            lead.setFrameShape(QFrame.Shape.VLine)
+            lead.setFixedWidth(6)
+            lead.setFixedHeight(22)
+            lead_action = self.main_toolbar.addWidget(lead)
+        self._toolbar_started = True
+        widget._lead = lead
+        widget._lead_action = lead_action
+        widget._bar_action = self.main_toolbar.addWidget(widget)
+        return widget, layout
 
     def _build_toolbar(self) -> None:
         self.tool_buttons = {}
         self._toolbars = {}
         self._toolbar_actions = {}
-        folie = self._group_bar("Folie")
-        schrift = self._group_bar("Schrift")
-        absatz = self._group_bar("Absatz")
-        zeichnen = self._group_bar("Zeichnen")
-        objekte = self._group_bar("Objekte")
-        video = self._group_bar("Video")
-        player = self._group_bar("Player")
-        self._plain_action(folie, "＋", self.add_slide, "Neue Folie")
-        self._plain_action(folie, "−", self.delete_slide, "Folie löschen")
-        self._plain_action(folie, "⧉", self.duplicate_slide, "Folie duplizieren")
-        self._plain_action(folie, "↑", lambda _checked=False: self.move_slide(-1), "Folie nach oben")
-        self._plain_action(folie, "↓", lambda _checked=False: self.move_slide(1), "Folie nach unten")
-        self._tool_action(folie, "pan", "✥", "Verschieben")
-        self.theme_box = QComboBox()
-        self.theme_box.addItems(["hell", "dunkel", "farbe", "graustufen"])
-        self.theme_box.setCurrentText(self.prefs.get("theme") or "farbe")
-        self.theme_box.setToolTip("Thema")
-        self.theme_box.setMaximumWidth(120)
-        self.theme_box.currentTextChanged.connect(self.apply_theme)
-        folie.addWidget(self.theme_box)
-        self.touch_box = QComboBox()
-        self.touch_box.addItems(["Touch schieben", "Touch zeichnen"])
-        self.touch_box.setToolTip("Touch: verschieben oder zeichnen")
-        self.touch_box.setMaximumWidth(140)
-        self.touch_box.currentIndexChanged.connect(self._touch_mode)
-        folie.addWidget(self.touch_box)
+        self._toolbar_extra = {}
+        self._toolbar_started = False
+        bar = QToolBar("Werkzeuge")
+        bar.setObjectName("mainTools")
+        bar.setMovable(False)
+        bar.setFloatable(False)
+        bar.setMinimumHeight(40)
+        bar.setMaximumHeight(48)
+        bar.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextOnly)
+        self.main_toolbar = bar
+        self.addToolBar(bar)
+
+        folie, folie_layout = self._new_group("Folie")
+        schrift, schrift_layout = self._new_group("Schrift")
+        absatz, absatz_layout = self._new_group("Absatz")
+        zeichnen, zeichnen_layout = self._new_group("Zeichnen")
+        objekte, objekte_layout = self._new_group("Objekte")
+        video, video_layout = self._new_group("Video")
+        player, player_layout = self._new_group("Player")
+        self._toolbars = {
+            "auswahl": folie,
+            "text": schrift,
+            "grafik": zeichnen,
+            "video": video,
+            "player": player,
+        }
+        self._toolbar_extra = {"text": [absatz], "grafik": [objekte]}
+
+        self._symbol(folie_layout, "＋", self.add_slide, "Neue Folie")
+        self._symbol(folie_layout, "−", self.delete_slide, "Folie löschen")
+        self._symbol(folie_layout, "↑", lambda _checked=False: self.move_slide(-1), "Folie nach oben")
+        self._symbol(folie_layout, "↓", lambda _checked=False: self.move_slide(1), "Folie nach unten")
 
         self.font_box = QFontComboBox()
-        self.font_box.setMaximumWidth(160)
+        self.font_box.setObjectName("compactFont")
+        self.font_box.setFixedWidth(100)
         self.font_box.setToolTip("Schriftart")
         self.font_box.currentFontChanged.connect(self.apply_font)
         self.size_box = QSpinBox()
         self.size_box.setRange(8, 120)
         self.size_box.setValue(28)
+        self.size_box.setFixedWidth(72)
         self.size_box.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.size_box.setKeyboardTracking(True)
         self.size_box.setAccelerated(True)
         self.size_box.setToolTip("Schriftgröße")
-        self.size_box.setMaximumWidth(72)
         self.size_box.valueChanged.connect(self.apply_size)
-        schrift.addWidget(self.font_box)
-        schrift.addWidget(self.size_box)
-        self._plain_action(schrift, "T", self.insert_text_box, "Textfeld einfügen")
-        self._plain_action(schrift, "F", self.toggle_bold, "Fett")
-        self._plain_action(schrift, "K", self.toggle_italic, "Kursiv")
-        self._plain_action(schrift, "U", self.toggle_underline, "Unterstrichen")
-        self._plain_action(schrift, "A", self.pick_color, "Schriftfarbe")
+        schrift_layout.addWidget(self.font_box)
+        schrift_layout.addWidget(self.size_box)
+        self._symbol(schrift_layout, "T", self.insert_text_box, "Textfeld einfügen")
+        self._symbol(schrift_layout, "F", self.toggle_bold, "Fett")
+        self._symbol(schrift_layout, "K", self.toggle_italic, "Kursiv")
+        self._symbol(schrift_layout, "U", self.toggle_underline, "Unterstrichen")
+        self._symbol(schrift_layout, "A", self.pick_color, "Schriftfarbe")
 
-        self._plain_action(absatz, "⬅", lambda _checked=False: self._align_text("left"), "Linksbündig")
-        self._plain_action(absatz, "↔", lambda _checked=False: self._align_text("center"), "Zentriert")
-        self._plain_action(absatz, "➡", lambda _checked=False: self._align_text("right"), "Rechtsbündig")
+        self._symbol(absatz_layout, "⬅", lambda _checked=False: self._align_text("left"), "Linksbündig")
+        self._symbol(absatz_layout, "↔", lambda _checked=False: self._align_text("center"), "Zentriert")
+        self._symbol(absatz_layout, "➡", lambda _checked=False: self._align_text("right"), "Rechtsbündig")
 
         for key, symbol, tip in (
             ("rect", "▭", "Rechteck"),
             ("ellipse", "◯", "Ellipse"),
-            ("roundrect", "▢", "Rahmen"),
             ("arrow", "→", "Pfeil"),
-            ("star", "★", "Stern"),
             ("line", "／", "Linie"),
             ("pen", "✎", "Stift"),
-            ("highlighter", "🖍", "Marker"),
             ("eraser", "⌫", "Radierer"),
         ):
-            self._tool_action(zeichnen, key, symbol, tip)
+            self._tool(zeichnen_layout, key, symbol, tip)
+
+        self._tool(objekte_layout, "select", "⌖", "Auswahl")
+        self._tool(objekte_layout, "text", "T", "Text")
+        self.tool_buttons["select"].setChecked(True)
+        self._symbol(objekte_layout, "🖼", self.insert_image, "Bild einfügen")
+        self._symbol(video_layout, "▶", self.insert_video, "Video einfügen")
+        self._symbol(player_layout, "▶", self.present, "Präsentieren")
+
+        more_menu = QMenu("Weitere", self)
+        more_action = QAction("Weitere", self)
+        more_action.setToolTip("Weitere")
+        more_action.setStatusTip("Weitere")
+        more_action.setMenu(more_menu)
+        more_button = QToolButton()
+        more_button.setDefaultAction(more_action)
+        more_button.setToolTip("Weitere")
+        more_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextOnly)
+        more_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        more_host = QWidget()
+        more_host.setMinimumHeight(40)
+        more_layout = QHBoxLayout(more_host)
+        more_layout.setContentsMargins(1, 0, 1, 0)
+        more_layout.addWidget(more_button)
+        gap = QFrame()
+        gap.setFrameShape(QFrame.Shape.VLine)
+        gap.setFixedWidth(6)
+        gap.setFixedHeight(22)
+        self.main_toolbar.addWidget(gap)
+        self.main_toolbar.addWidget(more_host)
+        self.more_menu = more_menu
+
+        self._menu_item(more_menu, "Folie duplizieren", self.duplicate_slide)
+        self._menu_tool(more_menu, "pan", "Verschieben", "Verschieben")
+        self.theme_box = QComboBox()
+        self.theme_box.addItems(["hell", "dunkel", "farbe", "graustufen"])
+        self.theme_box.setCurrentText(self.prefs.get("theme") or "farbe")
+        self.theme_box.setToolTip("Thema")
+        self.theme_box.currentTextChanged.connect(self.apply_theme)
+        self.touch_box = QComboBox()
+        self.touch_box.addItems(["Touch schieben", "Touch zeichnen"])
+        self.touch_box.setToolTip("Touch: verschieben oder zeichnen")
+        self.touch_box.currentIndexChanged.connect(self._touch_mode)
+        self._menu_field(more_menu, "Thema", self.theme_box)
+        self._menu_field(more_menu, "Touch", self.touch_box)
+        more_menu.addSeparator()
+        for key, label in (
+            ("roundrect", "Rahmen"),
+            ("star", "Stern"),
+            ("highlighter", "Marker"),
+        ):
+            self._menu_tool(more_menu, key, label, label)
         self.pen_width = QSpinBox()
         self.pen_width.setRange(1, 48)
         self.pen_width.setValue(6)
-        self.pen_width.setMaximumWidth(64)
         self.pen_width.setToolTip("Stärke")
         self.pen_width.valueChanged.connect(self._pen)
         self.pen_curve = QSpinBox()
         self.pen_curve.setRange(2, 40)
         self.pen_curve.setValue(10)
-        self.pen_curve.setMaximumWidth(64)
         self.pen_curve.setToolTip("Druck")
         self.pen_curve.valueChanged.connect(self._pen)
         self.pen_smooth = QSpinBox()
         self.pen_smooth.setRange(0, 4)
         self.pen_smooth.setValue(1)
-        self.pen_smooth.setMaximumWidth(64)
         self.pen_smooth.setToolTip("Glättung")
         self.pen_smooth.valueChanged.connect(self._pen)
-        zeichnen.addWidget(self.pen_width)
-        zeichnen.addWidget(self.pen_curve)
-        zeichnen.addWidget(self.pen_smooth)
-        self._tool_action(objekte, "select", "⌖", "Auswahl")
-        self._tool_action(objekte, "text", "T", "Text")
-        self._tool_action(objekte, "chart", "▦", "Diagramm")
-        self.tool_buttons["select"].setChecked(True)
-        self._plain_action(objekte, "🖼", self.insert_image, "Bild einfügen")
-        self._plain_action(objekte, "▶", self.insert_video, "Video einfügen")
-        self._plain_action(objekte, "▣", self.insert_3d, "3D-Modell")
-        self._plain_action(objekte, "⧉", self.group_selected, "Gruppieren")
-        self._plain_action(objekte, "▢", self.ungroup_selected, "Gruppierung aufheben")
-        for symbol, mode, tip in (
-            ("☀", "bright", "Aufhellen"),
-            ("◐", "gray", "Graustufen"),
-            ("○", "blur", "Weichzeichnen"),
-            ("✦", "sharpen", "Schärfen"),
-            ("⇄", "flip", "Spiegeln"),
-            ("✂", "knockout", "Eckfarbe freistellen"),
+        self._menu_field(more_menu, "Stärke", self.pen_width)
+        self._menu_field(more_menu, "Druck", self.pen_curve)
+        self._menu_field(more_menu, "Glättung", self.pen_smooth)
+        more_menu.addSeparator()
+        self._menu_tool(more_menu, "chart", "Diagramm", "Diagramm")
+        self._menu_item(more_menu, "3D-Modell", self.insert_3d)
+        self._menu_item(more_menu, "Gruppieren", self.group_selected)
+        self._menu_item(more_menu, "Gruppierung aufheben", self.ungroup_selected)
+        for mode, label in (
+            ("bright", "Aufhellen"),
+            ("gray", "Graustufen"),
+            ("blur", "Weichzeichnen"),
+            ("sharpen", "Schärfen"),
+            ("flip", "Spiegeln"),
+            ("knockout", "Eckfarbe freistellen"),
         ):
-            self._plain_action(objekte, symbol, lambda _checked=False, name=mode: self.filter_image(name), tip)
+            self._menu_item(more_menu, label, lambda _checked=False, name=mode: self.filter_image(name))
+        more_menu.addSeparator()
+        self._menu_item(more_menu, "Kamera", self.open_camera)
+        self._menu_item(more_menu, "Slideshow abspielen", self.play_slideshow)
+        self._menu_item(more_menu, "Leinwand", self.open_zui)
+        self._menu_item(more_menu, "Morph-Vorschau", self.preview_morph)
+        self._menu_item(more_menu, "Eingangseffekt", self.preview_entrance)
 
-        self._plain_action(video, "▶", self.insert_video, "Video einfügen")
-        self._plain_action(video, "📷", self.open_camera, "Kamera-Einblendung")
-        self._plain_action(player, "▶", self.present, "Präsentieren")
-        self._plain_action(player, "⏯", self.play_slideshow, "Slideshow abspielen")
-        self._plain_action(player, "⊞", self.open_zui, "Leinwand")
-        self._plain_action(player, "↝", self.preview_morph, "Morph-Vorschau")
-        self._plain_action(player, "✧", self.preview_entrance, "Eingangseffekt")
-
-        rows = (
-            ("auswahl", folie, "Folie"),
-            ("text", schrift, "Schrift"),
-            ("grafik", zeichnen, "Zeichnen"),
-            ("video", video, "Video"),
-            ("player", player, "Player"),
-        )
-        self._toolbars = {key: bar for key, bar, _title in rows}
-        self._toolbar_extra = {"text": [absatz], "grafik": [objekte]}
-        for key, bar, _title in rows:
-            self.addToolBar(bar)
-            self.addToolBarBreak()
-            for extra in self._toolbar_extra.get(key, []):
-                self.addToolBar(extra)
-                self.addToolBarBreak()
         self._ensure_toolbars_visible_once()
-        for key, _bar, title in rows:
+        for key, title in (
+            ("auswahl", "Folie"),
+            ("text", "Schrift"),
+            ("grafik", "Zeichnen"),
+            ("video", "Video"),
+            ("player", "Player"),
+        ):
             action = QAction(title, self)
             action.setCheckable(True)
             visible = self._settings_bool(f"toolbar/{key}", True)
             action.setChecked(visible)
+            self._toolbar_actions[key] = action
             self._show_toolbar(key, visible)
             action.toggled.connect(lambda on, name=key: self._show_toolbar(name, bool(on)))
             action.triggered.connect(lambda on, name=key: self._show_toolbar(name, bool(on)))
-            for bar in self._bars(key):
-                bar.visibilityChanged.connect(lambda on, name=key: self._remember_toolbar(name, bool(on)))
             self.view_menu.addAction(action)
-            self._toolbar_actions[key] = action
         self.view_menu.addSeparator()
         self._add(self.view_menu, "Alle Leisten anzeigen", self.show_all_toolbars)
 
@@ -597,7 +695,17 @@ class MainWindow(QMainWindow):
         # isVisible() ist falsch, solange das Fenster noch zu ist.
         # setVisible muss den Wunsch trotzdem speichern.
         for bar in self._bars(name):
+            toggle = getattr(bar, "_bar_action", None)
+            if toggle is not None:
+                toggle.setVisible(bool(on))
             bar.setVisible(bool(on))
+            lead_toggle = getattr(bar, "_lead_action", None)
+            if lead_toggle is not None:
+                lead_toggle.setVisible(bool(on))
+            lead = getattr(bar, "_lead", None)
+            if lead is not None:
+                lead.setVisible(bool(on))
+        self._remember_toolbar(name, bool(on))
 
     def show_all_toolbars(self) -> None:
         for key in TOOLBAR_KEYS:

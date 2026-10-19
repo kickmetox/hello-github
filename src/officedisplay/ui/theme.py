@@ -88,8 +88,8 @@ def stylesheet(name: str) -> str:
     QWidget {{ color: {theme['ink']}; font-family: "Segoe UI", "Noto Sans", sans-serif; font-size: 13px; }}
     QMenuBar, QMenu {{ background: {theme['panel']}; color: {theme['ink']}; }}
     QMenu::item:selected {{ background: {theme['accent']}; color: {theme['accent_ink']}; }}
-    QToolBar {{ background: {theme['panel']}; border: 0; border-bottom: 1px solid {theme['line']}; spacing: 4px; padding: 4px; min-height: 40px; }}
-    QToolBar QToolButton {{ min-height: 24px; padding: 4px 8px; background: {theme['panel']}; color: {theme['ink']}; border: 1px solid {theme['line']}; border-radius: 6px; }}
+    QToolBar {{ background: {theme['panel']}; border: 0; border-bottom: 1px solid {theme['line']}; spacing: 2px; padding: 0px 2px; min-height: 40px; max-height: 48px; }}
+    QToolBar QToolButton {{ min-height: 24px; max-height: 32px; padding: 0px 4px; margin: 0; background: {theme['panel']}; color: {theme['ink']}; border: 1px solid {theme['line']}; border-radius: 4px; }}
     QToolBar QToolButton:checked {{ background: {theme['accent']}; color: {theme['accent_ink']}; }}
     QDockWidget {{ color: {theme['ink']}; titlebar-close-icon: none; }}
     QDockWidget::title {{ background: {theme['panel']}; padding: 6px; border: 1px solid {theme['line']}; }}
@@ -106,6 +106,7 @@ def stylesheet(name: str) -> str:
         background: {theme['panel']}; color: {theme['ink']}; border: 1px solid {theme['line']};
         border-radius: 6px; padding: 2px 4px 2px 8px; min-height: 26px; min-width: 72px;
     }}
+    QFontComboBox#compactFont {{ min-height: 24px; max-height: 32px; min-width: 96px; max-width: 118px; padding: 0px 4px; }}
     QPushButton {{
         background: {theme['panel']}; color: {theme['ink']}; border: 1px solid {theme['line']};
         border-radius: 8px; padding: 6px 10px;

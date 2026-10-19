@@ -11,7 +11,7 @@ Standard ist offline. Die Statuszeile zeigt „Offline · kein Tracking“, sola
 - Mitte: die aktuelle Folie mit ihrer eigenen Hintergrundfarbe. Darunter die Notizzeile, gebunden an die Sprechernotiz.
 - Links: Folienminiaturen. Ein Klick lädt die Folie.
 - Rechts: schmale Layout-Leiste. Ein Klick setzt Titel, Titel+Inhalt, zwei Spalten, Zitat oder leer nur auf der aktuellen Folie.
-- Oben: Gruppen Folie, Schrift, Absatz, Zeichnen und Objekte, jeweils in einer eigenen Zeile, dazu Video und Player. Ansicht schaltet die Leisten. „Menü“ und Alt holen die Menüleiste zurück. Der Zustand bleibt gespeichert.
+- Oben: eine Symbolleiste. Folie, Schrift, Absatz, Zeichnen und Objekte stehen nebeneinander, Video und Präsentieren ebenfalls. Seltenere Befehle liegen unter „Weitere“. Ansicht schaltet die Gruppen. „Menü“ und Alt holen die Menüleiste zurück. Der Zustand bleibt gespeichert.
 - Unten: „Folie n von m“, Zoom und die Zeigerart.
 
 ## Formate
@@ -22,7 +22,7 @@ Themen: hell, dunkel, farbe, graustufen.
 
 ## Objekte
 
-Werkzeuge: Auswahl, Text, Rechteck, Ellipse, Rahmen, Pfeil, Stern, Linie, Stift, Marker, Radierer, Diagramm, Verschieben. Zusätzlich Bild, Video, Kamera und 3D. Die Textleiste setzt Schrift, Größe, Fett, Kursiv, Unterstrichen, Farbe und Ausrichtung. Die Grafikleiste trägt Formen, Stift, Stärke, Druck, Glättung, Bild und Filter. Die Videoleiste fügt ein Video ein oder öffnet die Kamera. Die Playerleiste startet Präsentieren, Slideshow, Leinwand, Morph und den Eingangseffekt.
+Werkzeuge: Auswahl, Text, Rechteck, Ellipse, Rahmen, Pfeil, Stern, Linie, Stift, Marker, Radierer, Diagramm, Verschieben. Zusätzlich Bild, Video, Kamera und 3D. In der einen Symbolleiste sitzen Schrift, Größe, Fett, Kursiv, Unterstrichen, Farbe und Ausrichtung, dazu Formen, Stift, Bild und Präsentieren. Stärke, Druck, Glättung, Filter, Kamera, Slideshow, Leinwand, Morph und der Eingangseffekt liegen unter „Weitere“.
 
 Text doppelklicken und tippen. Schriftart, Größe, Fett, Kursiv, Unterstrichen und Farbe gelten für den gewählten Text. Ist die Marke gesperrt, bleiben nur die erlaubten Schriften und Farben.
 
