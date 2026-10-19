@@ -141,6 +141,7 @@ _PRESET_KIND = {
 }
 
 
+# ECMA-376 / ISO/IEC 29500, PresentationML. Beschreibung: docs/FORMATE.md.
 def import_pptx(path: str | Path, media_dir: str | Path | None = None) -> Presentation:
     source = Path(path)
     try:
@@ -184,6 +185,7 @@ def _open_package(source: Path):
 
 def _from_package(package, source: Path, media: dict) -> Presentation:
     try:
+        # p:sldSz cx/cy in EMU. 914400 EMU = 1 Zoll. Fehlend: 13,333 × 7,5 Zoll.
         slide_w = float(package.slide_width or 12192000)
         slide_h = float(package.slide_height or 6858000)
     except Exception:
@@ -550,6 +552,7 @@ def _ordered_slide_names(archive, names: dict[str, str]) -> list[str]:
 
 
 def _zip_slide_size(archive, names: dict[str, str]) -> tuple[float, float]:
+    """PresentationML p:sldSz. [MS-OE376] 2.1.1143, Part 4 Section 4.3.1.34: cx/cy in EMU."""
     raw = _zip_bytes(archive, names, "ppt/presentation.xml")
     root = _parse_xml(raw) if raw else None
     if root is None:
@@ -973,6 +976,7 @@ def _inside(node, stop, name: str) -> bool:
 
 
 def _blip_embed(element) -> str | None:
+    """a:blip r:embed zeigt auf das Bildteil, meist ppt/media."""
     if element is None:
         return None
     for node in element.iter():
@@ -1025,6 +1029,7 @@ def _color_of(element) -> str | None:
 
 
 def _explicit_sz(element) -> int | None:
+    """DrawingML a:rPr oder a:defRPr, Attribut sz in Hundertstel Punkt."""
     if element is None:
         return None
     body = element if _local(getattr(element, "tag", "")) == "txBody" else _child(element, "txBody")
@@ -1267,7 +1272,7 @@ def _text_valign(shape) -> str | None:
 
 
 def _norm_box(x: float, y: float, w: float, h: float, slide_w: float, slide_h: float):
-    """EMU durch die Foliengröße in EMU. Eine Pixelbreite verfälscht die Lage."""
+    """DrawingML a:xfrm off/ext, geteilt durch p:sldSz. Beides in EMU, nicht durch eine Pixelbreite."""
     return (x / slide_w, y / slide_h, max(w, 1.0) / slide_w, max(h, 1.0) / slide_h)
 
 
@@ -1378,6 +1383,7 @@ def _background_sources(page) -> list:
 
 
 def _apply_background_chain(slide: Slide, sources, media: dict) -> None:
+    """PresentationML p:bg der Folie, sonst slideLayout, sonst slideMaster."""
     for element, part in sources:
         spec = _bg_fill(element)
         if spec is None or spec.get("kind") == "other":

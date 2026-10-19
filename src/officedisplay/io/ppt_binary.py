@@ -1,7 +1,8 @@
-"""PowerPoint 97–2003 (.ppt) ohne LibreOffice.
+"""PowerPoint 97–2003 (.ppt) ohne LibreOffice. Beschreibung: docs/FORMATE.md.
 
-OLE-Container und Record-Header werden hier gelesen. Text kommt aus
-RT_TextCharsAtom und RT_TextBytesAtom. Bilder nur bei PNG- oder JPEG-Signatur.
+[MS-CFB] 2.2 liest den OLE-Container. [MS-PPT] 2.3.1 ist der RecordHeader.
+Text: RT_TextCharsAtom 0x0FA0 ([MS-PPT] 2.9.42) und RT_TextBytesAtom 0x0FA8
+([MS-PPT] 2.9.43). Bilder nur bei PNG- oder JPEG-Signatur.
 """
 
 from __future__ import annotations
@@ -24,11 +25,12 @@ _FATSECT = 0xFFFFFFFD
 _DIFSECT = 0xFFFFFFFC
 _NOSTREAM = 0xFFFFFFFF
 
-_RT_SLIDE = 1006
-_RT_PERSIST = 1011
-_RT_TEXT_CHARS = 4000
-_RT_TEXT_BYTES = 4008
-_RT_SLIDE_LIST = 4080
+# [MS-PPT] 2.13.24 RecordType.
+_RT_SLIDE = 1006  # RT_Slide 0x03EE
+_RT_PERSIST = 1011  # RT_SlidePersistAtom 0x03F3
+_RT_TEXT_CHARS = 4000  # RT_TextCharsAtom 0x0FA0, UTF-16LE
+_RT_TEXT_BYTES = 4008  # RT_TextBytesAtom 0x0FA8, cp1252
+_RT_SLIDE_LIST = 4080  # RT_SlideListWithText 0x0FF0
 
 _ENCRYPTED = "Die Datei ist verschlüsselt und lässt sich hier nicht öffnen."
 _PNG = b"\x89PNG\r\n\x1a\n"
@@ -176,6 +178,7 @@ def _texts(data: bytes) -> list[str]:
 
 
 def _records(blob: bytes):
+    """[MS-PPT] 2.3.1 RecordHeader: ver/instance, recType, recLen."""
     pos = 0
     end = len(blob)
     while pos + 8 <= end:
@@ -194,6 +197,7 @@ def _clean(text: str) -> str:
 
 
 def _image_blobs(blob: bytes) -> list[bytes]:
+    """Nur PNG- und JPEG-Signatur. Freie Zeichnungen und OLE bleiben aus."""
     found: list[bytes] = []
     seen: set[bytes] = set()
     for raw in _pngs(blob) + _jpegs(blob):
@@ -251,6 +255,7 @@ def _attach_loose_pictures(slides: list[dict], pictures: list[bytes]) -> None:
 
 
 def _compound_streams(blob: bytes) -> dict[str, bytes]:
+    """[MS-CFB] 2.2 Compound File Header, danach FAT und Verzeichnis."""
     if len(blob) < 512 or blob[:8] != _SIGNATURE:
         raise PptReadError("Die Datei ist kein OLE-Dokument.")
     if struct.unpack_from("<H", blob, 0x1C)[0] != 0xFFFE:
