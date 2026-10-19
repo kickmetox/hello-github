@@ -210,6 +210,43 @@ class LibraryDialog(QDialog):
         self.accept()
 
 
+class MagicDesignDialog(QDialog):
+    """Satz zu Folien. Der Aufbau dieses Fensters ruft kein Netz auf."""
+
+    def __init__(self, parent=None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("Magic Design")
+        self.resize(520, 220)
+        self.action = ""
+        self.sentence = QLineEdit()
+        self.sentence.setPlaceholderText("Ein Satz, zum Beispiel Quartalszahlen Nord Süd")
+        note = QLabel(
+            "Lokal ohne Netz: Titelfolie mit vollflächigem Hintergrund, Inhaltsfolien, "
+            "passende Vorlage. „Über Canva erzeugen“ sendet den Satz nur mit Token "
+            "an POST /generations und zeigt die Design-ID."
+        )
+        note.setWordWrap(True)
+        local = QPushButton("Lokal erzeugen")
+        canva = QPushButton("Über Canva erzeugen")
+        cancel = QPushButton("Abbrechen")
+        local.clicked.connect(lambda: self._finish("local"))
+        canva.clicked.connect(lambda: self._finish("canva"))
+        cancel.clicked.connect(self.reject)
+        row = QHBoxLayout()
+        row.addWidget(local)
+        row.addWidget(canva)
+        row.addWidget(cancel)
+        layout = QVBoxLayout(self)
+        layout.addWidget(QLabel("Ein Satz für den Foliensatz"))
+        layout.addWidget(self.sentence)
+        layout.addWidget(note)
+        layout.addLayout(row)
+
+    def _finish(self, action: str) -> None:
+        self.action = action
+        self.accept()
+
+
 class BrandDialog(QDialog):
     def __init__(self, parent, brand: dict) -> None:
         super().__init__(parent)

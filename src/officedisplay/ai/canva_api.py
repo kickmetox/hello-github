@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -72,6 +73,18 @@ class CanvaClient:
         body = {"design_id": design_id, "format": {"type": file_type}}
         return self._request("POST", "/exports", body)
 
+    def create_design_generation(self, brief: str) -> dict:
+        """POST /generations, dokumentiert als Create design generation job."""
+        body = {
+            "brief": brief[:5000],
+            "design_type": {"type": "preset", "name": "presentation"},
+        }
+        return self._request("POST", "/generations", body)
+
+    def get_design_generation(self, job_id: str) -> dict:
+        """GET /generations/{jobId}, dokumentiert als Get design generation job."""
+        return self._request("GET", f"/generations/{urllib.parse.quote(job_id)}")
+
     def get_export(self, job_id: str) -> dict:
         return self._request("GET", f"/exports/{urllib.parse.quote(job_id)}")
 
@@ -103,3 +116,64 @@ class CanvaClient:
             return json.loads(raw)
         except json.JSONDecodeError as exc:
             raise CanvaAPIError("Canva-Antwort ist kein JSON.") from exc
+
+
+def design_id_from_generation(payload: dict) -> str:
+    job = payload.get("job") if isinstance(payload, dict) else None
+    if not isinstance(job, dict):
+        return ""
+    result = job.get("result") if isinstance(job.get("result"), dict) else {}
+    design = result.get("design") if isinstance(result.get("design"), dict) else {}
+    return str(design.get("id") or "")
+
+
+def request_canva_magic(
+    token: str,
+    base_url: str,
+    brief: str,
+    opener=None,
+    polls: int = 4,
+    pause: float = 0.4,
+) -> str:
+    """Canva Magic Design nur mit Token. Ohne Token bleibt urllib zu."""
+    if not (token or "").strip():
+        raise CanvaAPIError("Kein Canva-Zugriffstoken hinterlegt. Es wurde nichts gesendet.")
+    sentence = " ".join((brief or "").split())
+    if not sentence:
+        raise CanvaAPIError("Bitte einen Satz eingeben.")
+    client = CanvaClient(token.strip(), base_url or DEFAULT_BASE, opener=opener)
+    payload = client.create_design_generation(sentence)
+    design_id = design_id_from_generation(payload)
+    job = payload.get("job") if isinstance(payload.get("job"), dict) else {}
+    status = str(job.get("status") or "")
+    job_id = str(job.get("id") or "")
+    if status == "failed":
+        raise CanvaAPIError(_generation_failure(job))
+    attempts = 1
+    while not design_id and status == "in_progress" and job_id and attempts < polls:
+        if pause:
+            time.sleep(pause)
+        attempts += 1
+        payload = client.get_design_generation(job_id)
+        design_id = design_id_from_generation(payload)
+        job = payload.get("job") if isinstance(payload.get("job"), dict) else {}
+        status = str(job.get("status") or "")
+        job_id = str(job.get("id") or job_id)
+        if status == "failed":
+            raise CanvaAPIError(_generation_failure(job))
+    if design_id:
+        return (
+            f"Canva-Design-ID: {design_id}\n"
+            "PPTX-Export: Canva → Studio und Connect, diese Design-ID eintragen, Export als PPTX."
+        )
+    if job_id:
+        return f"Canva-Auftrag {job_id} läuft noch. Eine Design-ID liegt noch nicht vor."
+    raise CanvaAPIError("Canva hat keine Design-ID geliefert.")
+
+
+def _generation_failure(job: dict) -> str:
+    error = job.get("error") if isinstance(job.get("error"), dict) else {}
+    detail = str(error.get("message") or "").strip()
+    if detail:
+        return f"Canva konnte das Design nicht erzeugen. {detail}"
+    return "Canva konnte das Design nicht erzeugen."

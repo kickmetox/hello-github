@@ -125,6 +125,46 @@ def _shape(x, y, w, h, shape, fill, name="") -> SlideObject:
     )
 
 
+_TEMPLATE_FOR_LAYOUT = {
+    "title": "Titel mit Fläche",
+    "bullets": "Pitch",
+    "two_col": "Vergleich",
+    "chart": "Kennzahlen",
+    "timeline": "Unterricht",
+    "quote": "Zitat",
+}
+
+
+def matching_template(prompt: str) -> str:
+    return _TEMPLATE_FOR_LAYOUT.get(predict_layout(prompt), "Pitch")
+
+
+def deck_has_content(presentation: Presentation) -> bool:
+    """Leere Startfolie zählt nicht als Inhalt."""
+    if (presentation.title or "").strip() not in ("", "Unbenannt"):
+        return True
+    if len(presentation.slides) != 1:
+        return True
+    slide = presentation.slides[0]
+    if slide.objects or (slide.notes or "").strip() or slide.comments:
+        return True
+    return False
+
+
+def magic_deck(prompt: str) -> Presentation:
+    """Lokales Magic Design. Wiederverwendet generate_deck, erfindet keine Zahlen."""
+    deck = generate_deck(prompt)
+    deck.analytics["vorlage"] = matching_template(prompt)
+    cover = deck.slides[0]
+    cover.background.mode = "gradient"
+    cover.background.opacity = 1.0
+    if not cover.background.color:
+        cover.background.color = "#0B63E5"
+    if not cover.background.color2:
+        cover.background.color2 = "#08357A"
+    return deck
+
+
 def generate_deck(prompt: str) -> Presentation:
     """Ein Satz wird zu einem abgestimmten Foliensatz.
 

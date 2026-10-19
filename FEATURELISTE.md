@@ -61,6 +61,7 @@ Stand der Umsetzung in diesem Programmordner. Standard ist lokal, ohne Tracking.
 
 - Online-KI: OpenAI-kompatibles `POST {basis}/chat/completions` und, nur mit extra Haken, `POST {basis}/images/generations`. Erlaubt sind HTTPS sowie `http://127.0.0.1` und `http://localhost`. Ausgeschaltet bleibt der Aufruf lokal.
 - Canva Connect: Markenvorlagen listen, Autofill `create_from_brand_template`, Export als PPTX. OAuth-URL mit PKCE S256. Das Token wird vom Nutzer eingefügt, kein Client-Geheimnis im Programm.
+- Magic Design: Menü Canva → Magic Design… baut aus einem Satz lokal Folien (`generate_deck`, passende Vorlage, vollflächige Titelfolie, keine erfundenen Zahlen). „Über Canva erzeugen“ ruft nur mit Token `POST /rest/v1/generations` auf und zeigt die Design-ID; der vorhandene PPTX-Export bleibt nutzbar. Ohne Token und beim Öffnen des Dialogs kein Netz.
 - Lokales Canva-ähnliches Studio bleibt ohne Netz: Vorlagen, Größen, Elemente, Ausrichten, Markenpalette, Fotofilter, Freistellen, Software-3D.
 
 ## Nicht enthalten

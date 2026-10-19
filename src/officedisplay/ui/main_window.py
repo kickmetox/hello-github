@@ -24,11 +24,11 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from officedisplay.ai.canva_api import CanvaAPIError, CanvaClient
+from officedisplay.ai.canva_api import CanvaAPIError, CanvaClient, request_canva_magic
 from officedisplay.ai.commands import apply_command
 from officedisplay.ai.doc_transform import read_text_file, slides_from_text
 from officedisplay.ai.layout_model import inspect_model
-from officedisplay.ai.offline_design import generate_deck
+from officedisplay.ai.offline_design import deck_has_content, generate_deck, magic_deck
 from officedisplay.ai.online_ai import OnlineAIError, OnlineAISettings, draft_deck, generate_image, rewrite_text
 from officedisplay.ai.speech_coach import analyze_speech
 from officedisplay.analytics import DwellLog
@@ -73,6 +73,7 @@ from officedisplay.ui.dialogs import (
     DataDialog,
     HelpDialog,
     LibraryDialog,
+    MagicDesignDialog,
     PresenterDialog,
     SettingsDialog,
     ThreeDialog,
@@ -233,6 +234,7 @@ class MainWindow(QMainWindow):
         self._add(ai_menu, "Modell inspizieren", self.inspect_model)
         self._add(ai_menu, "Sprech-Coach", self.speech_coach)
         self._add(ai_menu, "Einstellungen Online-KI / Canva", self.open_settings)
+        self._add(library_menu, "Magic Design…", self.open_magic_design)
         self._add(library_menu, "Studio und Connect", self.open_library)
         self._add(show_menu, "Präsentieren", self.present, "F5")
         self._add(show_menu, "Slideshow abspielen", self.play_slideshow)
@@ -1361,6 +1363,47 @@ class MainWindow(QMainWindow):
         timer.start(40)
         tick()
         dialog.exec()
+
+    def open_magic_design(self) -> None:
+        dialog = MagicDesignDialog(self)
+        if not dialog.exec():
+            return
+        sentence = dialog.sentence.text().strip()
+        if not sentence:
+            show_text(self, "Magic Design", "Bitte einen Satz eingeben.")
+            return
+        if deck_has_content(self.presentation):
+            answer = QMessageBox.question(
+                self,
+                "Magic Design",
+                "Vorhandenen Inhalt durch den neuen Foliensatz ersetzen?",
+            )
+            if answer != QMessageBox.StandardButton.Yes:
+                return
+        self._apply_magic_deck(sentence)
+        if dialog.action != "canva":
+            vorlage = self.presentation.analytics.get("vorlage") or ""
+            self.statusBar().showMessage(f"Magic Design, Vorlage {vorlage}".strip())
+            return
+        try:
+            message = request_canva_magic(
+                self.secrets.get("canva_token") or "",
+                self.prefs.get("canva_base") or "https://api.canva.com/rest/v1",
+                sentence,
+            )
+            show_text(self, "Canva", message)
+        except CanvaAPIError as exc:
+            show_text(self, "Canva", str(exc))
+
+    def _apply_magic_deck(self, sentence: str) -> None:
+        self._push()
+        deck = magic_deck(sentence)
+        deck.width = self.presentation.width
+        deck.height = self.presentation.height
+        deck.brand = self.presentation.clone().brand
+        self.presentation = deck
+        self.canvas.set_presentation(self.presentation, 0)
+        self.refresh_thumbs()
 
     def open_library(self) -> None:
         dialog = LibraryDialog(self)

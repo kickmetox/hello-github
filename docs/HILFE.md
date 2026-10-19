@@ -74,6 +74,8 @@ Ohne Haken bleibt alles lokal. Mit Haken und hinterlegtem Schlüssel ruft „Onl
 
 Canva Connect liegt unter Menü Canva → Studio und Connect. Markenvorlagen listen, Autofill und PPTX-Export laufen nur mit einem selbst eingefügten Token und nur auf Klick. Die lokale Vorlage, die Größe und die Elemente brauchen kein Konto.
 
+Magic Design liegt unter Menü Canva → Magic Design…. Ein Satz baut lokal einen Foliensatz: Titelfolie mit vollflächigem Verlauf, Inhaltsfolien und die passende lokale Vorlage. Verwendet werden nur Wörter aus dem Satz, keine erfundenen Zahlen. Ist schon Inhalt da, kommt eine kurze Rückfrage, sonst wird ersetzt. „Über Canva erzeugen“ sendet denselben Satz nur auf Klick und nur mit Token an den dokumentierten Aufruf `POST /rest/v1/generations` (HTTPS, Bearer) und zeigt die Design-ID. PPTX holt danach Studio und Connect mit dieser Design-ID. Ohne Token geht nichts ins Netz. Das Öffnen des Dialogs ruft Canva nicht auf.
+
 Schlüsseldatei: `~/.config/officedisplay/secrets.json`, Dateimodus 600.
 
 ## Bibliothek
