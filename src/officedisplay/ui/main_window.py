@@ -56,8 +56,10 @@ from officedisplay.io.slideshow_io import (
     entries_from_paths,
     export_slideshow_odisp,
     save_oshow,
+    save_presentation_oshow,
     slideshow_from_path,
 )
+from officedisplay.io.standalone_show import write_standalone_show
 from officedisplay.macros_runner import MacroError, run_macro
 from officedisplay.model.presentation import (
     Presentation,
@@ -260,6 +262,8 @@ class MainWindow(QMainWindow):
         self._add(file_menu, "Slideshow speichern unter…", self.save_slideshow_as)
         self._add(file_menu, "Slideshow aus Dateien…", self.slideshow_from_files)
         self._add(file_menu, "Slideshow als Präsentation…", self.export_slideshow_file)
+        self._add(file_menu, "Als Slideshow speichern…", self.save_presentation_as_slideshow)
+        self._add(file_menu, "Slideshow als Programm speichern…", self.save_slideshow_program)
         file_menu.addSeparator()
         self._add(file_menu, "Tabelle verbinden…", self.bind_data)
         self._add(file_menu, "Daten aktualisieren", self.refresh_data)
@@ -300,6 +304,8 @@ class MainWindow(QMainWindow):
         self._add(library_menu, "Studio und Connect", self.open_library)
         self._add(show_menu, "Präsentieren", self.present, "F5")
         self._add(show_menu, "Slideshow abspielen", self.play_slideshow)
+        self._add(show_menu, "Als Slideshow speichern…", self.save_presentation_as_slideshow)
+        self._add(show_menu, "Slideshow als Programm speichern…", self.save_slideshow_program)
         self._add(show_menu, "Leinwand (ZUI)", self.open_zui)
         self._add(show_menu, "Morph-Vorschau", self.preview_morph)
         self._add(show_menu, "Eingangseffekt abspielen", self.preview_entrance)
@@ -912,6 +918,20 @@ class MainWindow(QMainWindow):
             return
         self.slideshow_path = Path(path) if Path(path).suffix.lower() == ".oshow" else None
         self.statusBar().showMessage(f"Slideshow „{self.slideshow.title}“ · {len(self.slideshow.entries)} Einträge")
+
+    def save_presentation_as_slideshow(self) -> None:
+        path, _ = QFileDialog.getSaveFileName(self, "Als Slideshow speichern", "praesentation.oshow", "Slideshow (*.oshow)")
+        if not path:
+            return
+        target = save_presentation_oshow(self.presentation, path)
+        self.statusBar().showMessage(f"Präsentation als Slideshow gespeichert: {target.name}")
+
+    def save_slideshow_program(self) -> None:
+        folder = QFileDialog.getExistingDirectory(self, "Slideshow als Programm speichern")
+        if not folder:
+            return
+        target = write_standalone_show(self.presentation, folder)
+        self.statusBar().showMessage(f"Slideshow-Programm gespeichert: {target}")
 
     def save_slideshow(self) -> None:
         if self.slideshow is None:

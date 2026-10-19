@@ -184,6 +184,16 @@ def slideshow_to_presentation(show: Slideshow) -> Presentation:
     return presentation
 
 
+def save_presentation_oshow(presentation: Presentation, path: str | Path) -> Path:
+    """Offene Präsentation als `.oshow`: eine Folie, ein Eintrag, Reihenfolge bleibt."""
+    target = Path(path)
+    if target.suffix.lower() != ".oshow":
+        target = target.with_suffix(".oshow")
+    show = slideshow_from_presentation(presentation, None)
+    save_oshow(show, target)
+    return target
+
+
 def export_slideshow_odisp(show: Slideshow, path: str | Path) -> Presentation:
     from officedisplay.io.native_io import save_odisp
 

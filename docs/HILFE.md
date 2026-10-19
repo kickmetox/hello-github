@@ -54,7 +54,7 @@ Ohne angeschlossenes Tablett bleibt alles mit der Maus bedienbar.
 - Speichern: `.odisp` (Zip mit `presentation.json` und Medien).
 - Export PPTX und ODP über das Menü Datei.
 - Öffnen und Import PPTX lesen `.pptx` (auch neben `.odisp` und `.odp` im ersten Filter). Folien, Texte, Bilder und einfache Formen werden übernommen. Eine defekte Datei bleibt liegen; es erscheint eine Meldung, die Präsentation wird nicht geleert. Ziehen einer `.pptx` auf die Fläche hängt die Folien an.
-- Slideshow: Datei → Slideshow öffnen, speichern, aus Dateien anlegen, als Präsentation exportieren. Das Paket ist `.oshow` (Zip mit `slideshow.json` und Medien). Einträge sind Bild, Video oder Text (TXT, MD, PDF). Der Export `.odisp` macht aus jedem Eintrag eine Folie. Öffnen einer `.odisp` oder `.pptx` legt je Folie einen Eintrag an, als Text mit erstem Bild, als Video oder als gerenderte Vorschau.
+- Slideshow: Datei → Slideshow öffnen, speichern, aus Dateien anlegen, als Präsentation exportieren. Das Paket ist `.oshow` (Zip mit `slideshow.json` und Medien). Einträge sind Bild, Video oder Text (TXT, MD, PDF). Der Export `.odisp` macht aus jedem Eintrag eine Folie. Öffnen einer `.odisp` oder `.pptx` legt je Folie einen Eintrag an, als Text mit erstem Bild, als Video oder als gerenderte Vorschau. Datei und Präsentieren → Als Slideshow speichern schreibt die offene Präsentation als `.oshow` (eine Folie, ein Eintrag); Slideshow als Programm speichern legt einen Ordner mit `player.py`, `Slideshow.bat` und `Slideshow.sh` an.
 - Tabelle verbinden liest XLSX oder CSV und merkt sich den Dateipfad. Daten aktualisieren liest neu.
 
 ## Lokale Gestaltung

@@ -89,6 +89,110 @@ class SlideshowIoTests(unittest.TestCase):
         self.assertIn("Platz nehmen", loaded.slides[1].objects[0].props["text"])
 
 
+class PresentationSlideshowTests(unittest.TestCase):
+    def test_text_then_image_becomes_two_entries(self):
+        from PIL import Image
+
+        from officedisplay.io.slideshow_io import load_oshow, save_presentation_oshow
+        from officedisplay.model.presentation import Presentation, Slide, SlideObject, new_id
+
+        folder = Path(tempfile.mkdtemp())
+        image_path = folder / "foto.png"
+        Image.new("RGB", (16, 10), (20, 40, 80)).save(image_path)
+        deck = Presentation(
+            title="Abend",
+            slides=[
+                Slide(
+                    id=new_id(),
+                    name="Begrüßung",
+                    objects=[
+                        SlideObject(
+                            id=new_id(),
+                            kind="text",
+                            x=0.1,
+                            y=0.2,
+                            w=0.8,
+                            h=0.3,
+                            props={"text": "Willkommen"},
+                        )
+                    ],
+                ),
+                Slide(
+                    id=new_id(),
+                    name="Foto",
+                    objects=[
+                        SlideObject(
+                            id=new_id(),
+                            kind="image",
+                            x=0.0,
+                            y=0.0,
+                            w=1.0,
+                            h=1.0,
+                            props={"path": str(image_path)},
+                        )
+                    ],
+                ),
+            ],
+        )
+        target = save_presentation_oshow(deck, folder / "abend")
+        self.assertEqual(target.name, "abend.oshow")
+        loaded = load_oshow(target)
+        self.assertEqual([entry.kind for entry in loaded.entries], ["text", "image"])
+        self.assertIn("Willkommen", loaded.entries[0].text)
+        self.assertEqual(loaded.entries[0].title, "Begrüßung")
+        self.assertTrue(Path(loaded.entries[1].path).is_file())
+
+    def test_program_folder_loads_and_player_compiles(self):
+        import py_compile
+
+        from PIL import Image
+
+        from officedisplay.io.slideshow_io import load_oshow
+        from officedisplay.io.standalone_show import write_standalone_show
+        from officedisplay.model.presentation import Presentation, Slide, SlideObject, new_id
+
+        folder = Path(tempfile.mkdtemp())
+        image_path = folder / "bild.png"
+        Image.new("RGB", (8, 8), (9, 9, 9)).save(image_path)
+        deck = Presentation(
+            title="Programm",
+            slides=[
+                Slide(
+                    id=new_id(),
+                    name="Text",
+                    objects=[SlideObject(id=new_id(), kind="text", x=0.1, y=0.1, w=0.5, h=0.2, props={"text": "Hallo"})],
+                ),
+                Slide(
+                    id=new_id(),
+                    name="Bild",
+                    objects=[
+                        SlideObject(id=new_id(), kind="image", x=0, y=0, w=1, h=1, props={"path": str(image_path)})
+                    ],
+                ),
+            ],
+        )
+        program = folder / "zeigen"
+        write_standalone_show(deck, program)
+        for name in ("Slideshow.bat", "Slideshow.sh", "player.py", "show.oshow", "liesmich.txt"):
+            self.assertTrue((program / name).is_file(), name)
+        loaded = load_oshow(program / "show.oshow")
+        self.assertEqual([entry.kind for entry in loaded.entries], ["text", "image"])
+        self.assertIn("Hallo", loaded.entries[0].text)
+        player = (program / "player.py").read_text(encoding="utf-8")
+        self.assertNotIn("officedisplay", player)
+        py_compile.compile(str(program / "player.py"), doraise=True)
+        lines = (program / "liesmich.txt").read_text(encoding="utf-8").splitlines()
+        self.assertEqual(len(lines), 3)
+        bat = (program / "Slideshow.bat").read_text(encoding="utf-8")
+        self.assertIn("PYTHONPATH", bat)
+        self.assertIn("https://www.python.org/downloads/", bat)
+        self.assertIn("python -m pip install PySide6", bat)
+        self.assertIn("py -3", bat)
+        shell = (program / "Slideshow.sh").read_text(encoding="utf-8")
+        self.assertIn("python3", shell)
+        self.assertTrue(os.access(program / "Slideshow.sh", os.X_OK))
+
+
 class ShapeAndBackgroundTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
