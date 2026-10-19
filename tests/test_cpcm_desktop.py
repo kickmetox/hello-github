@@ -18,7 +18,9 @@ class DesktopTests(unittest.TestCase):
             (inbox / "note.txt").write_text("fenster", encoding="utf-8")
             session = Session(root)
             session.add(str(inbox / "note.txt"))
-            self.assertIn("Dateien: 1", session.backup())
+            self.assertEqual(session.set_vault(str(root / "ziel")), root / "ziel")
+            self.assertIn("Ziel:", session.backup())
+            self.assertTrue((root / "ziel" / "snapshots").is_dir())
             snapshot = session.snapshots()[0]["id"]
             report = session.restore(snapshot, overwrite=True, translate_paths=False, destination=str(root / "out"))
             self.assertIn("note.txt", report)

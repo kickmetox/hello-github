@@ -144,6 +144,62 @@ user32.PostMessageW.restype = wintypes.BOOL
 shell32.ShellExecuteW.argtypes = [wintypes.HWND, wintypes.LPCWSTR, wintypes.LPCWSTR, wintypes.LPCWSTR, wintypes.LPCWSTR, ctypes.c_int]
 shell32.ShellExecuteW.restype = wintypes.HINSTANCE
 
+BIF_RETURNONLYFSDIRS = 0x0001
+BIF_EDITBOX = 0x0010
+BIF_NEWDIALOGSTYLE = 0x0040
+BFFM_INITIALIZED = 1
+BFFM_SETSELECTIONW = 0x0467
+BFFCALLBACK = ctypes.WINFUNCTYPE(ctypes.c_int, wintypes.HWND, wintypes.UINT, LPARAM, LPARAM)
+_FOLDER_CALLBACKS: list = []
+
+
+class BROWSEINFOW(ctypes.Structure):
+    _fields_ = [
+        ("hwndOwner", wintypes.HWND),
+        ("pidlRoot", ctypes.c_void_p),
+        ("pszDisplayName", wintypes.LPWSTR),
+        ("lpszTitle", wintypes.LPCWSTR),
+        ("ulFlags", wintypes.UINT),
+        ("lpfn", ctypes.c_void_p),
+        ("lParam", LPARAM),
+        ("iImage", ctypes.c_int),
+    ]
+
+
+def pick_folder(owner, title: str, initial: str) -> str:
+    """Ordnerdialog. Abbrechen liefert einen leeren Text."""
+    ole32 = ctypes.WinDLL("ole32")
+    ole32.CoInitializeEx(None, 2)
+    display = ctypes.create_unicode_buffer(260)
+    initial_buf = ctypes.create_unicode_buffer(initial or "")
+
+    def hook(hwnd, msg, lparam, data):
+        if msg == BFFM_INITIALIZED:
+            user32.SendMessageW(hwnd, BFFM_SETSELECTIONW, 1, ctypes.addressof(initial_buf))
+        return 0
+
+    callback = BFFCALLBACK(hook)
+    _FOLDER_CALLBACKS.append(callback)
+    info = BROWSEINFOW()
+    info.hwndOwner = owner
+    info.pszDisplayName = ctypes.cast(display, wintypes.LPWSTR)
+    info.lpszTitle = title
+    info.ulFlags = BIF_RETURNONLYFSDIRS | BIF_EDITBOX | BIF_NEWDIALOGSTYLE
+    info.lpfn = ctypes.cast(callback, ctypes.c_void_p)
+    shell32.SHBrowseForFolderW.argtypes = [ctypes.POINTER(BROWSEINFOW)]
+    shell32.SHBrowseForFolderW.restype = ctypes.c_void_p
+    shell32.SHGetPathFromIDListW.argtypes = [ctypes.c_void_p, wintypes.LPWSTR]
+    shell32.SHGetPathFromIDListW.restype = wintypes.BOOL
+    pidl = shell32.SHBrowseForFolderW(ctypes.byref(info))
+    if not pidl:
+        return ""
+    path = ctypes.create_unicode_buffer(32768)
+    if not shell32.SHGetPathFromIDListW(pidl, path):
+        ole32.CoTaskMemFree(pidl)
+        return ""
+    ole32.CoTaskMemFree(pidl)
+    return path.value
+
 
 def _hwnd_key(hwnd) -> int:
     return int(ctypes.cast(hwnd, ctypes.c_void_p).value or 0)
@@ -320,8 +376,8 @@ class MainWindow:
             user32.SendMessageW(hwnd, 0x00F1, 1, 0)
             self.checks[key] = hwnd
         self.sync = _button(self.hwnd, "Abgleich starten", 16, 76, 180, 32, ID_SYNC)
-        self.backup = _button(self.hwnd, "Auswahl sichern", 204, 76, 160, 32, 2009)
-        self.wallpaper = _button(self.hwnd, "Hintergrund übernehmen", 372, 76, 200, 32, ID_WALLPAPER)
+        self.backup = _button(self.hwnd, "Sicherung erstellen", 204, 76, 180, 32, 2009)
+        self.wallpaper = _button(self.hwnd, "Hintergrund übernehmen", 396, 76, 210, 32, ID_WALLPAPER)
         self.path = _edit(self.hwnd, str(Path.home()), 16, 120, 560, 26)
         self.go = _button(self.hwnd, "Öffnen", 584, 120, 90, 26, 2002)
         self.up = _button(self.hwnd, "Nach oben", 680, 120, 110, 26, 2003)
@@ -421,6 +477,11 @@ class MainWindow:
             if not self.session.selection_rows():
                 _report(self.log, "Noch nichts ausgewählt. Bereiche anklicken und Abgleich starten, oder links eine Datei aufnehmen.")
                 return
+            destination = self._ask_backup_dir()
+            if not destination:
+                _report(self.log, "Sicherung abgebrochen. Es wurde kein Zielordner gewählt.")
+                return
+            self.session.set_vault(destination)
             self._start_job("Sicherung läuft …", lambda progress: self.session.backup(progress))
         elif ident == ID_EXIT:
             user32.DestroyWindow(self.hwnd)
@@ -448,11 +509,19 @@ class MainWindow:
     def chosen_areas(self) -> list[str]:
         return [key for key, hwnd in self.checks.items() if _checked(hwnd)]
 
+    def _ask_backup_dir(self) -> str:
+        return pick_folder(self.hwnd, "Wohin soll die Sicherung?", str(self.session.vault()))
+
     def _start_sync(self) -> None:
         keys = self.chosen_areas()
         if not keys:
             _report(self.log, "Mindestens einen Bereich auswählen.")
             return
+        destination = self._ask_backup_dir()
+        if not destination:
+            _report(self.log, "Abgleich abgebrochen. Es wurde kein Zielordner gewählt.")
+            return
+        self.session.set_vault(destination)
         try:
             prepared = self.session.prepare_personal(keys)
         except Exception as exc:

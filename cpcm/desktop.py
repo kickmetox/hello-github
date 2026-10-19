@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 from pathlib import Path
 
 from cpcm import AUTHOR_EMAIL, AUTHOR_NAME, __version__
@@ -83,12 +84,31 @@ class Session:
             lines.append("Nicht vorhanden: " + ", ".join(missing))
         return "\n".join(lines)
 
+    def set_vault(self, path: str) -> Path:
+        text = path.strip()
+        if not text:
+            raise ValueError("Kein Zielordner.")
+        target = Path(text).expanduser()
+        target.mkdir(parents=True, exist_ok=True)
+        if not target.is_dir():
+            raise ValueError(f"Kein Ordner: {target}")
+        old = self.vault()
+        data = self.settings()
+        data["vault"] = str(target)
+        save_settings(data, self.root)
+        new = self.vault()
+        old_selection = old / "selection.json"
+        new_selection = new / "selection.json"
+        if old.resolve() != new.resolve() and old_selection.is_file() and not new_selection.is_file():
+            shutil.copy2(old_selection, new_selection)
+        return new
+
     def backup(self, progress=None) -> str:
         host, _other = self.identities()
         snapshot = create_snapshot(self.vault(), load_selection(self.vault()), host, progress=progress)
         files = sum(1 for entry in snapshot.entries if entry.kind == "file")
         skipped = len(snapshot.skipped)
-        return f"Sicherung {snapshot.id}\nDateien: {files}\nÜbersprungen: {skipped}"
+        return f"Sicherung {snapshot.id}\nZiel: {self.vault()}\nDateien: {files}\nÜbersprungen: {skipped}"
 
     def apply_saved_wallpaper(self) -> str:
         from cpcm.backup import snapshot_dir

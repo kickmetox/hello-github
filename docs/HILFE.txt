@@ -6,11 +6,11 @@ ame@sellerbach.de
 Das Programm ist ein Fenster. Es öffnet keinen Browser.
 
 Abgleich
-Die Kästchen oben sind Dokumente, Bilder, Desktop, Downloads, Musik, Videos, Mail, Termine, Hintergrund und Einstellungen. Abgleich starten nimmt nur diese Bereiche, nicht das ganze Benutzerprofil. Das Fenster bleibt dabei bedienbar. Unten steht, wie viele Dateien schon kopiert sind.
+Die Kästchen oben sind Dokumente, Bilder, Desktop, Downloads, Musik, Videos, Mail, Termine, Hintergrund und Einstellungen. Abgleich starten und Sicherung erstellen fragen zuerst, wohin die Sicherung soll. Abbrechen legt nichts an. Der gewählte Ordner ist danach der Vault. Abgleich starten nimmt nur die angekreuzten Bereiche, nicht das ganze Benutzerprofil. Das Fenster bleibt dabei bedienbar. Unten steht, wie viele Dateien schon kopiert sind.
 
 Mail ist das Thunderbird-Profil und, unter Windows, vorhandene Outlook-PST-Dateien. Termine sind ICS-Dateien und der Evolution-Kalender. Der Hintergrund wird als Bild mitgenommen. Hintergrund übernehmen setzt ihn auf diesem Rechner.
 
-Auswahl sichern kopiert nur, was links aufgenommen wurde. Ohne Auswahl passiert nichts. Ein Klick hängt nicht mehr, auch wenn im Profil Windows-Verknüpfungen wie Application Data liegen.
+Sicherung erstellen kopiert nur, was links aufgenommen wurde, und fragt vorher nach dem Ordner. Ohne Auswahl passiert nichts. Ein Klick hängt nicht mehr, auch wenn im Profil Windows-Verknüpfungen wie Application Data liegen.
 
 Was ausgeführt wird und was nur ein Plan bleibt
 Pakete, Firmware, Dateisystemreparatur und Spannungsänderungen werden als Text gezeigt und nicht von selbst ausgeführt. Der Abgleich der eigenen Dateien, der Mail, der Termine, der Bilder und des Hintergrunds wird ausgeführt.
