@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+.venv/
+vault/snapshots/
+vault/pre-restore/
+vault/selection.json
+vault/hardware-profiles.json
+cpcm-settings.json
+*.cpcm
+build/
+dist/
+# Heruntergeladenes Windows-Python, nur Build-Input für CPCM-Setup.exe
+python-*-embed-*.zip

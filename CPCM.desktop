@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=CPCM
+Comment=Cross Platform Config Manager
+Exec=python3 cpcm.py serve
+Icon=icon.png
+Terminal=false
+Type=Application
+Categories=Utility;
+StartupNotify=true

@@ -1,0 +1,8 @@
+python312.zip
+.
+..
+Lib
+
+# CPCM: "." ist der Ordner von python.exe, ".." das Installationsverzeichnis.
+# Lib liegt neben python.exe. site und pip bleiben aus.
+#import site

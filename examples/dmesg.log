@@ -1,0 +1,3 @@
+[  12.441] tool[992]: error while loading shared libraries: libssl.so.3: cannot open shared object file
+[  12.442] bash: line 1: 992 Segmentation fault (core dumped) ./tool
+[  40.100] ntfs3: Volume is dirty, unclean file system

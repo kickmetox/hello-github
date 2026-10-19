@@ -1,0 +1,13 @@
+[project]
+name = "cpcm"
+version = "1.0.0"
+description = "Cross Platform Config Manager"
+authors = [{name = "Andreas Meyer", email = "ame@sellerbach.de"}]
+requires-python = ">=3.11"
+readme = "README.md"
+
+[project.scripts]
+cpcm = "cpcm.cli:main"
+
+[tool.setuptools]
+packages = ["cpcm"]

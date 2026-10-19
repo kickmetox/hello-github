@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CPCM – Cross Platform Config Manager</title>
+  <link rel="icon" href="/icon.png" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="top">
+      <img class="logo" src="/icon.png" alt="CPCM" />
+      <div class="wordmark">
+        <p class="eyebrow">Linux und Windows · <span id="world-pill"></span></p>
+        <h1><span>CP</span>CM</h1>
+        <p class="sub">Cross Platform Config Manager</p>
+      </div>
+      <div class="meta">
+        <p class="vault-line" id="vault-line"></p>
+        <p class="author" id="author-line"></p>
+      </div>
+    </header>
+    <nav class="nav" id="nav">
+      <button type="button" data-panel="backup" class="active">Sicherung</button>
+      <button type="button" data-panel="restore">Wiederherstellen</button>
+      <button type="button" data-panel="worlds">Welten</button>
+      <button type="button" data-panel="apps">Programme</button>
+      <button type="button" data-panel="config">Konfiguration</button>
+      <button type="button" data-panel="diagnose">Diagnose</button>
+      <button type="button" data-panel="hardware">Hardware</button>
+    </nav>
+    <main>
+      <section id="panel-backup" class="panel active">
+        <div class="split">
+          <div class="card">
+            <h2>Dateien und Ordner</h2>
+            <p class="lead">Was hier ausgewählt wird, landet im gemeinsamen Vault und kann auf der anderen Welt wiederhergestellt werden.</p>
+            <div class="row">
+              <input id="browse-path" type="text" spellcheck="false" />
+              <button type="button" id="browse-go">Öffnen</button>
+              <button type="button" id="browse-up">Nach oben</button>
+            </div>
+            <ul id="browser" class="browser"></ul>
+          </div>
+          <div class="card">
+            <h2>Auswahl</h2>
+            <ul id="selection" class="selection"></ul>
+            <div class="row"><button type="button" class="primary" id="do-backup">Sicherung erstellen</button></div>
+            <pre id="backup-result" class="out"></pre>
+          </div>
+        </div>
+      </section>
+      <section id="panel-restore" class="panel">
+        <div class="card">
+          <h2>Sicherungen</h2>
+          <p class="lead">Dieselbe Sicherung wird unter Windows und Linux gelesen. Vor dem Überschreiben legt CPCM die vorhandene Datei unter <code>pre-restore</code> ab.</p>
+          <ul id="snapshots" class="snapshots"></ul>
+          <div class="row checks">
+            <label><input id="restore-overwrite" type="checkbox" /> Vorhandene Dateien ersetzen</label>
+            <label><input id="restore-translate" type="checkbox" checked /> Pfade in Textdateien auf dieses System umschreiben</label>
+          </div>
+          <div class="row">
+            <input id="restore-dest" type="text" placeholder="Leer lassen für die eigenen Ordner, oder ein Zielverzeichnis" spellcheck="false" />
+            <button type="button" class="primary" id="do-restore">Wiederherstellen</button>
+          </div>
+          <pre id="restore-result" class="out"></pre>
+          <div class="row">
+            <input id="export-path" type="text" placeholder="Export als .cpcm" spellcheck="false" />
+            <button type="button" id="do-export">Exportieren</button>
+          </div>
+          <div class="row">
+            <input id="import-path" type="text" placeholder="Pfad zu einer .cpcm-Datei" spellcheck="false" />
+            <button type="button" id="do-import">Importieren</button>
+          </div>
+        </div>
+      </section>
+      <section id="panel-worlds" class="panel">
+        <div class="card">
+          <h2>Beide Welten</h2>
+          <p class="lead">Home-Verzeichnisse bestimmen, wohin documents, config und home auf der anderen Seite zeigen.</p>
+          <div class="grid2">
+            <label>Linux-Home<input id="home-linux" type="text" spellcheck="false" /></label>
+            <label>Windows-Home<input id="home-windows" type="text" spellcheck="false" /></label>
+          </div>
+          <div class="row"><button type="button" class="primary" id="save-homes">Homes speichern</button></div>
+          <h3>Vault</h3>
+          <div class="row">
+            <input id="vault-path" type="text" spellcheck="false" />
+            <button type="button" id="save-vault">Vault übernehmen</button>
+          </div>
+          <ul id="world-items" class="selection"></ul>
+        </div>
+      </section>
+      <section id="panel-apps" class="panel">
+        <div class="card">
+          <h2>Programme</h2>
+          <p class="lead">Photoshop wird nicht als GIMP ausgegeben, sondern als Arbeitsablauf. Paketbefehle stammen nur aus der festen Liste.</p>
+          <div class="row">
+            <button type="button" id="detect-apps">Dieses System lesen</button>
+            <select id="pkg-manager"></select>
+            <button type="button" class="primary" id="plan-apps">Plan erstellen</button>
+          </div>
+          <textarea id="app-names" rows="6" placeholder="Ein Name pro Zeile"></textarea>
+          <pre id="app-plan" class="out"></pre>
+        </div>
+      </section>
+      <section id="panel-config" class="panel">
+        <div class="split">
+          <div class="card">
+            <h2>Konfiguration übersetzen</h2>
+            <div class="row">
+              <select id="tr-source"><option value="linux">von Linux</option><option value="windows">von Windows</option></select>
+              <select id="tr-target"><option value="windows">nach Windows</option><option value="linux">nach Linux</option></select>
+              <button type="button" id="load-bashrc">Beispiel</button>
+              <button type="button" class="primary" id="do-translate">Übersetzen</button>
+            </div>
+            <textarea id="tr-in" rows="12" spellcheck="false"></textarea>
+            <pre id="tr-out" class="out"></pre>
+          </div>
+          <div class="card">
+            <h2>Kürzel, Gesten, Erscheinungsbild</h2>
+            <div class="row">
+              <input id="shortcut" type="text" value="Strg+Alt+Super+K" spellcheck="false" />
+              <button type="button" id="do-shortcut">Übersetzen</button>
+            </div>
+            <pre id="shortcut-out" class="out"></pre>
+            <div class="row checks">
+              <label><input id="natural-scroll" type="checkbox" checked /> Natürliches Scrollen</label>
+              <label><input id="tap-click" type="checkbox" checked /> Tippen klickt</label>
+            </div>
+            <div class="row">
+              <button type="button" id="do-gestures">Gesten erzeugen</button>
+              <button type="button" id="do-theme">Erscheinungsbild erzeugen</button>
+            </div>
+            <pre id="theme-out" class="out"></pre>
+          </div>
+        </div>
+      </section>
+      <section id="panel-diagnose" class="panel">
+        <div class="card">
+          <h2>Diagnose</h2>
+          <div class="row">
+            <button type="button" id="load-event">Windows-Beispiel</button>
+            <button type="button" id="load-dmesg">Linux-Beispiel</button>
+            <button type="button" class="primary" id="do-diagnose">Übersetzen</button>
+          </div>
+          <textarea id="log-in" rows="8" spellcheck="false"></textarea>
+          <div id="findings"></div>
+          <h3>Dateisystem der anderen Welt</h3>
+          <div class="row">
+            <select id="fs-world"><option value="linux">von Linux aus</option><option value="windows">von Windows aus</option></select>
+            <select id="fs-type"><option>ntfs</option><option>ext4</option><option>btrfs</option></select>
+            <input id="fs-device" type="text" placeholder="/dev/nvme0n1p3 oder C:" spellcheck="false" />
+            <button type="button" id="do-fs">Plan</button>
+          </div>
+          <pre id="fs-out" class="out"></pre>
+        </div>
+      </section>
+      <section id="panel-hardware" class="panel">
+        <div class="card">
+          <h2>Leistung, Lüfter, Laden</h2>
+          <p class="lead" id="hw-note"></p>
+          <div id="profiles" class="profiles"></div>
+          <svg id="curve" viewBox="0 0 320 140" class="curve"></svg>
+          <pre id="hw-probe" class="out"></pre>
+        </div>
+      </section>
+    </main>
+  </div>
+  <script src="/app.js"></script>
+</body>
+</html>
