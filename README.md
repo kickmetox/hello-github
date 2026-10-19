@@ -16,6 +16,12 @@ Stift, Grafiktablett und Touch sind eigene Zeiger. Der Stift zeichnet mit Druck,
 
 Standard ist offline: kein Tracking, kein automatischer Netzaufruf. Online-KI (OpenAI-kompatible HTTPS-API) und Canva Connect sind möglich, aber nur nach Freigabe unter „KI → Einstellungen Online-KI / Canva“ und nur auf Klick. Schlüssel liegen unter `~/.config/officedisplay/secrets.json` mit Modus 600. Die ausführliche Bedienung steht in `docs/HILFE.md`, die Merkmale in `FEATURELISTE.md`, die kurze Fassung in `KURZBESCHREIBUNG.md`.
 
+## Installieren
+
+Windows: den Ordner entpacken und `installer\install.bat` per Doppelklick starten. Danach im Programmordner `Office Display.bat` starten.
+
+Linux und macOS: `chmod +x installer/install.sh` und `./installer/install.sh`. Danach `./Office Display.sh`. `start.sh` und `start-officedisplay.sh` bleiben liegen.
+
 ## Start
 
 ```bash

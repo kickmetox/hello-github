@@ -105,3 +105,7 @@ Vorlagen: Pitch, Unterricht, Kennzahlen, Zitat, Vergleich, Team, Titel. Größe 
 - Strg+G gruppieren, Strg+Umschalt+G lösen, Strg+D duplizieren, Entf löschen
 - F1 Hilfe, F5 Präsentieren
 - Im Player: Pfeile, Leertaste, Bild auf/ab, Pos1, Ende, Escape, B, Punkt, W, N
+
+## Installieren
+
+Unter Windows den entpackten Ordner öffnen und `installer\install.bat` doppelklicken. Fehlt Python, nennt der Installer https://www.python.org/downloads/ und bricht ab. Danach startet `Office Display.bat` das Programm. Unter Linux und macOS `./installer/install.sh`, danach `./Office Display.sh`.
