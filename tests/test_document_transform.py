@@ -5,19 +5,27 @@ from pathlib import Path
 from officedisplay.ai.doc_transform import outline_from_text, slides_from_text
 
 
-PDF = b"""%PDF-1.4
-1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj
-2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj
-3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >> endobj
-4 0 obj << /Length 88 >> stream
-BT /F1 18 Tf 72 720 Td (Einleitung) Tj ET
-BT /F1 14 Tf 72 680 Td (Der Umsatz blieb stabil.) Tj ET
-endstream
-endobj
-5 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj
-trailer << /Root 1 0 R >>
-%%EOF
-"""
+def _pdf_bytes(sentence: str) -> bytes:
+    stream = f"BT /F1 18 Tf 72 720 Td ({sentence}) Tj ET\n".encode("latin-1")
+    chunks = [
+        b"1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n",
+        b"2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n",
+        b"3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 300] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>\nendobj\n",
+        b"4 0 obj\n<< /Length " + str(len(stream)).encode() + b" >>\nstream\n" + stream + b"endstream\nendobj\n",
+        b"5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n",
+    ]
+    blob = b"%PDF-1.4\n"
+    offsets = []
+    for chunk in chunks:
+        offsets.append(len(blob))
+        blob += chunk
+    xref = len(blob)
+    blob += f"xref\n0 {len(chunks) + 1}\n".encode()
+    blob += b"0000000000 65535 f \n"
+    for offset in offsets:
+        blob += f"{offset:010d} 00000 n \n".encode()
+    blob += f"trailer\n<< /Size {len(chunks) + 1} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n".encode()
+    return blob
 
 
 class DocumentTransformTest(unittest.TestCase):
@@ -40,7 +48,7 @@ class DocumentTransformTest(unittest.TestCase):
     def test_pdf_uses_only_extracted_text(self):
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / "quelle.pdf"
-            path.write_bytes(PDF)
+            path.write_bytes(_pdf_bytes("Der Umsatz blieb stabil."))
             from officedisplay.ai.doc_transform import read_text_file
 
             raw = read_text_file(str(path))

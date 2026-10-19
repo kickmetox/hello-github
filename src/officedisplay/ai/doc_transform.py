@@ -56,8 +56,12 @@ def read_text_file(path: str) -> str:
     suffix = path.lower().rsplit(".", 1)[-1]
     if suffix == "pdf":
         from pypdf import PdfReader
+        from pypdf.errors import PdfReadError
 
-        reader = PdfReader(path)
+        try:
+            reader = PdfReader(path)
+        except PdfReadError as exc:
+            raise ValueError(f"PDF konnte nicht gelesen werden: {exc}") from exc
         return "\n".join((page.extract_text() or "") for page in reader.pages)
     with open(path, "r", encoding="utf-8", errors="replace") as handle:
         return handle.read()
