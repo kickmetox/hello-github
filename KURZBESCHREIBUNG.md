@@ -1,9 +1,11 @@
 # Kurzbeschreibung
 
-Office Display ist ein lokales Programm zum Anlegen und Bearbeiten von Präsentationsvorlagen.
+Office Display ist ein lokales Programm zum Anlegen und Bearbeiten von Präsentationen.
 
-Es enthält Folieneditor, Textformatierung, Zeichenstift, Formen, Bilder, einfache Fotofilter, Videoverweise, Diagramme aus CSV- und Excel-Dateien, 3D-Schnappschüsse, Vorlagen im Stil eines Designstudios, Magic Resize auf gängige Formate, Gruppieren, Import und Export. Die Oberfläche lässt sich hell, dunkel, farbig oder in Graustufen schalten.
+Es enthält Folieneditor, Textformatierung, Zeichenstift, Formen, Bilder, einfache Fotofilter, Videoverweise, Diagramme aus CSV- und Excel-Dateien, 3D-Schnappschüsse, lokale Vorlagen, Größenanpassung, Gruppieren, Import und Export. Die Oberfläche lässt sich hell, dunkel, farbig oder in Graustufen schalten.
 
-Die Bearbeitung braucht kein Netz. Eine Online-KI im OpenAI-kompatiblen Format und die Canva Connect API können zugeschaltet werden. Beides bleibt aus, bis ein Schlüssel eingetragen und die Funktion angeklickt wird.
+Die Bearbeitung braucht kein Netz. Es werden keine Daten übertragen und nichts gemessen, außer die Verweildauer, die nur auf Wunsch in eine lokale JSON-Datei geschrieben wird.
+
+Der Programmordner ist das Repository. Auf diesem System gibt es kein Laufwerk `D:`.
 
 Kontakt: Andreas Meyer, ame@sellerbach.de

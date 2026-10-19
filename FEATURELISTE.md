@@ -1,53 +1,60 @@
 # Featureliste Office Display
 
-Stand der Umsetzung in diesem Programmordner. Was ein Netz bräuchte, ist aus oder ein ausdrücklicher Klick.
+Stand der Umsetzung in diesem Programmordner. Alles läuft lokal. Es gibt keine Cloud-Aufrufe und kein Tracking.
 
-## Klassische Performance und Datensteuerung
+## Editor
 
-- Excel- und CSV-Kopplung: lokale Dateien werden gelesen, die ersten 500 Datenzeilen landen im Diagramm, „Daten aktualisieren“ liest die Datei neu. Sehr große Arbeitsmappen werden zeilenweise begrenzt, damit der Editor bedienbar bleibt.
-- Animation: Morph-Vorschau schiebt Objekte mit gleichem Namen zur nächsten Folie. Weitere Eingangseffekte sind als Folienübergang im Datenmodell gespeichert.
-- Offline-Formatierung: Schriften, Farben, Ausrichtung, Hintergründe und Markensperre funktionieren ohne Internet. Makros sind lokale Python-Dateien mit der Funktion `run(api)` und ohne Dateisystemzugriff.
-- Kompatibilität: Export und Import von `.pptx` (python-pptx) und ein grundlegendes `.odp`. Das eigene Paket `.odisp` hält Texte und Mediendateien editierbar.
-- Datenschutz: kein Tracking, kein Cloud-Zwang. Analyse der Verweildauer schreibt nur eine lokale JSON-Datei, wenn sie gespeichert wird.
+- Werkzeuge: Auswahl, Text, Formen, Stift, Marker, Radierer, Diagramm, Bild, Video, 3D.
+- Text: Schriftfamilie, Größe, fett, kursiv, unterstrichen, Farbe, Ausrichtung. Markensperre begrenzt Schrift und Farbe.
+- Hintergründe: Farbe, Verlauf, Bild, volle Fläche, Deckkraft, cover, contain, kacheln.
+- Rechts die Folienminiaturen. Ein Klick lädt die Folie. Objekte lassen sich per Ziehen oder Menü auf eine andere Folie legen.
+- Gruppieren und Gruppierung aufheben. Drag-and-drop von Bild, Video, Text und Dateien auf die Fläche.
+- Themen: hell, dunkel, farbe, graustufen.
+- Foliengröße ist nicht auf 16:9 festgelegt. Elemente liegen in relativen Koordinaten und bleiben in den Rändern.
 
-## KI, offline und optional online
+## Stift, Grafiktablett, Touch
 
-- Text-zu-Design offline: ein Satz wird zu Titel, Ablauf, Inhalt und Abschluss. Zahlen, die nicht im Satz stehen, sind als Beispielwerte markiert.
-- Dieselbe Struktur kann online erzeugt werden, wenn die Online-KI eingeschaltet ist. Die Schnittstelle ist `POST {basis}/chat/completions` (OpenAI-kompatibel, auch Ollama unter `http://127.0.0.1:11434/v1`).
-- Dokumente: TXT, Markdown und PDF werden in Folien zerlegt. Die Sätze bleiben erhalten, die Notiz nennt die Quellzeile.
-- Inline-Befehle offline, zum Beispiel „zwei spalten“, „diagramm“, „dunkler hintergrund“.
-- Quellenfokus: die Dokumentumwandlung formuliert keine neuen Fakten. Die Online-Anweisung verlangt dasselbe; ein fremdes Modell kann sich trotzdem nicht daran halten, deshalb bleibt der Schalter aus, bis er gebraucht wird.
-- Layout-Klassifikator: kleines ONNX-Modell unter `models/layout_classifier.onnx`, dazu dieselbe Rechnung in NumPy. „Modell inspizieren“ startet Netron, falls das Paket installiert ist.
-- Sprech-Coach: Füllwörter Deutsch/Englisch, Wörter pro Minute und Satzlängen aus der Sprechernotiz. Kein Mikrofonmitschnitt.
-- Optionale Bildgenerierung: `POST {basis}/images/generations`, nur mit separatem Haken.
+- Maus, Stift und Touch werden über Qt-Tablet- und Touch-Ereignisse unterschieden. Die Statuszeile zeigt Maus, Stift, Radierer oder Touch.
+- Stift: Strichstärke folgt dem Druck. Stärke, Druckkurve und Glättung sind einstellbar. Neigung wird entgegengenommen, wenn das System sie meldet.
+- Radiererseite oder Radiererwerkzeug entfernt getroffene Striche.
+- Touch verschiebt und zoomt mit zwei Fingern, oder zeichnet, wenn „Touch: zeichnen“ gewählt ist.
+- Ohne Tablett bleibt die Maus der Eingabeweg. Die Strichlogik ist ohne Gerät testbar.
 
-## Canva-Fähigkeiten
+## Dateien und Daten
 
-Lokal, ohne Canva-Konto:
+- `.pptx` über python-pptx. Texte und Bilder bleiben nach dem Rundweg editierbar. Gruppen werden beim Export flach geschrieben.
+- `.odp` mit grundlegender `content.xml` für Textinhalte.
+- `.odisp`: Zip mit `presentation.json` und Medien.
+- Excel und CSV: lokale Datei an ein Diagramm binden und erneut einlesen (openpyxl).
+- TXT, Markdown und PDF (pypdf) werden nur aus dem Quelltext in Folien zerlegt. Die Notiz nennt die Quelle. Es werden keine Fakten ergänzt.
+- Makros: bestätigte Python-Dateien aus `macros/` mit `def run(api)` und einer kleinen API.
+- Kommentare, Folienstatus und Verweildauer liegen in der Datei bzw. in einer lokalen JSON. Präsentationsmodus zeigt Folie und Notiz.
+- Ordner-Sync schreibt `deck.json` und liest sie bei geänderter Zeit neu. Das ist ein lokaler Dateiabgleich, kein Server und kein Videochat.
+- Kamera: Qt Multimedia, wenn ein Gerät da ist. Sonst eine Meldung, dass keine Kamera und kein Cloud-Videochat vorhanden sind.
 
-- Vorlagen: Pitch, Unterricht, Kennzahlen, Zitat, Vergleich, Team, Titel.
-- Magic Resize: 16:9, 4:3, Quadrat, Story 9:16, Portrait, A4, LinkedIn, Banner. Positionen sind relativ, Schriften und Hochformat werden nachgeführt.
-- Elemente: Rahmen, Fläche, Kreis, Raute, Stern, Pfeil, Badge.
-- Ausrichten und Raster beim Ziehen.
-- Markenführung: gesperrte Schriften, Farbpalette, Logo.
-- Fotowerkzeuge: Helligkeit, Graustufen, Weichzeichnen, Schärfen, Spiegeln, einfaches Freistellen nach der Eckfarbe.
-- 3D: Würfel, Pyramide oder OBJ, softwaregerendert, als Bild auf der Folie.
+## Gestaltung, offline
 
-Canva Connect, nur mit eigenem Token und nur auf Klick:
+- Ein deutscher oder englischer Satz erzeugt einen Foliensatz (Titel, Ablauf, Inhalt, bei passendem Text auch zwei Spalten, Kennzahl, Diagramm, Zitat, Zeitstrahl, Abschluss). Zahlen stammen nur aus dem Satz. Fehlen sie, steht das im Text.
+- Befehle auf der aktuellen Folie, zum Beispiel „zwei spalten“, „dunkler hintergrund“, „diagramm“. Ein Diagramm ohne Zahlen im Text bekommt keine Beispielreihe.
+- Das Diagramm-Werkzeug in der Leiste legt beschriftete Beispielwerte an, die ersetzt werden sollen. Das ist eine leere Schablone, keine Aussage über eine Quelle.
+- Schriftgröße, höchstens sechs Aufzählungen und Ränder begrenzen den Überlauf.
+- `assets/brand.json` sperrt auf Wunsch Schrift, Palette und Logo.
+- Lokale Bibliothek: Vorlagen, Vektorformen, Diagramm- und Kennzahl-Objekte, Größen wie 16:9, 4:3, Quadrat, 9:16, A4 und Banner.
+- 3D: Würfel, Pyramide oder OBJ, perspektivisch in Software gerendert, als Bild auf der Folie.
+- Animation: Eingang Einblenden, Einfliegen, Zoom. Morph verschiebt Objekte mit gleichem Namen zwischen zwei Folien in einer Vorschau.
+- Klickaktion: zu einer Folie springen oder einen Hinweis zeigen.
+- Leinwand: Übersicht aller Folien, Klick öffnet eine Folie.
+- Sprech-Coach liest die Sprechernotiz: Füllwörter Deutsch und Englisch, Wörter pro Minute, Variation der Satzlänge. Es wird nichts aufgenommen.
 
-- Markenvorlagen listen: `GET https://api.canva.com/rest/v1/brand-templates`
-- Autofill: `POST /rest/v1/autofills` mit `create_from_brand_template`
-- Export: `POST /rest/v1/exports` mit Format `pptx`
-- OAuth-Startadresse mit PKCE wird gebaut. Das Programm speichert keinen Canva-Client-Geheimschlüssel.
+## Modell, C++ und C#
 
-## Eingabe
-
-- Maus, Stift (Druck, Neigung wird entgegengenommen, die Strichstärke folgt dem Druck), Radiererseite, Touch.
-- Touch standardmäßig zum Verschieben und mit zwei Fingern zum Zoomen. Der Schalter „Touch: zeichnen“ lässt den Finger im Stiftwerkzeug zeichnen.
-- Strg+Mausrad zoomt die Ansicht. Die Leinwand unter „Präsentieren → Leinwand“ zeigt alle Folien und zoomt.
+- Kleiner Layout-Klassifikator unter `models/layout_classifier.onnx`. Dieselbe Rechnung liegt in NumPy, damit das Programm ohne onnxruntime läuft.
+- „Modell inspizieren“ startet Netron auf diesem ONNX, wenn das Paket installiert ist, nur auf `127.0.0.1`. Sonst zeigt es den Pfad.
+- `native/cpp` baut `libodnative.so` (Helligkeit, Kontrast, Graustufen, Strichglättung). Fehlt die Bibliothek, rechnet Python dasselbe.
+- `OfficeDisplay.sln` enthält ein C#-Werkzeug für eine Farbreihe. Ohne installiertes `dotnet` nutzt Python dieselbe Reihe.
 
 ## Nicht enthalten
 
-- Kein eingebauter Videochat und keine fremde Cloud-Zusammenarbeit. Kommentare und Folienstatus liegen in der Datei.
-- Keine Millionen externer Stockmotive. Die Formen sind lokal.
-- Kein stilles Hochladen von Folien.
+- Kein Netz, kein Tracking, keine Telemetrie.
+- Kein Cloud-Videochat und kein Katalog mit fremden Stockmotiven.
+- Keine großen Sprachmodelle und kein Download von Modellgewichten.

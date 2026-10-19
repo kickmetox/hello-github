@@ -36,10 +36,6 @@ def dotnet_project() -> Path:
     return project_root() / "dotnet" / "OfficeDisplay.Tools" / "OfficeDisplay.Tools.csproj"
 
 
-def secrets_path() -> Path:
-    return Path.home() / ".config" / "officedisplay" / "secrets.json"
-
-
 def dotnet_solution() -> Path:
     return project_root() / "OfficeDisplay.sln"
 

@@ -1,10 +1,20 @@
 # Office Display
 
-Office Display erstellt Präsentationen lokal und schreibt sie als PowerPoint-Datei (`.pptx`), OpenDocument (`.odp`) und im eigenen Paket (`.odisp`). Damit lassen sich die Dateien in PowerPoint, OpenOffice, OnlyOffice und SoftMaker öffnen.
+Office Display ist ein lokales Präsentationsprogramm. Es schreibt PowerPoint (`.pptx`), OpenDocument (`.odp`) und das eigene Paket (`.odisp`). Diese Dateien lassen sich in PowerPoint, OpenOffice, OnlyOffice und SoftMaker öffnen.
 
 Andreas Meyer · ame@sellerbach.de
 
-Der Programmordner ist dieses Repository. Auf diesem Linux-System gibt es kein Laufwerk `D:\AI_Temp\OfficeDisplay`. Unter Windows kann der Ordner dorthin kopiert werden; die Startdatei sucht keine feste Platte.
+## Programmordner
+
+Der Programmordner ist das Repository, also das Verzeichnis dieser Datei. Auf diesem Linux-System gibt es kein Laufwerk `D:`. Der ursprünglich genannte Ordner `D:\AI_Temp\OfficeDisplay` existiert hier nicht. Unter Windows kann das Repository an einen beliebigen Ort kopiert werden; die Startdateien suchen keine feste Platte.
+
+## Kurzbeschreibung
+
+Eine Folie liegt in der Mitte. Rechts stehen die Miniaturen der angelegten Folien; ein Klick lädt die Folie in den Editor. Texte, Bilder, Formen, Stiftstriche, Diagramme und Videos bleiben Objekte und lassen sich auswählen, verschieben, skalieren und gruppieren. Eine Auswahl mit Umschalt auf eine Miniatur ziehen legt das Objekt auf diese Folie.
+
+Stift, Grafiktablett und Touch sind eigene Zeiger. Der Stift zeichnet mit Druck, die Radiererseite radiert, Touch verschiebt oder zeichnet je nach Schalter. Ohne Tablett bleibt die Maus bedienbar.
+
+Das Programm arbeitet offline. Es gibt kein Tracking, keine Cloud-KI und keinen Cloud-Katalog. Die ausführliche Bedienung steht in `docs/HILFE.md`, die Merkmale in `FEATURELISTE.md`, die kurze Fassung in `KURZBESCHREIBUNG.md`.
 
 ## Start
 
@@ -12,24 +22,23 @@ Der Programmordner ist dieses Repository. Auf diesem Linux-System gibt es kein L
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 cmake -S native/cpp -B native/cpp/build && cmake --build native/cpp/build
-.venv/bin/python scripts/build_onnx.py
-./start-officedisplay.sh
+./start.sh
 ```
 
-Unter Windows, wenn Python und die Pakete installiert sind:
+Alternativ `./start-officedisplay.sh`. Unter Windows, wenn Python und die Pakete installiert sind: `start-officedisplay.bat`.
 
-```bat
-start-officedisplay.bat
+Ohne Startdatei:
+
+```bash
+PYTHONPATH=src python3 -m officedisplay
 ```
 
-Visual Studio öffnet `OfficeDisplay.sln` (C#-Farbwerkzeug und C++-Bibliothek). Die Oberfläche selbst ist Python mit PySide6.
+Das ONNX-Modell liegt bereits unter `models/layout_classifier.onnx`. `scripts/build_onnx.py` schreibt es bei Bedarf neu.
 
-## Kurz
+Visual Studio öffnet `OfficeDisplay.sln`. Das ist ein C#-Farbwerkzeug. Die Oberfläche selbst ist Python mit PySide6. Fehlt `dotnet`, nutzt das Programm die Python-Farbreihe.
 
-Eine Folie liegt in der Mitte. Rechts stehen die bereits angelegten Folien; ein Klick lädt sie in den Editor. Texte, Bilder, Formen, Stiftstriche, Diagramme und Videos bleiben Objekte: auswählen, verschieben, skalieren, gruppieren. Umschalt+Ziehen einer Auswahl auf eine Folienminiatur legt das Objekt auf diese Folie.
+## Tests
 
-Stift, Grafiktablett und Touch sind eigene Zeiger. Der Stift zeichnet mit Druck, die Radiererseite radiert, Touch verschiebt oder zeichnet je nach Schalter. Ohne Tablett bleibt die Maus bedienbar.
-
-Online-KI und Canva Connect sind aus. Sie senden nur dann Daten, wenn der Schalter gesetzt ist und eine Aktion angeklickt wird. Schlüssel liegen in `~/.config/officedisplay/secrets.json`.
-
-Ausführliche Bedienung: `docs/HILFE.md`. Merkmale: `FEATURELISTE.md`.
+```bash
+QT_QPA_PLATFORM=offscreen PYTHONPATH=src .venv/bin/python -m unittest discover -s tests
+```

@@ -128,8 +128,8 @@ def _shape(x, y, w, h, shape, fill, name="") -> SlideObject:
 def generate_deck(prompt: str) -> Presentation:
     """Ein Satz wird zu einem abgestimmten Foliensatz.
 
-    Es werden nur Formulierungen aus dem Satz verwendet. Diagrammzahlen, die
-    nicht im Satz stehen, werden als Beispielwerte markiert.
+    Es werden nur Formulierungen und Zahlen aus dem Satz verwendet. Fehlen
+    Zahlen, bleibt das Diagramm leer und der Text nennt die fehlende Quelle.
     """
     prompt = " ".join((prompt or "").split())
     if not prompt:
