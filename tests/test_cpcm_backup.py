@@ -84,6 +84,24 @@ class BackupTests(unittest.TestCase):
             self.assertIn("Unsicherer Speicherpfad", " ".join(item["reason"] for item in report.skipped))
             self.assertFalse((root / "outside.txt").exists())
 
+    def test_symlink_loop_and_cache_do_not_grow(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            folder = root / "docs"
+            folder.mkdir()
+            (folder / "a.txt").write_text("a", encoding="utf-8")
+            (folder / "loop").symlink_to(folder, target_is_directory=True)
+            cache = folder / "node_modules"
+            cache.mkdir()
+            (cache / "pkg.js").write_text("no", encoding="utf-8")
+            linux = identity_for_home(World.LINUX, root, "ada")
+            windows = identity_for_home(World.WINDOWS, Path(r"C:\Users\ada"), "ada")
+            selection = Selection()
+            add_path(selection, folder, linux, windows)
+            snapshot = create_snapshot(root / "vault", selection, linux)
+            files = [entry.canonical for entry in snapshot.entries if entry.kind == "file"]
+            self.assertEqual(files, ["home/docs/a.txt"])
+
     def test_refuses_empty_selection(self):
         with tempfile.TemporaryDirectory() as tmp:
             with self.assertRaises(ValueError):

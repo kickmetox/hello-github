@@ -172,7 +172,31 @@ def to_canonical_safe(path: Path, host: Identity) -> str | None:
     return canonical if _payload_parts_ok(canonical) else None
 
 
-def create_snapshot(vault: Path, selection: Selection, host: Identity) -> Snapshot:
+_REPARSE_POINT = 0x400
+_SKIP_DIR_NAMES = {
+    "node_modules", "__pycache__", ".cache", "cache", "cache2", "gpucache",
+    "code cache", "shader-cache", "crash reports", "startupcache", "grshadercache",
+}
+
+
+def is_reparse_point(path: Path) -> bool:
+    """Symlink oder Windows-Junction. In so einen Ordner wird nicht hinabgestiegen."""
+    try:
+        if path.is_symlink():
+            return True
+        attributes = getattr(path.lstat(), "st_file_attributes", 0)
+    except OSError:
+        return True
+    return bool(attributes & _REPARSE_POINT)
+
+
+def skip_directory(path: Path) -> bool:
+    if path.name.casefold() in _SKIP_DIR_NAMES:
+        return True
+    return is_reparse_point(path)
+
+
+def create_snapshot(vault: Path, selection: Selection, host: Identity, progress=None) -> Snapshot:
     if not selection.items:
         raise ValueError("Keine Dateien oder Verzeichnisse ausgewählt")
     vault.mkdir(parents=True, exist_ok=True)
@@ -189,7 +213,7 @@ def create_snapshot(vault: Path, selection: Selection, host: Identity) -> Snapsh
     )
     seen: dict[str, Entry] = {}
     for item in selection.items:
-        _collect_item(item, host, vault, payload_root, seen, snapshot.skipped)
+        _collect_item(item, host, vault, payload_root, seen, snapshot.skipped, progress)
     snapshot.entries = list(seen.values())
     (root / "manifest.json").write_text(
         json.dumps(snapshot.to_json(), indent=2, ensure_ascii=False) + "\n",
@@ -198,7 +222,7 @@ def create_snapshot(vault: Path, selection: Selection, host: Identity) -> Snapsh
     return snapshot
 
 
-def _collect_item(item, host, vault, payload_root, seen, skipped) -> None:
+def _collect_item(item, host, vault, payload_root, seen, skipped, progress=None) -> None:
     local = local_path_for(item, host)
     if local is None:
         skipped.append({"canonical": item.canonical, "reason": "kein lokaler Pfad"})
@@ -210,10 +234,13 @@ def _collect_item(item, host, vault, payload_root, seen, skipped) -> None:
         skipped.append({"path": str(local), "reason": "liegt im Vault"})
         return
     if item.kind == "file" or local.is_file() or local.is_symlink():
-        _store_path(local, host, payload_root, vault, seen, skipped)
+        _store_path(local, host, payload_root, vault, seen, skipped, progress)
         return
     if not local.is_dir():
         skipped.append({"path": str(local), "reason": "weder Datei noch Verzeichnis"})
+        return
+    if skip_directory(local) and local != local_path_for(item, host):
+        skipped.append({"path": str(local), "reason": "Verknüpfung oder Zwischenspeicher"})
         return
     _store_dir_entry(local, host, seen)
     for current, dirnames, filenames in os.walk(local, followlinks=False):
@@ -221,10 +248,11 @@ def _collect_item(item, host, vault, payload_root, seen, skipped) -> None:
         kept: list[str] = []
         for name in dirnames:
             child = current_path / name
-            if _inside(child, vault):
-                continue
-            if child.is_symlink():
-                _store_path(child, host, payload_root, vault, seen, skipped)
+            if _inside(child, vault) or skip_directory(child):
+                if is_reparse_point(child) and not _inside(child, vault):
+                    _store_path(child, host, payload_root, vault, seen, skipped, progress)
+                elif not _inside(child, vault):
+                    skipped.append({"path": str(child), "reason": "Zwischenspeicher"})
                 continue
             kept.append(name)
             _store_dir_entry(child, host, seen)
@@ -232,7 +260,7 @@ def _collect_item(item, host, vault, payload_root, seen, skipped) -> None:
         for name in filenames:
             child = current_path / name
             if not _inside(child, vault):
-                _store_path(child, host, payload_root, vault, seen, skipped)
+                _store_path(child, host, payload_root, vault, seen, skipped, progress)
 
 
 def _store_dir_entry(path: Path, host: Identity, seen: dict[str, Entry]) -> None:
@@ -248,7 +276,7 @@ def _store_dir_entry(path: Path, host: Identity, seen: dict[str, Entry]) -> None
     )
 
 
-def _store_path(path, host, payload_root, vault, seen, skipped) -> None:
+def _store_path(path, host, payload_root, vault, seen, skipped, progress=None) -> None:
     if _inside(path, vault):
         skipped.append({"path": str(path), "reason": "liegt im Vault"})
         return
@@ -271,7 +299,11 @@ def _store_path(path, host, payload_root, vault, seen, skipped) -> None:
         return
     payload = _safe_payload(payload_root, canonical)
     payload.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copyfile(path, payload)
+    try:
+        shutil.copyfile(path, payload)
+    except OSError as exc:
+        skipped.append({"path": str(path), "reason": f"nicht lesbar: {exc.strerror or exc}"})
+        return
     seen[canonical] = Entry(
         canonical=canonical,
         kind="file",
@@ -282,6 +314,8 @@ def _store_path(path, host, payload_root, vault, seen, skipped) -> None:
         mode=_mode_of(path),
         mtime=path.stat().st_mtime,
     )
+    if progress is not None:
+        progress(sum(1 for entry in seen.values() if entry.kind == "file"), str(path))
 
 
 def list_snapshots(vault: Path) -> list[dict]:

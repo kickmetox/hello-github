@@ -42,7 +42,7 @@ Liegt der Ordner schon in `D:\AI_Temp\CPCM`, denselben Befehl dort ausführen. R
 
 ## 3. Start
 
-`CPCM.exe`, `CPCM.bat` oder die Desktop-Verknüpfung. Es öffnet sich das Programmfenster. Unten stehen Vault-Pfad und „Andreas Meyer · ame@sellerbach.de“. Die Bedienungsanleitung ist `docs\BEDIENUNGSANLEITUNG.rtf`, die Feature-Liste `docs\FEATURE-LISTE.rtf`.
+`CPCM.exe`, `CPCM.bat` oder die Desktop-Verknüpfung. Es öffnet sich das Programmfenster. Oben die Bereiche anklicken und **Abgleich starten**. Das kopiert Dokumente, Bilder, Mail, Termine, Hintergrund und Einstellungen und folgt keinen Windows-Verknüpfungen im Kreis. Unten stehen Vault-Pfad und „Andreas Meyer · ame@sellerbach.de“. Die Bedienungsanleitung ist `docs\BEDIENUNGSANLEITUNG.rtf`, die Feature-Liste `docs\FEATURE-LISTE.rtf`.
 
 Der normale Weg ist `CPCM-Setup.exe` im Abschnitt Setup. `Install-CPCM.ps1` bleibt die Alternative für den Quellordner.
 

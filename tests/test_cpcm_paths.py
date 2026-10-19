@@ -37,6 +37,15 @@ class PathTests(unittest.TestCase):
             mapped = from_canonical(to_canonical(notes, linux), windows, allow_external=False)
             self.assertEqual(mapped, r"C:\Users\ada\Documents\notes\a.txt")
 
+    def test_thunderbird_and_wallpaper_cross_worlds(self):
+        linux = identity_for_home(World.LINUX, Path("/home/ada"), "ada")
+        windows = identity_for_home(World.WINDOWS, Path(r"C:\Users\ada"), "ada")
+        mail = to_canonical(linux.home / ".thunderbird" / "abcd" / "prefs.js", linux)
+        self.assertEqual(mail, "mail/thunderbird/abcd/prefs.js")
+        self.assertEqual(from_canonical(mail, windows, allow_external=False), r"C:\Users\ada\AppData\Roaming\Thunderbird\abcd\prefs.js")
+        image = from_canonical("appearance/wallpaper", windows, allow_external=False)
+        self.assertEqual(image, r"C:\Users\ada\AppData\Roaming\Microsoft\Windows\Themes\CPCM-Wallpaper.jpg")
+
     def test_external_does_not_cross_worlds(self):
         with tempfile.TemporaryDirectory() as tmp:
             outside = Path(tmp) / "outside" / "a.txt"

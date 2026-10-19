@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ctypes
+import threading
 from ctypes import wintypes
 from pathlib import Path
 
@@ -63,6 +64,10 @@ ID_APPS = 1202
 ID_CONFIG = 1203
 ID_DIAGNOSE = 1204
 ID_HARDWARE = 1205
+ID_SYNC = 1300
+ID_WALLPAPER = 1301
+WM_CPCM_PROGRESS = 0x8000 + 1
+WM_CPCM_DONE = 0x8000 + 2
 
 _STATES: dict[int, object] = {}
 _CALLBACKS: list = []
@@ -134,6 +139,8 @@ user32.SendMessageW.restype = LRESULT
 user32.SetWindowTextW.argtypes = [wintypes.HWND, wintypes.LPCWSTR]
 user32.GetWindowTextW.argtypes = [wintypes.HWND, wintypes.LPWSTR, ctypes.c_int]
 user32.MessageBoxW.argtypes = [wintypes.HWND, wintypes.LPCWSTR, wintypes.LPCWSTR, wintypes.UINT]
+user32.PostMessageW.argtypes = [wintypes.HWND, wintypes.UINT, WPARAM, LPARAM]
+user32.PostMessageW.restype = wintypes.BOOL
 shell32.ShellExecuteW.argtypes = [wintypes.HWND, wintypes.LPCWSTR, wintypes.LPCWSTR, wintypes.LPCWSTR, wintypes.LPCWSTR, ctypes.c_int]
 shell32.ShellExecuteW.restype = wintypes.HINSTANCE
 
@@ -295,23 +302,37 @@ class MainWindow:
         self.font = _font()
         self.entries: list[dict] = []
         self.items: list[dict] = []
+        self.busy = False
+        self.job_result = ""
+        self.job_error = ""
+        self.progress_text = ""
+        self.progress_lock = threading.Lock()
         self.hwnd = user32.CreateWindowExW(
             0, "CPCMMain", session.title(), WS_OVERLAPPEDWINDOW,
-            CW_USEDEFAULT, CW_USEDEFAULT, 980, 680, None, self._menu(), None, None,
+            CW_USEDEFAULT, CW_USEDEFAULT, 980, 760, None, self._menu(), None, None,
         )
         _STATES[_hwnd_key(self.hwnd)] = self
-        self.path = _edit(self.hwnd, str(Path.home()), 12, 12, 620, 26)
-        self.go = _button(self.hwnd, "Öffnen", 640, 12, 90, 26, 2002)
-        self.up = _button(self.hwnd, "Nach oben", 736, 12, 100, 26, 2003)
-        self.add_file = _button(self.hwnd, "Datei…", 842, 12, 110, 26, 2004)
-        self.browser = _listbox(self.hwnd, 12, 48, 460, 430, 2006)
-        self.selection = _listbox(self.hwnd, 484, 48, 468, 360, 2007)
-        self.take = _button(self.hwnd, "Aufnehmen", 484, 416, 120, 28, 2011)
-        self.remove = _button(self.hwnd, "Entfernen", 612, 416, 110, 28, 2008)
-        self.backup = _button(self.hwnd, "Sicherung erstellen", 730, 416, 180, 28, 2009)
-        self.log = _edit(self.hwnd, "", 12, 488, 940, 110, multi=True, readonly=True)
-        self.status = _child(self.hwnd, "STATIC", session.status_line(), 0, 12, 608, 940, 22)
-        for hwnd in (self.path, self.go, self.up, self.add_file, self.browser, self.selection, self.take, self.remove, self.backup, self.log, self.status):
+        self.checks = {}
+        for index, (key, label) in enumerate(session.areas()):
+            column = index % 5
+            row = index // 5
+            hwnd = _child(self.hwnd, "BUTTON", label, BS_AUTOCHECKBOX | WS_TABSTOP, 16 + column * 186, 12 + row * 28, 176, 24, 2100 + index)
+            user32.SendMessageW(hwnd, 0x00F1, 1, 0)
+            self.checks[key] = hwnd
+        self.sync = _button(self.hwnd, "Abgleich starten", 16, 76, 180, 32, ID_SYNC)
+        self.backup = _button(self.hwnd, "Auswahl sichern", 204, 76, 160, 32, 2009)
+        self.wallpaper = _button(self.hwnd, "Hintergrund übernehmen", 372, 76, 200, 32, ID_WALLPAPER)
+        self.path = _edit(self.hwnd, str(Path.home()), 16, 120, 560, 26)
+        self.go = _button(self.hwnd, "Öffnen", 584, 120, 90, 26, 2002)
+        self.up = _button(self.hwnd, "Nach oben", 680, 120, 110, 26, 2003)
+        self.add_file = _button(self.hwnd, "Datei…", 796, 120, 150, 26, 2004)
+        self.browser = _listbox(self.hwnd, 16, 156, 460, 300, 2006)
+        self.selection = _listbox(self.hwnd, 488, 156, 458, 250, 2007)
+        self.take = _button(self.hwnd, "Aufnehmen", 488, 416, 140, 28, 2011)
+        self.remove = _button(self.hwnd, "Entfernen", 636, 416, 140, 28, 2008)
+        self.log = _edit(self.hwnd, "Bereiche sind vorausgewählt. Abgleich starten kopiert Dokumente, Bilder, Mail, Termine, Hintergrund und Einstellungen. Das Fenster bleibt bedienbar.", 16, 456, 930, 220, multi=True, readonly=True)
+        self.status = _child(self.hwnd, "STATIC", session.status_line(), 0, 16, 688, 930, 24)
+        for hwnd in (self.sync, self.backup, self.wallpaper, self.path, self.go, self.up, self.add_file, self.browser, self.selection, self.take, self.remove, self.log, self.status, *self.checks.values()):
             _apply_font(hwnd, self.font)
         icon_path = session.root / "cpcm.ico"
         if icon_path.is_file():
@@ -392,15 +413,15 @@ class MainWindow:
                 item_id = self.items[index]["id"]
                 _guard(self.hwnd, self.log, lambda: self.session.remove_selected(item_id))
                 self.refresh_selection()
+        elif ident == ID_SYNC:
+            self._start_sync()
+        elif ident == ID_WALLPAPER:
+            _guard(self.hwnd, self.log, self.session.apply_saved_wallpaper)
         elif ident == 2009:
-            def act():
-                if not self.session.selection_rows():
-                    entry = self.current_entry()
-                    self.session.add(entry["path"] if entry else _text_of(self.path))
-                    self.refresh_selection()
-                return self.session.backup()
-
-            _guard(self.hwnd, self.log, act)
+            if not self.session.selection_rows():
+                _report(self.log, "Noch nichts ausgewählt. Bereiche anklicken und Abgleich starten, oder links eine Datei aufnehmen.")
+                return
+            self._start_job("Sicherung läuft …", lambda progress: self.session.backup(progress))
         elif ident == ID_EXIT:
             user32.DestroyWindow(self.hwnd)
         elif ident == ID_HELP:
@@ -423,6 +444,60 @@ class MainWindow:
             self._diagnose()
         elif ident == ID_HARDWARE:
             self._hardware()
+
+    def chosen_areas(self) -> list[str]:
+        return [key for key, hwnd in self.checks.items() if _checked(hwnd)]
+
+    def _start_sync(self) -> None:
+        keys = self.chosen_areas()
+        if not keys:
+            _report(self.log, "Mindestens einen Bereich auswählen.")
+            return
+        try:
+            prepared = self.session.prepare_personal(keys)
+        except Exception as exc:
+            _report(self.log, str(exc))
+            return
+        self.refresh_selection()
+        _set_text(self.log, prepared + "\n\nSicherung läuft …")
+        self._start_job("Sicherung läuft …", lambda progress: prepared + "\n\n" + self.session.backup(progress))
+
+    def _start_job(self, label: str, func) -> None:
+        if self.busy:
+            _report(self.log, "Eine Sicherung läuft bereits.")
+            return
+        self.busy = True
+        self.job_result = ""
+        self.job_error = ""
+        _set_text(self.status, label)
+
+        def work() -> None:
+            try:
+                def progress(count: int, name: str) -> None:
+                    with self.progress_lock:
+                        self.progress_text = f"{count} Dateien  {name}"
+                    user32.PostMessageW(self.hwnd, WM_CPCM_PROGRESS, count, 0)
+
+                self.job_result = func(progress)
+            except Exception as exc:
+                self.job_error = str(exc) or exc.__class__.__name__
+            user32.PostMessageW(self.hwnd, WM_CPCM_DONE, 0, 0)
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def show_progress(self) -> None:
+        with self.progress_lock:
+            text = self.progress_text
+        if text:
+            _set_text(self.status, text)
+
+    def finish_job(self) -> None:
+        self.busy = False
+        if self.job_error:
+            _report(self.log, self.job_error)
+        else:
+            _report(self.log, self.job_result)
+        self.refresh_selection()
 
     def _help(self) -> None:
         tool = ToolWindow(self.hwnd, self.session, "Hilfe", 720, 560)
@@ -536,6 +611,12 @@ class MainWindow:
 
 def _wndproc(hwnd, message, wparam, lparam):
     state = _STATES.get(_hwnd_key(hwnd))
+    if message == WM_CPCM_PROGRESS and isinstance(state, MainWindow):
+        state.show_progress()
+        return 0
+    if message == WM_CPCM_DONE and isinstance(state, MainWindow):
+        state.finish_job()
+        return 0
     if message == WM_COMMAND and state is not None:
         ident = int(wparam) & 0xFFFF
         notify = (int(wparam) >> 16) & 0xFFFF

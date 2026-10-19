@@ -146,8 +146,39 @@ def to_external(path: Path, world: World) -> str:
     return "external/" + tail if tail else "external"
 
 
+def _norm(path: Path) -> str:
+    return os.path.normcase(os.fspath(path)).replace("\\", "/").rstrip("/")
+
+
+def special_canonical(path: Path, identity: Identity) -> str | None:
+    """Mail und Hintergrund haben auf beiden Systemen feste, unterschiedliche Orte."""
+    current = _norm(path)
+    if identity.world == World.WINDOWS:
+        roots = (
+            (Path(join_root(str(identity.appdata), "Thunderbird")), "mail/thunderbird"),
+            (Path(join_root(str(identity.appdata), "Microsoft", "Windows", "Themes", "TranscodedWallpaper")), "appearance/wallpaper"),
+            (Path(join_root(str(identity.appdata), "Microsoft", "Windows", "Themes", "CPCM-Wallpaper.jpg")), "appearance/wallpaper"),
+        )
+    else:
+        roots = (
+            (identity.home / ".thunderbird", "mail/thunderbird"),
+            (identity.home / ".local" / "share" / "cpcm" / "wallpaper.jpg", "appearance/wallpaper"),
+        )
+    for root, canonical in roots:
+        base = _norm(root)
+        if current == base:
+            return canonical
+        prefix = base + "/"
+        if current.startswith(prefix) and canonical != "appearance/wallpaper":
+            return f"{canonical}/{current[len(prefix):]}"
+    return None
+
+
 def to_canonical(path: Path, identity: Identity) -> str:
     path = Path(path)
+    special = special_canonical(path, identity)
+    if special is not None:
+        return special
     specials: list[tuple[int, str, str]] = []
     for label, root in (("config", identity.appdata), ("local", identity.localappdata)):
         rel = relative_if_inside(path, root)
@@ -187,6 +218,15 @@ def from_canonical(canonical: str, identity: Identity, *, allow_external: bool |
     if parts is None:
         return None
     head, rest = parts[0], parts[1:]
+    if head == "mail" and rest and rest[0] == "thunderbird":
+        tail = rest[1:]
+        if identity.world == World.WINDOWS:
+            return join_root(str(identity.appdata), "Thunderbird", *tail)
+        return join_root(str(identity.home), ".thunderbird", *tail)
+    if head == "appearance" and rest == ["wallpaper"]:
+        if identity.world == World.WINDOWS:
+            return join_root(str(identity.appdata), "Microsoft", "Windows", "Themes", "CPCM-Wallpaper.jpg")
+        return join_root(str(identity.home), ".local", "share", "cpcm", "wallpaper.jpg")
     if head == "config":
         return join_root(str(identity.appdata), *rest)
     if head == "local":

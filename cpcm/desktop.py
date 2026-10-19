@@ -12,6 +12,7 @@ from cpcm.diagnose import analyze, script_for
 from cpcm.filesystems import repair_plan
 from cpcm.hardware import load_profiles, probe, set_active
 from cpcm.paths import World, host_identity
+from cpcm.personal import AREAS, apply_wallpaper, discover
 from cpcm.selection import add_path, load_selection, remove_item, save_selection
 from cpcm.server import browse
 from cpcm.settings import counterpart_identity, host_home_identity, install_root, load_settings, save_settings, vault_dir
@@ -69,10 +70,35 @@ class Session:
     def selection_rows(self) -> list[dict]:
         return [item.to_json() for item in load_selection(self.vault()).items]
 
-    def backup(self) -> str:
+    def areas(self) -> tuple[tuple[str, str], ...]:
+        return AREAS
+
+    def prepare_personal(self, keys: list[str]) -> str:
         host, _other = self.identities()
-        snapshot = create_snapshot(self.vault(), load_selection(self.vault()), host)
-        return f"Sicherung {snapshot.id}\nDateien: {sum(1 for entry in snapshot.entries if entry.kind == 'file')}"
+        found, missing = discover(host, keys)
+        if not found:
+            raise ValueError("Keiner der gewählten Bereiche ist auf diesem Rechner vorhanden.")
+        lines = [self.add(str(path)) for path in found]
+        if missing:
+            lines.append("Nicht vorhanden: " + ", ".join(missing))
+        return "\n".join(lines)
+
+    def backup(self, progress=None) -> str:
+        host, _other = self.identities()
+        snapshot = create_snapshot(self.vault(), load_selection(self.vault()), host, progress=progress)
+        files = sum(1 for entry in snapshot.entries if entry.kind == "file")
+        skipped = len(snapshot.skipped)
+        return f"Sicherung {snapshot.id}\nDateien: {files}\nÜbersprungen: {skipped}"
+
+    def apply_saved_wallpaper(self) -> str:
+        from cpcm.backup import snapshot_dir
+        rows = self.snapshots()
+        if not rows:
+            raise ValueError("Keine Sicherung vorhanden.")
+        image = snapshot_dir(self.vault(), rows[0]["id"]) / "payload" / "appearance" / "wallpaper"
+        if not image.is_file():
+            raise ValueError("Die letzte Sicherung enthält keinen Hintergrund.")
+        return apply_wallpaper(image)
 
     def snapshots(self) -> list[dict]:
         return list_snapshots(self.vault())
