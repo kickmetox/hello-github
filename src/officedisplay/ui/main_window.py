@@ -210,6 +210,7 @@ class MainWindow(QMainWindow):
         self._add(edit_menu, "Duplizieren", self.duplicate_selected, "Ctrl+D")
         self._add(edit_menu, "Löschen", self.delete_selected, "Del")
         self._add(edit_menu, "Auf Folie verschieben…", self.move_selected_dialog)
+        self._add(insert_menu, "Text", self.insert_text_box)
         self._add(insert_menu, "Bild…", self.insert_image)
         self._add(insert_menu, "Video…", self.insert_video)
         self._add(insert_menu, "Text- oder PDF-Datei…", self.insert_document)
@@ -304,13 +305,18 @@ class MainWindow(QMainWindow):
         auswahl.addWidget(self.touch_box)
         self.tool_buttons["select"].setChecked(True)
 
+        self._plain_action(text_bar, "Textfeld", self.insert_text_box)
         self.font_box = QFontComboBox()
         self.font_box.currentFontChanged.connect(self.apply_font)
         self.size_box = QSpinBox()
         self.size_box.setRange(8, 120)
         self.size_box.setValue(28)
+        self.size_box.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.size_box.setKeyboardTracking(True)
+        self.size_box.setAccelerated(True)
         self.size_box.valueChanged.connect(self.apply_size)
         text_bar.addWidget(self.font_box)
+        text_bar.addWidget(QLabel("Größe"))
         text_bar.addWidget(self.size_box)
         for label, slot in (
             ("Fett", self.toggle_bold),
@@ -528,6 +534,7 @@ class MainWindow(QMainWindow):
 
     def undo_change(self) -> None:
         if not self.undo:
+            self.statusBar().showMessage("Nichts zum Rückgängigmachen.")
             return
         self.redo.append(self.presentation.to_dict())
         self.presentation = Presentation.from_dict(self.undo.pop())
@@ -536,6 +543,7 @@ class MainWindow(QMainWindow):
 
     def redo_change(self) -> None:
         if not self.redo:
+            self.statusBar().showMessage("Nichts zum Wiederholen.")
             return
         self.undo.append(self.presentation.to_dict())
         self.presentation = Presentation.from_dict(self.redo.pop())
@@ -702,6 +710,7 @@ class MainWindow(QMainWindow):
 
     def delete_slide(self) -> None:
         if len(self.presentation.slides) <= 1:
+            self.statusBar().showMessage("Die letzte Folie bleibt.")
             return
         self._push()
         del self.presentation.slides[self.canvas.slide_index]
@@ -712,6 +721,7 @@ class MainWindow(QMainWindow):
         index = self.canvas.slide_index
         target = index + step
         if target < 0 or target >= len(self.presentation.slides):
+            self.statusBar().showMessage("Die Folie ist schon am Rand.")
             return
         self._push()
         slides = self.presentation.slides
@@ -721,28 +731,47 @@ class MainWindow(QMainWindow):
 
     def group_selected(self) -> None:
         if len(self.canvas.selected) < 2:
+            self.statusBar().showMessage("Bitte mindestens zwei Objekte auswählen.")
             return
         self._push()
         group = group_objects(self.current_slide(), list(self.canvas.selected))
-        if group:
-            self.canvas.selected = [group.id]
+        if not group:
+            self.undo.pop()
+            self.statusBar().showMessage("Diese Objekte lassen sich nicht gruppieren.")
+            return
+        self.canvas.selected = [group.id]
         self.refresh_thumbs()
 
     def ungroup_selected(self) -> None:
         if len(self.canvas.selected) != 1:
+            self.statusBar().showMessage("Bitte eine Gruppe auswählen.")
             return
         self._push()
         released = ungroup(self.current_slide(), self.canvas.selected[0])
+        if not released:
+            self.undo.pop()
+            self.statusBar().showMessage("Bitte eine Gruppe auswählen.")
+            return
         self.canvas.selected = [obj.id for obj in released]
         self.refresh_thumbs()
 
     def duplicate_selected(self) -> None:
+        if not self.canvas.selected:
+            self.statusBar().showMessage("Bitte ein Objekt auswählen.")
+            return
         self._push()
         copies = duplicate_objects(self.current_slide(), list(self.canvas.selected))
+        if not copies:
+            self.undo.pop()
+            self.statusBar().showMessage("Bitte ein Objekt auswählen.")
+            return
         self.canvas.selected = [obj.id for obj in copies]
         self.refresh_thumbs()
 
     def delete_selected(self) -> None:
+        if not self.canvas.selected:
+            self.statusBar().showMessage("Bitte ein Objekt auswählen.")
+            return
         self._push()
         for object_id in list(self.canvas.selected):
             obj, _parent, container = find_object(self.current_slide(), object_id)
@@ -753,6 +782,7 @@ class MainWindow(QMainWindow):
 
     def move_selected_dialog(self) -> None:
         if not self.canvas.selected:
+            self.statusBar().showMessage("Bitte ein Objekt auswählen.")
             return
         index, ok = QInputDialog.getInt(self, "Folie", "Zielindex (1 = erste Folie)", 1, 1, len(self.presentation.slides))
         if ok:
@@ -760,6 +790,7 @@ class MainWindow(QMainWindow):
 
     def move_selection_to(self, index: int, object_id: str) -> None:
         if index < 0 or index >= len(self.presentation.slides):
+            self.statusBar().showMessage("Diese Folie gibt es nicht.")
             return
         source = self.current_slide()
         target = self.presentation.slides[index]
@@ -768,6 +799,9 @@ class MainWindow(QMainWindow):
             self.canvas.selected = []
             self.canvas.set_index(index)
             self.refresh_thumbs()
+        else:
+            self.undo.pop()
+            self.statusBar().showMessage("Das Objekt liegt schon auf dieser Folie.")
 
     def _sync_format(self, _ids) -> None:
         objects = self.selected_objects()
@@ -776,15 +810,20 @@ class MainWindow(QMainWindow):
             self.size_box.setValue(int(objects[0].props.get("font_size") or 28))
             self.size_box.blockSignals(False)
 
-    def _mutate_text(self, fn) -> None:
+    def _mutate_text(self, fn) -> bool:
         objects = [obj for obj in self.selected_objects() if obj.kind == "text"]
         if not objects:
-            return
+            self.statusBar().showMessage("Bitte einen Text auswählen.")
+            return False
         self._push()
         brand = self.presentation.brand
         for obj in objects:
             fn(obj, brand)
-        self.canvas.update()
+            if self.canvas._editing_id == obj.id:
+                self.canvas.sync_editor_style(obj)
+        self.refresh_thumbs()
+        self.canvas.repaint()
+        return True
 
     def apply_font(self, font) -> None:
         def change(obj, brand):
@@ -793,7 +832,10 @@ class MainWindow(QMainWindow):
         self._mutate_text(change)
 
     def apply_size(self, value: int) -> None:
-        self._mutate_text(lambda obj, _brand: obj.props.__setitem__("font_size", int(value)))
+        size = max(8, min(120, int(value)))
+        self.canvas.default_font_size = size
+        if self._mutate_text(lambda obj, _brand: obj.props.__setitem__("font_size", size)):
+            self.statusBar().showMessage(f"Schriftgröße {size}")
 
     def toggle_bold(self) -> None:
         self._mutate_text(lambda obj, _brand: obj.props.__setitem__("bold", not obj.props.get("bold")))
@@ -844,6 +886,36 @@ class MainWindow(QMainWindow):
         slide.background.fit = "cover"
         slide.background.opacity = 1
         self.refresh_thumbs()
+
+    def insert_text_box(self) -> None:
+        self._push()
+        size = int(self.size_box.value()) if hasattr(self, "size_box") else 28
+        obj = SlideObject(
+            id=new_id(),
+            kind="text",
+            x=0.12,
+            y=0.18,
+            w=0.46,
+            h=0.18,
+            name="text",
+            props={
+                "text": "Text",
+                "font_family": "Segoe UI",
+                "font_size": size,
+                "bold": False,
+                "italic": False,
+                "underline": False,
+                "color": "#1B1F2A",
+                "align": "left",
+            },
+        )
+        self.current_slide().objects.append(obj)
+        self.canvas.selected = [obj.id]
+        self.canvas.selectionChanged.emit(self.canvas.selected)
+        self.refresh_thumbs()
+        self.canvas.begin_text_edit(obj.id)
+        self.canvas.editor.selectAll()
+        self.statusBar().showMessage("Textfeld eingefügt")
 
     def insert_image(self) -> None:
         path, _ = QFileDialog.getOpenFileName(self, "Bild", "", "Bilder (*.png *.jpg *.jpeg *.webp *.bmp)")
@@ -930,6 +1002,7 @@ class MainWindow(QMainWindow):
     def filter_image(self, mode: str) -> None:
         objects = [obj for obj in self.selected_objects() if obj.kind == "image" and obj.props.get("path")]
         if not objects:
+            self.statusBar().showMessage("Bitte ein Bild auswählen.")
             return
         self._push()
         folder = media_folder(self.path)
@@ -952,6 +1025,7 @@ class MainWindow(QMainWindow):
     def align(self, mode: str) -> None:
         objects = self.selected_objects()
         if len(objects) < 2:
+            self.statusBar().showMessage("Bitte mindestens zwei Objekte auswählen.")
             return
         self._push()
         align_objects(objects, mode)
@@ -1145,6 +1219,7 @@ class MainWindow(QMainWindow):
     def _set_entrance(self, effect: str) -> None:
         objects = self.selected_objects()
         if not objects:
+            self.statusBar().showMessage("Bitte ein Objekt auswählen.")
             return
         self._push()
         for obj in objects:
@@ -1215,6 +1290,7 @@ class MainWindow(QMainWindow):
     def shape_fill_color(self, color: str | None = None, obj: SlideObject | None = None) -> None:
         target = self._shape_target(obj)
         if target is None:
+            self.statusBar().showMessage("Bitte eine Form auswählen.")
             return
         if not color:
             picked = QColorDialog.getColor(parent=self)
@@ -1228,6 +1304,7 @@ class MainWindow(QMainWindow):
     def shape_stroke_color(self, color: str | None = None, obj: SlideObject | None = None) -> None:
         target = self._shape_target(obj)
         if target is None:
+            self.statusBar().showMessage("Bitte eine Form auswählen.")
             return
         if not color:
             picked = QColorDialog.getColor(parent=self)
@@ -1243,6 +1320,7 @@ class MainWindow(QMainWindow):
     def shape_load_image(self, path: str | None = None, obj: SlideObject | None = None) -> None:
         target = self._shape_target(obj)
         if target is None:
+            self.statusBar().showMessage("Bitte eine Form auswählen.")
             return
         if not path:
             path, _ = QFileDialog.getOpenFileName(self, "Bild in die Form", "", "Bilder (*.png *.jpg *.jpeg *.webp *.bmp)")
@@ -1256,6 +1334,7 @@ class MainWindow(QMainWindow):
     def shape_as_background(self, obj: SlideObject | None = None) -> None:
         target = self._shape_target(obj)
         if target is None:
+            self.statusBar().showMessage("Bitte eine Form auswählen.")
             return
         path = target.props.get("image") or target.props.get("path")
         if not path:

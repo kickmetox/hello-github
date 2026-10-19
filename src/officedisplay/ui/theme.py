@@ -61,9 +61,19 @@ def stylesheet(name: str) -> str:
     QToolBar QToolButton {{ min-height: 24px; padding: 4px 8px; }}
     QDockWidget {{ color: {theme['ink']}; titlebar-close-icon: none; }}
     QDockWidget::title {{ background: {theme['panel']}; padding: 6px; border: 1px solid {theme['line']}; }}
-    QListWidget, QPlainTextEdit, QLineEdit, QComboBox, QSpinBox, QTextBrowser {{
+    QListWidget, QPlainTextEdit, QLineEdit, QComboBox, QTextBrowser {{
         background: {theme['panel']}; color: {theme['ink']}; border: 1px solid {theme['line']}; border-radius: 8px; padding: 4px;
     }}
+    QSpinBox {{
+        background: {theme['panel']}; color: {theme['ink']}; border: 1px solid {theme['line']};
+        border-radius: 6px; padding: 2px 20px 2px 8px; min-height: 26px; min-width: 72px;
+    }}
+    QSpinBox::up-button, QSpinBox::down-button {{
+        subcontrol-origin: border; width: 18px; border-left: 1px solid {theme['line']}; background: {theme['panel']};
+    }}
+    QSpinBox::up-button {{ subcontrol-position: top right; height: 14px; border-top-right-radius: 6px; }}
+    QSpinBox::down-button {{ subcontrol-position: bottom right; height: 14px; border-bottom-right-radius: 6px; }}
+    QSpinBox::up-button:hover, QSpinBox::down-button:hover {{ background: {theme['accent']}; }}
     QPushButton {{
         background: {theme['panel']}; color: {theme['ink']}; border: 1px solid {theme['line']};
         border-radius: 8px; padding: 6px 10px;

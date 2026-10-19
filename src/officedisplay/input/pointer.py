@@ -10,12 +10,15 @@ ohne Grafiktablet testbar.
 from dataclasses import dataclass, field
 
 
+CREATE_TOOLS = {"text", "chart", "rect", "ellipse", "roundrect", "triangle", "diamond", "star", "arrow", "line"}
+
+
 def interpret_pointer(tool: str, pointer_kind: str, touch_mode: str) -> str:
-    """Aktion: draw, erase, pan, select.
+    """Aktion: draw, erase, pan, select, create.
 
     Stift zeichnet im Stiftwerkzeug und radiert, wenn die Radiererseite
-    aufliegt. Touch zeichnet nur im Modus „Zeichnen“, sonst wird verschoben
-    oder ausgewählt. Die Maus folgt dem aktiven Werkzeug.
+    aufliegt. Touch zeichnet nur im Modus „Zeichnen“. Text- und Formwerkzeuge
+    legen ein Objekt an, auch mit dem Finger. Die Maus folgt dem aktiven Werkzeug.
     """
     if pointer_kind == "eraser":
         return "erase"
@@ -24,12 +27,16 @@ def interpret_pointer(tool: str, pointer_kind: str, touch_mode: str) -> str:
             return "erase"
         if tool in {"pen", "highlighter"}:
             return "draw"
+        if tool in CREATE_TOOLS:
+            return "create"
         return "select"
     if pointer_kind == "touch":
         if touch_mode == "draw" and tool == "eraser":
             return "erase"
         if touch_mode == "draw" and tool in {"pen", "highlighter"}:
             return "draw"
+        if tool in CREATE_TOOLS:
+            return "create"
         if touch_mode == "pan":
             return "pan"
         return "select"
@@ -39,6 +46,8 @@ def interpret_pointer(tool: str, pointer_kind: str, touch_mode: str) -> str:
         return "erase"
     if tool == "pan":
         return "pan"
+    if tool in CREATE_TOOLS:
+        return "create"
     return "select"
 
 

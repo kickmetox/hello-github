@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from PySide6.QtCore import QEvent, QMimeData, QPoint, QPointF, QRectF, Qt, Signal
-from PySide6.QtGui import QColor, QDrag, QPainter, QPen
+from PySide6.QtGui import QColor, QDrag, QFont, QPainter, QPen
 from PySide6.QtWidgets import QPlainTextEdit, QWidget
 
 from officedisplay.input.pointer import StrokeBuilder, device_kind_from_name, interpret_pointer
@@ -59,6 +59,7 @@ class SlideCanvas(QWidget):
         self.editor.setFrameStyle(0)
         self.editor.focusOutEvent = self._editor_focus_out  # type: ignore[method-assign]
         self._editing_id = None
+        self.default_font_size = 28
 
     def set_presentation(self, presentation, index: int = 0) -> None:
         self.presentation = presentation
@@ -353,10 +354,10 @@ class SlideCanvas(QWidget):
                 w=max(w, 0.3),
                 h=max(h, 0.12),
                 name="text",
-                props={
+                    props={
                     "text": "Text",
                     "font_family": "Segoe UI",
-                    "font_size": 28,
+                    "font_size": int(self.default_font_size or 28),
                     "bold": False,
                     "italic": False,
                     "underline": False,
@@ -367,6 +368,7 @@ class SlideCanvas(QWidget):
             self.slide().objects.append(obj)
             self.selected = [obj.id]
             self.begin_text_edit(obj.id)
+            self.editor.selectAll()
         elif kind == "chart":
             self.slide().objects.append(
                 SlideObject(
@@ -480,8 +482,35 @@ class SlideCanvas(QWidget):
         end = self.n2w(obj.x + obj.w, obj.y + obj.h)
         self.editor.setGeometry(int(point.x()), int(point.y()), max(80, int(end.x() - point.x())), max(40, int(end.y() - point.y())))
         self.editor.setPlainText(str(obj.props.get("text") or ""))
+        self.sync_editor_style(obj)
         self.editor.show()
         self.editor.setFocus()
+
+    def sync_editor_style(self, obj) -> None:
+        """Editor zeigt die Objektgröße. Das Fenster-Stylesheet würde sonst bei 13 px bleiben."""
+        if obj is None:
+            return
+        family = str(obj.props.get("font_family") or "Segoe UI").replace("'", "")
+        size = int(obj.props.get("font_size") or self.default_font_size or 28)
+        height = self.presentation.height if self.presentation else 1080
+        scale = self.slide_rect().height() / float(height or 1080)
+        px = max(12, int(round(size * max(scale, 0.45))))
+        weight = "700" if obj.props.get("bold") else "400"
+        style = "italic" if obj.props.get("italic") else "normal"
+        decoration = "underline" if obj.props.get("underline") else "none"
+        color = str(obj.props.get("color") or "#1B1F2A")
+        self.editor.setStyleSheet(
+            "QPlainTextEdit {"
+            f"font-family: '{family}'; font-size: {px}px; font-weight: {weight}; font-style: {style}; "
+            f"text-decoration: {decoration}; color: {color}; background: #FFFFFF; border: 1px solid #0B63E5; "
+            "padding: 2px; }"
+        )
+        font = QFont(family)
+        font.setPixelSize(px)
+        font.setBold(bool(obj.props.get("bold")))
+        font.setItalic(bool(obj.props.get("italic")))
+        font.setUnderline(bool(obj.props.get("underline")))
+        self.editor.setFont(font)
 
     def _editor_focus_out(self, event) -> None:
         self.commit_text()
@@ -492,12 +521,7 @@ class SlideCanvas(QWidget):
             return
         obj = self._find(self._editing_id)
         if obj is not None:
-            from officedisplay.ai.offline_design import estimate_font
-
             obj.props["text"] = self.editor.toPlainText()
-            obj.props["font_size"] = estimate_font(
-                obj.props["text"], obj.w, obj.h, self.presentation.height, int(obj.props.get("font_size") or 24)
-            )
         self._editing_id = None
         self.editor.hide()
         self.changed.emit()
