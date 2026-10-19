@@ -1,6 +1,6 @@
 # Featureliste Office Display
 
-Stand der Umsetzung in diesem Programmordner. Alles läuft lokal. Es gibt keine Cloud-Aufrufe und kein Tracking.
+Stand der Umsetzung in diesem Programmordner. Standard ist lokal, ohne Tracking. Online-KI und Canva Connect sind optional und bleiben aus, bis sie freigegeben werden.
 
 ## Editor
 
@@ -53,8 +53,14 @@ Stand der Umsetzung in diesem Programmordner. Alles läuft lokal. Es gibt keine 
 - `native/cpp` baut `libodnative.so` (Helligkeit, Kontrast, Graustufen, Strichglättung). Fehlt die Bibliothek, rechnet Python dasselbe.
 - `OfficeDisplay.sln` enthält ein C#-Werkzeug für eine Farbreihe. Ohne installiertes `dotnet` nutzt Python dieselbe Reihe.
 
+## Optional online
+
+- Online-KI: OpenAI-kompatibles `POST {basis}/chat/completions` und, nur mit extra Haken, `POST {basis}/images/generations`. Erlaubt sind HTTPS sowie `http://127.0.0.1` und `http://localhost`. Ausgeschaltet bleibt der Aufruf lokal.
+- Canva Connect: Markenvorlagen listen, Autofill `create_from_brand_template`, Export als PPTX. OAuth-URL mit PKCE S256. Das Token wird vom Nutzer eingefügt, kein Client-Geheimnis im Programm.
+- Lokales Canva-ähnliches Studio bleibt ohne Netz: Vorlagen, Größen, Elemente, Ausrichten, Markenpalette, Fotofilter, Freistellen, Software-3D.
+
 ## Nicht enthalten
 
-- Kein Netz, kein Tracking, keine Telemetrie.
+- Kein Tracking, keine Telemetrie, kein automatischer Netzaufruf.
 - Kein Cloud-Videochat und kein Katalog mit fremden Stockmotiven.
-- Keine großen Sprachmodelle und kein Download von Modellgewichten.
+- Keine großen Sprachmodelle im Installationspaket und kein Download von Modellgewichten.

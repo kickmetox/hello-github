@@ -14,7 +14,7 @@ Eine Folie liegt in der Mitte. Rechts stehen die Miniaturen der angelegten Folie
 
 Stift, Grafiktablett und Touch sind eigene Zeiger. Der Stift zeichnet mit Druck, die Radiererseite radiert, Touch verschiebt oder zeichnet je nach Schalter. Ohne Tablett bleibt die Maus bedienbar.
 
-Das Programm arbeitet offline. Es gibt kein Tracking, keine Cloud-KI und keinen Cloud-Katalog. Die ausführliche Bedienung steht in `docs/HILFE.md`, die Merkmale in `FEATURELISTE.md`, die kurze Fassung in `KURZBESCHREIBUNG.md`.
+Standard ist offline: kein Tracking, kein automatischer Netzaufruf. Online-KI (OpenAI-kompatible HTTPS-API) und Canva Connect sind möglich, aber nur nach Freigabe unter „KI → Einstellungen Online-KI / Canva“ und nur auf Klick. Schlüssel liegen unter `~/.config/officedisplay/secrets.json` mit Modus 600. Die ausführliche Bedienung steht in `docs/HILFE.md`, die Merkmale in `FEATURELISTE.md`, die kurze Fassung in `KURZBESCHREIBUNG.md`.
 
 ## Start
 

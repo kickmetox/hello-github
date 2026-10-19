@@ -63,5 +63,4 @@ def default_brand_path() -> Path:
 
 
 def secrets_path() -> Path:
-    """Ungenutzt. Office Display speichert keine Cloud-Schlüssel."""
-    return Path.home() / ".config" / "officedisplay" / "unused-secrets.json"
+    return Path.home() / ".config" / "officedisplay" / "secrets.json"

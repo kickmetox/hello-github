@@ -23,10 +23,12 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from officedisplay.ai.canva_api import CanvaAPIError, CanvaClient
 from officedisplay.ai.commands import apply_command
 from officedisplay.ai.doc_transform import read_text_file, slides_from_text
 from officedisplay.ai.layout_model import inspect_model
 from officedisplay.ai.offline_design import generate_deck
+from officedisplay.ai.online_ai import OnlineAIError, OnlineAISettings, draft_deck, generate_image, rewrite_text
 from officedisplay.ai.speech_coach import analyze_speech
 from officedisplay.analytics import DwellLog
 from officedisplay.design.animate import morph_slide
@@ -54,7 +56,7 @@ from officedisplay.model.presentation import (
     ungroup,
 )
 from officedisplay.paths import help_path, icon_path
-from officedisplay.settings_store import media_folder
+from officedisplay.settings_store import load_secrets, media_folder, save_secrets
 from officedisplay.ui.canvas import SlideCanvas
 from officedisplay.ui.dialogs import (
     AboutDialog,
@@ -64,8 +66,10 @@ from officedisplay.ui.dialogs import (
     HelpDialog,
     LibraryDialog,
     PresenterDialog,
+    SettingsDialog,
     ThreeDialog,
     ZuiDialog,
+    parse_json_field,
     show_text,
 )
 from officedisplay.ui.render import clear_image_cache, render_thumb
@@ -119,6 +123,7 @@ class MainWindow(QMainWindow):
         self.dwell = DwellLog()
         self.settings = QSettings("Sellerbach", "OfficeDisplay")
         self.prefs = self._load_prefs()
+        self.secrets = load_secrets()
         self.canvas = SlideCanvas()
         self.canvas.set_presentation(self.presentation, 0)
         self.canvas.gestureStarted.connect(self._remember)
@@ -138,7 +143,7 @@ class MainWindow(QMainWindow):
         self._build_toolbar()
         self.apply_theme(self.prefs.get("theme") or "farbe")
         self.refresh_thumbs()
-        self.statusBar().showMessage("Andreas Meyer · ame@sellerbach.de · Zeiger: Maus · Offline")
+        self.statusBar().showMessage("Andreas Meyer · ame@sellerbach.de · Zeiger: Maus · Offline · kein Tracking")
 
     def _load_prefs(self) -> dict:
         raw = self.settings.value("prefs", "")
@@ -158,7 +163,7 @@ class MainWindow(QMainWindow):
         insert_menu = self.menuBar().addMenu("Einfügen")
         design_menu = self.menuBar().addMenu("Gestalten")
         ai_menu = self.menuBar().addMenu("KI")
-        library_menu = self.menuBar().addMenu("Bibliothek")
+        library_menu = self.menuBar().addMenu("Canva")
         show_menu = self.menuBar().addMenu("Präsentieren")
         help_menu = self.menuBar().addMenu("Hilfe")
         self._add(file_menu, "Neu", self.new_file, "Ctrl+N")
@@ -203,7 +208,8 @@ class MainWindow(QMainWindow):
         self._add(ai_menu, "Text zu Folien…", self.open_ai)
         self._add(ai_menu, "Modell inspizieren", self.inspect_model)
         self._add(ai_menu, "Sprech-Coach", self.speech_coach)
-        self._add(library_menu, "Vorlagen und Größen", self.open_library)
+        self._add(ai_menu, "Einstellungen Online-KI / Canva", self.open_settings)
+        self._add(library_menu, "Studio und Connect", self.open_library)
         self._add(show_menu, "Präsentieren", self.present)
         self._add(show_menu, "Leinwand (ZUI)", self.open_zui)
         self._add(show_menu, "Morph-Vorschau", self.preview_morph)
@@ -334,7 +340,8 @@ class MainWindow(QMainWindow):
         self.canvas.pen_smooth = int(self.pen_smooth.value())
 
     def _pointer(self, name: str) -> None:
-        self.statusBar().showMessage(f"Andreas Meyer · ame@sellerbach.de · Zeiger: {name} · Offline · kein Tracking")
+        online = "Online an" if self.prefs.get("online_enabled") else "Offline"
+        self.statusBar().showMessage(f"Andreas Meyer · ame@sellerbach.de · Zeiger: {name} · {online} · kein Tracking")
 
     def _remember(self) -> None:
         self._before = self.presentation.to_dict()
@@ -805,9 +812,70 @@ class MainWindow(QMainWindow):
                     self.canvas.set_presentation(self.presentation, 0)
             elif action == "inspect":
                 self.inspect_model()
-        except (OSError, ValueError, KeyError) as exc:
+            elif action == "online":
+                data = draft_deck(self._online_settings(), dialog.prompt.text())
+                from officedisplay.ai.offline_design import deck_from_outline
+
+                self._push()
+                self.presentation = deck_from_outline(data["slides"], dialog.prompt.text()[:80] or "Online")
+                self.canvas.set_presentation(self.presentation, 0)
+            elif action == "rewrite":
+                objects = [obj for obj in self.selected_objects() if obj.kind == "text"]
+                if objects:
+                    text = rewrite_text(
+                        self._online_settings(),
+                        str(objects[0].props.get("text") or ""),
+                        dialog.command.text() or "kürzer",
+                    )
+                    self._push()
+                    objects[0].props["text"] = text.strip()
+            elif action == "image":
+                self._store_generated_image(generate_image(self._online_settings(), dialog.prompt.text()))
+        except (OnlineAIError, OSError, ValueError, KeyError) as exc:
             show_text(self, "KI", str(exc))
         self.refresh_thumbs()
+
+    def _online_settings(self) -> OnlineAISettings:
+        return OnlineAISettings(
+            enabled=bool(self.prefs.get("online_enabled")),
+            base_url=self.prefs.get("base_url") or "https://api.openai.com/v1",
+            api_key=self.secrets.get("api_key") or "",
+            model=self.prefs.get("model") or "gpt-4o-mini",
+            image_model=self.prefs.get("image_model") or "dall-e-3",
+            allow_images=bool(self.prefs.get("allow_images")),
+        )
+
+    def open_settings(self) -> None:
+        dialog = SettingsDialog(self, self.prefs, self.secrets)
+        if dialog.exec():
+            prefs, secrets = dialog.values()
+            self.prefs.update(prefs)
+            self.secrets.update(secrets)
+            self._save_prefs()
+            save_secrets(self.secrets)
+            self._pointer("Maus")
+
+    def _store_generated_image(self, payload: dict) -> None:
+        import base64
+        import urllib.request
+
+        data = (payload.get("data") or [{}])[0]
+        raw = None
+        if data.get("b64_json"):
+            raw = base64.b64decode(data["b64_json"])
+        elif data.get("url"):
+            url = str(data["url"])
+            if not url.startswith("https://"):
+                raise OnlineAIError("Bild-URL ist nicht HTTPS.")
+            with urllib.request.urlopen(url, timeout=60) as response:
+                raw = response.read()
+        if not raw:
+            raise OnlineAIError("Keine Bilddaten in der Antwort.")
+        self._push()
+        folder = media_folder(self.path)
+        target = folder / f"{new_id()}.png"
+        target.write_bytes(raw)
+        place_on_slide(self.current_slide(), str(target), 0.15, 0.15)
 
     def inspect_model(self) -> None:
         show_text(self, "Modell inspizieren", inspect_model())
@@ -992,6 +1060,28 @@ class MainWindow(QMainWindow):
         elif action == "element":
             self._push()
             self.current_slide().objects.append(element(dialog.elements.currentText()))
+        else:
+            try:
+                client = CanvaClient(
+                    self.secrets.get("canva_token") or "",
+                    self.prefs.get("canva_base") or "https://api.canva.com/rest/v1",
+                )
+                if action == "list":
+                    show_text(self, "Canva", json.dumps(client.list_brand_templates(), ensure_ascii=False, indent=2)[:4000])
+                elif action == "autofill":
+                    fields = parse_json_field(dialog.fields.toPlainText())
+                    job = client.create_autofill(dialog.template_id.text().strip(), fields, self.presentation.title)
+                    show_text(self, "Canva Autofill", json.dumps(job, ensure_ascii=False, indent=2)[:4000])
+                elif action == "export":
+                    job = client.create_export(dialog.template_id.text().strip(), "pptx")
+                    show_text(
+                        self,
+                        "Canva Export",
+                        json.dumps(job, ensure_ascii=False, indent=2)[:2000]
+                        + "\n\nFertige PPTX danach über Datei → Import PPTX laden.",
+                    )
+            except (CanvaAPIError, ValueError, json.JSONDecodeError) as exc:
+                show_text(self, "Canva", str(exc))
         self.refresh_thumbs()
 
     def present(self) -> None:

@@ -4,7 +4,7 @@ Andreas Meyer, ame@sellerbach.de
 
 Office Display bearbeitet Folien auf diesem Rechner. PowerPoint, OpenOffice, OnlyOffice und SoftMaker lesen den Export `.pptx`. OpenOffice liest zusätzlich `.odp`.
 
-Es wird nichts übertragen. Die Statuszeile zeigt „Offline · kein Tracking“.
+Standard ist offline. Die Statuszeile zeigt „Offline · kein Tracking“, solange die Online-KI nicht freigegeben ist. Danach steht dort „Online an · kein Tracking“. Es gibt kein Tracking.
 
 ## Fläche
 
@@ -63,11 +63,21 @@ Sprech-Coach prüft die Sprechernotiz auf Füllwörter, Länge und Eintönigkeit
 
 Modell inspizieren öffnet das kleine ONNX-Layoutmodell mit Netron, wenn `netron` installiert ist, und nur auf diesem Rechner. Sonst zeigt es den Dateipfad `models/layout_classifier.onnx`.
 
+## Online-KI und Canva
+
+Menü KI → Einstellungen Online-KI / Canva.
+
+Ohne Haken bleibt alles lokal. Mit Haken und hinterlegtem Schlüssel ruft „Online erzeugen“ eine OpenAI-kompatible Chat-API auf und baut daraus Folien. „Markierten Text online umformulieren“ und „Bild online erzeugen“ brauchen denselben Schalter; Bilder zusätzlich den Haken für die Bildgenerierung. Erlaubt sind nur HTTPS sowie `http://127.0.0.1` und `http://localhost`.
+
+Canva Connect liegt unter Menü Canva → Studio und Connect. Markenvorlagen listen, Autofill und PPTX-Export laufen nur mit einem selbst eingefügten Token und nur auf Klick. Die lokale Vorlage, die Größe und die Elemente brauchen kein Konto.
+
+Schlüsseldatei: `~/.config/officedisplay/secrets.json`, Dateimodus 600.
+
 ## Bibliothek
 
-Menü Bibliothek → Vorlagen und Größen.
+Menü Canva → Studio und Connect.
 
-Vorlagen: Pitch, Unterricht, Kennzahlen, Zitat, Vergleich, Team, Titel. Größe anpassen stellt 16:9, 4:3, Quadrat, Story, Portrait, A4, LinkedIn oder Banner ein. Elemente sind Rahmen, Fläche, Kreis, Raute, Stern, Pfeil und Badge. Das sind lokale Formen, kein fremder Katalog.
+Vorlagen: Pitch, Unterricht, Kennzahlen, Zitat, Vergleich, Team, Titel. Größe anpassen stellt 16:9, 4:3, Quadrat, Story, Portrait, A4, LinkedIn oder Banner ein. Elemente sind Rahmen, Fläche, Kreis, Raute, Stern, Pfeil und Badge. Das sind lokale Formen. Der Canva-Katalog wird nur auf ausdrücklichen Klick abgefragt.
 
 ## Weitere Werkzeuge
 
