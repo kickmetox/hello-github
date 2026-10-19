@@ -142,9 +142,7 @@ class PresentationSlideshowTests(unittest.TestCase):
         self.assertEqual(loaded.entries[0].title, "Begrüßung")
         self.assertTrue(Path(loaded.entries[1].path).is_file())
 
-    def test_program_folder_loads_and_player_compiles(self):
-        import py_compile
-
+    def test_program_folder_opens_in_the_browser(self):
         from PIL import Image
 
         from officedisplay.io.slideshow_io import load_oshow
@@ -173,23 +171,26 @@ class PresentationSlideshowTests(unittest.TestCase):
         )
         program = folder / "zeigen"
         write_standalone_show(deck, program)
-        for name in ("Slideshow.bat", "Slideshow.sh", "player.py", "show.oshow", "liesmich.txt"):
-            self.assertTrue((program / name).is_file(), name)
+        self.assertTrue((program / "index.html").is_file())
+        self.assertTrue((program / "Slideshow.bat").is_file())
+        self.assertTrue((program / "media").is_dir())
+        self.assertFalse((program / "player.py").exists())
+        page = (program / "index.html").read_text(encoding="utf-8")
+        self.assertNotIn("http", page)
+        self.assertNotIn("PySide", page)
+        self.assertNotIn("import", page)
+        self.assertIn("bild.png", page)
+        self.assertTrue((program / "media" / "bild.png").is_file())
         loaded = load_oshow(program / "show.oshow")
         self.assertEqual([entry.kind for entry in loaded.entries], ["text", "image"])
         self.assertIn("Hallo", loaded.entries[0].text)
-        player = (program / "player.py").read_text(encoding="utf-8")
-        self.assertNotIn("officedisplay", player)
-        py_compile.compile(str(program / "player.py"), doraise=True)
-        lines = (program / "liesmich.txt").read_text(encoding="utf-8").splitlines()
-        self.assertEqual(len(lines), 3)
+        note = (program / "liesmich.txt").read_text(encoding="utf-8")
+        self.assertIn("index.html", note)
+        self.assertIn("kein Python", note)
         bat = (program / "Slideshow.bat").read_text(encoding="utf-8")
-        self.assertIn("PYTHONPATH", bat)
-        self.assertIn("https://www.python.org/downloads/", bat)
-        self.assertIn("python -m pip install PySide6", bat)
-        self.assertIn("py -3", bat)
+        self.assertIn('start "" "%~dp0index.html"', bat)
         shell = (program / "Slideshow.sh").read_text(encoding="utf-8")
-        self.assertIn("python3", shell)
+        self.assertIn("xdg-open", shell)
         self.assertTrue(os.access(program / "Slideshow.sh", os.X_OK))
 
 
