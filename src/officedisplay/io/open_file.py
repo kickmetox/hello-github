@@ -22,7 +22,6 @@ TEXTISH_EXT = {".rtx"}
 PPT_EXT = {".ppt"}
 DECK_EXT = OOXML_EXT | PACKAGE_EXT | TEXTISH_EXT | PPT_EXT | {".odp", ".odisp"}
 
-_PPT_MESSAGE = "Die Datei .ppt lässt sich nur öffnen, wenn LibreOffice (soffice) vorhanden ist."
 _PACKAGE_MESSAGE = "Die Datei ist kein PowerPoint-Paket. Erwartet wird ein ZIP mit ppt/presentation.xml."
 _RTX_MESSAGE = "Die Datei .rtx ist weder ein PowerPoint-Paket noch Text oder RTF."
 
@@ -46,10 +45,7 @@ def load_presentation(path: str | Path) -> Presentation:
 
         return slides_from_text(text, source.stem or "Dokument")
     if suffix in PPT_EXT:
-        converted = _ppt_to_pptx(source)
-        if converted is None:
-            raise FormatReadError(_PPT_MESSAGE)
-        return import_pptx(converted)
+        return _load_ppt(source)
     if suffix == ".odp":
         from officedisplay.io.odp_io import import_odp
 
@@ -95,6 +91,23 @@ def _rtf_to_text(raw: str) -> str:
     text = text.replace("{", " ").replace("}", " ")
     text = text.replace("\\", " ")
     return re.sub(r"[ \t]+\n", "\n", text).strip()
+
+
+def _load_ppt(source: Path) -> Presentation:
+    """LibreOffice nur, wenn es schon da ist. Sonst der eigene OLE-Leser."""
+    if shutil.which("soffice"):
+        converted = _ppt_to_pptx(source)
+        if converted is not None:
+            try:
+                return import_pptx(converted)
+            except Exception:
+                pass
+    from officedisplay.io.ppt_binary import PptReadError, import_ppt
+
+    try:
+        return import_ppt(source)
+    except PptReadError as exc:
+        raise FormatReadError(str(exc)) from exc
 
 
 def _ppt_to_pptx(source: Path) -> Path | None:

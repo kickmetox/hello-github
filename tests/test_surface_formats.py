@@ -83,26 +83,84 @@ class SurfaceFormatTest(unittest.TestCase):
                 self.assertEqual(slide.objects[-1].kind, "video")
                 self.assertTrue(slide.objects[-1].props["path"].endswith(path.suffix))
 
-    def test_ppt_without_soffice_is_a_message(self):
-        import shutil
+    def test_ppt_without_soffice_reads_text_and_png(self):
+        import struct
+
+        from PIL import Image
 
         from officedisplay.io import open_file
         from officedisplay.io.open_file import FormatReadError, load_presentation
 
+        def record(version: int, kind: int, body: bytes) -> bytes:
+            return struct.pack("<HHI", version & 0xF, kind, len(body)) + body
+
+        def compound(stream: bytes) -> bytes:
+            sector = 512
+            count = max(1, (len(stream) + sector - 1) // sector)
+            fat = [0xFFFFFFFF] * 128
+            fat[0] = 0xFFFFFFFD
+            fat[1] = 0xFFFFFFFE
+            for index in range(count):
+                sid = 2 + index
+                fat[sid] = 0xFFFFFFFE if index == count - 1 else sid + 1
+            header = bytearray(512)
+            header[0:8] = bytes.fromhex("D0CF11E0A1B11AE1")
+            struct.pack_into("<HHHHH", header, 0x18, 0x003E, 0x0003, 0xFFFE, 9, 6)
+            struct.pack_into("<I", header, 0x2C, 1)
+            struct.pack_into("<I", header, 0x30, 1)
+            struct.pack_into("<I", header, 0x38, 0)
+            struct.pack_into("<I", header, 0x3C, 0xFFFFFFFE)
+            struct.pack_into("<I", header, 0x44, 0xFFFFFFFE)
+            for index in range(109):
+                struct.pack_into("<I", header, 0x4C + index * 4, 0xFFFFFFFF)
+            struct.pack_into("<I", header, 0x4C, 0)
+
+            def entry(name: str, kind: int, start: int, size: int, child: int = 0xFFFFFFFF) -> bytes:
+                raw = bytearray(128)
+                encoded = name.encode("utf-16le")
+                raw[0 : len(encoded)] = encoded
+                struct.pack_into("<H", raw, 64, len(encoded) + 2)
+                raw[66] = kind
+                raw[67] = 1
+                struct.pack_into("<III", raw, 68, 0xFFFFFFFF, 0xFFFFFFFF, child)
+                struct.pack_into("<I", raw, 116, start)
+                struct.pack_into("<Q", raw, 120, size)
+                return bytes(raw)
+
+            directory = bytearray(512)
+            directory[0:128] = entry("Root Entry", 5, 0xFFFFFFFE, 0, child=1)
+            directory[128:256] = entry("PowerPoint Document", 2, 2, len(stream))
+            data = stream.ljust(count * sector, b"\x00")
+            return bytes(header) + struct.pack("<128I", *fat) + bytes(directory) + data
+
         with tempfile.TemporaryDirectory() as folder:
-            path = Path(folder) / "alt.ppt"
-            path.write_bytes(b"\xd0\xcf\x11\xe0kein powerpoint")
+            root = Path(folder)
+            image = root / "punkt.png"
+            Image.new("RGB", (8, 8), (10, 20, 30)).save(image)
+            text = record(0, 4000, "Bericht".encode("utf-16le"))
+            slide = record(0xF, 1006, text + image.read_bytes())
+            path = root / "alt.ppt"
+            path.write_bytes(compound(slide))
+            broken = root / "kaputt.ppt"
+            broken.write_bytes(b"\xd0\xcf\x11\xe0kein powerpoint")
             original = open_file.shutil.which
             open_file.shutil.which = lambda _name: None
             try:
+                loaded = load_presentation(path)
                 with self.assertRaises(FormatReadError) as caught:
-                    load_presentation(path)
+                    load_presentation(broken)
             finally:
                 open_file.shutil.which = original
+            texts = [obj.props.get("text", "") for slide in loaded.slides for obj in slide.objects if obj.kind == "text"]
+            self.assertTrue(any("Bericht" in text for text in texts))
+            images = [obj for slide in loaded.slides for obj in slide.objects if obj.kind == "image"]
+            self.assertTrue(images)
+            self.assertTrue(Path(images[0].props["path"]).read_bytes().startswith(b"\x89PNG"))
             message = str(caught.exception)
-            self.assertIn("soffice", message)
+            self.assertNotIn("soffice", message)
+            self.assertNotIn("LibreOffice", message)
             self.assertNotIn("Traceback", message)
-            self.assertIsNone(shutil.which("soffice"))
+            self.assertTrue(message.strip())
 
     def test_menu_layout_and_notes(self):
         from PySide6.QtCore import QSettings
