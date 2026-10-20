@@ -1,0 +1,5 @@
+cmake_minimum_required(VERSION 3.16)
+project(odnative LANGUAGES CXX)
+add_library(odnative SHARED src/odnative.cpp)
+set_target_properties(odnative PROPERTIES OUTPUT_NAME odnative POSITION_INDEPENDENT_CODE ON)
+target_compile_features(odnative PRIVATE cxx_std_17)
