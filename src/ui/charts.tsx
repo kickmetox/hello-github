@@ -75,12 +75,38 @@ export function Spark({ values, mode }: { values: number[]; mode: 'line' | 'col'
 function ChartShape({ type, cats, series }: { type: Chart['type']; cats: string[]; series: { name: string; data: number[] }[] }) {
   const first = series[0]?.data ?? [];
   if (!first.length) return <text x="8" y="60" fill="#9ab">Keine Zahlen im Bereich</text>;
+  const primary = primarySeries(series);
   if (type === 'pie' || type === 'doughnut') return <Pie data={first} cats={cats} hole={type === 'doughnut'} />;
   if (type === 'radar') return <Radar data={first} cats={cats} />;
   if (type === 'scatter') return <Scatter xs={first} ys={series[1]?.data ?? first.map((_, i) => i)} />;
   if (type === 'funnel') return <Funnel data={first} cats={cats} />;
   if (type === 'waterfall') return <Waterfall data={first} />;
+  if (type === 'treemap' || type === 'sunburst' || type === 'pareto') {
+    if (!primary.some((value) => value !== 0)) return <text x="8" y="60" fill="#9ab">Keine Zahlen im Bereich</text>;
+  }
+  if (type === 'treemap') return <Treemap data={primary} cats={cats} />;
+  if (type === 'sunburst') return <Sunburst data={primary} />;
+  if (type === 'pareto') return <Pareto data={primary} cats={cats} />;
+  if (type === 'boxplot') return <Boxplot series={numericSeries(series)} />;
   return <Bars type={type} cats={cats} series={series} />;
+}
+
+function numericSeries(series: { name: string; data: number[] }[]): { name: string; data: number[] }[] {
+  const usable = series.filter((item) => item.data.some((value) => Number.isFinite(value) && value !== 0));
+  return usable.length ? usable : series;
+}
+
+function primarySeries(series: { name: string; data: number[] }[]): number[] {
+  let best = series[0]?.data ?? [];
+  let bestRange = -1;
+  for (const item of numericSeries(series)) {
+    const range = Math.max(...item.data) - Math.min(...item.data);
+    if (range > bestRange) {
+      best = item.data;
+      bestRange = range;
+    }
+  }
+  return best;
 }
 
 function Bars({ type, cats, series }: { type: Chart['type']; cats: string[]; series: { name: string; data: number[] }[] }) {
@@ -232,6 +258,152 @@ function Waterfall({ data }: { data: number[] }) {
       })}
     </g>
   );
+}
+
+function Treemap({ data, cats }: { data: number[]; cats: string[] }) {
+  const values = data.map((value) => Math.abs(value));
+  const boxes = sliceTreemap(values, 6, 8, 188, 104);
+  return (
+    <g>
+      {boxes.map((box, i) => (
+        <g key={i}>
+          <rect x={box.x} y={box.y} width={Math.max(0, box.w - 1)} height={Math.max(0, box.h - 1)} fill={COLORS[i % COLORS.length]}>
+            <title>{`${cats[i] ?? i + 1}: ${data[i]}`}</title>
+          </rect>
+          {box.w > 28 && box.h > 14 ? (
+            <text x={box.x + 3} y={box.y + 11} fontSize="6" fill="#fff">{(cats[i] ?? '').slice(0, 10)}</text>
+          ) : null}
+        </g>
+      ))}
+    </g>
+  );
+}
+
+function sliceTreemap(values: number[], x: number, y: number, w: number, h: number): { x: number; y: number; w: number; h: number }[] {
+  const boxes = values.map(() => ({ x, y, w: 0, h: 0 }));
+  const indexed = values.map((value, index) => ({ value, index })).filter((item) => item.value > 0);
+  layoutTreemap(indexed.map((item) => item.value), x, y, w, h).forEach((box, order) => {
+    boxes[indexed[order].index] = box;
+  });
+  return boxes;
+}
+
+function layoutTreemap(values: number[], x: number, y: number, w: number, h: number): { x: number; y: number; w: number; h: number }[] {
+  if (!values.length || w <= 0 || h <= 0) return [];
+  if (values.length === 1) return [{ x, y, w, h }];
+  const total = values.reduce((sum, value) => sum + value, 0) || 1;
+  const share = values[0] / total;
+  if (w >= h) {
+    const dw = w * share;
+    return [{ x, y, w: dw, h }, ...layoutTreemap(values.slice(1), x + dw, y, w - dw, h)];
+  }
+  const dh = h * share;
+  return [{ x, y, w, h: dh }, ...layoutTreemap(values.slice(1), x, y + dh, w, h - dh)];
+}
+
+function Sunburst({ data }: { data: number[] }) {
+  const outer = data.map((value) => Math.abs(value));
+  const inner: number[] = [];
+  for (let i = 0; i < outer.length; i += 2) inner.push(outer[i] + (outer[i + 1] ?? 0));
+  return (
+    <g>
+      <Ring values={inner.length ? inner : outer} r0={18} r1={36} />
+      <Ring values={outer} r0={38} r1={54} />
+    </g>
+  );
+}
+
+function Ring({ values, r0, r1 }: { values: number[]; r0: number; r1: number }) {
+  const sum = values.reduce((a, b) => a + b, 0) || 1;
+  let angle = -Math.PI / 2;
+  return (
+    <g>
+      {values.map((value, i) => {
+        const sweep = (value / sum) * Math.PI * 2;
+        const large = sweep > Math.PI ? 1 : 0;
+        const a2 = angle + Math.max(sweep - 0.02, 0);
+        const p = (radius: number, a: number) => [100 + Math.cos(a) * radius, 60 + Math.sin(a) * radius];
+        const [x1, y1] = p(r1, angle);
+        const [x2, y2] = p(r1, a2);
+        const [x3, y3] = p(r0, a2);
+        const [x4, y4] = p(r0, angle);
+        const d = `M${x1},${y1} A${r1},${r1} 0 ${large} 1 ${x2},${y2} L${x3},${y3} A${r0},${r0} 0 ${large} 0 ${x4},${y4} Z`;
+        angle += sweep;
+        return <path key={i} d={d} fill={COLORS[i % COLORS.length]} />;
+      })}
+    </g>
+  );
+}
+
+function Pareto({ data, cats }: { data: number[]; cats: string[] }) {
+  const rows = data.map((value, i) => ({ value: Math.abs(value), cat: cats[i] ?? String(i + 1) })).sort((a, b) => b.value - a.value);
+  const max = Math.max(...rows.map((row) => row.value), 1);
+  const total = rows.reduce((sum, row) => sum + row.value, 0) || 1;
+  const n = rows.length;
+  const group = 160 / n;
+  let run = 0;
+  const line = rows.map((row, i) => {
+    run += row.value;
+    const x = 32 + (i + 0.5) * group;
+    const y = 108 - (run / total) * 90;
+    return `${i ? 'L' : 'M'}${x},${y}`;
+  }).join(' ');
+  return (
+    <g>
+      {rows.map((row, i) => {
+        const h = (row.value / max) * 80;
+        return <rect key={row.cat + i} x={32 + i * group} y={108 - h} width={Math.max(2, group - 3)} height={h} fill={COLORS[0]} />;
+      })}
+      <path d={line} fill="none" stroke="#e0a12f" strokeWidth="1.6" />
+      {rows.map((row, i) => {
+        const step = Math.max(1, Math.ceil(n / Math.max(1, Math.floor(160 / 36))));
+        if (i % step !== 0) return null;
+        return <text key={row.cat + i} x={32 + (i + 0.2) * group} y={116} fontSize="6" fill="#9ab">{row.cat.slice(0, 6)}</text>;
+      })}
+    </g>
+  );
+}
+
+function Boxplot({ series }: { series: { name: string; data: number[] }[] }) {
+  const boxes = series.map((item) => quartiles(item.data)).filter((box): box is Quartiles => box !== null);
+  if (!boxes.length) return <text x="8" y="60" fill="#9ab">Keine Zahlen im Bereich</text>;
+  const min = Math.min(...boxes.map((box) => box.min));
+  const max = Math.max(...boxes.map((box) => box.max));
+  const span = max - min || 1;
+  const yOf = (n: number) => 108 - ((n - min) / span) * 96;
+  const slot = 160 / boxes.length;
+  return (
+    <g>
+      {boxes.map((box, i) => {
+        const x = 36 + i * slot;
+        const top = yOf(box.q3);
+        const bottom = yOf(box.q1);
+        return (
+          <g key={i}>
+            <line x1={x + 10} y1={yOf(box.max)} x2={x + 10} y2={yOf(box.min)} stroke="#9ab" />
+            <line x1={x + 4} y1={yOf(box.max)} x2={x + 16} y2={yOf(box.max)} stroke="#9ab" />
+            <line x1={x + 4} y1={yOf(box.min)} x2={x + 16} y2={yOf(box.min)} stroke="#9ab" />
+            <rect x={x} y={top} width={20} height={Math.max(1, bottom - top)} fill={COLORS[i % COLORS.length]} opacity="0.85" />
+            <line x1={x} y1={yOf(box.mid)} x2={x + 20} y2={yOf(box.mid)} stroke="#fff" />
+          </g>
+        );
+      })}
+    </g>
+  );
+}
+
+interface Quartiles { min: number; q1: number; mid: number; q3: number; max: number }
+
+function quartiles(data: number[]): Quartiles | null {
+  const sorted = data.filter((value) => Number.isFinite(value)).sort((a, b) => a - b);
+  if (!sorted.length) return null;
+  const at = (p: number) => {
+    const index = (sorted.length - 1) * p;
+    const lo = Math.floor(index);
+    const hi = Math.ceil(index);
+    return sorted[lo] * (1 - (index - lo)) + sorted[hi] * (index - lo);
+  };
+  return { min: sorted[0], q1: at(0.25), mid: at(0.5), q3: at(0.75), max: sorted[sorted.length - 1] };
 }
 
 function readChart(ctl: GridController, chart: Chart): { cats: string[]; series: { name: string; data: number[] }[] } {

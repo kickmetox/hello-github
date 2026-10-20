@@ -12,7 +12,11 @@ npm test
 npm run dev
 ```
 
-Die Entwicklungsumgebung liegt auf Port 5173. `npm run build` prüft TypeScript und schreibt `dist/`.
+Die Entwicklungsumgebung liegt auf Port 5173. `npm run build` prüft TypeScript und schreibt `dist/`. `npm run package` baut zusätzlich `release/ReckonGrid-1.0.0-Setup.zip` und `release/ReckonGrid-1.0.0-Workspace.zip`.
+
+## Installation
+
+Das Setup-Archiv enthält die kompilierte App. Unter Windows `install.ps1` ausführen, unter Linux `sh install.sh`. Ohne Installation startet `Start-ReckonGrid.bat` beziehungsweise `sh start.sh` die App im Browser auf `127.0.0.1`. Es sind keine Administratorrechte nötig.
 
 Die Beispielmappe **Umsatzdatenbank** ist beim ersten Öffnen aktiv. `DSUMME` für Region Nord und Jahr nach 2025 steht in H9. Änderungen bleiben unter dem Schlüssel `reckongrid-v1` im lokalen Speicher des Browsers.
 

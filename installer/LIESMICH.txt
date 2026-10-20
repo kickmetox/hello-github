@@ -1,0 +1,20 @@
+ReckonGrid 1.0.0
+Andreas Meyer, ame@sellerbach.de
+
+Installation unter Windows
+1. Diesen Ordner entpacken.
+2. Rechtsklick auf install.ps1, „Mit PowerShell ausführen“.
+   Falls die Ausführung blockiert wird:
+   powershell -ExecutionPolicy Bypass -File install.ps1
+3. Die Verknüpfung liegt danach auf dem Desktop und im Startmenü.
+   Die Dateien liegen unter %LOCALAPPDATA%\ReckonGrid.
+   Es sind keine Administratorrechte nötig.
+
+Ohne Installation: Start-ReckonGrid.bat doppelklicken.
+
+Installation unter Linux
+1. Ordner entpacken.
+2. Im Terminal: sh install.sh
+3. Danach startet ReckonGrid im Browser. Der Starter heißt reckongrid.
+
+Die App rechnet lokal. Es wird kein Konto und kein Netzwerkzugriff benötigt.

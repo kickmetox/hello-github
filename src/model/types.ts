@@ -36,7 +36,21 @@ export interface Cell {
   rev?: number;
 }
 
-export type ChartType = 'column' | 'bar' | 'line' | 'pie' | 'area' | 'scatter' | 'radar' | 'waterfall' | 'funnel' | 'doughnut';
+export type ChartType =
+  | 'column'
+  | 'bar'
+  | 'line'
+  | 'pie'
+  | 'area'
+  | 'scatter'
+  | 'radar'
+  | 'waterfall'
+  | 'funnel'
+  | 'doughnut'
+  | 'treemap'
+  | 'sunburst'
+  | 'pareto'
+  | 'boxplot';
 
 export interface Chart {
   id: string;

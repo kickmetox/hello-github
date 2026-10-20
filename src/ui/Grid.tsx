@@ -96,7 +96,8 @@ export function Grid({ ctl }: { ctl: GridController }) {
           justifyContent: style?.align === 'center' ? 'center' : style?.align === 'right' ? 'flex-end' : undefined,
           alignItems: style?.valign === 'top' ? 'flex-start' : style?.valign === 'bottom' ? 'flex-end' : 'center',
           whiteSpace: style?.wrap ? 'normal' : 'nowrap',
-          borderBottom: style?.border === 'bottom' || style?.border === 'thick' ? `2px solid ${style.color ?? '#9ab'}` : undefined,
+          lineHeight: style?.wrap ? '1.2' : undefined,
+          boxShadow: borderShadow(sheet, r, c),
           outline: peer ? `2px solid ${peer.color}` : undefined,
         }}
         title={cell?.comment}
@@ -397,6 +398,11 @@ function ContextMenu({ ctl }: { ctl: GridController }) {
       {item('Einfügen', () => ctl.paste())}
       {item('Zeile einfügen', () => ctl.insertRows())}
       {item('Zeile löschen', () => ctl.deleteRows())}
+      {item('Zeilenumbruch', () => {
+        const on = !!ctl.sheet().cells[`${ctl.view.focus.r},${ctl.view.focus.c}`]?.style?.wrap;
+        ctl.patchStyle({ wrap: !on });
+      })}
+      {item('Rahmen außen', () => ctl.patchStyle({ border: 'outer' }))}
       {item('Kommentar', () => ctl.openDialog('comment'))}
       {item('Hyperlink', () => ctl.openDialog('link'))}
       {item('Filter', () => ctl.toggleFilter())}
@@ -430,6 +436,22 @@ function onEditorKey(event: React.KeyboardEvent, ctl: GridController): void {
     event.preventDefault();
     ctl.nudgePoint(0, 1);
   }
+}
+
+function borderShadow(sheet: Sheet, r: number, c: number): string | undefined {
+  const border = sheet.cells[`${r},${c}`]?.style?.border;
+  if (!border || border === 'none') return undefined;
+  const color = '#c5d0dc';
+  if (border === 'bottom') return `inset 0 -2px 0 ${color}`;
+  if (border === 'thick') return `inset 0 0 0 2px ${color}`;
+  if (border === 'all') return `inset 0 0 0 1px ${color}`;
+  const same = (rr: number, cc: number) => sheet.cells[`${rr},${cc}`]?.style?.border === 'outer';
+  const parts: string[] = [];
+  if (!same(r - 1, c)) parts.push(`inset 0 1px 0 ${color}`);
+  if (!same(r + 1, c)) parts.push(`inset 0 -1px 0 ${color}`);
+  if (!same(r, c - 1)) parts.push(`inset 1px 0 0 ${color}`);
+  if (!same(r, c + 1)) parts.push(`inset -1px 0 0 ${color}`);
+  return parts.join(', ');
 }
 
 function buildLayout(sheet: Sheet, hidden: Set<number>, zoom: number) {

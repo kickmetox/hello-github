@@ -86,15 +86,24 @@ button { cursor: pointer; }
 .ribbon {
   display: flex;
   gap: 10px;
-  min-height: 84px;
+  align-items: stretch;
+  min-height: 92px;
   padding: 6px 8px 4px;
   background: var(--ribbon);
   border-bottom: 1px solid var(--edge);
   overflow-x: auto;
+  overflow-y: hidden;
 }
-.group { display: flex; flex-direction: column; gap: 2px; padding-right: 10px; border-right: 1px solid var(--edge); }
+.group { display: flex; flex-direction: column; gap: 2px; flex: 0 0 auto; padding-right: 10px; border-right: 1px solid var(--edge); }
 .group:last-child { border-right: 0; }
 .group-body { display: flex; gap: 3px; align-items: center; min-height: 54px; }
+.group-body.stack { flex-wrap: wrap; align-content: center; width: 304px; row-gap: 3px; }
+.rb svg { display: block; flex: 0 0 auto; }
+.rb-menu.border-menu .menu-pop { min-width: 148px; }
+.rb-menu.border-menu .menu-pop button { background: transparent; border: 0; text-align: left; padding: 4px 6px; }
+.rb-menu.border-menu .menu-pop button:hover { background: rgba(127,127,127,.16); }
+.pie-hole { fill: #1a2330; }
+.app.light .pie-hole { fill: #fff; }
 .group-label { text-align: center; font-size: 10px; color: var(--muted); }
 .rb, .rb-menu {
   background: transparent;
@@ -118,10 +127,8 @@ button { cursor: pointer; }
 .rb-menu summary { list-style: none; height: 26px; padding: 0 6px; display: flex; align-items: center; }
 .rb-menu summary::-webkit-details-marker { display: none; }
 .menu-pop, .pop {
-  position: absolute;
-  z-index: 20;
-  top: 28px;
-  left: 0;
+  position: fixed;
+  z-index: 40;
   background: var(--ribbon);
   border: 1px solid var(--edge);
   box-shadow: var(--shadow);
@@ -133,6 +140,7 @@ button { cursor: pointer; }
 .swatches { display: flex; flex-wrap: wrap; width: 168px; gap: 4px; }
 .swatch { width: 18px; height: 18px; border: 1px solid #0006; padding: 0; }
 .formula-bar {
+  position: relative;
   height: 30px;
   display: flex;
   align-items: center;
