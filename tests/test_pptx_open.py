@@ -410,5 +410,245 @@ class PptxOpenTest(unittest.TestCase):
             self.assertGreater(ink, 3)
 
 
+    def test_title_layout_stays_one_slide_and_not_a_text_wall(self):
+        from lxml import etree
+        from pptx import Presentation
+        from pptx.enum.text import PP_ALIGN
+        from pptx.oxml import parse_xml
+        from pptx.oxml.ns import qn
+        from pptx.util import Emu, Pt
+
+        from officedisplay.io.pptx_io import import_pptx
+
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            banner = root / "banner.png"
+            left = root / "links.png"
+            right = root / "rechts.png"
+            Image.new("RGB", (80, 20), (20, 90, 180)).save(banner)
+            Image.new("RGB", (16, 16), (0, 80, 160)).save(left)
+            Image.new("RGB", (16, 16), (180, 40, 40)).save(right)
+            package = Presentation()
+            package.slide_width = Emu(12192000)
+            package.slide_height = Emu(6858000)
+            self.assertGreater(len(package.slide_layouts), 1)
+            slide = package.slides.add_slide(package.slide_layouts[6])
+            width, height = int(package.slide_width), int(package.slide_height)
+            slide.shapes.add_picture(str(banner), Emu(0), Emu(0), package.slide_width, Emu(int(height * 0.16)))
+            title = slide.shapes.add_textbox(
+                Emu(int(width * 0.15)),
+                Emu(int(height * 0.32)),
+                Emu(int(width * 0.70)),
+                Emu(int(height * 0.18)),
+            )
+            paragraph = title.text_frame.paragraphs[0]
+            paragraph.alignment = PP_ALIGN.CENTER
+            p_props = paragraph._p.get_or_add_pPr()
+            default_run = p_props.makeelement(qn("a:defRPr"))
+            default_run.set("sz", "1200")
+            p_props.append(default_run)
+            run = paragraph.add_run()
+            run.text = "Anforderungen"
+            run.font.size = Pt(36)
+            subtitle = slide.shapes.add_textbox(
+                Emu(int(width * 0.18)),
+                Emu(int(height * 0.52)),
+                Emu(int(width * 0.64)),
+                Emu(int(height * 0.12)),
+            )
+            sub = subtitle.text_frame.paragraphs[0]
+            lead = sub.add_run()
+            lead.text = "Nebenzeile "
+            marked = sub.add_run()
+            marked.text = "gelb"
+            marked_props = marked._r.get_or_add_rPr()
+            highlight = marked_props.makeelement(qn("a:highlight"))
+            color = highlight.makeelement(qn("a:srgbClr"))
+            color.set("val", "FFFF00")
+            highlight.append(color)
+            marked_props.append(highlight)
+            plain = sub.add_run()
+            plain.text = " fremd"
+            slide.shapes.add_picture(
+                str(left),
+                Emu(int(width * 0.04)),
+                Emu(int(height * 0.78)),
+                Emu(int(width * 0.12)),
+                Emu(int(height * 0.14)),
+            )
+            slide.shapes.add_picture(
+                str(right),
+                Emu(int(width * 0.82)),
+                Emu(int(height * 0.78)),
+                Emu(int(width * 0.12)),
+                Emu(int(height * 0.14)),
+            )
+            slide.notes_slide.notes_text_frame.text = "Nur Notiz"
+            background = (
+                '<p:bg xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" '
+                'xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">'
+                '<p:bgPr><a:solidFill><a:srgbClr val="003399"/></a:solidFill></p:bgPr></p:bg>'
+            )
+            common = slide._element.cSld
+            if common.bg is not None:
+                common._remove_bg()
+            common.spTree.addprevious(parse_xml(background))
+            tree = slide.shapes._spTree
+            keep = {qn("p:nvGrpSpPr"), qn("p:grpSpPr")}
+            moving = [child for child in list(tree) if child.tag not in keep]
+            alternate = etree.Element(qn("ve:AlternateContent"))
+            choice = etree.SubElement(alternate, qn("ve:Choice"))
+            choice.set("Requires", "a")
+            fallback = etree.SubElement(alternate, qn("ve:Fallback"))
+            wall = f'''
+            <p:sp xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+                  xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
+              <p:nvSpPr>
+                <p:cNvPr id="90" name="Textwand"/>
+                <p:cNvSpPr txBox="1"/>
+                <p:nvPr/>
+              </p:nvSpPr>
+              <p:spPr>
+                <a:xfrm><a:off x="0" y="0"/><a:ext cx="{width}" cy="{height}"/></a:xfrm>
+              </p:spPr>
+              <p:txBody>
+                <a:bodyPr/><a:lstStyle/>
+                <a:p><a:r><a:rPr sz="1200"/><a:t>Textwand</a:t></a:r></a:p>
+              </p:txBody>
+            </p:sp>
+            '''
+            fallback.append(parse_xml(wall))
+            for child in moving:
+                tree.remove(child)
+                choice.append(child)
+            tree.append(alternate)
+            path = root / "anforderungen.pptx"
+            package.save(path)
+            ghost = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+            <p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+                   xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
+              <p:cSld><p:spTree>
+                <p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>
+                <p:grpSpPr/>
+                <p:sp><p:nvSpPr><p:cNvPr id="2" name="Geist"/><p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr>
+                  <p:txBody><a:bodyPr/><a:p><a:r><a:t>LayoutGeist</a:t></a:r></a:p></p:txBody>
+                </p:sp>
+              </p:spTree></p:cSld>
+            </p:sld>
+            """
+            _add_zip_entry(path, "ppt/slides/slide99.xml", ghost.encode("utf-8"))
+            loaded = import_pptx(path)
+            self.assertEqual(len(loaded.slides), 1)
+            page = loaded.slides[0]
+            blob = _texts(loaded)
+            self.assertIn("Anforderungen", blob)
+            self.assertNotIn("Textwand", blob)
+            self.assertNotIn("LayoutGeist", blob)
+            self.assertNotIn("Nur Notiz", blob)
+            self.assertEqual(page.notes, "Nur Notiz")
+            self.assertEqual(page.background.color.upper(), "#003399")
+            images = [obj for obj in page.objects if obj.kind == "image"]
+            self.assertTrue(any(obj.y < 0.2 and obj.h < 0.4 and obj.w > 0.6 for obj in images))
+            self.assertTrue(any(obj.x < 0.25 and obj.y > 0.65 and obj.w < 0.4 for obj in images))
+            self.assertTrue(any(obj.x > 0.6 and obj.y > 0.65 and obj.w < 0.4 for obj in images))
+            heading = next(obj for obj in page.objects if obj.kind == "text" and "Anforderungen" in str(obj.props.get("text") or ""))
+            self.assertNotIn("Nebenzeile", str(heading.props.get("text") or ""))
+            self.assertGreaterEqual(int(heading.props.get("font_size") or 0), 28)
+            self.assertLess(heading.h, 0.6)
+            self.assertEqual(heading.props.get("align"), "center")
+            other = next(obj for obj in page.objects if obj.kind == "text" and "Nebenzeile" in str(obj.props.get("text") or ""))
+            self.assertNotEqual(other.id, heading.id)
+            runs = other.props.get("runs") or []
+            self.assertTrue(any(item.get("text") == "gelb" and item.get("highlight") for item in runs))
+            self.assertTrue(any("fremd" in str(item.get("text") or "") and not item.get("highlight") for item in runs))
+            self.assertFalse(any(obj.kind == "shape" and str(obj.props.get("fill") or "").upper() == "#FFFF00" for obj in page.objects))
+
+    def test_notes_layouts_and_extra_slide_files_are_not_slides(self):
+        from officedisplay.io.pptx_io import import_pptx
+
+        with tempfile.TemporaryDirectory() as folder:
+            target = Path(folder) / "liste.pptx"
+            slide = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+            <p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+                   xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
+              <p:cSld><p:spTree>
+                <p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>
+                <p:grpSpPr/>
+                <p:sp>
+                  <p:nvSpPr><p:cNvPr id="2" name="Titel"/><p:cNvSpPr txBox="1"/><p:nvPr><p:ph type="title"/></p:nvPr></p:nvSpPr>
+                  <p:spPr><a:xfrm><a:off x="400000" y="400000"/><a:ext cx="8000000" cy="1200000"/></a:xfrm></p:spPr>
+                  <p:txBody><a:bodyPr/><a:lstStyle/>
+                    <a:p><a:r><a:rPr sz="3600"/><a:t>Anforderungen</a:t></a:r></a:p>
+                  </p:txBody>
+                </p:sp>
+              </p:spTree></p:cSld>
+            </p:sld>
+            """
+            notes = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+            <p:notes xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+                     xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
+              <p:cSld><p:spTree>
+                <p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>
+                <p:grpSpPr/>
+                <p:sp><p:nvSpPr><p:cNvPr id="3" name="Notizen"/><p:cNvSpPr/><p:nvPr><p:ph type="body"/></p:nvPr></p:nvSpPr>
+                  <p:txBody><a:bodyPr/><a:p><a:r><a:t>NurNotiz</a:t></a:r></a:p></p:txBody>
+                </p:sp>
+              </p:spTree></p:cSld>
+            </p:notes>
+            """
+            layout = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+            <p:sldLayout xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+                         xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
+              <p:cSld><p:spTree>
+                <p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>
+                <p:grpSpPr/>
+                <p:sp><p:txBody><a:bodyPr/><a:p><a:r><a:t>Mastertext</a:t></a:r></a:p></p:txBody></p:sp>
+              </p:spTree></p:cSld>
+            </p:sldLayout>
+            """
+            extra = slide.replace("Anforderungen", "LayoutGeist")
+            presentation = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+            <p:presentation xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+                            xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
+              <p:sldIdLst><p:sldId id="256" r:id="rId2"/></p:sldIdLst>
+              <p:sldSz cx="12192000" cy="6858000"/>
+            </p:presentation>
+            """
+            rels = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+            <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+              <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide1.xml"/>
+              <Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesSlide" Target="notesSlides/notesSlide1.xml"/>
+              <Relationship Id="rId4" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout" Target="slideLayouts/slideLayout1.xml"/>
+            </Relationships>
+            """
+            with zipfile.ZipFile(target, "w") as archive:
+                archive.writestr("[Content_Types].xml", b"<Types>")
+                archive.writestr("ppt/presentation.xml", presentation.encode("utf-8"))
+                archive.writestr("ppt/_rels/presentation.xml.rels", rels.encode("utf-8"))
+                archive.writestr("ppt/slides/slide1.xml", slide.encode("utf-8"))
+                archive.writestr("ppt/slides/slide99.xml", extra.encode("utf-8"))
+                archive.writestr("ppt/notesSlides/notesSlide1.xml", notes.encode("utf-8"))
+                archive.writestr("ppt/slideLayouts/slideLayout1.xml", layout.encode("utf-8"))
+            loaded = import_pptx(target)
+            self.assertEqual(len(loaded.slides), 1)
+            blob = _texts(loaded)
+            self.assertIn("Anforderungen", blob)
+            self.assertNotIn("LayoutGeist", blob)
+            self.assertNotIn("Mastertext", blob)
+            self.assertNotIn("NurNotiz", blob)
+            heading = next(obj for obj in loaded.slides[0].objects if "Anforderungen" in str(obj.props.get("text") or ""))
+            self.assertGreaterEqual(int(heading.props.get("font_size") or 0), 28)
+            self.assertLess(heading.w, 0.95)
+
+
+def _add_zip_entry(path: Path, name: str, payload: bytes) -> None:
+    temporary = path.with_suffix(".tmp.pptx")
+    with zipfile.ZipFile(path, "r") as source, zipfile.ZipFile(temporary, "w") as target:
+        for info in source.infolist():
+            target.writestr(info, source.read(info.filename))
+        target.writestr(name, payload)
+    temporary.replace(path)
+
+
 if __name__ == "__main__":
     unittest.main()

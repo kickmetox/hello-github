@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import tempfile
 from pathlib import Path
 
@@ -201,6 +202,9 @@ def _from_package(package, source: Path, media: dict) -> Presentation:
             page = slides[index]
         except Exception:
             presentation.slides.append(slide)
+            continue
+        # Notizen, Layouts und Master sind keine Folien. Nur p:sld aus der Folienliste.
+        if not _part_is_content_slide(page):
             continue
         try:
             notes = page.notes_slide.notes_text_frame.text
@@ -514,12 +518,13 @@ def _ordered_slide_names(archive, names: dict[str, str]) -> list[str]:
                     if isinstance(key, str) and key.endswith("}id") and "relationships" in key:
                         rid = value
                         break
-            path = _resolve("ppt", rels[rid][1]) if rid and rid in rels else None
-            if path and path in names and path not in used:
+            rel = rels.get(rid) if rid else None
+            path = _resolve("ppt", rel[1]) if rel and _is_slide_relationship(rel[0], rel[1]) else None
+            if path and path in names and path not in used and _is_content_slide_path(path):
                 slots.append(path)
                 used.add(path)
             else:
-                # Fehlende rId oder Ziel: Platz halten, Folie später aus dem ZIP füllen.
+                # Fehlende rId oder Ziel: Platz halten, nur mit einer echten Folie füllen.
                 slots.append(None)
 
     def sort_key(norm: str):
@@ -534,10 +539,11 @@ def _ordered_slide_names(archive, names: dict[str, str]) -> list[str]:
     for norm in names:
         if "/_rels/" in norm or norm in used:
             continue
-        base = norm.rsplit("/", 1)[-1]
-        if norm.startswith("ppt/slides/") and base.startswith("slide") and base.endswith(".xml"):
+        if _is_content_slide_path(norm) and re.fullmatch(r"slide\d+\.xml", norm.rsplit("/", 1)[-1], re.I):
             extras.append(norm)
     extras.sort(key=sort_key)
+    if not slots:
+        return extras
     ordered: list[str] = []
     extra_index = 0
     for slot in slots:
@@ -547,8 +553,30 @@ def _ordered_slide_names(archive, names: dict[str, str]) -> list[str]:
         if extra_index < len(extras):
             ordered.append(extras[extra_index])
             extra_index += 1
-    ordered.extend(extras[extra_index:])
     return ordered
+
+
+def _is_slide_relationship(typ: str, target: str) -> bool:
+    """Nur die Beziehungsart slide. notesSlide, slideLayout und slideMaster nicht."""
+    kind = (typ or "").replace("\\", "/").rsplit("/", 1)[-1]
+    if kind != "slide":
+        return False
+    return _is_content_slide_path(_resolve("ppt", target) or target)
+
+
+def _is_content_slide_path(path: str) -> bool:
+    low = (path or "").replace("\\", "/").lower()
+    if any(part in low for part in ("/notesslides/", "/slidelayouts/", "/slidemasters/", "/notesmasters/", "/handoutmasters/")):
+        return False
+    return low.endswith(".xml")
+
+
+def _part_is_content_slide(page) -> bool:
+    part = getattr(page, "part", None)
+    name = str(getattr(part, "partname", "") or "").lower()
+    if not name:
+        return True
+    return _is_content_slide_path(name) and "notesslide" not in name
 
 
 def _zip_slide_size(archive, names: dict[str, str]) -> tuple[float, float]:
@@ -614,7 +642,8 @@ def _take_xml_element(element, slide: Slide, slide_w: float, slide_h: float, tra
     if tag in {"nvGrpSpPr", "grpSpPr", "nvSpPr", "spPr", "nvGraphicFramePr", "xfrm", "txBody", "style", "extLst"}:
         return
     if tag == "AlternateContent":
-        holder = _child(element, "Fallback") or _child(element, "Choice")
+        # PowerPoint zeigt mc:Choice. Der Fallback ist oft die Textwand.
+        holder = _alternate_holder(element)
         if holder is None:
             return
         for child in list(holder):
@@ -738,7 +767,7 @@ def _append_stand_in(slide: Slide, box, name: str) -> None:
 
 
 def _xml_text(element, box, text: str, name: str) -> SlideObject:
-    return _plain_text(
+    obj = _plain_text(
         box,
         text,
         name,
@@ -747,6 +776,28 @@ def _xml_text(element, box, text: str, name: str) -> SlideObject:
         _valign_of(element),
         _run_color(element) or "#1B1F2A",
     )
+    _attach_highlight_runs(obj.props, element)
+    return obj
+
+
+def _alternate_holder(element):
+    """mc:Choice ist die gestaltete Folie. Fallback nur, wenn Choice leer ist."""
+    choice = _child(element, "Choice")
+    fallback = _child(element, "Fallback")
+    if _has_drawable(choice):
+        return choice
+    if _has_drawable(fallback):
+        return fallback
+    return None
+
+
+def _has_drawable(element) -> bool:
+    if element is None:
+        return False
+    for node in element.iter():
+        if _local(getattr(node, "tag", "")) in {"sp", "pic", "grpSp", "graphicFrame", "cxnSp"}:
+            return True
+    return False
 
 
 def _plain_text(box, text: str, name: str, font_size: int, align: str = "left", valign: str | None = None, color: str = "#1B1F2A") -> SlideObject:
@@ -1029,25 +1080,31 @@ def _color_of(element) -> str | None:
 
 
 def _explicit_sz(element) -> int | None:
-    """DrawingML a:rPr oder a:defRPr, Attribut sz in Hundertstel Punkt."""
+    """DrawingML a:rPr oder a:defRPr, Attribut sz in Hundertstel Punkt.
+
+    Die Größe des ersten Laufs mit Text gilt. Ein leeres defRPr mit 12 pt
+    verdrängt keine Überschrift mit 32–44 pt.
+    """
     if element is None:
         return None
     body = element if _local(getattr(element, "tag", "")) == "txBody" else _child(element, "txBody")
     if body is None:
         return None
-    run_sz = None
     def_sz = None
     for child in body:
         if _local(child.tag) != "p":
             continue
-        for node in child.iter():
+        for node in child:
             local = _local(node.tag)
-            if local == "rPr" and node.get("sz") and run_sz is None:
-                run_sz = _sz_value(node.get("sz"))
-            if local == "defRPr" and node.get("sz") and def_sz is None:
-                def_sz = _sz_value(node.get("sz"))
-    if run_sz is not None:
-        return run_sz
+            if local == "r":
+                text = "".join((item.text or "") for item in node.iter() if _local(item.tag) == "t")
+                rpr = _child(node, "rPr")
+                if text.strip() and rpr is not None and rpr.get("sz"):
+                    return _sz_value(rpr.get("sz"))
+            if local == "pPr" and def_sz is None:
+                props = _child(node, "defRPr")
+                if props is not None and props.get("sz"):
+                    def_sz = _sz_value(props.get("sz"))
     if def_sz is not None:
         return def_sz
     lst = _child(body, "lstStyle")
@@ -1056,6 +1113,62 @@ def _explicit_sz(element) -> int | None:
             if _local(node.tag) == "defRPr" and node.get("sz"):
                 return _sz_value(node.get("sz"))
     return None
+
+
+def _run_records(element) -> list[dict]:
+    """Ein Lauf bleibt ein Lauf. a:highlight färbt nur diesen Lauf, ISO/IEC 29500 21.1.2.3.4."""
+    body = element if element is not None and _local(getattr(element, "tag", "")) == "txBody" else _child(element, "txBody") if element is not None else None
+    if body is None:
+        return []
+    records = []
+    paragraphs = [child for child in body if _local(child.tag) == "p"]
+    for para in paragraphs:
+        pieces = []
+        for child in para:
+            local = _local(child.tag)
+            if local == "br":
+                pieces.append({"text": "\n"})
+                continue
+            if local not in {"r", "fld"}:
+                continue
+            text = "".join((item.text or "") for item in child.iter() if _local(item.tag) == "t")
+            if text == "":
+                continue
+            rpr = _child(child, "rPr")
+            piece = {"text": text}
+            highlight = _highlight_color(rpr)
+            if highlight:
+                piece["highlight"] = highlight
+            if rpr is not None and rpr.get("sz"):
+                size = _sz_value(rpr.get("sz"))
+                if size:
+                    piece["size"] = size
+            color = _color_of(_child(rpr, "solidFill")) if rpr is not None else None
+            if color:
+                piece["color"] = color
+            pieces.append(piece)
+        if not pieces:
+            continue
+        if records:
+            records.append({"text": "\n"})
+        records.extend(pieces)
+    return records
+
+
+def _highlight_color(rpr) -> str | None:
+    if rpr is None:
+        return None
+    node = _child(rpr, "highlight")
+    if node is None:
+        return None
+    return _color_of(node)
+
+
+def _attach_highlight_runs(props: dict, element) -> None:
+    records = _run_records(element)
+    if not any(item.get("highlight") for item in records):
+        return
+    props["runs"] = records
 
 
 def _align_of(element) -> str | None:
@@ -1828,7 +1941,7 @@ def _placeholder_fallback(shape) -> tuple[float, float, float, float]:
 
 
 def _alternate_shapes(collection) -> list:
-    """python-pptx überspringt AlternateContent. Fallback-Formen trotzdem lesen."""
+    """python-pptx überspringt AlternateContent. Choice lesen, sonst den Fallback."""
     if collection is None:
         return []
     try:
@@ -1837,19 +1950,12 @@ def _alternate_shapes(collection) -> list:
         tree = collection._spTree
         factory = collection._shape_factory
         alternate = qn("ve:AlternateContent")
-        fallback = qn("ve:Fallback")
-        choice = qn("ve:Choice")
         tags = {qn("p:sp"), qn("p:grpSp"), qn("p:graphicFrame"), qn("p:cxnSp"), qn("p:pic")}
         found = []
         for child in list(tree):
             if child.tag != alternate:
                 continue
-            holder = None
-            for name in (fallback, choice):
-                candidate = child.find(name)
-                if candidate is not None and any(element.tag in tags for element in candidate):
-                    holder = candidate
-                    break
+            holder = _alternate_holder(child)
             if holder is None:
                 continue
             for element in holder:
@@ -1895,6 +2001,7 @@ def _text_object(shape, box, text: str) -> SlideObject:
     valign = _text_valign(shape)
     if valign:
         props["valign"] = valign
+    _attach_highlight_runs(props, getattr(shape, "_element", None))
     return SlideObject(
         id=new_id(),
         kind="text",

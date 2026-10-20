@@ -4,7 +4,7 @@ import math
 from pathlib import Path
 
 from PySide6.QtCore import QPointF, QRectF, Qt
-from PySide6.QtGui import QBrush, QColor, QFont, QImage, QLinearGradient, QPainter, QPainterPath, QPen, QPolygonF
+from PySide6.QtGui import QBrush, QColor, QFont, QFontMetrics, QImage, QLinearGradient, QPainter, QPainterPath, QPen, QPolygonF
 
 from officedisplay.input.pointer import stroke_width
 
@@ -141,6 +141,10 @@ def _paint_object(painter, presentation, obj, rect, ox, oy, ow, oh, selected) ->
 
 
 def _text(painter: QPainter, obj, box: QRectF, scale: float = 1.0) -> None:
+    runs = obj.props.get("runs")
+    if isinstance(runs, list) and any(isinstance(item, dict) and item.get("highlight") for item in runs):
+        _text_runs(painter, obj, box, scale, runs)
+        return
     font = QFont(obj.props.get("font_family") or "Segoe UI")
     font.setPixelSize(max(1, int((obj.props.get("font_size") or 18) * scale)))
     font.setBold(bool(obj.props.get("bold")))
@@ -165,6 +169,68 @@ def _text(painter: QPainter, obj, box: QRectF, scale: float = 1.0) -> None:
     elif extra > 0 and valign == "bottom":
         box = box.adjusted(0, extra, 0, 0)
     painter.drawText(box, align | Qt.AlignmentFlag.AlignTop | Qt.TextFlag.TextWordWrap, text)
+
+
+def _text_runs(painter: QPainter, obj, box: QRectF, scale: float, runs: list) -> None:
+    """Hervorhebung nur hinter dem Lauf, nicht als Balken über den Rest der Zeile."""
+    lines: list[list[dict]] = [[]]
+    for run in runs:
+        if not isinstance(run, dict):
+            continue
+        parts = str(run.get("text") or "").split("\n")
+        for index, part in enumerate(parts):
+            if index:
+                lines.append([])
+            if part:
+                lines[-1].append({**run, "text": part})
+    if lines and not lines[-1]:
+        lines.pop()
+    if not lines:
+        return
+    family = obj.props.get("font_family") or "Segoe UI"
+    base_size = int(obj.props.get("font_size") or 18)
+    align = obj.props.get("align") or "left"
+
+    def piece_font(piece: dict) -> QFont:
+        font = QFont(family)
+        font.setPixelSize(max(1, int((piece.get("size") or base_size) * scale)))
+        font.setBold(bool(obj.props.get("bold")))
+        return font
+
+    heights = []
+    for line in lines:
+        height = 1
+        for piece in line:
+            height = max(height, QFontMetrics(piece_font(piece)).height())
+        heights.append(height)
+    total = sum(heights)
+    y = box.top()
+    extra = box.height() - total
+    valign = obj.props.get("valign") or "top"
+    if extra > 0 and valign == "middle":
+        y += extra / 2
+    elif extra > 0 and valign == "bottom":
+        y += extra
+    for line, height in zip(lines, heights):
+        widths = []
+        for piece in line:
+            widths.append(QFontMetrics(piece_font(piece)).horizontalAdvance(piece["text"]))
+        span = sum(widths)
+        if align == "center":
+            x = box.left() + max(0.0, (box.width() - span) / 2)
+        elif align == "right":
+            x = box.left() + max(0.0, box.width() - span)
+        else:
+            x = box.left()
+        for piece, width in zip(line, widths):
+            font = piece_font(piece)
+            if piece.get("highlight"):
+                painter.fillRect(QRectF(x, y, width, height), qcolor(piece.get("highlight"), "#FFFF00"))
+            painter.setFont(font)
+            painter.setPen(qcolor(piece.get("color") or obj.props.get("color"), "#1B1F2A"))
+            painter.drawText(QRectF(x, y, max(width, 1.0), height), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, piece["text"])
+            x += width
+        y += height
 
 
 def _shape_clip(kind: str, box: QRectF) -> QPainterPath:

@@ -31,3 +31,9 @@ Bilder nur, wenn im Folienkörper oder im Pictures-Strom die Signatur von PNG od
 LibreOffice ist nicht vorausgesetzt. Ist `soffice` schon installiert, darf es die Datei vorher nach PPTX wandeln. Sonst liest der OLE-Leser.
 
 Nicht gelesen werden freie Zeichnungen im alten PPT, Animationen, OLE und SmartArt. Die ursprüngliche Zeichenposition aus dem OfficeArt-Baum wird nicht rekonstruiert. Text und gefundene Bilder liegen auf festen Flächen der Folie.
+
+## ODP
+
+`.odp` ist eine Präsentation nach OASIS OpenDocument 1.3, Teil 3. Eine Folie ist `draw:page` in `office:presentation`. `draw:frame` trägt `svg:x`, `svg:y`, `svg:width` und `svg:height` in cm, mm, in oder px, geteilt durch die Seitengröße aus `style:page-layout`. Text steht in `draw:text-box` mit `text:p`. Ein Bild ist `draw:image` mit `xlink:href` auf `Pictures/` im ZIP. Der Hintergrund kommt aus `styles.xml`, über `style:drawing-page-properties` oder `style:graphic-properties`, ein Bild davon aus `draw:fill-image`.
+
+Nicht gelesen werden Animationen und 3D.
