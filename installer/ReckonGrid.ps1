@@ -9,8 +9,12 @@ param(
 $ErrorActionPreference = 'Stop'
 
 function Resolve-AppRoot([string]$Hint) {
+  if ($Hint) {
+    $hintIndex = Join-Path $Hint 'index.html'
+    if (Test-Path -LiteralPath $hintIndex) { return (Resolve-Path -LiteralPath $Hint).Path }
+    return $null
+  }
   $candidates = New-Object System.Collections.Generic.List[string]
-  if ($Hint) { $candidates.Add($Hint) }
   $candidates.Add((Join-Path $PSScriptRoot 'app'))
   $candidates.Add((Join-Path $PSScriptRoot 'dist'))
   $parent = Split-Path -Parent $PSScriptRoot
