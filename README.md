@@ -18,6 +18,12 @@ npm run dev
 
 Die Entwicklungsumgebung liegt auf Port 5173. `npm run build` prüft TypeScript und schreibt `dist/`. `npm run package` baut zusätzlich `release/ReckonGrid-1.0.0-Setup.zip` und `release/ReckonGrid-1.0.0-Workspace.zip`. Das Workspace-Archiv enthält `dist` und die Starter im Hauptordner, damit es nach dem Entpacken ohne `npm install` startet. `release/ReckonGrid-1.0.0-Workordner.zip` ist der gesamte Projektordner inklusive Quelltext, `dist`, Installer, `node_modules` und der übrigen Release-Archive, ohne `.git`.
 
+## Windows-Anwendung
+
+`release/ReckonGrid-Setup-1.0.0.exe` ist das NSIS-Setup der Desktop-App. Die Datei enthält die gebaute Oberfläche und startet ReckonGrid in einem eigenen Fenster, ohne Node und ohne Browser. Doppelklick, Installationsordner bestätigen (Benutzerordner, keine Administratorrechte), dann die Verknüpfung ReckonGrid öffnen. Warnt SmartScreen, weil die Datei nicht signiert ist: „Weitere Informationen“ und „Trotzdem ausführen“. `Start-ReckonGrid.bat` bleibt der bisherige Start im Browser.
+
+Entwicklung des Windows-Pakets: `npm run desktop` (electron-builder, Ziel NSIS x64).
+
 ## Installation
 
 Das Setup-Archiv enthält die kompilierte App. Unter Windows `install.bat` doppelklicken (oder `powershell -NoProfile -ExecutionPolicy Bypass -File install.ps1`). Unter Linux `sh install.sh`. Ohne Installation startet `Start-ReckonGrid.bat` beziehungsweise `sh start.sh` die App im Browser auf `127.0.0.1`. Schlägt der Start fehl, bleibt das Fenster mit der Meldung offen. Lehnt Windows den HttpListener ab, übernimmt ein eingebauter Socket-Server denselben Port. Es sind keine Administratorrechte nötig.

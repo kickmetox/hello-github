@@ -4,12 +4,57 @@
   "version": "1.0.0",
   "type": "module",
   "description": "ReckonGrid – Tabellenkalkulation mit Datenbankfunktion. Andreas Meyer, ame@sellerbach.de",
+  "author": "Andreas Meyer <ame@sellerbach.de>",
+  "main": "electron/main.cjs",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit --pretty false && vite build",
     "package": "npm run build && node scripts/package-release.mjs",
+    "desktop": "npm run build && electron-builder --win nsis --x64",
     "preview": "vite preview",
     "test": "vitest run"
+  },
+  "build": {
+    "appId": "de.sellerbach.reckongrid",
+    "productName": "ReckonGrid",
+    "copyright": "Copyright © Andreas Meyer, ame@sellerbach.de",
+    "asar": true,
+    "directories": {
+      "output": "release-build"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json",
+      "!**/*.map"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "installer/icon.ico",
+      "executableName": "ReckonGrid"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "allowElevation": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "ReckonGrid",
+      "uninstallDisplayName": "ReckonGrid",
+      "installerLanguages": [
+        "de_DE",
+        "en_US"
+      ],
+      "artifactName": "ReckonGrid-Setup-${version}.exe"
+    }
   },
   "dependencies": {
     "react": "^18.3.1",
@@ -20,6 +65,8 @@
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",
     "@vitejs/plugin-react": "^4.3.4",
+    "electron": "^33.4.11",
+    "electron-builder": "^25.1.8",
     "typescript": "^5.7.3",
     "vite": "^6.0.7",
     "vitest": "^3.0.4"
