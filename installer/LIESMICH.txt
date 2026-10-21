@@ -1,0 +1,41 @@
+ReckonGrid 1.0.0
+Andreas Meyer, ame@sellerbach.de
+
+Sofort starten (Windows)
+1. Diesen Ordner entpacken.
+2. Start-ReckonGrid.bat doppelklicken.
+   Es öffnet sich ein sichtbares Fenster und danach der Browser
+   auf http://127.0.0.1:4173/ (oder dem nächsten freien Port).
+   Das Fenster muss offen bleiben. Schließen beendet die App.
+   Schlägt der Start fehl, bleibt das Fenster mit der Fehlermeldung offen.
+3. index.html nicht doppelklicken. Über file:// laden keine Module.
+
+Installation (Windows, ohne Administrator)
+1. install.bat doppelklicken.
+   Das ist zuverlässiger als ein direkter Start von install.ps1,
+   weil die Ausführungsrichtlinie dabei umgangen wird.
+2. Alternativ, falls die Richtlinie blockiert:
+   powershell -NoProfile -ExecutionPolicy Bypass -File install.ps1
+3. Die Verknüpfung liegt danach auf dem Desktop und im Startmenü
+   und zeigt auf Start-ReckonGrid.bat (sichtbares Fenster).
+   Die Dateien liegen unter %LOCALAPPDATA%\ReckonGrid.
+
+Wenn der Windows-HttpListener den Port ablehnt, startet dasselbe
+Fenster automatisch einen eingebauten Socket-Server. Dafür ist keine
+weitere Installation und kein Administrator nötig.
+
+Sofort starten (Linux)
+1. Ordner entpacken.
+2. Im Terminal: sh start.sh
+3. Der Browser öffnet http://127.0.0.1:4173/. Strg+C beendet die App.
+
+Installation unter Linux: sh install.sh
+Danach heißt der Starter reckongrid.
+
+Workspace-Archiv
+Der Ordner dist ist enthalten. Start-ReckonGrid.bat beziehungsweise
+sh start.sh im Hauptordner starten die gebaute App ohne npm install.
+Für die Entwicklung im Quelltext: npm install und danach npm run dev
+(Port 5173).
+
+Die App rechnet lokal. Es wird kein Konto benötigt.
