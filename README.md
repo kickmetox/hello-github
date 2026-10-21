@@ -16,7 +16,7 @@ npm test
 npm run dev
 ```
 
-Die Entwicklungsumgebung liegt auf Port 5173. `npm run build` prüft TypeScript und schreibt `dist/`. `npm run package` baut zusätzlich `release/ReckonGrid-1.0.0-Setup.zip` und `release/ReckonGrid-1.0.0-Workspace.zip`. Das Workspace-Archiv enthält `dist` und die Starter im Hauptordner, damit es nach dem Entpacken ohne `npm install` startet.
+Die Entwicklungsumgebung liegt auf Port 5173. `npm run build` prüft TypeScript und schreibt `dist/`. `npm run package` baut zusätzlich `release/ReckonGrid-1.0.0-Setup.zip` und `release/ReckonGrid-1.0.0-Workspace.zip`. Das Workspace-Archiv enthält `dist` und die Starter im Hauptordner, damit es nach dem Entpacken ohne `npm install` startet. `release/ReckonGrid-1.0.0-Workordner.zip` ist der gesamte Projektordner inklusive Quelltext, `dist`, Installer, `node_modules` und der übrigen Release-Archive, ohne `.git`.
 
 ## Installation
 
