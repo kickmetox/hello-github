@@ -135,7 +135,7 @@ function Shell({ ctl }: { ctl: GridController }) {
   return (
     <div className={`app ${ctl.view.theme}`}>
       <header className="titlebar">
-        <img src="/icon.png" alt="ReckonGrid" />
+        <img src={`${import.meta.env.BASE_URL}icon.png`} alt="ReckonGrid" />
         <span className="brand">ReckonGrid</span>
         <input
           className="doc"

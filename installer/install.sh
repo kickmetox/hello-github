@@ -20,7 +20,7 @@ Name=ReckonGrid
 Comment=Tabellenkalkulation mit Datenbankfunktion
 Exec=${DEST}/start.sh
 Icon=${DEST}/icon.png
-Terminal=false
+Terminal=true
 Categories=Office;
 EOF
 ln -sfn "$DEST/start.sh" "${HOME}/.local/bin/reckongrid"

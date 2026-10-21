@@ -6,17 +6,21 @@ ReckonGrid rechnet lokal im Browser: deutsche und englische Formeln, dynamische 
 
 ## Start
 
+Die gebaute App startet ohne Node: unter Windows `Start-ReckonGrid.bat` doppelklicken, unter Linux `sh start.sh`. Der Browser öffnet `http://127.0.0.1:4173/` (oder den nächsten freien Port). Das Startfenster bleibt offen; schließen beziehungsweise Strg+C beendet die App. `index.html` nicht per Doppelklick öffnen, weil Module über `file://` blockiert werden.
+
+Entwicklung im Quelltext:
+
 ```bash
 npm install
 npm test
 npm run dev
 ```
 
-Die Entwicklungsumgebung liegt auf Port 5173. `npm run build` prüft TypeScript und schreibt `dist/`. `npm run package` baut zusätzlich `release/ReckonGrid-1.0.0-Setup.zip` und `release/ReckonGrid-1.0.0-Workspace.zip`.
+Die Entwicklungsumgebung liegt auf Port 5173. `npm run build` prüft TypeScript und schreibt `dist/`. `npm run package` baut zusätzlich `release/ReckonGrid-1.0.0-Setup.zip` und `release/ReckonGrid-1.0.0-Workspace.zip`. Das Workspace-Archiv enthält `dist` und die Starter im Hauptordner, damit es nach dem Entpacken ohne `npm install` startet.
 
 ## Installation
 
-Das Setup-Archiv enthält die kompilierte App. Unter Windows `install.ps1` ausführen, unter Linux `sh install.sh`. Ohne Installation startet `Start-ReckonGrid.bat` beziehungsweise `sh start.sh` die App im Browser auf `127.0.0.1`. Es sind keine Administratorrechte nötig.
+Das Setup-Archiv enthält die kompilierte App. Unter Windows `install.bat` doppelklicken (oder `powershell -NoProfile -ExecutionPolicy Bypass -File install.ps1`). Unter Linux `sh install.sh`. Ohne Installation startet `Start-ReckonGrid.bat` beziehungsweise `sh start.sh` die App im Browser auf `127.0.0.1`. Schlägt der Start fehl, bleibt das Fenster mit der Meldung offen. Lehnt Windows den HttpListener ab, übernimmt ein eingebauter Socket-Server denselben Port. Es sind keine Administratorrechte nötig.
 
 Die Beispielmappe **Umsatzdatenbank** ist beim ersten Öffnen aktiv. `DSUMME` für Region Nord und Jahr nach 2025 steht in H9. Änderungen bleiben unter dem Schlüssel `reckongrid-v1` im lokalen Speicher des Browsers.
 
