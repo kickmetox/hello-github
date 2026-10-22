@@ -154,6 +154,33 @@ def test_inbox_users_and_password(auth):
     _restore_admin_password()
 
 
+def test_ocr_scan_is_searchable(auth):
+    from app.ocr import engine_status
+    from tests.test_extract import _font, _png
+
+    if not engine_status()["available"] or _font() is None:
+        pytest.skip("Tesseract oder Schrift fehlt")
+    image = _png("QUARZSCAN")
+    uploaded = auth.post(
+        "/api/documents",
+        files={"files": ("quarzscan.png", image, "image/png")},
+        data={"title": "Scan Quarz"},
+        headers=HEADER,
+    )
+    assert uploaded.status_code == 201, uploaded.text
+    document = uploaded.json()["documents"][0]
+    assert document["text_status"] == "ocr"
+    detail = auth.get(f"/api/documents/{document['id']}")
+    assert "QUARZSCAN" in detail.json()["text"].replace(" ", "")
+    found = auth.get("/api/search", params={"q": "QUARZSCAN"})
+    assert found.json()["results"][0]["document"]["id"] == document["id"]
+    again = auth.post(f"/api/documents/{document['id']}/ocr", headers=HEADER)
+    assert again.status_code == 200, again.text
+    assert again.json()["text_status"] == "ocr"
+    health = auth.get("/api/health")
+    assert health.json()["ocr"]["available"] is True
+
+
 def test_dashboard_and_health(auth):
     health = auth.get("/api/health")
     assert health.json()["status"] == "ok"

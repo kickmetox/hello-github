@@ -1,4 +1,4 @@
-"""Text aus hochgeladenen Dateien. Bilder bleiben ohne OCR im Archiv."""
+"""Text aus hochgeladenen Dateien. Scans liest ein lokales Tesseract, wenn es da ist."""
 
 from __future__ import annotations
 
@@ -39,13 +39,12 @@ def extract_text(filename: str, data: bytes) -> tuple[str, str]:
             text = _decode_text(data)
             status = "extracted" if text.strip() else "empty"
         elif ext == ".pdf":
-            text = _pdf_text(data)
-            status = "extracted" if text.strip() else "empty"
+            text, status = _pdf_document(data)
         elif ext == ".docx":
             text = _docx_text(data)
             status = "extracted" if text.strip() else "empty"
         else:
-            return "", "binary"
+            text, status = _ocr_image(data)
     except Exception:
         return "", "failed"
     text = text.replace("\x00", "").strip()
@@ -64,14 +63,93 @@ def _decode_text(data: bytes) -> str:
     return data.decode("utf-8", errors="replace")
 
 
-def _pdf_text(data: bytes) -> str:
+def _enough_text(value: str) -> bool:
+    return sum(1 for char in value if char.isalnum()) >= 8
+
+
+def _pdf_pages(data: bytes) -> list[str]:
     from pypdf import PdfReader
 
     reader = PdfReader(BytesIO(data))
+    return [(page.extract_text() or "") for page in reader.pages]
+
+
+def _pdf_document(data: bytes) -> tuple[str, str]:
+    from app.ocr import OcrUnavailable, recognize, tesseract_binary
+
+    pages = _pdf_pages(data)
+    if not pages:
+        return "", "empty"
+    weak = [index for index, text in enumerate(pages) if not _enough_text(text)]
+    if not weak:
+        return "\n".join(pages), "extracted"
+    joined = "\n".join(pages)
+    if not tesseract_binary():
+        if _enough_text(joined):
+            return joined, "extracted"
+        return "", "no_ocr"
+    try:
+        rendered = _render_pdf_pages(data, weak[:8])
+    except Exception:
+        if _enough_text(joined):
+            return joined, "extracted"
+        return "", "failed"
     parts: list[str] = []
-    for page in reader.pages:
-        parts.append(page.extract_text() or "")
-    return "\n".join(parts)
+    used_ocr = False
+    for index, text in enumerate(pages):
+        image = rendered.get(index)
+        if image is None:
+            parts.append(text)
+            continue
+        try:
+            recognized = recognize(image)
+        except OcrUnavailable:
+            if _enough_text(joined):
+                return joined, "extracted"
+            return "", "no_ocr"
+        if recognized.strip():
+            parts.append(recognized)
+            used_ocr = True
+        else:
+            parts.append(text)
+    combined = "\n".join(parts)
+    if not combined.strip():
+        return "", "empty"
+    return combined, "ocr" if used_ocr else "extracted"
+
+
+def _render_pdf_pages(data: bytes, indexes: list[int]) -> dict[int, bytes]:
+    import pypdfium2 as pdfium
+
+    rendered: dict[int, bytes] = {}
+    pdf = pdfium.PdfDocument(data)
+    try:
+        for index in indexes:
+            if index >= len(pdf):
+                continue
+            page = pdf[index]
+            bitmap = page.render(scale=2)
+            image = bitmap.to_pil()
+            image.thumbnail((4000, 4000))
+            buffer = BytesIO()
+            image.save(buffer, format="PNG")
+            rendered[index] = buffer.getvalue()
+            bitmap.close()
+    finally:
+        pdf.close()
+    return rendered
+
+
+def _ocr_image(data: bytes) -> tuple[str, str]:
+    from app.ocr import OcrUnavailable, recognize
+
+    try:
+        text = recognize(data)
+    except OcrUnavailable:
+        return "", "no_ocr"
+    if not text.strip():
+        return "", "empty"
+    return text, "ocr"
 
 
 def _docx_text(data: bytes) -> str:
