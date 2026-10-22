@@ -75,6 +75,9 @@ def to_dict(doc: Document, include_text: bool = False) -> dict:
         "document_date": iso_date(doc.document_date),
         "reminder_date": iso_date(doc.reminder_date),
         "is_tax_relevant": bool(doc.is_tax_relevant),
+        "status": doc.status or "neu",
+        "retain_until": iso_date(doc.retain_until),
+        "version_number": int(doc.version_number or 1),
         "created_at": iso_dt(doc.created_at),
         "updated_at": iso_dt(doc.updated_at),
         "correspondent": None
@@ -89,6 +92,19 @@ def to_dict(doc: Document, include_text: bool = False) -> dict:
     }
     if include_text:
         payload["text"] = doc.full_text or ""
+        from sqlalchemy.orm import object_session
+
+        session = object_session(doc)
+        if session is None:
+            payload["versions"] = []
+            payload["links"] = []
+            payload["fields"] = []
+        else:
+            from app.extend import document_fields, document_links, document_versions
+
+            payload["versions"] = document_versions(session, doc.id)
+            payload["links"] = document_links(session, doc.id)
+            payload["fields"] = document_fields(session, doc.id)
     return payload
 
 
@@ -101,7 +117,12 @@ def corpus(doc: Document) -> str:
         "" if doc.correspondent is None else doc.correspondent.name,
         "" if doc.doctype is None else doc.doctype.name,
         " ".join(tag.name for tag in doc.tags),
+        doc.field_text or "",
     ]
+    from app.extend import STATUS_LABELS
+
+    parts.append(doc.status or "")
+    parts.append(STATUS_LABELS.get(doc.status or "", ""))
     return "\n".join(parts)
 
 
@@ -169,6 +190,7 @@ def list_documents(
     tax_only: bool = False,
     limit: int = 50,
     offset: int = 0,
+    status: str = "",
 ) -> tuple[list[Document], int]:
     stmt = document_query()
     count_stmt = select(func.count()).select_from(Document)
@@ -179,6 +201,7 @@ def list_documents(
             Document.original_name.like(pattern, escape="\\"),
             Document.notes.like(pattern, escape="\\"),
             Document.full_text.like(pattern, escape="\\"),
+            Document.field_text.like(pattern, escape="\\"),
         )
         stmt = stmt.where(condition)
         count_stmt = count_stmt.where(condition)
@@ -194,6 +217,9 @@ def list_documents(
     if tax_only:
         stmt = stmt.where(Document.is_tax_relevant.is_(True))
         count_stmt = count_stmt.where(Document.is_tax_relevant.is_(True))
+    if status:
+        stmt = stmt.where(Document.status == status)
+        count_stmt = count_stmt.where(Document.status == status)
     total = int(db.scalar(count_stmt) or 0)
     rows = db.scalars(stmt.order_by(Document.created_at.desc(), Document.id.desc()).limit(limit).offset(offset)).all()
     return list(rows), total
@@ -273,6 +299,10 @@ def create_document(
         document_date=document_date,
         reminder_date=reminder_date,
         is_tax_relevant=bool(is_tax_relevant),
+        status="neu",
+        retain_until=None,
+        version_number=1,
+        field_text="",
         correspondent_id=None if correspondent is None else correspondent.id,
         doctype_id=None if doctype is None else doctype.id,
         uploaded_by_id=None if user is None else user.id,
@@ -290,6 +320,9 @@ def create_document(
         db.rollback()
         raise DocManError(500, "Die Datei konnte nicht gespeichert werden.") from exc
     doc.stored_name = stored
+    from app.extend import apply_rules
+
+    apply_rules(db, doc)
     audit(db, user, "upload", audit_message + f": {clean_title}", doc.id)
     db.commit()
     db.refresh(doc)
@@ -317,6 +350,19 @@ def update_document(db: Session, user: User, document_id: int, payload: dict) ->
     doc.correspondent_id = None if correspondent is None else correspondent.id
     doc.doctype_id = None if doctype is None else doctype.id
     doc.tags = _resolve_tags(db, payload.get("tag_ids") or [])
+    if "status" in payload and payload["status"] is not None:
+        from app.extend import check_status
+
+        doc.status = check_status(payload["status"])
+    if "retain_until" in payload:
+        doc.retain_until = payload.get("retain_until")
+    if "fields" in payload and payload["fields"] is not None:
+        from app.extend import set_field_values
+
+        set_field_values(db, doc, payload["fields"])
+    from app.extend import apply_rules
+
+    apply_rules(db, doc)
     doc.updated_at = utcnow()
     audit(db, user, "update", f"Metadaten geändert: {doc.title}", doc.id)
     db.commit()
@@ -324,15 +370,30 @@ def update_document(db: Session, user: User, document_id: int, payload: dict) ->
     return get_document(db, doc.id)
 
 
-def delete_document(db: Session, user: User, document_id: int) -> None:
+def delete_document(db: Session, user: User, document_id: int, force: bool = False) -> None:
+    from sqlalchemy import delete as sql_delete
+
+    from app.extend import remove_version_files
+    from app.models import DocumentLink, FieldValue
+
     doc = get_document(db, document_id)
+    today = date.today()
+    if doc.retain_until is not None and doc.retain_until >= today:
+        if not (force and user.is_admin):
+            raise DocManError(409, f"Aufbewahrung bis {doc.retain_until.isoformat()}. Löschen ist gesperrt.")
+    version_paths = remove_version_files(db, doc.id)
     stored = settings.files_dir / doc.stored_name
     title = doc.title
+    db.execute(sql_delete(DocumentLink).where(or_(DocumentLink.left_id == doc.id, DocumentLink.right_id == doc.id)))
+    db.execute(sql_delete(FieldValue).where(FieldValue.document_id == doc.id))
     audit(db, user, "delete", f"Dokument gelöscht: {title}", doc.id)
     db.delete(doc)
     db.commit()
     if stored.is_file():
         stored.unlink()
+    for path in version_paths:
+        if path.is_file():
+            path.unlink()
     rebuild_index(db)
 
 
@@ -478,9 +539,16 @@ def dashboard(db: Session) -> dict:
 def scan_inbox(db: Session, user: User) -> dict:
     imported: list[int] = []
     rejected: list[dict] = []
-    for path in sorted(settings.inbox_dir.iterdir()):
-        if not path.is_file() or path.name.startswith("."):
-            continue
+    if not settings.inbox_dir.is_dir():
+        return {"imported": imported, "rejected": rejected}
+    candidates = [
+        path
+        for path in sorted(settings.inbox_dir.iterdir())
+        if path.is_file() and not path.name.startswith(".")
+    ]
+    if not candidates:
+        return {"imported": imported, "rejected": rejected}
+    for path in candidates:
         try:
             data = path.read_bytes()
             doc = create_document(db, user, path.name, data, rebuild=False, audit_message="Aus dem Posteingang übernommen")

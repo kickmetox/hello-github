@@ -42,7 +42,7 @@ DocMan ist ein lokales Ein-Prozess-Archiv. Die folgende Liste beschreibt nur Fun
 - Lauscht standardmäßig nur auf `127.0.0.1`
 - SQLite-Datei `data\docman.db`
 - Dateiablage `data\files`, Posteingang `data\inbox`, Abweisungen `data\rejected`
-- Konfiguration über `DOCMAN_HOST`, `DOCMAN_PORT`, `DOCMAN_DATA`, `DOCMAN_SEED`
+- Konfiguration über `DOCMAN_HOST`, `DOCMAN_PORT`, `DOCMAN_DATA`, `DOCMAN_SEED`, `DOCMAN_WATCH`, `DOCMAN_WATCH_SECONDS`
 - OpenAPI unter `/docs`, Health unter `/api/health`
 - Fünf Beispieldokumente beim ersten Start, abschaltbar mit `DOCMAN_SEED=0`
 
@@ -56,18 +56,26 @@ DocMan ist ein lokales Ein-Prozess-Archiv. Die folgende Liste beschreibt nur Fun
 - Text aus Textdateien, aus der PDF-Textebene und aus DOCX
 - Bilder bleiben als Datei erhalten; ohne Textebene sucht das Archiv über Titel, Notiz und Stammdaten
 - Ziehen und Ablegen in der Oberfläche
-- Posteingang: Schaltfläche liest `data\inbox`, übernimmt gültige Dateien und verschiebt ungültige nach `data\rejected`
+- Posteingang: Schaltfläche und Hintergrundwächter lesen `data\inbox`, übernehmen gültige Dateien und verschieben ungültige nach `data\rejected`. Der Wächter startet mit der Anwendung, Abstand mindestens 3 Sekunden, Standard 8 Sekunden, abschaltbar mit `DOCMAN_WATCH=0`. Ein leerer Posteingang schreibt kein Protokoll
 - Metadaten beim Ablegen: Titel, Notiz, Dokumentdatum, Wiedervorlage, Steuerkennzeichen, Korrespondent, Dokumenttyp, Schlagwörter
+- Neue Version einer bestehenden Akte: die bisherige Datei liegt unter `data\versions`, die neue Datei wird die aktuelle Fassung. Dieselbe Prüfsumme wie die aktuelle Fassung oder wie ein anderes Dokument wird abgelehnt
+- Klartext-Export der extrahierten Textebene als Textdatei
 
 ### Dokumente, Metadaten, Suche
 
-- Bibliothek mit Filter auf Titel, Dateiname, Notiz und Volltext sowie nach Schlagwort, Dokumenttyp, Korrespondent und Steuerkennzeichen
+- Bibliothek mit Filter auf Titel, Dateiname, Notiz, Volltext und eigene Feldwerte sowie nach Schlagwort, Dokumenttyp, Korrespondent, Status und Steuerkennzeichen
+- Gespeicherte Sichten je Benutzer
 - Schlagwörter mit Farbe, Korrespondenten mit E-Mail und Notiz, Dokumenttypen mit Beschreibung
-- Dokumentdetail: Metadaten ändern, Datei herunterladen, Dokument löschen
+- Eigene Felder der Art Text, Zahl oder Datum. Zahlen dürfen ein Komma enthalten. Die Werte gehen in den Suchindex
+- Status `neu`, `geprueft`, `freigegeben`, `bezahlt`, `abgelegt`
+- Verknüpfung zweier Dokumente, in beide Richtungen sichtbar
+- Aufbewahrung bis zu einem Datum sperrt das Löschen. Ein Administrator kann die Sperre mit `force` übergehen. Das ist eine Anwendungssperre, keine GoBD- oder WORM-Archivierung
+- Regeln: passen Korrespondent, Dokumenttyp und Schlagwort, soweit gesetzt, setzt die Regel beim Ablegen und Speichern einen Status und kann ein Schlagwort ergänzen. Eine Regel ohne Kriterium wird nicht angelegt und eine leere Regel ignoriert
+- Dokumentdetail: Metadaten, Status, Felder, Aufbewahrung, Versionen und Verknüpfungen ändern, Datei und Text herunterladen, Dokument löschen
 - Vorschau für PDF und Bilder im Browser, extrahierter Text daneben
 - Dashboard: Anzahl, Speicher, steuerrelevante Dokumente, Indexgröße, zuletzt abgelegt, Wiedervorlagen bis 30 Tage einschließlich überfälliger Termine
 - TF-IDF-Index mit Kosinusähnlichkeit, deutschen und englischen Füllwörtern, Textauszug und Score
-- Der Index umfasst Titel, Dateiname, Notiz, Volltext, Korrespondent, Dokumenttyp und Schlagwörter
+- Der Index umfasst Titel, Dateiname, Notiz, Volltext, Korrespondent, Dokumenttyp, Schlagwörter, Status und eigene Feldwerte
 - Neuaufbau nach Änderungen, über die Schaltfläche und über `cli.py reindex`
 - Kommandozeilensuche: `cli.py search`
 
@@ -79,28 +87,29 @@ DocMan ist ein lokales Ein-Prozess-Archiv. Die folgende Liste beschreibt nur Fun
 - Administrator legt weitere Benutzer an und vergibt das Admin-Flag
 - Passwortwechsel in der Oberfläche; das Startpasswort `admin` wird zum Wechsel angezeigt
 - Jede angemeldete Person darf lesen, ändern, löschen, herunterladen und Stammdaten pflegen
-- Protokoll der letzten 200 Ereignisse: Anmeldung, Fehlanmeldung, Abmeldung, Passwort, Benutzeranlage, Upload, Änderung, Löschung, Download, Suche, Neuindex, Posteingang
+- Protokoll der letzten 200 Ereignisse: Anmeldung, Fehlanmeldung, Abmeldung, Passwort, Benutzeranlage, Upload, Änderung, Löschung, Download, Version, Verknüpfung, Text-Export, Suche, Neuindex, Posteingang
 - Zeiten in der Oberfläche in Europe/Berlin
 
 ### Oberfläche
 
-- Dunkler Webclient ohne Plugin: Übersicht, Dokumente, Suche, Stammdaten, Protokoll, Dokument, Upload, Passwort
+- Dunkler Webclient ohne Plugin: Übersicht, Dokumente, Suche, Stammdaten, Protokoll, Dokument, Upload, Version, Verknüpfung, eigene Felder, Regeln, gespeicherte Sichten, Passwort
 - REST-API unter `/api`
 
 ## Einordnung
 
-DocMan liegt näher an einem kleinen Paperless-Archiv als an ecoDMS oder Docutain: Tags, Korrespondenten, Dokumenttypen, lokaler Volltext, manueller Posteingangsordner und Weboberfläche. Es gibt keine OCR-Engine, keine PDF/A-Wandlung, keine GoBD-Archivierung, keine Office- oder Mail-Plugins, keine Scanner- oder Smartphone-App und keine Zahlungsfunktion.
+DocMan liegt näher an einem kleinen Paperless-Archiv als an ecoDMS oder Docutain: Tags, Korrespondenten, Dokumenttypen, lokaler Volltext, Posteingang, Versionen, Verknüpfungen, Status, eigene Felder, einfache Regeln und Weboberfläche. Die Aufbewahrungssperre hält ein Dokument bis zu einem Datum gegen Löschen fest. Es gibt keine OCR-Engine, keine PDF/A-Wandlung, keine GoBD-Archivierung, keine Office- oder Mail-Plugins, keine Scanner- oder Smartphone-App und keine Zahlungsfunktion.
 
 ## Daten
 
 | Pfad | Inhalt |
 | --- | --- |
 | `data\docman.db` | SQLite |
-| `data\files` | abgelegte Dateien |
+| `data\files` | aktuelle Dateien |
+| `data\versions` | frühere Fassungen |
 | `data\inbox` | noch nicht übernommene Dateien |
 | `data\rejected` | abgelehnte Posteingänge |
 
-`DOCMAN_HOST`, `DOCMAN_PORT`, `DOCMAN_DATA` und `DOCMAN_SEED` stehen in `.env.example`. Die Anwendung liest die Variablen aus der Umgebung. Standardadresse ist nur `127.0.0.1`.
+`DOCMAN_HOST`, `DOCMAN_PORT`, `DOCMAN_DATA`, `DOCMAN_SEED`, `DOCMAN_WATCH` und `DOCMAN_WATCH_SECONDS` stehen in `.env.example`. Die Anwendung liest die Variablen aus der Umgebung. Standardadresse ist nur `127.0.0.1`. Der Posteingangs-Wächter ist standardmäßig an.
 
 ## Grundlagen
 

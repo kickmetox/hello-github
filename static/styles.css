@@ -173,6 +173,15 @@ main { padding: 8px 28px 48px; }
   border: 1px solid var(--line);
   background: #121826;
 }
+.badge.status-neu { border-color: #8eacff; }
+.badge.status-geprueft { border-color: #e6c15a; }
+.badge.status-freigegeben { border-color: #7ddea0; }
+.badge.status-bezahlt { border-color: #3ee0b0; }
+.badge.status-abgelegt { border-color: #8b93a7; }
+.view-bar, .stack { display: grid; gap: 10px; }
+.view-bar { grid-template-columns: minmax(180px, 1fr) minmax(160px, 1fr) auto auto; align-items: end; }
+.stack { margin-top: 18px; }
+.stack h2 { margin: 0; }
 .filters, .form-grid { display: grid; gap: 10px; grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .filters > button { align-self: end; justify-self: start; min-width: 140px; }
 .form-grid.detail { grid-template-columns: 1fr 1fr; }
@@ -227,7 +236,7 @@ pre.text { margin: 0; padding: 16px; white-space: pre-wrap; font-family: var(--m
   .banner { margin: 0 14px; }
 }
 @media (max-width: 640px) {
-  .stats, .grid-2, .detail, .filters, .form-grid, .sidebar nav, .doc-card { grid-template-columns: 1fr; }
+  .stats, .grid-2, .detail, .filters, .form-grid, .sidebar nav, .doc-card, .view-bar { grid-template-columns: 1fr; }
   .span-2 { grid-column: auto; }
   .top-actions { width: 100%; }
 }

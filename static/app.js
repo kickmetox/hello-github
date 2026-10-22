@@ -1,8 +1,22 @@
 const HEADER = { "X-DocMan": "1" };
+const STATUSES = [
+  ["neu", "Neu"],
+  ["geprueft", "Geprüft"],
+  ["freigegeben", "Freigegeben"],
+  ["bezahlt", "Bezahlt"],
+  ["abgelegt", "Abgelegt"],
+];
+const FIELD_KINDS = [
+  ["text", "Text"],
+  ["number", "Zahl"],
+  ["date", "Datum"],
+];
 const state = {
   user: null,
   meta: { tags: [], correspondents: [], doctypes: [] },
-  filters: { q: "", tag_id: "", doctype_id: "", correspondent_id: "", tax_only: false },
+  filters: { q: "", tag_id: "", doctype_id: "", correspondent_id: "", status: "", tax_only: false },
+  views: [],
+  activeView: "",
   searchQuery: "",
 };
 
@@ -88,6 +102,25 @@ function formatStamp(iso) {
 
 function tagChip(tag) {
   return el("span", { class: "tag", text: tag.name, style: `border-color:${tag.color}` });
+}
+
+function statusLabel(value) {
+  const found = STATUSES.find(([code]) => code === value);
+  return found ? found[1] : value || "Neu";
+}
+
+function statusSelect(name, selected, emptyLabel) {
+  const select = el("select", { name });
+  if (emptyLabel) select.append(el("option", { value: "", text: emptyLabel }));
+  STATUSES.forEach(([value, label]) => select.append(el("option", { value, text: label })));
+  select.value = selected || "";
+  if (!emptyLabel && !select.value) select.value = "neu";
+  return select;
+}
+
+function kindLabel(value) {
+  const found = FIELD_KINDS.find(([code]) => code === value);
+  return found ? found[1] : value;
 }
 
 function highlight(text, terms) {
@@ -209,6 +242,7 @@ function docButton(doc) {
   return el("button", { class: "row", type: "button", "data-action": "open-doc", "data-id": String(doc.id) }, [
     el("h3", { text: doc.title }),
     el("div", { class: "tags" }, [
+      doc.status ? el("span", { class: `badge status-${doc.status}`, text: statusLabel(doc.status) }) : null,
       doc.doctype ? el("span", { class: "badge", text: doc.doctype.name }) : null,
       doc.correspondent ? el("span", { class: "badge", text: doc.correspondent.name }) : null,
       ...doc.tags.map(tagChip),
@@ -219,18 +253,33 @@ function docButton(doc) {
 }
 
 async function renderDocuments() {
+  state.views = await api("/api/views");
   const main = $("main");
   const filters = el("form", { id: "library-filters", class: "filters" }, [
     labeled("Titel oder Text", el("input", { name: "q", value: state.filters.q, placeholder: "Filtern" })),
     labeled("Schlagwort", el("select", { name: "tag_id", id: "filter-tag" })),
     labeled("Dokumenttyp", el("select", { name: "doctype_id", id: "filter-type" })),
     labeled("Korrespondent", el("select", { name: "correspondent_id", id: "filter-corr" })),
+    labeled("Status", statusSelect("status", state.filters.status, "Alle Status")),
   ]);
   const tax = el("label", { class: "check" }, [
     el("input", { type: "checkbox", name: "tax_only" }),
     "Nur steuerrelevante",
   ]);
   filters.append(tax);
+  const viewSelect = el("select", { id: "saved-view" }, [
+    el("option", { value: "", text: "Gespeicherte Sicht" }),
+    ...state.views.map((view) => el("option", { value: String(view.id), text: view.name })),
+  ]);
+  if (state.activeView) viewSelect.value = state.activeView;
+  const viewBar = el("form", { id: "view-form", class: "view-bar" }, [
+    viewSelect,
+    labeled("Neue Sicht", el("input", { name: "name", maxlength: "80", placeholder: "Name" })),
+    el("button", { type: "submit", text: "Sicht speichern" }),
+    state.activeView
+      ? el("button", { type: "button", "data-action": "delete-view", "data-id": state.activeView, text: "Sicht löschen" })
+      : null,
+  ]);
   main.replaceChildren(
     el("section", { class: "page" }, [
       el("header", { class: "page-head" }, [
@@ -241,6 +290,7 @@ async function renderDocuments() {
         ]),
       ]),
       filters,
+      viewBar,
       el("div", { id: "library-results", class: "cards" }),
     ]),
   );
@@ -260,6 +310,7 @@ async function loadLibrary() {
   if (state.filters.tag_id) params.set("tag_id", state.filters.tag_id);
   if (state.filters.doctype_id) params.set("doctype_id", state.filters.doctype_id);
   if (state.filters.correspondent_id) params.set("correspondent_id", state.filters.correspondent_id);
+  if (state.filters.status) params.set("status", state.filters.status);
   if (state.filters.tax_only) params.set("tax_only", "true");
   const data = await api(`/api/documents?${params.toString()}`);
   $("library-count").textContent = `${data.total} ${data.total === 1 ? "Dokument" : "Dokumente"}`;
@@ -328,12 +379,14 @@ async function renderOrganize() {
   main.replaceChildren(
     el("section", { class: "page" }, [
       el("header", { class: "page-head" }, [
-        el("div", {}, [el("h1", { text: "Stammdaten" }), el("p", { class: "lede", text: "Schlagwörter, Korrespondenten und Dokumenttypen." })]),
+        el("div", {}, [el("h1", { text: "Stammdaten" }), el("p", { class: "lede", text: "Schlagwörter, Korrespondenten, Dokumenttypen, eigene Felder und Regeln." })]),
       ]),
       el("div", { class: "cards" }, [
         namePanel("Schlagwort", "tag-form", state.meta.tags, "delete-tag", true),
         namePanel("Korrespondent", "corr-form", state.meta.correspondents, "delete-corr", false),
         namePanel("Dokumenttyp", "type-form", state.meta.doctypes, "delete-type", false),
+        await fieldPanel(),
+        await rulePanel(),
       ]),
       el("section", { class: "panel", id: "users-panel" }),
     ]),
@@ -352,6 +405,51 @@ function namePanel(title, formId, rows, action, withColor) {
     el("button", { type: "button", class: "ghost", "data-action": action, "data-id": String(row.id), text: "Entfernen" }),
   ])));
   return el("section", { class: "panel" }, [el("h2", { text: title }), form, list]);
+}
+
+async function fieldPanel() {
+  const rows = await api("/api/fields");
+  const kind = el("select", { name: "kind" });
+  FIELD_KINDS.forEach(([value, label]) => kind.append(el("option", { value, text: label })));
+  const form = el("form", { id: "field-form", class: "list" }, [
+    labeled("Name", el("input", { name: "name", required: true, maxlength: "80" })),
+    labeled("Art", kind),
+    el("button", { class: "primary", type: "submit", text: "Hinzufügen" }),
+  ]);
+  const list = el("div", { class: "list" }, rows.map((row) => el("div", { class: "doc-card" }, [
+    el("strong", { text: row.name }),
+    el("span", { class: "muted", text: kindLabel(row.kind) }),
+    el("button", { type: "button", class: "ghost", "data-action": "delete-field", "data-id": String(row.id), text: "Entfernen" }),
+  ])));
+  return el("section", { class: "panel" }, [el("h2", { text: "Eigenes Feld" }), form, list]);
+}
+
+async function rulePanel() {
+  const rows = await api("/api/rules");
+  const correspondent = el("select", { name: "correspondent_id" });
+  const doctype = el("select", { name: "doctype_id" });
+  const matchTag = el("select", { name: "match_tag_id" });
+  const addTag = el("select", { name: "add_tag_id" });
+  fillSelect(correspondent, state.meta.correspondents, "Kein Korrespondent");
+  fillSelect(doctype, state.meta.doctypes, "Kein Dokumenttyp");
+  fillSelect(matchTag, state.meta.tags, "Kein Schlagwort");
+  fillSelect(addTag, state.meta.tags, "Keins hinzufügen");
+  const form = el("form", { id: "rule-form", class: "list" }, [
+    labeled("Name", el("input", { name: "name", required: true, maxlength: "120" })),
+    labeled("Korrespondent", correspondent),
+    labeled("Dokumenttyp", doctype),
+    labeled("Schlagwort", matchTag),
+    labeled("Status setzen", statusSelect("set_status", "", "Kein Status")),
+    labeled("Schlagwort hinzufügen", addTag),
+    el("button", { class: "primary", type: "submit", text: "Regel anlegen" }),
+    el("p", { class: "muted", text: "Alle gesetzten Kriterien müssen passen. Die Regel läuft beim Ablegen und Speichern." }),
+  ]);
+  const list = el("div", { class: "list" }, rows.map((row) => el("div", { class: "doc-card" }, [
+    el("strong", { text: row.name }),
+    el("span", { class: "muted", text: row.set_status ? statusLabel(row.set_status) : "ohne Status" }),
+    el("button", { type: "button", class: "ghost", "data-action": "delete-rule", "data-id": String(row.id), text: "Entfernen" }),
+  ])));
+  return el("section", { class: "panel" }, [el("h2", { text: "Regel" }), form, list]);
 }
 
 async function renderUsers() {
@@ -385,16 +483,30 @@ async function renderAudit() {
     ]))),
   ]);
   $("main").replaceChildren(el("section", { class: "page" }, [
-    el("header", { class: "page-head" }, [el("div", {}, [el("h1", { text: "Protokoll" }), el("p", { class: "lede", text: "Anmeldungen, Ablage, Suche und Löschungen." })])]),
+    el("header", { class: "page-head" }, [el("div", {}, [el("h1", { text: "Protokoll" }), el("p", { class: "lede", text: "Anmeldungen, Ablage, Versionen, Verknüpfungen und Löschungen." })])]),
     el("div", { class: "panel" }, [table]),
   ]));
 }
 
 async function renderDetail(id) {
-  const doc = await api(`/api/documents/${id}`);
+  const [doc, fieldDefs, library] = await Promise.all([
+    api(`/api/documents/${id}`),
+    api("/api/fields"),
+    api("/api/documents?limit=100"),
+  ]);
+  const values = new Map((doc.fields || []).map((field) => [field.field_id, field.value]));
+  const fieldInputs = fieldDefs.map((field) => labeled(field.name, el("input", {
+    name: "field_value",
+    "data-field-id": String(field.id),
+    type: field.kind === "date" ? "date" : "text",
+    value: values.get(field.id) || "",
+    inputmode: field.kind === "number" ? "decimal" : null,
+  })));
   const form = el("form", { id: "detail-form", class: "form-grid detail" }, [
     labeled("Titel", el("input", { name: "title", value: doc.title, required: true })),
     labeled("Dateiname", el("input", { value: doc.original_name, disabled: true })),
+    labeled("Status", statusSelect("status", doc.status || "neu", "")),
+    labeled("Aufbewahrung bis", el("input", { name: "retain_until", type: "date", value: doc.retain_until || "" })),
     labeled("Dokumentdatum", el("input", { name: "document_date", type: "date", value: doc.document_date || "" })),
     labeled("Wiedervorlage", el("input", { name: "reminder_date", type: "date", value: doc.reminder_date || "" })),
     labeled("Korrespondent", el("select", { name: "correspondent_id", id: "detail-corr" })),
@@ -403,11 +515,14 @@ async function renderDetail(id) {
       el("input", { type: "checkbox", name: "is_tax_relevant" }),
       "Steuerrelevant",
     ]),
+    ...fieldInputs,
     labeledSpan("Notizen", el("textarea", { name: "notes", text: doc.notes })),
+    el("p", { class: "muted span-2", text: "Bis zum Aufbewahrungsdatum bleibt Löschen gesperrt. Das ist eine Anwendungssperre, kein GoBD-Archiv." }),
     el("div", { class: "span-2" }, [el("span", { class: "muted", text: "Schlagwörter" }), el("div", { id: "detail-tags", class: "checks" })]),
     el("div", { class: "actions span-2" }, [
       el("button", { class: "primary", type: "submit", text: "Speichern" }),
       el("a", { class: "button", href: `/api/documents/${doc.id}/file`, text: "Herunterladen" }),
+      el("a", { class: "button", href: `/api/documents/${doc.id}/text`, text: "Text exportieren" }),
       el("button", { type: "button", class: "danger", "data-action": "delete-doc", "data-id": String(doc.id), text: "Löschen" }),
     ]),
   ]);
@@ -415,10 +530,15 @@ async function renderDetail(id) {
   const preview = buildPreview(doc);
   $("main").replaceChildren(el("section", { class: "page" }, [
     el("header", { class: "page-head" }, [
-      el("div", {}, [el("h1", { text: doc.title }), el("p", { class: "lede", text: `${formatBytes(doc.size)} · ${doc.text_status} · ${doc.uploaded_by || "System"}` })]),
+      el("div", {}, [el("h1", { text: doc.title }), el("p", { class: "lede", text: `${statusLabel(doc.status)} · Version ${doc.version_number || 1} · ${formatBytes(doc.size)} · ${doc.text_status} · ${doc.uploaded_by || "System"}` })]),
     ]),
     el("div", { class: "detail" }, [
-      el("div", { class: "panel" }, [form, el("p", { class: "mono", text: doc.sha256 })]),
+      el("div", { class: "panel" }, [
+        form,
+        versionBlock(doc),
+        linkBlock(doc, library.documents || []),
+        el("p", { class: "mono", text: doc.sha256 }),
+      ]),
       el("div", {}, [
         preview,
         doc.text ? el("pre", { class: "text", text: doc.text }) : el("p", { class: "empty", text: textStatusMessage(doc) }),
@@ -434,6 +554,41 @@ async function renderDetail(id) {
     el("input", { type: "checkbox", name: "tag_ids", value: String(tag.id), checked: selected.has(tag.id) ? "checked" : null }),
     tag.name,
   ])));
+}
+
+function versionBlock(doc) {
+  const items = (doc.versions || []).map((row) => el("div", { class: "doc-card" }, [
+    el("span", { text: `Version ${row.version_number} · ${row.original_name} · ${formatBytes(row.size)} · ${formatStamp(row.created_at)}` }),
+    el("a", { class: "button", href: `/api/documents/${doc.id}/versions/${row.id}/file`, text: "Herunterladen" }),
+  ]));
+  return el("section", { class: "stack" }, [
+    el("h2", { text: `Versionen · aktuell ${doc.version_number || 1}` }),
+    items.length ? el("div", { class: "list" }, items) : el("p", { class: "muted", text: "Noch keine ältere Version." }),
+    el("form", { id: "version-form", class: "actions" }, [
+      el("input", { name: "file", type: "file", required: true }),
+      el("button", { type: "submit", text: "Neue Version" }),
+    ]),
+  ]);
+}
+
+function linkBlock(doc, documents) {
+  const others = documents.filter((item) => item.id !== doc.id);
+  const select = el("select", { name: "document_id" }, [
+    el("option", { value: "", text: "Dokument wählen" }),
+    ...others.map((item) => el("option", { value: String(item.id), text: item.title })),
+  ]);
+  const items = (doc.links || []).map((link) => el("div", { class: "doc-card" }, [
+    el("button", { type: "button", class: "row", "data-action": "open-doc", "data-id": String(link.id), text: link.title }),
+    el("button", { type: "button", class: "ghost", "data-action": "remove-link", "data-id": String(link.id), text: "Lösen" }),
+  ]));
+  return el("section", { class: "stack" }, [
+    el("h2", { text: "Verknüpfungen" }),
+    items.length ? el("div", { class: "list" }, items) : el("p", { class: "muted", text: "Keine Verknüpfung." }),
+    el("form", { id: "link-form", class: "actions" }, [
+      select,
+      el("button", { type: "submit", text: "Verknüpfen" }),
+    ]),
+  ]);
 }
 
 function labeled(caption, field) {
@@ -542,6 +697,10 @@ async function submitUpload(form) {
 async function submitDetail(form) {
   const id = currentRoute().id;
   const tags = Array.from(form.querySelectorAll("input[name=tag_ids]:checked")).map((node) => Number(node.value));
+  const fields = Array.from(form.querySelectorAll("input[name=field_value]")).map((node) => ({
+    field_id: Number(node.dataset.fieldId),
+    value: node.value,
+  }));
   await api(`/api/documents/${id}`, {
     method: "PATCH",
     json: {
@@ -549,10 +708,13 @@ async function submitDetail(form) {
       notes: form.elements.notes.value,
       document_date: form.elements.document_date.value || null,
       reminder_date: form.elements.reminder_date.value || null,
+      retain_until: form.elements.retain_until.value || null,
+      status: form.elements.status.value,
       is_tax_relevant: form.elements.is_tax_relevant.checked,
       correspondent_id: form.elements.correspondent_id.value ? Number(form.elements.correspondent_id.value) : null,
       doctype_id: form.elements.doctype_id.value ? Number(form.elements.doctype_id.value) : null,
       tag_ids: tags,
+      fields,
     },
   });
   toast("Gespeichert.");
@@ -577,13 +739,30 @@ function bind() {
         reveal("login");
       } else if (action === "delete-doc") {
         if (!window.confirm("Dokument und Datei wirklich löschen?")) return;
-        await api(`/api/documents/${target.dataset.id}`, { method: "DELETE" });
+        try {
+          await api(`/api/documents/${target.dataset.id}`, { method: "DELETE" });
+        } catch (error) {
+          const locked = error.message.startsWith("Aufbewahrung");
+          if (!(locked && state.user.is_admin && window.confirm(`${error.message} Als Administrator trotzdem löschen?`))) throw error;
+          await api(`/api/documents/${target.dataset.id}?force=true`, { method: "DELETE" });
+        }
         toast("Gelöscht.");
         navigate("documents");
       } else if (action === "delete-tag" || action === "delete-corr" || action === "delete-type") {
         const path = action === "delete-tag" ? "tags" : action === "delete-corr" ? "correspondents" : "doctypes";
         await api(`/api/${path}/${target.dataset.id}`, { method: "DELETE" });
         await renderOrganize();
+      } else if (action === "delete-field" || action === "delete-rule") {
+        const path = action === "delete-field" ? "fields" : "rules";
+        await api(`/api/${path}/${target.dataset.id}`, { method: "DELETE" });
+        await renderOrganize();
+      } else if (action === "delete-view") {
+        await api(`/api/views/${target.dataset.id}`, { method: "DELETE" });
+        state.activeView = "";
+        await renderDocuments();
+      } else if (action === "remove-link") {
+        await api(`/api/documents/${currentRoute().id}/links/${target.dataset.id}`, { method: "DELETE" });
+        await renderDetail(currentRoute().id);
       } else if (action === "scan-inbox") {
         const result = await api("/api/inbox/scan", { method: "POST", json: {} });
         toast(`${result.imported.length} aus dem Posteingang, ${result.rejected.length} abgelehnt.`);
@@ -638,6 +817,45 @@ function bind() {
       } else if (form.id === "type-form") {
         await api("/api/doctypes", { json: { name: form.elements.name.value } });
         await renderOrganize();
+      } else if (form.id === "field-form") {
+        await api("/api/fields", { json: { name: form.elements.name.value, kind: form.elements.kind.value } });
+        await renderOrganize();
+      } else if (form.id === "rule-form") {
+        const num = (value) => (value ? Number(value) : null);
+        await api("/api/rules", {
+          json: {
+            name: form.elements.name.value,
+            correspondent_id: num(form.elements.correspondent_id.value),
+            doctype_id: num(form.elements.doctype_id.value),
+            match_tag_id: num(form.elements.match_tag_id.value),
+            set_status: form.elements.set_status.value,
+            add_tag_id: num(form.elements.add_tag_id.value),
+          },
+        });
+        await renderOrganize();
+      } else if (form.id === "version-form") {
+        const id = currentRoute().id;
+        const file = form.elements.file.files[0];
+        if (!file) throw new Error("Datei für die neue Version wählen.");
+        const body = new FormData();
+        body.append("file", file);
+        await api(`/api/documents/${id}/versions`, { method: "POST", body });
+        toast("Neue Version gespeichert.");
+        await renderDetail(id);
+      } else if (form.id === "link-form") {
+        const id = currentRoute().id;
+        const other = Number(form.elements.document_id.value);
+        if (!other) throw new Error("Dokument zum Verknüpfen wählen.");
+        await api(`/api/documents/${id}/links`, { method: "POST", json: { document_id: other } });
+        toast("Verknüpft.");
+        await renderDetail(id);
+      } else if (form.id === "view-form") {
+        const name = form.elements.name.value.trim();
+        if (!name) throw new Error("Name der Sicht fehlt.");
+        const created = await api("/api/views", { json: { name, query: Object.assign({}, state.filters) } });
+        state.activeView = String(created.id);
+        toast("Sicht gespeichert.");
+        await renderDocuments();
       } else if (form.id === "user-form") {
         await api("/api/users", {
           json: {
@@ -660,13 +878,38 @@ function bind() {
   });
 
   document.body.addEventListener("change", async (event) => {
+    if (event.target.id === "saved-view") {
+      const view = state.views.find((item) => String(item.id) === event.target.value);
+      if (!view) {
+        state.activeView = "";
+        return;
+      }
+      const query = view.query || {};
+      state.activeView = String(view.id);
+      state.filters = {
+        q: query.q || "",
+        tag_id: query.tag_id ? String(query.tag_id) : "",
+        doctype_id: query.doctype_id ? String(query.doctype_id) : "",
+        correspondent_id: query.correspondent_id ? String(query.correspondent_id) : "",
+        status: query.status || "",
+        tax_only: Boolean(query.tax_only),
+      };
+      try {
+        await renderDocuments();
+      } catch (error) {
+        toast(error.message);
+      }
+      return;
+    }
     const form = event.target.form;
     if (!form || form.id !== "library-filters") return;
+    state.activeView = "";
     state.filters = {
       q: form.elements.q.value.trim(),
       tag_id: form.elements.tag_id.value,
       doctype_id: form.elements.doctype_id.value,
       correspondent_id: form.elements.correspondent_id.value,
+      status: form.elements.status.value,
       tax_only: form.elements.tax_only.checked,
     };
     try {

@@ -23,10 +23,13 @@ class Settings:
         self.port = int(os.environ.get("DOCMAN_PORT", "8000"))
         self.data_dir = _data_dir()
         self.files_dir = self.data_dir / "files"
+        self.versions_dir = self.data_dir / "versions"
         self.inbox_dir = self.data_dir / "inbox"
         self.rejected_dir = self.data_dir / "rejected"
         self.db_path = self.data_dir / "docman.db"
         self.seed = os.environ.get("DOCMAN_SEED", "1") != "0"
+        self.watch = os.environ.get("DOCMAN_WATCH", "1") != "0"
+        self.watch_seconds = max(3, int(os.environ.get("DOCMAN_WATCH_SECONDS", "8")))
         self.max_upload_bytes = 25 * 1024 * 1024
         self.max_files_per_upload = 20
         self.session_days = 14

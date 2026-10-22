@@ -38,5 +38,5 @@ def get_db() -> Iterator[Session]:
 
 
 def ensure_dirs() -> None:
-    for folder in (settings.data_dir, settings.files_dir, settings.inbox_dir, settings.rejected_dir):
+    for folder in (settings.data_dir, settings.files_dir, settings.versions_dir, settings.inbox_dir, settings.rejected_dir):
         folder.mkdir(parents=True, exist_ok=True)

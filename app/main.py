@@ -28,6 +28,9 @@ def init_database() -> int:
     import app.models  # noqa: F401
 
     Base.metadata.create_all(engine)
+    from app.migrate import upgrade_schema
+
+    upgrade_schema()
     with SessionLocal() as db:
         ensure_admin(db)
         ensure_samples(db)
@@ -36,9 +39,15 @@ def init_database() -> int:
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
+    from app.extend import start_watcher, stop_watcher
+
     count = init_database()
+    start_watcher()
     logger.info("DocMan %s bereit, %s Dokumente im Index", __version__, count)
-    yield
+    try:
+        yield
+    finally:
+        stop_watcher()
 
 
 app = FastAPI(title="DocMan", version=__version__, lifespan=lifespan)

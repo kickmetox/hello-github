@@ -183,6 +183,173 @@ def _restore_admin_password():
         db.commit()
 
 
+def test_versions_links_fields_rules_retention_views_and_watch(auth):
+    before = auth.get("/api/audit").json()
+    empty = auth.post("/api/inbox/scan", headers=HEADER)
+    assert empty.status_code == 200
+    assert empty.json() == {"imported": [], "rejected": []}
+    after_empty = auth.get("/api/audit").json()
+    assert len(after_empty) == len(before)
+
+    original = _upload(auth, "fassung-a.txt", "Xylophonvertrag Fassung eins")
+    uploaded = auth.post(
+        f"/api/documents/{original['id']}/versions",
+        files={"file": ("fassung-b.txt", "Xylophonvertrag Fassung zwei".encode("utf-8"), "text/plain")},
+        headers=HEADER,
+    )
+    assert uploaded.status_code == 200, uploaded.text
+    current = uploaded.json()
+    assert current["version_number"] == 2
+    assert current["versions"][0]["version_number"] == 1
+    old = auth.get(f"/api/documents/{original['id']}/versions/{current['versions'][0]['id']}/file")
+    assert old.status_code == 200
+    assert old.content == "Xylophonvertrag Fassung eins".encode("utf-8")
+    fresh = auth.get(f"/api/documents/{original['id']}/file")
+    assert fresh.content == "Xylophonvertrag Fassung zwei".encode("utf-8")
+    same = auth.post(
+        f"/api/documents/{original['id']}/versions",
+        files={"file": ("fassung-c.txt", "Xylophonvertrag Fassung zwei".encode("utf-8"), "text/plain")},
+        headers=HEADER,
+    )
+    assert same.status_code == 409
+
+    other = _upload(auth, "quarz.txt", "Quarzrechnung Gegenstueck")
+    linked = auth.post(
+        f"/api/documents/{original['id']}/links",
+        json={"document_id": other["id"]},
+        headers=HEADER,
+    )
+    assert linked.status_code == 200
+    assert linked.json()["links"][0]["id"] == other["id"]
+    reverse = auth.get(f"/api/documents/{other['id']}")
+    assert reverse.json()["links"][0]["id"] == original["id"]
+    self_link = auth.post(
+        f"/api/documents/{original['id']}/links",
+        json={"document_id": original["id"]},
+        headers=HEADER,
+    )
+    assert self_link.status_code == 422
+    removed = auth.delete(f"/api/documents/{original['id']}/links/{other['id']}", headers=HEADER)
+    assert removed.status_code == 200
+    assert removed.json()["links"] == []
+
+    tag = auth.post("/api/tags", json={"name": "WorkflowX", "color": "#e6c15a"}, headers=HEADER)
+    assert tag.status_code == 201
+    rule = auth.post(
+        "/api/rules",
+        json={"name": "WorkflowX bezahlt", "match_tag_id": tag.json()["id"], "set_status": "bezahlt"},
+        headers=HEADER,
+    )
+    assert rule.status_code == 201, rule.text
+    ruled = auth.post(
+        "/api/documents",
+        files={"files": ("regel.txt", "Regeltext WorkflowX".encode("utf-8"), "text/plain")},
+        data={"title": "Regelakte", "tag_ids": str(tag.json()["id"])},
+        headers=HEADER,
+    )
+    assert ruled.status_code == 201, ruled.text
+    assert ruled.json()["documents"][0]["status"] == "bezahlt"
+    empty_rule = auth.post("/api/rules", json={"name": "Leer", "set_status": "neu"}, headers=HEADER)
+    assert empty_rule.status_code == 422
+
+    field = auth.post("/api/fields", json={"name": "Rechnungsbetrag", "kind": "number"}, headers=HEADER)
+    assert field.status_code == 201, field.text
+    field_id = field.json()["id"]
+    priced = auth.patch(
+        f"/api/documents/{other['id']}",
+        json=_meta("Quarzrechnung Gegenstueck", fields=[{"field_id": field_id, "value": "12,50"}]),
+        headers=HEADER,
+    )
+    assert priced.status_code == 200, priced.text
+    assert priced.json()["fields"][0]["value"] == "12.50"
+    found = auth.get("/api/search", params={"q": "Rechnungsbetrag"})
+    assert found.json()["results"][0]["document"]["id"] == other["id"]
+    kept = auth.patch(
+        f"/api/documents/{other['id']}",
+        json=_meta("Quarzrechnung Gegenstueck", status="geprueft"),
+        headers=HEADER,
+    )
+    assert kept.status_code == 200
+    assert kept.json()["status"] == "geprueft"
+    assert kept.json()["fields"][0]["value"] == "12.50"
+    omitted = auth.patch(
+        f"/api/documents/{other['id']}",
+        json=_meta("Quarzrechnung Gegenstueck"),
+        headers=HEADER,
+    )
+    assert omitted.json()["status"] == "geprueft"
+    assert omitted.json()["fields"][0]["value"] == "12.50"
+
+    exported = auth.get(f"/api/documents/{other['id']}/text")
+    assert exported.status_code == 200
+    assert "Quarzrechnung Gegenstueck" in exported.text
+    assert exported.headers["content-type"].startswith("text/plain")
+
+    locked = _upload(auth, "sperre.txt", "Aufbewahrungssperre allein")
+    held = auth.patch(
+        f"/api/documents/{locked['id']}",
+        json=_meta("Aufbewahrungssperre allein", retain_until="2099-01-01"),
+        headers=HEADER,
+    )
+    assert held.status_code == 200
+    blocked = auth.delete(f"/api/documents/{locked['id']}", headers=HEADER)
+    assert blocked.status_code == 409
+    assert "Aufbewahrung" in blocked.json()["detail"]
+    reader = auth.post(
+        "/api/users",
+        json={"username": "sperre", "display_name": "Sperre", "password": "geheim12", "is_admin": False},
+        headers=HEADER,
+    )
+    assert reader.status_code == 201
+    auth.post("/api/auth/login", json={"username": "sperre", "password": "geheim12"}, headers=HEADER)
+    forced = auth.delete(f"/api/documents/{locked['id']}", params={"force": "true"}, headers=HEADER)
+    assert forced.status_code == 409
+    auth.post("/api/auth/login", json={"username": "admin", "password": "admin"}, headers=HEADER)
+    released = auth.delete(f"/api/documents/{locked['id']}", params={"force": "true"}, headers=HEADER)
+    assert released.status_code == 200
+    assert auth.get(f"/api/documents/{locked['id']}").status_code == 404
+
+    listed = auth.get("/api/documents", params={"status": "bezahlt"})
+    assert listed.status_code == 200
+    assert any(row["id"] == ruled.json()["documents"][0]["id"] for row in listed.json()["documents"])
+
+    saved = auth.post(
+        "/api/views",
+        json={"name": "Nur bezahlt", "query": {"status": "bezahlt", "q": "", "tax_only": False}},
+        headers=HEADER,
+    )
+    assert saved.status_code == 201, saved.text
+    views = auth.get("/api/views")
+    assert any(row["id"] == saved.json()["id"] and row["query"]["status"] == "bezahlt" for row in views.json())
+    gone = auth.delete(f"/api/views/{saved.json()['id']}", headers=HEADER)
+    assert gone.status_code == 200
+
+    from app.extend import watch_once
+
+    inbox_file = settings.inbox_dir / "waechter.txt"
+    inbox_file.write_text("Waechter Posteingang automatisch", encoding="utf-8")
+    watched = watch_once()
+    assert watched["imported"]
+    assert not inbox_file.exists()
+    quiet = watch_once()
+    assert quiet == {"imported": [], "rejected": []}
+
+
+def _meta(title, **extra):
+    payload = {
+        "title": title,
+        "notes": "",
+        "document_date": None,
+        "reminder_date": None,
+        "is_tax_relevant": False,
+        "correspondent_id": None,
+        "doctype_id": None,
+        "tag_ids": [],
+    }
+    payload.update(extra)
+    return payload
+
+
 def _upload(client, name, text):
     response = client.post(
         "/api/documents",

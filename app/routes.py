@@ -5,7 +5,7 @@ from __future__ import annotations
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, File, Form, Request, Response, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -21,7 +21,19 @@ from app.auth import (
 )
 from app.config import PREVIEW_INLINE, settings
 from app.database import get_db
-from app.models import Correspondent, DocType, Tag, User
+from app.extend import (
+    add_link,
+    add_version,
+    create_field,
+    create_rule,
+    create_view,
+    delete_field,
+    document_links,
+    rule_dict,
+    version_path,
+    view_dict,
+)
+from app.models import Correspondent, DocType, FieldDef, SavedView, Tag, User, WorkflowRule
 from app.timeutil import utcnow
 from app.services import (
     DocManError,
@@ -88,6 +100,11 @@ class DocTypeBody(BaseModel):
     description: str = ""
 
 
+class FieldItem(BaseModel):
+    field_id: int
+    value: str = ""
+
+
 class DocumentBody(BaseModel):
     title: str
     notes: str = ""
@@ -97,6 +114,39 @@ class DocumentBody(BaseModel):
     correspondent_id: int | None = None
     doctype_id: int | None = None
     tag_ids: list[int] = []
+    status: str | None = None
+    retain_until: str | None = None
+    fields: list[FieldItem] | None = None
+
+
+class LinkBody(BaseModel):
+    document_id: int
+
+
+class FieldBody(BaseModel):
+    name: str
+    kind: str = "text"
+
+
+class ViewBody(BaseModel):
+    name: str
+    query: dict = {}
+
+
+class RuleBody(BaseModel):
+    name: str
+    correspondent_id: int | None = None
+    doctype_id: int | None = None
+    match_tag_id: int | None = None
+    set_status: str = ""
+    add_tag_id: int | None = None
+
+
+def _sent(body: BaseModel, name: str) -> bool:
+    fields = getattr(body, "model_fields_set", None)
+    if fields is None:
+        fields = getattr(body, "__fields_set__", set())
+    return name in fields
 
 
 def require_user(request: Request, db: Session = Depends(get_db)) -> User:
@@ -215,6 +265,7 @@ def documents(
     doctype_id: int | None = None,
     correspondent_id: int | None = None,
     tax_only: bool = False,
+    status: str = "",
     limit: int = 50,
     offset: int = 0,
     _user: User = Depends(require_user),
@@ -222,7 +273,7 @@ def documents(
 ) -> dict:
     limit = max(1, min(limit, 100))
     offset = max(0, offset)
-    rows, total = list_documents(db, q, tag_id, doctype_id, correspondent_id, tax_only, limit, offset)
+    rows, total = list_documents(db, q, tag_id, doctype_id, correspondent_id, tax_only, limit, offset, status)
     return {"total": total, "documents": [to_dict(row) for row in rows]}
 
 
@@ -295,33 +346,123 @@ def document_update(
     db: Session = Depends(get_db),
 ) -> dict:
     try:
-        doc = update_document(
-            db,
-            user,
-            document_id,
-            {
-                "title": body.title,
-                "notes": body.notes,
-                "document_date": parse_date(body.document_date),
-                "reminder_date": parse_date(body.reminder_date),
-                "is_tax_relevant": body.is_tax_relevant,
-                "correspondent_id": body.correspondent_id,
-                "doctype_id": body.doctype_id,
-                "tag_ids": body.tag_ids,
-            },
-        )
+        payload = {
+            "title": body.title,
+            "notes": body.notes,
+            "document_date": parse_date(body.document_date),
+            "reminder_date": parse_date(body.reminder_date),
+            "is_tax_relevant": body.is_tax_relevant,
+            "correspondent_id": body.correspondent_id,
+            "doctype_id": body.doctype_id,
+            "tag_ids": body.tag_ids,
+        }
+        if _sent(body, "status"):
+            payload["status"] = body.status
+        if _sent(body, "retain_until"):
+            payload["retain_until"] = parse_date(body.retain_until)
+        if _sent(body, "fields"):
+            payload["fields"] = [{"field_id": item.field_id, "value": item.value} for item in (body.fields or [])]
+        doc = update_document(db, user, document_id, payload)
         return to_dict(doc, include_text=True)
     except DocManError as exc:
         _guard(exc)
 
 
 @router.delete("/documents/{document_id}")
-def document_delete(document_id: int, user: User = Depends(require_user), db: Session = Depends(get_db)) -> dict:
+def document_delete(
+    document_id: int,
+    force: bool = False,
+    user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+) -> dict:
     try:
-        delete_document(db, user, document_id)
+        delete_document(db, user, document_id, force=force)
     except DocManError as exc:
         _guard(exc)
     return {"ok": True}
+
+
+@router.get("/documents/{document_id}/text")
+def document_text(document_id: int, user: User = Depends(require_user), db: Session = Depends(get_db)):
+    try:
+        doc = get_document(db, document_id)
+    except DocManError as exc:
+        _guard(exc)
+    audit(db, user, "export", f"Text exportiert: {doc.title}", doc.id)
+    db.commit()
+    filename = quote(f"{doc.title}.txt")
+    return Response(
+        content=(doc.full_text or "").encode("utf-8"),
+        media_type="text/plain; charset=utf-8",
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{filename}"},
+    )
+
+
+@router.post("/documents/{document_id}/versions")
+async def document_version(
+    document_id: int,
+    file: UploadFile = File(...),
+    user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    data = await file.read()
+    try:
+        doc = add_version(db, user, document_id, file.filename or "datei", data)
+        return to_dict(doc, include_text=True)
+    except DocManError as exc:
+        _guard(exc)
+
+
+@router.get("/documents/{document_id}/versions/{version_id}/file")
+def document_version_file(
+    document_id: int,
+    version_id: int,
+    user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        row, path = version_path(db, document_id, version_id)
+        doc = get_document(db, document_id)
+    except DocManError as exc:
+        _guard(exc)
+    audit(db, user, "download", f"Version {row.version_number} geöffnet: {doc.title}", doc.id)
+    db.commit()
+    filename = quote(row.original_name)
+    return FileResponse(
+        path,
+        media_type=row.mime.split(";")[0],
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{filename}"},
+    )
+
+
+@router.post("/documents/{document_id}/links")
+def document_link(
+    document_id: int,
+    body: LinkBody,
+    user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    try:
+        add_link(db, user, document_id, body.document_id)
+        return {"links": document_links(db, document_id)}
+    except DocManError as exc:
+        _guard(exc)
+
+
+@router.delete("/documents/{document_id}/links/{other_id}")
+def document_unlink(
+    document_id: int,
+    other_id: int,
+    user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    from app.extend import remove_link
+
+    try:
+        remove_link(db, user, document_id, other_id)
+        return {"links": document_links(db, document_id)}
+    except DocManError as exc:
+        _guard(exc)
 
 
 @router.get("/documents/{document_id}/file")
@@ -369,6 +510,90 @@ def reindex(user: User = Depends(require_user), db: Session = Depends(get_db)) -
 @router.post("/inbox/scan")
 def inbox(user: User = Depends(require_user), db: Session = Depends(get_db)) -> dict:
     return scan_inbox(db, user)
+
+
+@router.get("/fields")
+def fields(_user: User = Depends(require_user), db: Session = Depends(get_db)) -> list[dict]:
+    rows = db.scalars(select(FieldDef).order_by(FieldDef.name)).all()
+    return [{"id": row.id, "name": row.name, "kind": row.kind} for row in rows]
+
+
+@router.post("/fields", status_code=201)
+def add_field(body: FieldBody, _user: User = Depends(require_user), db: Session = Depends(get_db)) -> dict:
+    try:
+        row = create_field(db, body.name, body.kind)
+    except DocManError as exc:
+        _guard(exc)
+    return {"id": row.id, "name": row.name, "kind": row.kind}
+
+
+@router.delete("/fields/{field_id}")
+def remove_field(field_id: int, _user: User = Depends(require_user), db: Session = Depends(get_db)) -> dict:
+    try:
+        delete_field(db, field_id)
+    except DocManError as exc:
+        _guard(exc)
+    return {"ok": True}
+
+
+@router.get("/views")
+def views(user: User = Depends(require_user), db: Session = Depends(get_db)) -> list[dict]:
+    rows = db.scalars(select(SavedView).where(SavedView.user_id == user.id).order_by(SavedView.name)).all()
+    return [view_dict(row) for row in rows]
+
+
+@router.post("/views", status_code=201)
+def add_view(body: ViewBody, user: User = Depends(require_user), db: Session = Depends(get_db)) -> dict:
+    try:
+        row = create_view(db, user, body.name, body.query)
+    except DocManError as exc:
+        _guard(exc)
+    return view_dict(row)
+
+
+@router.delete("/views/{view_id}")
+def remove_view(view_id: int, user: User = Depends(require_user), db: Session = Depends(get_db)) -> dict:
+    row = db.get(SavedView, view_id)
+    if row is None or row.user_id != user.id:
+        raise _http(404, "Sicht nicht gefunden.")
+    db.delete(row)
+    db.commit()
+    return {"ok": True}
+
+
+@router.get("/rules")
+def rules(_user: User = Depends(require_user), db: Session = Depends(get_db)) -> list[dict]:
+    rows = db.scalars(select(WorkflowRule).order_by(WorkflowRule.name)).all()
+    return [rule_dict(row) for row in rows]
+
+
+@router.post("/rules", status_code=201)
+def add_rule(body: RuleBody, _user: User = Depends(require_user), db: Session = Depends(get_db)) -> dict:
+    try:
+        row = create_rule(
+            db,
+            {
+                "name": body.name,
+                "correspondent_id": body.correspondent_id,
+                "doctype_id": body.doctype_id,
+                "match_tag_id": body.match_tag_id,
+                "set_status": body.set_status,
+                "add_tag_id": body.add_tag_id,
+            },
+        )
+    except DocManError as exc:
+        _guard(exc)
+    return rule_dict(row)
+
+
+@router.delete("/rules/{rule_id}")
+def remove_rule(rule_id: int, _user: User = Depends(require_user), db: Session = Depends(get_db)) -> dict:
+    row = db.get(WorkflowRule, rule_id)
+    if row is None:
+        raise _http(404, "Regel nicht gefunden.")
+    db.delete(row)
+    db.commit()
+    return {"ok": True}
 
 
 @router.get("/tags")
