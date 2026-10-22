@@ -87,6 +87,10 @@ DocMan ist ein lokales Ein-Prozess-Archiv. Die folgende Liste beschreibt nur Fun
 - Dunkler Webclient ohne Plugin: Übersicht, Dokumente, Suche, Stammdaten, Protokoll, Dokument, Upload, Passwort
 - REST-API unter `/api`
 
+## Einordnung
+
+DocMan liegt näher an einem kleinen Paperless-Archiv als an ecoDMS oder Docutain: Tags, Korrespondenten, Dokumenttypen, lokaler Volltext, manueller Posteingangsordner und Weboberfläche. Es gibt keine OCR-Engine, keine PDF/A-Wandlung, keine GoBD-Archivierung, keine Office- oder Mail-Plugins, keine Scanner- oder Smartphone-App und keine Zahlungsfunktion.
+
 ## Daten
 
 | Pfad | Inhalt |
