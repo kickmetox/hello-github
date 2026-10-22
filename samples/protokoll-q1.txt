@@ -1,0 +1,13 @@
+Besprechungsprotokoll Archiv Q1
+
+Teilnehmende: Archiv, Buchhaltung, Verwaltung.
+Datum der Besprechung: 31. März 2026.
+
+Beschluss 1: Verträge, Rechnungen und Protokolle erhalten einen Dokumenttyp und mindestens ein Schlagwort.
+Beschluss 2: Steuerrelevante Rechnungen werden markiert und nicht nur im E-Mail-Postfach gelassen.
+Beschluss 3: Der Posteingangsordner wird regelmäßig gescannt, damit abgelegte Dateien in das Archiv wandern.
+Beschluss 4: Die Suche bleibt lokal. Es wird kein externer Dienst für den Volltext verwendet.
+
+Offener Punkt: Gescannte Bilder ohne Textebene sind über den Dateinamen und die Notiz suchbar.
+Nächster Termin nach dem Beitragstermin der Hausratversicherung.
+Das Protokoll ersetzt keine einzelnen Verträge.

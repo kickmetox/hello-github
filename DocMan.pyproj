@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="4.0">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>{6F0C2A14-9B3E-4D7A-8C11-51E2A0D8C0A1}</ProjectGuid>
+    <ProjectHome>.</ProjectHome>
+    <StartupFile>run.py</StartupFile>
+    <SearchPath>.</SearchPath>
+    <WorkingDirectory>.</WorkingDirectory>
+    <OutputPath>.</OutputPath>
+    <Name>DocMan</Name>
+    <RootNamespace>app</RootNamespace>
+    <IsWindowsApplication>False</IsWindowsApplication>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
+    <DebugSymbols>true</DebugSymbols>
+    <EnableUnmanagedDebugging>false</EnableUnmanagedDebugging>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
+    <DebugSymbols>true</DebugSymbols>
+    <EnableUnmanagedDebugging>false</EnableUnmanagedDebugging>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="run.py" />
+    <Compile Include="cli.py" />
+    <Compile Include="app\__init__.py" />
+    <Compile Include="app\config.py" />
+    <Compile Include="app\database.py" />
+    <Compile Include="app\models.py" />
+    <Compile Include="app\auth.py" />
+    <Compile Include="app\search_engine.py" />
+    <Compile Include="app\extract.py" />
+    <Compile Include="app\timeutil.py" />
+    <Compile Include="app\services.py" />
+    <Compile Include="app\seed.py" />
+    <Compile Include="app\routes.py" />
+    <Compile Include="app\main.py" />
+    <Compile Include="tests\conftest.py" />
+    <Compile Include="tests\test_search_engine.py" />
+    <Compile Include="tests\test_extract.py" />
+    <Compile Include="tests\test_api.py" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="requirements.txt" />
+    <Content Include="requirements-dev.txt" />
+    <Content Include="README.md" />
+    <Content Include="static\index.html" />
+    <Content Include="static\styles.css" />
+    <Content Include="static\app.js" />
+    <Content Include="static\favicon.svg" />
+    <Content Include="samples\mietvertrag.txt" />
+    <Content Include="samples\rechnung-buero.txt" />
+    <Content Include="samples\projektnotiz-suchindex.txt" />
+    <Content Include="samples\versicherung-hausrat.txt" />
+    <Content Include="samples\protokoll-q1.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="app\" />
+    <Folder Include="static\" />
+    <Folder Include="samples\" />
+    <Folder Include="tests\" />
+  </ItemGroup>
+  <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets" />
+</Project>

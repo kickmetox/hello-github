@@ -1,0 +1,14 @@
+Projektnotiz zum lokalen Suchindex
+
+DocMan durchsucht das Archiv nicht erst bei der Abfrage im Rohtext.
+Beim Speichern wird aus Titel, Notiz, Dokumenttext, Korrespondent, Dokumenttyp und Schlagworten ein Korpus gebaut.
+Der Index zerlegt diesen Korpus in Terme, entfernt Füllwörter und berechnet TF-IDF.
+
+Termfrequenz beschreibt, wie oft ein Wort in einem Dokument vorkommt.
+Die inverse Dokumenthäufigkeit senkt das Gewicht von Wörtern, die in fast allen Dokumenten stehen,
+und hebt seltene Wörter an. Die Anfrage wird in denselben Vektorraum gelegt.
+Die Relevanz ist die Kosinusähnlichkeit zwischen Anfragevektor und Dokumentvektor.
+
+Beispiel: Eine Suche nach „Kündigung Mietvertrag“ soll den Wohnungsmietvertrag vor einer allgemeinen Notiz listen,
+weil die Begriffe dort dichter und spezifischer auftreten. Eine Suche nach „Umsatzsteuer Vorsteuer“ trifft die Rechnung.
+Der Index wird nach dem Hochladen, nach Metadatenänderungen und über den Befehl reindex neu aufgebaut.

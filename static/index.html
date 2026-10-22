@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="same-origin">
+  <title>DocMan</title>
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/styles.css?v=3">
+</head>
+<body>
+  <div id="splash" class="splash">
+    <div class="mark">DocMan</div>
+    <p>Archiv wird geladen</p>
+  </div>
+  <section id="login-view" class="login-view" hidden>
+    <form id="login-form" class="login-card">
+      <div class="mark">DocMan</div>
+      <h1>Lokales Archiv</h1>
+      <p class="lede">Dokumente, Stammdaten und TF-IDF-Suche bleiben auf diesem Rechner.</p>
+      <label>Benutzername<input name="username" autocomplete="username" required></label>
+      <label>Passwort<input name="password" type="password" autocomplete="current-password" required></label>
+      <p id="login-error" class="form-error" hidden></p>
+      <button class="primary" type="submit">Anmelden</button>
+      <p class="hint">Erststart: admin / admin. Das Passwort danach ändern.</p>
+    </form>
+  </section>
+  <div id="app-view" class="shell" hidden>
+    <aside class="sidebar">
+      <div class="brand">
+        <img src="/static/favicon.svg" alt="" width="28" height="28">
+        <div>
+          <strong>DocMan</strong>
+          <span>Archiv</span>
+        </div>
+      </div>
+      <nav id="nav" aria-label="Bereiche">
+        <button type="button" data-action="navigate" data-route="dashboard">Übersicht</button>
+        <button type="button" data-action="navigate" data-route="documents">Dokumente</button>
+        <button type="button" data-action="navigate" data-route="search">Suche</button>
+        <button type="button" data-action="navigate" data-route="organize">Stammdaten</button>
+        <button type="button" data-action="navigate" data-route="audit">Protokoll</button>
+      </nav>
+      <p class="sidebar-foot">Lokal · TF-IDF · kein Cloud-Index</p>
+    </aside>
+    <div class="workspace">
+      <header class="topbar">
+        <form id="quick-search" role="search">
+          <label class="sr" for="quick-query">Suche</label>
+          <input id="quick-query" placeholder="Archiv durchsuchen" autocomplete="off">
+        </form>
+        <div class="top-actions">
+          <button type="button" class="primary" data-action="open-upload">Hochladen</button>
+          <button type="button" id="user-button" data-action="open-password"></button>
+          <button type="button" data-action="logout">Abmelden</button>
+        </div>
+      </header>
+      <div id="banner" class="banner" hidden></div>
+      <main id="main"></main>
+    </div>
+  </div>
+  <div id="modal-root"></div>
+  <div id="toasts" aria-live="polite"></div>
+  <script src="/static/app.js?v=3"></script>
+</body>
+</html>
