@@ -223,7 +223,7 @@ async function renderDashboard() {
   main.replaceChildren(
     el("section", { class: "page" }, [
       el("header", { class: "page-head" }, [
-        el("div", {}, [el("h1", { text: "Übersicht" }), el("p", { class: "lede", text: "Ablage, Fristen und der lokale Suchindex." })]),
+        el("div", {}, [el("h1", { text: "Übersicht" }), el("p", { class: "lede", text: dashboardLede(data) })]),
       ]),
       stats,
       el("div", { class: "grid-2" }, [
@@ -232,6 +232,14 @@ async function renderDashboard() {
       ]),
     ]),
   );
+}
+
+function dashboardLede(data) {
+  const ocr = data.ocr;
+  if (ocr && ocr.available && ocr.languages.length) {
+    return `Ablage, Fristen und der lokale Suchindex. Texterkennung ${ocr.languages.join(" + ")}.`;
+  }
+  return "Ablage, Fristen und der lokale Suchindex. Tesseract wurde nicht gefunden: Scans bleiben Bilder, Dateien mit Textebene sind sofort durchsuchbar.";
 }
 
 function stat(label, value) {
@@ -523,6 +531,9 @@ async function renderDetail(id) {
       el("button", { class: "primary", type: "submit", text: "Speichern" }),
       el("a", { class: "button", href: `/api/documents/${doc.id}/file`, text: "Herunterladen" }),
       el("a", { class: "button", href: `/api/documents/${doc.id}/text`, text: "Text exportieren" }),
+      [".pdf", ".png", ".jpg", ".jpeg", ".webp", ".gif"].includes(doc.extension)
+        ? el("button", { type: "button", "data-action": "ocr-doc", "data-id": String(doc.id), text: "Text neu erkennen" })
+        : null,
       el("button", { type: "button", class: "danger", "data-action": "delete-doc", "data-id": String(doc.id), text: "Löschen" }),
     ]),
   ]);
@@ -530,7 +541,7 @@ async function renderDetail(id) {
   const preview = buildPreview(doc);
   $("main").replaceChildren(el("section", { class: "page" }, [
     el("header", { class: "page-head" }, [
-      el("div", {}, [el("h1", { text: doc.title }), el("p", { class: "lede", text: `${statusLabel(doc.status)} · Version ${doc.version_number || 1} · ${formatBytes(doc.size)} · ${doc.text_status} · ${doc.uploaded_by || "System"}` })]),
+      el("div", {}, [el("h1", { text: doc.title }), el("p", { class: "lede", text: `${statusLabel(doc.status)} · Version ${doc.version_number || 1} · ${formatBytes(doc.size)} · ${textStatusLabel(doc.text_status)} · ${doc.uploaded_by || "System"}` })]),
     ]),
     el("div", { class: "detail" }, [
       el("div", { class: "panel" }, [
@@ -599,9 +610,24 @@ function labeledSpan(caption, field) {
   return el("label", { class: "span-2" }, [caption, field]);
 }
 
+function textStatusLabel(value) {
+  const labels = {
+    extracted: "Text aus Datei",
+    ocr: "Text per OCR",
+    no_ocr: "OCR fehlt",
+    binary: "Bild",
+    empty: "kein Text",
+    failed: "nicht lesbar",
+    truncated: "Text gekürzt",
+  };
+  return labels[value] || value || "kein Text";
+}
+
 function textStatusMessage(doc) {
-  if (doc.text_status === "binary") return "Bild ohne Textebene. Die Suche nutzt Titel, Notiz und Stammdaten.";
+  if (doc.text_status === "no_ocr") return "Tesseract wurde nicht gefunden. Dieser Scan bleibt ein Bild. PDF, Word und Text mit vorhandener Textebene sind ohne OCR durchsuchbar.";
+  if (doc.text_status === "binary") return "Bild ohne gelesenen Text. Die Suche nutzt Titel, Notiz und Stammdaten.";
   if (doc.text_status === "failed") return "Text konnte nicht gelesen werden.";
+  if (doc.text_status === "ocr") return "Die Texterkennung hat keinen Text geliefert.";
   return "Kein extrahierbarer Text.";
 }
 
@@ -767,6 +793,10 @@ function bind() {
         const result = await api("/api/inbox/scan", { method: "POST", json: {} });
         toast(`${result.imported.length} aus dem Posteingang, ${result.rejected.length} abgelehnt.`);
         await loadLibrary();
+      } else if (action === "ocr-doc") {
+        await api(`/api/documents/${target.dataset.id}/ocr`, { method: "POST", json: {} });
+        toast("Text neu gelesen.");
+        await renderDetail(target.dataset.id);
       } else if (action === "reindex") {
         const result = await api("/api/search/reindex", { method: "POST", json: {} });
         toast(`Index enthält ${result.documents} Dokumente.`);

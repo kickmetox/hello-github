@@ -397,6 +397,21 @@ def delete_document(db: Session, user: User, document_id: int, force: bool = Fal
     rebuild_index(db)
 
 
+def reread_text(db: Session, user: User, document_id: int) -> Document:
+    doc = get_document(db, document_id)
+    data = stored_path(doc).read_bytes()
+    text, status = extract_text(doc.original_name, data)
+    if status == "no_ocr":
+        raise DocManError(503, "Tesseract wurde nicht gefunden. Dateien mit Textebene brauchen es nicht.")
+    doc.full_text = text
+    doc.text_status = status
+    doc.updated_at = utcnow()
+    audit(db, user, "ocr", f"Text neu gelesen: {doc.title}", doc.id)
+    db.commit()
+    rebuild_index(db)
+    return get_document(db, doc.id)
+
+
 def stored_path(doc: Document):
     path = (settings.files_dir / doc.stored_name).resolve()
     root = settings.files_dir.resolve()
@@ -531,9 +546,16 @@ def dashboard(db: Session) -> dict:
         "tax_relevant": int(db.scalar(select(func.count()).select_from(Document).where(Document.is_tax_relevant.is_(True))) or 0),
         "storage_bytes": storage,
         "index_documents": len(INDEX._vectors),
+        "ocr": _ocr_status(),
         "recent": [to_dict(doc) for doc in recent],
         "reminders": [to_dict(doc) for doc in reminders],
     }
+
+
+def _ocr_status() -> dict:
+    from app.ocr import engine_status
+
+    return engine_status()
 
 
 def scan_inbox(db: Session, user: User) -> dict:

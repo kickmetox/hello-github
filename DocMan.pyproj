@@ -31,6 +31,7 @@
     <Compile Include="app\auth.py" />
     <Compile Include="app\search_engine.py" />
     <Compile Include="app\extract.py" />
+    <Compile Include="app\ocr.py" />
     <Compile Include="app\timeutil.py" />
     <Compile Include="app\services.py" />
     <Compile Include="app\migrate.py" />

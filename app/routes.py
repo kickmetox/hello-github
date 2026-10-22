@@ -35,6 +35,7 @@ from app.extend import (
 )
 from app.models import Correspondent, DocType, FieldDef, SavedView, Tag, User, WorkflowRule
 from app.timeutil import utcnow
+from app.ocr import engine_status
 from app.services import (
     DocManError,
     audit,
@@ -54,6 +55,7 @@ from app.services import (
     parse_id_list,
     public_user,
     rebuild_index,
+    reread_text,
     scan_inbox,
     search_documents,
     stored_path,
@@ -174,7 +176,7 @@ def _guard(exc: DocManError):
 
 @router.get("/health")
 def health() -> dict:
-    return {"status": "ok", "name": "DocMan"}
+    return {"status": "ok", "name": "DocMan", "ocr": engine_status()}
 
 
 @router.post("/auth/login")
@@ -380,6 +382,14 @@ def document_delete(
     except DocManError as exc:
         _guard(exc)
     return {"ok": True}
+
+
+@router.post("/documents/{document_id}/ocr")
+def document_ocr(document_id: int, user: User = Depends(require_user), db: Session = Depends(get_db)) -> dict:
+    try:
+        return to_dict(reread_text(db, user, document_id), include_text=True)
+    except DocManError as exc:
+        _guard(exc)
 
 
 @router.get("/documents/{document_id}/text")

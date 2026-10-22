@@ -1,7 +1,11 @@
 import zipfile
 from io import BytesIO
+from pathlib import Path
+
+import pytest
 
 from app.extract import extract_text, safe_original_name
+from app.ocr import engine_status, tesseract_binary
 
 
 def test_text_and_hostile_filename():
@@ -25,11 +29,67 @@ def test_docx_paragraphs():
     assert "Nordlicht" in text
 
 
-def test_pdf_text_layer():
+def test_pdf_text_layer(monkeypatch):
+    def forbidden(_image):
+        raise AssertionError("Digitale Textebene darf nicht durch OCR laufen.")
+
+    monkeypatch.setattr("app.ocr.recognize", forbidden)
     payload = _pdf("Mietvertrag Berlin")
     text, status = extract_text("vertrag.pdf", payload)
     assert status == "extracted"
     assert "Mietvertrag" in text
+
+
+def test_image_without_tesseract_stays_unreadable(monkeypatch):
+    monkeypatch.setattr("app.ocr.tesseract_binary", lambda: None)
+    text, status = extract_text("scan.png", _png("QUARZSCAN"))
+    assert text == ""
+    assert status == "no_ocr"
+
+
+def test_image_and_scanned_pdf_are_read():
+    if not engine_status()["available"] or _font() is None:
+        pytest.skip("Tesseract oder Schrift fehlt")
+    image = _png("QUARZSCAN")
+    text, status = extract_text("scan.png", image)
+    assert status == "ocr"
+    assert "QUARZSCAN" in text.replace(" ", "")
+    pdf_text, pdf_status = extract_text("scan.pdf", _image_pdf(image))
+    assert pdf_status == "ocr"
+    assert "QUARZSCAN" in pdf_text.replace(" ", "")
+    assert tesseract_binary()
+
+
+def _font() -> str | None:
+    for candidate in (
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        r"C:\Windows\Fonts\arial.ttf",
+    ):
+        if Path(candidate).is_file():
+            return candidate
+    return None
+
+
+def _png(text: str) -> bytes:
+    from PIL import Image, ImageDraw, ImageFont
+
+    image = Image.new("RGB", (1600, 320), "white")
+    draw = ImageDraw.Draw(image)
+    font_path = _font()
+    font = ImageFont.truetype(font_path, 72) if font_path else ImageFont.load_default()
+    draw.text((48, 100), text, fill="black", font=font)
+    buffer = BytesIO()
+    image.save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
+def _image_pdf(png: bytes) -> bytes:
+    from PIL import Image
+
+    buffer = BytesIO()
+    with Image.open(BytesIO(png)) as image:
+        image.convert("RGB").save(buffer, format="PDF", resolution=150)
+    return buffer.getvalue()
 
 
 def _docx(text: str) -> bytes:
