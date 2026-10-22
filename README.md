@@ -34,16 +34,58 @@ Kommandozeile, analog zum Mini-Search-Engine-Ablauf:
 
 ## Funktionsumfang
 
-- Ablage von PDF, Text, Markdown, CSV, JSON, DOCX und Bildern (bis 25 MB)
-- Text aus PDF-Textebene, DOCX und Textdateien
-- Schlagwörter, Korrespondenten, Dokumenttypen, Steuerkennzeichen, Wiedervorlage
-- Bibliotheksfilter und Dokumentvorschau
-- TF-IDF-Suche mit Kosinusähnlichkeit und Textauszug
-- Posteingang `data\inbox` (Schaltfläche „Posteingang“)
-- Benutzer, Sitzungscookie, Protokoll
-- Beispieldokumente beim ersten Start
+DocMan ist ein lokales Ein-Prozess-Archiv. Die folgende Liste beschreibt nur Funktionen, die im Programm vorhanden sind.
 
-Bilder und gescannte PDFs ohne Textebene bleiben als Datei erhalten und sind über Titel, Notiz und Stammdaten suchbar.
+### Betrieb
+
+- Python-Anwendung, Projektmappe `DocMan.sln`, Start über `run.py` oder `cli.py serve`
+- Lauscht standardmäßig nur auf `127.0.0.1`
+- SQLite-Datei `data\docman.db`
+- Dateiablage `data\files`, Posteingang `data\inbox`, Abweisungen `data\rejected`
+- Konfiguration über `DOCMAN_HOST`, `DOCMAN_PORT`, `DOCMAN_DATA`, `DOCMAN_SEED`
+- OpenAPI unter `/docs`, Health unter `/api/health`
+- Fünf Beispieldokumente beim ersten Start, abschaltbar mit `DOCMAN_SEED=0`
+
+### Erfassung
+
+- Upload einer oder mehrerer Dateien, höchstens 20 Stück, höchstens 25 MB je Datei
+- Erlaubte Endungen: PDF, TXT, MD, CSV, JSON, LOG, DOCX, PNG, JPG, JPEG, WEBP, GIF
+- Andere Endungen werden abgelehnt
+- SHA-256-Duplikatsperre
+- Dateinamen werden auf den Basisnamen gekürzt
+- Text aus Textdateien, aus der PDF-Textebene und aus DOCX
+- Bilder bleiben als Datei erhalten; ohne Textebene sucht das Archiv über Titel, Notiz und Stammdaten
+- Ziehen und Ablegen in der Oberfläche
+- Posteingang: Schaltfläche liest `data\inbox`, übernimmt gültige Dateien und verschiebt ungültige nach `data\rejected`
+- Metadaten beim Ablegen: Titel, Notiz, Dokumentdatum, Wiedervorlage, Steuerkennzeichen, Korrespondent, Dokumenttyp, Schlagwörter
+
+### Dokumente, Metadaten, Suche
+
+- Bibliothek mit Filter auf Titel, Dateiname, Notiz und Volltext sowie nach Schlagwort, Dokumenttyp, Korrespondent und Steuerkennzeichen
+- Schlagwörter mit Farbe, Korrespondenten mit E-Mail und Notiz, Dokumenttypen mit Beschreibung
+- Dokumentdetail: Metadaten ändern, Datei herunterladen, Dokument löschen
+- Vorschau für PDF und Bilder im Browser, extrahierter Text daneben
+- Dashboard: Anzahl, Speicher, steuerrelevante Dokumente, Indexgröße, zuletzt abgelegt, Wiedervorlagen bis 30 Tage einschließlich überfälliger Termine
+- TF-IDF-Index mit Kosinusähnlichkeit, deutschen und englischen Füllwörtern, Textauszug und Score
+- Der Index umfasst Titel, Dateiname, Notiz, Volltext, Korrespondent, Dokumenttyp und Schlagwörter
+- Neuaufbau nach Änderungen, über die Schaltfläche und über `cli.py reindex`
+- Kommandozeilensuche: `cli.py search`
+
+### Zugang und Protokoll
+
+- Benutzername und Passwort, PBKDF2-HMAC-SHA256
+- Sitzungscookie, 14 Tage, HttpOnly, SameSite Lax; in der Datenbank liegt nur der SHA-256 des Tokens
+- Schreibende API-Aufrufe verlangen den Header `X-DocMan: 1`
+- Administrator legt weitere Benutzer an und vergibt das Admin-Flag
+- Passwortwechsel in der Oberfläche; das Startpasswort `admin` wird zum Wechsel angezeigt
+- Jede angemeldete Person darf lesen, ändern, löschen, herunterladen und Stammdaten pflegen
+- Protokoll der letzten 200 Ereignisse: Anmeldung, Fehlanmeldung, Abmeldung, Passwort, Benutzeranlage, Upload, Änderung, Löschung, Download, Suche, Neuindex, Posteingang
+- Zeiten in der Oberfläche in Europe/Berlin
+
+### Oberfläche
+
+- Dunkler Webclient ohne Plugin: Übersicht, Dokumente, Suche, Stammdaten, Protokoll, Dokument, Upload, Passwort
+- REST-API unter `/api`
 
 ## Daten
 
