@@ -5,7 +5,7 @@ Dateien in einem eigenen Fenster, läuft im Hintergrund und lässt sich aus
 anderen Programmen abfragen.
 
 Kompletter Arbeitsbaum als Zip (Quellcode, Tests, Build und Installer):
-[flare-workspace-laufwerk.zip](https://github.com/kickmetox/hello-github/raw/cursor/flare-spotlight-a293/flare-workspace-laufwerk.zip)
+[flare-workspace-gdf.zip](https://github.com/kickmetox/hello-github/raw/cursor/flare-spotlight-a293/flare-workspace-gdf.zip)
 
 Das Fenster ist ein normales Win32-Fenster. Es startet keinen Browser.
 Schließen blendet es nur aus; der Index läuft weiter, Strg+Alt+Leertaste holt es zurück.
@@ -134,7 +134,9 @@ Laufwerksbuchstaben sucht Flare nicht. Keine Websuche, keine E-Mail, keine
 Kontakte und keine Chats.
 
 Ausgelassen werden unter anderem `node_modules`, `.git`, versteckte Ordner,
-Caches und Schlüsseldateien (`id_rsa`, `.env`, `*.pem`).
+Schlüsseldateien (`id_rsa`, `.env`, `*.pem`) und Cache-Ordner
+(`OfficeFileCache`, `INetCache`, `GPUCache`, `Code Cache`, sowie `Cache` und
+`Temp` unter `AppData\Local`).
 
 Dateinamen immer. Textinhalt nur in Desktop, Dokumente, Downloads, Bilder,
 Musik und Videos, nur bis 64 KiB, nur die ersten 4 KiB, nur bekannte
@@ -155,12 +157,20 @@ gelesen wird danach nur, wo sich die Ordner-mtime geändert hat. Liegen Anlegen
 und Löschen im selben Zeitstempel, zieht das Watcher-Flag den Ordner sofort
 neu. Ohne Meldung passiert das spätestens nach 15 Minuten.
 
-Die Suche nutzt den B-Tree für Präfixe (auch ein oder zwei Zeichen) und
-FTS5-Trigramme für Teilstrings. Ein exakter Name steht vor einem Präfix, ein
-Präfix vor einem Infix wie `xchange` in `DataExchangeHost`. Tippfehler werden
-nur nachgezogen, wenn weder ein exakter Name noch ein Präfix vorhanden ist
-und die starken Treffer nicht reichen, und nur über den Anteil gemeinsamer
-Trigramme.
+Die Suche nutzt den B-Tree für Präfixe (auch ein oder zwei Zeichen). Ab drei
+Zeichen zählt ein Teilstring im Namen über den kleingeschriebenen Namen, nicht
+über eine FTS5-Trigramm-Phrase: die liefert unter drei Zeichen nichts und bei
+genau drei oft einen leeren Treffer. `gdf` trifft daher `GDF Formulare`,
+`Zürich GDF`, `1 GDF Formulare` und `Schriften GdF`, unabhängig von der
+Großschreibung. Ein ganzes Wort, begrenzt durch Anfang, Ende oder ein Zeichen
+das kein Buchstabe und keine Ziffer ist, steht weit vor einem Infix in einem
+langen Token. Gibt es mindestens ein ganzes Wort, füllen solche Hash-Treffer
+die Liste nicht. Längere Teilstrings nutzen zusätzlich FTS5-Trigramme. Das
+Fenster zeigt bis zu 200 Treffer, die Statuszeile nennt die Zahl. Ein exakter
+Name steht vor einem Präfix, ein Präfix vor einem Infix wie `xchange` in
+`DataExchangeHost`. Tippfehler werden nur nachgezogen, wenn weder ein exakter
+Name noch ein Präfix oder ein ganzes kurzes Wort vorhanden ist und die starken
+Treffer nicht reichen, und nur über den Anteil gemeinsamer Trigramme.
 
 CUDA wird benutzt, wenn `nvcuda.dll` einen Rechner meldet. Dann bewertet ein
 kleiner PTX-Kern ab 32 Kandidaten den Trigramm-Recall auf der GPU. Dieselbe

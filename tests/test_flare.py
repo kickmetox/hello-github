@@ -79,6 +79,93 @@ class RankingTests(unittest.TestCase):
         self.assertGreater(exact, prefix)
         self.assertGreater(prefix, token)
 
+    def test_gdf_word_outranks_hash_infix(self) -> None:
+        zurich = lexical_score(
+            "gdf", "Zürich GDF", r"D:\Zürich GDF", kind="dir", tier=1, use_count=0, via="trigram"
+        )
+        schriften = lexical_score(
+            "GDF", "Schriften GdF", r"D:\Schriften GdF", kind="dir", tier=1, use_count=0, via="trigram"
+        )
+        hashed = lexical_score(
+            "gdf",
+            "e_DRHCGYGDFOfQEGETH2FVEEEZCDGECYAF.R",
+            r"C:\Users\a\AppData\Local\Microsoft\Office\16.0\OfficeFileCache\e_DRHCGYGDFOfQEGETH2FVEEEZCDGECYAF.R",
+            kind="file",
+            tier=0,
+            use_count=30,
+            via="trigram",
+        )
+        self.assertGreater(zurich, hashed)
+        self.assertGreater(schriften, hashed)
+        self.assertGreater(zurich - hashed, 1000)
+
+    def test_gdf_short_query_hits_words_without_similar(self) -> None:
+        names = [
+            "GDF Formulare",
+            "Zürich GDF",
+            "1 GDF Formulare",
+            "Schriften GdF",
+        ]
+        hashes = [
+            "e_DRHCGYGDFOfQEGETH2FVEEEZCDGECYAF.R",
+            "e_CJAPDRHGGDF5CUFADXDOA7GVCHF5EOGN.R",
+            "bookmarks-2026-08-17_24_lq1gdfSw1my1fFgvOsvin-wgJlh8KVKjchfNug4lzq",
+        ]
+        with tempfile.TemporaryDirectory() as tmp:
+            index = Index(Path(tmp) / "index.db")
+            ranker = Ranker(allow_cuda=False)
+            try:
+                items: list[dict] = []
+                for number in range(158):
+                    name = names[number] if number < len(names) else f"GDF Ordner {number:03d}"
+                    items.append(
+                        {
+                            "kind": "dir",
+                            "name": name,
+                            "path": rf"D:\Dokumente\{number:03d}\{name}",
+                            "dir": rf"D:\Dokumente\{number:03d}",
+                            "ext": "",
+                            "launch": None,
+                            "mtime_ns": 1,
+                            "size": 0,
+                            "tier": 1,
+                        }
+                    )
+                for name in hashes:
+                    items.append(
+                        {
+                            "kind": "file",
+                            "name": name,
+                            "path": rf"C:\Users\a\AppData\Local\Microsoft\Office\16.0\OfficeFileCache\{name}",
+                            "dir": r"C:\Users\a\AppData\Local\Microsoft\Office\16.0\OfficeFileCache",
+                            "ext": Path(name).suffix.casefold(),
+                            "launch": None,
+                            "mtime_ns": 1,
+                            "size": 1,
+                            "tier": 0,
+                        }
+                    )
+                index.reconcile_dir(r"D:\Dokumente", r"D:\\", 1, 1, items, [])
+                from flare.search import ui_result_limit
+
+                found = search(index, ranker, "gdf", limit=ui_result_limit(False), similar=False)
+                got = [hit["name"] for hit in found["results"]]
+                for name in names:
+                    self.assertIn(name, got, got[:12])
+                for name in hashes:
+                    self.assertNotIn(name, got)
+                self.assertGreaterEqual(len(got), 158)
+                self.assertLessEqual(len(got), ui_result_limit(False))
+                wide = search(index, ranker, "GDF", limit=ui_result_limit(True), similar=True)
+                wide_names = [hit["name"] for hit in wide["results"]]
+                for name in names:
+                    self.assertIn(name, wide_names)
+                for name in hashes:
+                    self.assertNotIn(name, wide_names)
+            finally:
+                index.close()
+                ranker.close()
+
     def test_exact_xchange_outranks_infix_and_is_not_dropped(self) -> None:
         exact = lexical_score(
             "Xchange", "Xchange", r"F:\Xchange", kind="dir", tier=2, use_count=0, via="prefix"
@@ -266,6 +353,52 @@ class IndexTests(unittest.TestCase):
         self.assertTrue(should_skip_dir("node_modules"))
         self.assertTrue(should_skip_dir(".git"))
         self.assertFalse(should_skip_dir("Dokumente"))
+        self.assertTrue(
+            should_skip_dir(r"C:\Users\a\AppData\Local\Microsoft\Office\16.0\OfficeFileCache")
+        )
+        self.assertTrue(should_skip_dir("OfficeFileCache"))
+        self.assertTrue(should_skip_dir(r"C:\Users\a\AppData\Local\Microsoft\Windows\INetCache"))
+        self.assertTrue(should_skip_dir(r"C:\Users\a\AppData\Local\Google\Chrome\User Data\Default\GPUCache"))
+        self.assertTrue(should_skip_dir(r"C:\Users\a\AppData\Local\Google\Chrome\User Data\Default\Code Cache"))
+        self.assertTrue(should_skip_dir(r"C:\Users\a\AppData\Local\Google\Chrome\User Data\Default\Cache"))
+        self.assertTrue(should_skip_dir(r"C:\Users\a\AppData\Local\Temp"))
+        self.assertFalse(should_skip_dir(r"D:\GDF\Temp"))
+        self.assertFalse(should_skip_dir("Temp"))
+        self.assertFalse(should_skip_dir(r"D:\Projekte\Cache"))
+
+    def test_office_file_cache_is_not_indexed(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "profile"
+            cache = root / "AppData" / "Local" / "Microsoft" / "Office" / "16.0" / "OfficeFileCache"
+            cache.mkdir(parents=True)
+            (cache / "e_DRHCGYGDFOfQEGETH2FVEEEZCDGECYAF.R").write_bytes(b"x")
+            temp = root / "AppData" / "Local" / "Temp"
+            temp.mkdir(parents=True)
+            (temp / "gdf-temp.txt").write_text("x", encoding="utf-8")
+            kept = root / "Temp"
+            kept.mkdir()
+            (kept / "behalten.txt").write_text("x", encoding="utf-8")
+            (root / "GDF Formulare").mkdir()
+            index = Index(Path(tmp) / "index.db")
+            try:
+                crawler = Crawler(
+                    index,
+                    Governor(fast=True),
+                    [(str(root), 1)],
+                    threading.Event(),
+                    content=False,
+                    index_path=False,
+                )
+                crawler.prime()
+                crawler.drain()
+                stored = {row[0] for row in index.con.execute("SELECT name FROM items")}
+                self.assertIn("GDF Formulare", stored)
+                self.assertIn("behalten.txt", stored)
+                self.assertNotIn("e_DRHCGYGDFOfQEGETH2FVEEEZCDGECYAF.R", stored)
+                self.assertNotIn("OfficeFileCache", stored)
+                self.assertNotIn("gdf-temp.txt", stored)
+            finally:
+                index.close()
 
     def test_index_search_and_incremental(self) -> None:
         self._fill()
@@ -406,8 +539,8 @@ class SimilarityTests(unittest.TestCase):
         from flare.window import path_for_selection, rows_after_reset, search_status, selectable_rows
 
         self.assertGreaterEqual(_FUZZY_MIN, 0.5)
-        self.assertEqual(ui_result_limit(False), 50)
-        self.assertEqual(ui_result_limit(True), 50)
+        self.assertEqual(ui_result_limit(False), 200)
+        self.assertEqual(ui_result_limit(True), 200)
         self.assertGreaterEqual(ui_result_limit(False), 30)
         with tempfile.TemporaryDirectory() as tmp:
             index = Index(Path(tmp) / "index.db")
@@ -540,7 +673,7 @@ class SimilarityTests(unittest.TestCase):
                         self.assertEqual(folder["kind"], "dir")
                         infix = [name for name in names if "johnson" in name.casefold()]
                         self.assertGreaterEqual(len(infix), 30, names)
-                        self.assertLessEqual(len(payload["results"]), 50)
+                        self.assertLessEqual(len(payload["results"]), ui_result_limit(similar))
                     plain = search(index, ranker, "johnson", limit=ui_result_limit(False), similar=False)
                     plain_names = [hit["name"] for hit in plain["results"]]
                     self.assertIn("Johnson Start.txt", plain_names)

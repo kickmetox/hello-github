@@ -95,12 +95,46 @@ READDIR_MAX_AGE_NS = 15 * 60 * 1_000_000_000
 _PATH_DIR = ":path"
 
 
+# Eindeutige Cache-Ordner, egal wo sie liegen. Cache und Temp nur unter AppData\Local,
+# damit ein eigener Ordner dieses Namens auf D: erhalten bleibt.
+_CACHE_DIRS = {
+    "officefilecache",
+    "inetcache",
+    "gpucache",
+    "code cache",
+}
+_LOCAL_APP_CACHE = {"cache", "temp"}
+
+
+def _path_parts(name: str) -> list[str]:
+    return [part for part in name.replace("/", "\\").split("\\") if part not in {"", ".", ".."}]
+
+
+def _under_local_appdata(parts: list[str]) -> bool:
+    folded = [part.casefold() for part in parts]
+    for index in range(len(folded) - 1):
+        if folded[index] == "appdata" and folded[index + 1] == "local":
+            return True
+    return False
+
+
 def should_skip_dir(name: str) -> bool:
-    lowered = name.casefold()
-    if lowered in SKIP_DIRS:
+    """Ordner auslassen. `name` darf der bloße Name oder ein ganzer Pfad sein.
+
+    Jede Komponente zählt: ein Pfad, der OfficeFileCache enthält, wird nicht
+    gelesen. Cache und Temp gelten nur unter AppData\\Local.
+    """
+    parts = _path_parts(name)
+    if not parts:
+        return False
+    if _under_local_appdata(parts) and any(part.casefold() in _LOCAL_APP_CACHE for part in parts):
         return True
-    if name.startswith(".") and name not in {".", ".."}:
-        return True
+    for part in parts:
+        lowered = part.casefold()
+        if lowered in SKIP_DIRS or lowered in _CACHE_DIRS:
+            return True
+        if part.startswith(".") and part not in {".", ".."}:
+            return True
     return False
 
 
@@ -141,7 +175,7 @@ def collect_root_names(root: str | Path) -> list[dict[str, Any]]:
                 except OSError:
                     continue
                 if is_dir:
-                    if should_skip_dir(entry.name):
+                    if should_skip_dir(entry.path):
                         continue
                     if _consider_name(entry.path, True, seen, items):
                         stack.append(entry.path)
@@ -187,9 +221,9 @@ def collect_list_names(list_path: str | Path) -> list[dict[str, Any]]:
         is_dir = os.path.isdir(line)
         name = os.path.basename(norm(line).rstrip("\\/")) or line
         if is_dir:
-            if should_skip_dir(name):
+            if should_skip_dir(line):
                 continue
-        elif should_skip_file(name):
+        elif should_skip_dir(os.path.dirname(line)) or should_skip_file(name):
             continue
         _consider_name(line, is_dir, seen, items)
     return items
@@ -207,9 +241,9 @@ def _consider_name(
         return False
     name = os.path.basename(norm(path).rstrip("\\/")) or path
     if keep_skipped != key:
-        if is_dir and should_skip_dir(name):
+        if is_dir and should_skip_dir(path):
             return False
-        if not is_dir and should_skip_file(name):
+        if not is_dir and (should_skip_dir(os.path.dirname(path)) or should_skip_file(name)):
             return False
     try:
         st = os.stat(path, follow_symlinks=False)
@@ -736,8 +770,19 @@ class Crawler:
                 )
         self.index.reconcile_dir(_PATH_DIR, ":meta", 0, 0, rows, [])
 
+    def _drop_skipped(self, path: str) -> None:
+        """Bereits gelesene Cache-Ordner aus dem Katalog nehmen."""
+        try:
+            if self.index.knows_dir(path):
+                self.index.drop_tree(path)
+        except Exception:
+            log.debug("skip drop failed", exc_info=True)
+
     def scan_dir(self, path: str, tier: int, descend: bool) -> None:
         if path.startswith(":"):
+            return
+        if should_skip_dir(path):
+            self._drop_skipped(path)
             return
         if self.data_dir and is_inside(path, self.data_dir):
             return
@@ -762,6 +807,9 @@ class Crawler:
         if known is not None and known == current_mtime and not dirty and not stale:
             if descend:
                 for child in self.index.child_dirs(path):
+                    if should_skip_dir(child):
+                        self._drop_skipped(child)
+                        continue
                     self.add(child, tier, descend=True, priority=tier)
             self._watch_dir(path, tier)
             return
@@ -790,9 +838,10 @@ class Crawler:
                 except OSError:
                     continue
                 if is_dir:
-                    if should_skip_dir(name):
-                        continue
                     child = norm(entry.path)
+                    if should_skip_dir(child):
+                        self._drop_skipped(child)
+                        continue
                     if self.blocked(child, tier):
                         continue
                     if self.data_dir and is_inside(child, self.data_dir):

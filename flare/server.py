@@ -141,7 +141,7 @@ class Handler(BaseHTTPRequestHandler):
 
 def _limit(raw: str) -> int:
     try:
-        return max(1, min(int(raw), 50))
+        return max(1, min(int(raw), 200))
     except ValueError:
         return 8
 

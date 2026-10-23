@@ -61,7 +61,7 @@ def features() -> list[str]:
         "Nur-online-Dateien in Cloud-Ordnern stehen mit Namen im Index. Der Inhalt wird nicht heruntergeladen.",
         "Ausschlussliste in der Konfiguration: exclude_drives, ein Laufwerk wie E:\\ oder eine Datenträgerbezeichnung. Diese Laufwerke werden nicht indiziert.",
         "Keine Websuche. E-Mail, Kontakte, Chats und Inhalte anderer Programme werden nicht gelesen.",
-        "Übersprungen werden node_modules, .git, versteckte Ordner und Geheimnisdateien.",
+        "Übersprungen werden node_modules, .git, versteckte Ordner, Geheimnisdateien und Cache-Ordner wie OfficeFileCache, INetCache, GPUCache und Code Cache, dazu Cache und Temp unter AppData\\Local.",
         "Index-Last etwa 85 % in den ersten 20 Sekunden, danach etwa 35 %. Ist die CPU beschäftigt, wartet Flare zusätzlich.",
         "Andere Programme: HTTP auf 127.0.0.1 Port 47731, flare.py query und flare.client.Client.",
         "Einrichtung pro Benutzer unter %LOCALAPPDATA%\\Programs\\Flare. Der Index liegt automatisch unter %LOCALAPPDATA%\\Flare und wird beim Entfernen nicht gelöscht. Mehrere Kopien lassen sich speichern, kopieren und vergleichen: index-save, index-load, index-copy und index-compare. Im Hilfefenster die Knöpfe „Index speichern“, „Index kopieren“ und „Index vergleichen“. Das Menü Index im Suchfenster bietet Sichern, Laden und Vergleichen. Sichern öffnet den Speichern-Dialog, der Name flare-index.db ist vorgeschlagen und lässt sich samt Ordner ändern. Laden übernimmt eine Indexdatei. Vergleichen stellt zwei Indexdateien gegenüber. Das Setup beendet ein laufendes Flare.exe, bevor es DLLs kopiert.",

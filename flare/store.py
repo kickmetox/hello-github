@@ -106,6 +106,25 @@ def like_pattern(prefix: str) -> str:
     return "".join(out)
 
 
+def has_whole_word(query: str, name: str) -> bool:
+    """Die Anfrage ist ein ganzes Wort: Ränder sind Anfang, Ende oder kein Buchstabe und keine Ziffer."""
+    needle = query.casefold().strip()
+    folded = name.casefold()
+    if not needle or needle not in folded:
+        return False
+    start = 0
+    while True:
+        at = folded.find(needle, start)
+        if at < 0:
+            return False
+        before = at == 0 or not folded[at - 1].isalnum()
+        after_at = at + len(needle)
+        after = after_at >= len(folded) or not folded[after_at].isalnum()
+        if before and after:
+            return True
+        start = at + 1
+
+
 class Index:
     def __init__(self, path: str | Path, readonly: bool = False) -> None:
         self.path = Path(path)
@@ -134,6 +153,11 @@ class Index:
         self.con.execute("PRAGMA foreign_keys=ON")
         self.con.execute("PRAGMA busy_timeout=4000")
         self.con.execute("PRAGMA case_sensitive_like=ON")
+        self.con.create_function(
+            "flare_word",
+            2,
+            lambda name, query: 1 if has_whole_word(str(query or ""), str(name or "")) else 0,
+        )
         if not self.readonly:
             self.con.execute("PRAGMA journal_mode=WAL")
             self.con.execute("PRAGMA synchronous=NORMAL")
@@ -400,7 +424,9 @@ class Index:
         """Datei- und Ordnernamen, die die Anfrage irgendwo enthalten.
 
         `name_fold` ist bereits klein geschrieben, `case_sensitive_like` bleibt an.
-        Das führende `%` sucht mitten im Namen, nicht nur am Anfang.
+        Das führende `%` sucht mitten im Namen, nicht nur am Anfang. Ein ganzes
+        Wort steht vor einem Infix, damit Hash-Dateien kurze Treffer nicht verdrängen.
+        Unabhängig von FTS5: Trigramm-Phrasen mit drei Zeichen sind unzuverlässig.
         """
         if len(folded) < 3:
             return []
@@ -408,10 +434,13 @@ class Index:
             f"""
             SELECT {ITEM_COLS} FROM items
             WHERE name_fold LIKE ? ESCAPE '!'
-            ORDER BY use_count DESC, name_fold ASC
+            ORDER BY flare_word(name_fold, ?) DESC,
+                     use_count DESC,
+                     length(name_fold) ASC,
+                     name_fold ASC
             LIMIT ?
             """,
-            ("%" + like_pattern(folded), max(0, int(limit))),
+            ("%" + like_pattern(folded), folded, max(0, int(limit))),
         )
 
     def fts(self, match: str, limit: int) -> list[dict[str, Any]]:
