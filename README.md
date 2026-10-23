@@ -5,7 +5,7 @@ Dateien in einem eigenen Fenster, läuft im Hintergrund und lässt sich aus
 anderen Programmen abfragen.
 
 Kompletter Arbeitsbaum als Zip (Quellcode, Tests, Build und Installer):
-[flare-workspace-help.zip](https://github.com/kickmetox/hello-github/raw/cursor/flare-spotlight-a293/flare-workspace-help.zip)
+[flare-workspace-komplett.zip](https://github.com/kickmetox/hello-github/raw/cursor/flare-spotlight-a293/flare-workspace-komplett.zip)
 
 Das Fenster ist ein normales Win32-Fenster. Es startet keinen Browser.
 Schließen blendet es nur aus; der Index läuft weiter, Strg+Alt+Leertaste holt es zurück.
