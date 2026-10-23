@@ -14,10 +14,23 @@ from flare.launch import (
     quote_command_path,
     reveal_in_explorer,
 )
-from flare.window import VK_APPS, VK_DOWN, VK_ESCAPE, VK_F1, VK_F10, VK_RETURN, help_text as window_help
+from flare.window import (
+    VK_APPS,
+    VK_DOWN,
+    VK_ESCAPE,
+    VK_F1,
+    VK_F10,
+    VK_RETURN,
+    WM_CHAR,
+    WM_KEYDOWN,
+    WM_KEYUP,
+    help_text as window_help,
+)
 from flare.window import (
     copy_unicode_text,
     enter_action,
+    enter_activates_other_window,
+    swallow_enter,
     escape_action,
     hit_row,
     path_for_selection,
@@ -191,6 +204,22 @@ class HelpShortcutTests(unittest.TestCase):
         self.assertEqual(enter_action("johnson", "johnson", selected=-1, count=4), "none")
         self.assertEqual(enter_action("johnson", None, selected=0, count=1), "search")
         self.assertNotEqual(enter_action("report", "johnson", selected=0, count=1), "open")
+        empty = enter_action("GDF", "GDF", selected=-1, count=0)
+        stale = enter_action("GDF", None, selected=0, count=4)
+        self.assertEqual(empty, "search")
+        self.assertEqual(stale, "search")
+        self.assertNotEqual(empty, "open")
+        self.assertNotEqual(stale, "open")
+        self.assertFalse(enter_activates_other_window(empty))
+        self.assertFalse(enter_activates_other_window(stale))
+        self.assertFalse(enter_activates_other_window("none"))
+        self.assertTrue(
+            enter_activates_other_window(enter_action("GDF", "GDF", selected=0, count=1))
+        )
+        self.assertTrue(swallow_enter(WM_KEYDOWN, VK_RETURN))
+        self.assertTrue(swallow_enter(WM_KEYUP, VK_RETURN))
+        self.assertTrue(swallow_enter(WM_CHAR, 13))
+        self.assertFalse(swallow_enter(WM_KEYDOWN, VK_ESCAPE))
         self.assertEqual(escape_action("johnson", 0), "reset")
         self.assertEqual(escape_action("", 2), "reset")
         self.assertEqual(escape_action("", 0), "hide")

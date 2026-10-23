@@ -26,6 +26,8 @@ WM_SIZE = 0x0005
 WM_CLOSE = 0x0010
 WM_QUIT = 0x0012
 WM_KEYDOWN = 0x0100
+WM_KEYUP = 0x0101
+WM_CHAR = 0x0102
 WM_COMMAND = 0x0111
 WM_TIMER = 0x0113
 WM_CTLCOLOREDIT = 0x0133
@@ -34,6 +36,9 @@ WM_CTLCOLORSTATIC = 0x0138
 WM_SETFONT = 0x0030
 WM_CONTEXTMENU = 0x007B
 WM_SYSKEYDOWN = 0x0104
+WM_SYSKEYUP = 0x0105
+WM_GETDLGCODE = 0x0087
+DLGC_WANTALLKEYS = 0x0004
 WM_RBUTTONUP = 0x0205
 WM_FLARE_SHOW = 0x8001
 
@@ -461,16 +466,31 @@ def rows_after_reset(labels: list[str]) -> list[str]:
 
 
 def enter_action(query: str, list_query: str | None, *, selected: int, count: int) -> str:
-    """Enter öffnet nur eine Auswahl, die zur aktuellen Anfrage gehört.
+    """Enter öffnet nur einen Treffer der aktuellen Anfrage.
 
-    Weicht die Liste ab, lautet das Ergebnis „search“: suchen, ersten Treffer
-    markieren, auf diesem Enter nichts öffnen. „open“ nur bei gleicher Anfrage.
+    Leere Liste oder eine Liste zu einem anderen Text: „search“. Nichts öffnen
+    und das Fenster nicht abgeben. „open“ nur, wenn ein Treffer dieser Anfrage
+    ausgewählt ist und gerade geöffnet wird.
     """
-    if list_query != query:
+    if list_query != query or count <= 0:
         return "search"
-    if count <= 0 or selected < 0 or selected >= count:
+    if selected < 0 or selected >= count:
         return "none"
     return "open"
+
+
+def enter_activates_other_window(action: str) -> bool:
+    """Nur das Öffnen eines echten Treffers darf den Vordergrund verlassen."""
+    return action == "open"
+
+
+def swallow_enter(message: int, wparam: int) -> bool:
+    """Enter nicht an Windows durchreichen. Sonst aktiviert das System ein anderes Fenster."""
+    if int(wparam) == VK_RETURN and message in (WM_KEYDOWN, WM_KEYUP, WM_SYSKEYDOWN, WM_SYSKEYUP):
+        return True
+    if message == WM_CHAR and int(wparam) in (10, 13):
+        return True
+    return False
 
 
 def escape_action(query: str, hit_count: int) -> str:
@@ -974,6 +994,9 @@ class NativeWindow:
         self._icon_small = 0
         self._list_proc_cb: Any = None
         self._old_list_proc: Any = None
+        self._edit_proc_cb: Any = None
+        self._old_edit_proc: Any = None
+        self._enter_busy = False
         self._result_menu_open = False
         self._ignore_context_until = 0.0
         self._point_api = False
@@ -1012,9 +1035,7 @@ class NativeWindow:
                     hwnd = getattr(msg, "hWnd", None)
                     if hwnd is None:
                         hwnd = getattr(msg, "hwnd", 0)
-                    if msg.message in (WM_KEYDOWN, WM_SYSKEYDOWN) and self._shortcut(
-                        int(msg.wParam), int(hwnd or 0)
-                    ):
+                    if self._consume_key(int(msg.message), int(msg.wParam), int(hwnd or 0)):
                         continue
                     user32.TranslateMessage(ctypes.byref(msg))
                     user32.DispatchMessageW(ctypes.byref(msg))
@@ -1023,6 +1044,17 @@ class NativeWindow:
             self._help.close(focus=False)
             if self.hwnd:
                 user32.DestroyWindow(self.hwnd)
+
+    def _consume_key(self, message: int, wparam: int, hwnd: int) -> bool:
+        """True: Taste verbraucht. Enter erreicht weder Translate noch Dispatch."""
+        if swallow_enter(message, wparam) and message not in (WM_KEYDOWN, WM_SYSKEYDOWN):
+            return True
+        if message in (WM_KEYDOWN, WM_SYSKEYDOWN):
+            handled = self._shortcut(int(wparam), hwnd)
+            if swallow_enter(message, wparam):
+                return True
+            return handled
+        return False
 
     def _shortcut(self, key: int, hwnd: int = 0) -> bool:
         shift = False
@@ -1047,7 +1079,7 @@ class NativeWindow:
             self._help.close(focus=True)
             return True
         if action == "open":
-            self._open_selected()
+            self._on_enter()
             return True
         if action == "context":
             self._open_menu_for_current_selection(force=True)
@@ -1148,6 +1180,7 @@ class NativeWindow:
         _WINDOWS[int(hwnd)] = self
         self._font = gdi32.CreateFontW(-LIST_FONT_PX, 0, 0, 0, 400, 0, 0, 0, 1, 0, 0, 5, 0, "Segoe UI")
         self.edit = self._child("EDIT", "", 100, ES_AUTOHSCROLL | WS_BORDER)
+        self._subclass_search_edit()
         self.check = self._child("BUTTON", "Ähnliche Namen", 101, BS_AUTOCHECKBOX)
         self.list = self._child("LISTBOX", "", 102, LBS_NOTIFY | LBS_NOINTEGRALHEIGHT | WS_VSCROLL | WS_BORDER)
         self._apply_list_height()
@@ -1328,6 +1361,51 @@ class NativeWindow:
             return
         self._menu = bar
         user32.DrawMenuBar(self.hwnd)
+
+    def _subclass_search_edit(self) -> None:
+        """Enter im Suchfeld schlucken. Das einzeilige Edit würde ihn sonst durchreichen."""
+        if sys.platform != "win32" or not self.edit or self._wndproc_type is None:
+            return
+        user32 = ctypes.windll.user32
+        setter = getattr(user32, "SetWindowLongPtrW", None)
+        if setter is None:
+            return
+        try:
+            setter.argtypes = [wintypes.HWND, ctypes.c_int, ctypes.c_void_p]
+            setter.restype = ctypes.c_void_p
+            user32.CallWindowProcW.argtypes = [
+                ctypes.c_void_p,
+                wintypes.HWND,
+                wintypes.UINT,
+                wintypes.WPARAM,
+                wintypes.LPARAM,
+            ]
+            user32.CallWindowProcW.restype = LRESULT
+            callback = self._wndproc_type(self._edit_wndproc)
+            self._edit_proc_cb = callback
+            previous = setter(self.edit, GWLP_WNDPROC, ctypes.cast(callback, ctypes.c_void_p))
+        except (AttributeError, OSError):
+            self._edit_proc_cb = None
+            return
+        if not previous:
+            self._edit_proc_cb = None
+            return
+        self._old_edit_proc = previous
+
+    def _call_old_proc(self, old: Any, hwnd: int, msg: int, wparam: int, lparam: int) -> int:
+        if not old:
+            return int(_prepare_user32().DefWindowProcW(hwnd, msg, wparam, lparam))
+        return int(ctypes.windll.user32.CallWindowProcW(old, hwnd, msg, wparam, lparam))
+
+    def _edit_wndproc(self, hwnd: int, msg: int, wparam: int, lparam: int) -> int:
+        if msg == WM_GETDLGCODE:
+            base = self._call_old_proc(self._old_edit_proc, hwnd, msg, wparam, lparam)
+            return int(base) | DLGC_WANTALLKEYS
+        if swallow_enter(msg, int(wparam)):
+            if msg in (WM_KEYDOWN, WM_SYSKEYDOWN) and not self._enter_busy:
+                self._on_enter()
+            return 0
+        return self._call_old_proc(self._old_edit_proc, hwnd, msg, wparam, lparam)
 
     def _subclass_result_list(self) -> None:
         """Rechtsklick erreicht die Liste, nicht das Hauptfenster. Nur unter Windows."""
@@ -1729,6 +1807,10 @@ class NativeWindow:
         if msg == WM_FLARE_SHOW:
             self._reveal()
             return 0
+        if swallow_enter(msg, int(wparam)):
+            if msg in (WM_KEYDOWN, WM_SYSKEYDOWN):
+                self._on_enter()
+            return 0
         if msg == WM_SIZE:
             self._layout()
             return 0
@@ -2006,35 +2088,63 @@ class NativeWindow:
         if self._query():
             self._apply_result_status()
 
+    def _on_enter(self) -> None:
+        """Ein Enter. Die Schleife und das Suchfeld dürfen ihn nicht doppelt ausführen."""
+        if self._enter_busy:
+            return
+        self._enter_busy = True
+        try:
+            self._open_selected()
+        finally:
+            self._enter_busy = False
+
+    def _hold_flare_focus(self) -> None:
+        """Tastatur und Vordergrund bleiben in Flare. Kein anderes Fenster aktivieren."""
+        if sys.platform != "win32" or not self.hwnd:
+            return
+        user32 = ctypes.windll.user32
+        try:
+            user32.SetForegroundWindow(self.hwnd)
+            if self.edit:
+                user32.SetFocus(self.edit)
+        except (AttributeError, OSError):
+            return
+
     def _open_selected(self) -> None:
         if sys.platform == "win32" and not self.list:
+            self._hold_flare_focus()
             return
         query = self._query() if sys.platform == "win32" else ""
         selected = self.selected
         if self._list_query == query:
             selected = self._live_selection()
         action = enter_action(query, self._list_query, selected=selected, count=len(self.results))
-        if action == "search":
-            self._run_search()
-            return
-        if action != "open":
-            return
-        if self._query() != query or self._list_query != query:
-            return
-        if selected < 0 or selected >= len(self.results):
-            return
-        self.selected = selected
-        hit = self.results[self.selected]
-        try:
-            self._open_hit(hit)
-        except OSError as exc:
-            missing = isinstance(exc, FileNotFoundError)
-            missing = missing or getattr(exc, "errno", None) in (2, 3)
-            missing = missing or getattr(exc, "winerror", None) in (2, 3)
-            self._set_status("Datei fehlt." if missing else "Öffnen fehlgeschlagen.")
-            return
-        except Exception:
-            self._set_status("Öffnen fehlgeschlagen.")
+        if enter_activates_other_window(action):
+            if self._query() != query or self._list_query != query:
+                self._hold_flare_focus()
+                return
+            if selected < 0 or selected >= len(self.results):
+                self._hold_flare_focus()
+                return
+            self.selected = selected
+            hit = self.results[self.selected]
+            try:
+                self._open_hit(hit)
+            except OSError as exc:
+                missing = isinstance(exc, FileNotFoundError)
+                missing = missing or getattr(exc, "errno", None) in (2, 3)
+                missing = missing or getattr(exc, "winerror", None) in (2, 3)
+                self._set_status("Datei fehlt." if missing else "Öffnen fehlgeschlagen.")
+                self._hold_flare_focus()
+                return
+            except Exception:
+                self._set_status("Öffnen fehlgeschlagen.")
+                self._hold_flare_focus()
+                return
+        else:
+            if action == "search":
+                self._run_search()
+            self._hold_flare_focus()
             return
         if hit.get("kind") == "calc":
             try:
