@@ -11,6 +11,9 @@ Das Fenster ist ein normales Win32-Fenster. Es startet keinen Browser.
 Schließen blendet es nur aus; der Index läuft weiter, Strg+Alt+Leertaste holt es zurück.
 Standardkürzel: **Strg+Alt+Leertaste**. Es greift, während ein anderes Fenster
 den Fokus hat. In `config.json` steht das Kürzel als `ctrl+alt+space`.
+**Hilfe** im Fenster oder die Taste F1 öffnet im selben Programm eine
+Kurzbeschreibung, einen Beschreibungstext und die Feature-Liste. Escape
+schließt die Hilfe und kehrt zur Suche zurück. Es öffnet sich kein Browser.
 **Ähnlich** schaltet die Ähnlichkeitssuche ein, im Fenster als „Ähnliche Namen“
 und in der Web-Oberfläche als Knopf. Nahe Dateinamen bleiben sichtbar, auch
 wenn schon genaue Treffer da sind. Der Web-Knopf merkt sich die Wahl
