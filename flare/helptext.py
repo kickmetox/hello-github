@@ -19,8 +19,10 @@ def description() -> str:
     """Etwas längerer Beschreibungstext, immer noch ohne Werbesprache."""
     return (
         "Das Fenster ist ein normales Win32-Fenster in diesem Prozess. "
-        "Es startet weder Chrome noch Edge. Schließen oder Escape blendet das Fenster "
-        "nur aus; der Index läuft im Hintergrund weiter. Enter öffnet den markierten Treffer. "
+        "Es startet weder Chrome noch Edge. Schließen blendet das Fenster "
+        "nur aus; der Index läuft im Hintergrund weiter. "
+        "Suche zurücksetzen und das erste Escape löschen die Anfrage und die Treffer, während Enter nur einen Treffer der aktuellen Anfrage öffnet. "
+        "Das zweite Escape blendet das Fenster aus. "
         "Ein Rechtsklick, Umschalt+F10 oder die Kontextmenütaste öffnet Öffnen, Speicherort öffnen, "
         "Im Editor bearbeiten, Senden an, Pfad kopieren und Als Pfad kopieren. "
         "Im Editor bearbeiten nutzt den Schlüssel editor, sonst EDITOR, sonst notepad.exe, "
@@ -64,7 +66,7 @@ def features() -> list[str]:
         "Andere Programme: HTTP auf 127.0.0.1 Port 47731, flare.py query und flare.client.Client.",
         "Einrichtung pro Benutzer unter %LOCALAPPDATA%\\Programs\\Flare. Der Index liegt automatisch unter %LOCALAPPDATA%\\Flare und wird beim Entfernen nicht gelöscht. Mehrere Kopien lassen sich speichern, kopieren und vergleichen: index-save, index-load, index-copy und index-compare. Im Hilfefenster die Knöpfe „Index speichern“, „Index kopieren“ und „Index vergleichen“. Das Menü Index im Suchfenster bietet Sichern, Laden und Vergleichen. Sichern öffnet den Speichern-Dialog, der Name flare-index.db ist vorgeschlagen und lässt sich samt Ordner ändern. Laden übernimmt eine Indexdatei. Vergleichen stellt zwei Indexdateien gegenüber. Das Setup beendet ein laufendes Flare.exe, bevor es DLLs kopiert.",
         "Ein eigener Index ist eine separate Datei für ein anderes Programm, zum Beispiel eine Dokumentenverwaltung. index-create legt sie leer an, index-add --root liest Ordnernamen und index-add --list eine Pfadliste, query --index durchsucht sie. Eigene Indizes speichern nur Namen. Der persönliche Index bleibt unter %LOCALAPPDATA%\\Flare. „Index anlegen“ schreibt eine leere Datei.",
-        "Rechnung wie 2+2*3. Enter öffnet einen Treffer, Escape blendet die Suche aus.",
+        "Rechnung wie 2+2*3. Enter öffnet einen Treffer der aktuellen Anfrage, das zweite Escape blendet die Suche aus.",
         "Hilfe über den Knopf Hilfe oder F1. Escape schließt die Hilfe und kehrt zur Suche zurück.",
     ]
 

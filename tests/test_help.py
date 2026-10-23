@@ -15,7 +15,16 @@ from flare.launch import (
     reveal_in_explorer,
 )
 from flare.window import VK_APPS, VK_DOWN, VK_ESCAPE, VK_F1, VK_F10, VK_RETURN, help_text as window_help
-from flare.window import copy_unicode_text, hit_row, row_path, shortcut_action
+from flare.window import (
+    copy_unicode_text,
+    enter_action,
+    escape_action,
+    hit_row,
+    path_for_selection,
+    row_path,
+    rows_after_reset,
+    shortcut_action,
+)
 
 
 class HelpTextTests(unittest.TestCase):
@@ -112,6 +121,7 @@ class HelpShortcutTests(unittest.TestCase):
             "Info",
             "Andreas Meyer",
             "ame@sellerbach.de",
+            "Suche zurücksetzen",
         ):
             self.assertIn(label, menu)
         confirm = inspect.getsource(window.confirm_index_replace)
@@ -158,9 +168,13 @@ class HelpShortcutTests(unittest.TestCase):
         )
         self.assertGreaterEqual(list_item_height(18, 0), 22)
         self.assertGreater(list_item_height(18, 2), list_item_height(18, 0))
-        source = inspect.getsource(NativeWindow._run_search)
+        source = inspect.getsource(NativeWindow._run_search) + inspect.getsource(NativeWindow._fill_listbox)
+        self.assertIn("_fill_listbox", inspect.getsource(NativeWindow._run_search))
         self.assertIn("LB_RESETCONTENT", source)
         self.assertIn("_erase_list", source)
+        self.assertIn("LB_GETCOUNT", inspect.getsource(NativeWindow._fill_listbox))
+        self.assertEqual(rows_after_reset(labels), labels)
+        self.assertEqual(len(rows_after_reset(labels)), len(labels))
         self.assertIn("InvalidateRect", inspect.getsource(NativeWindow._erase_list))
         self.assertIn("LB_SETITEMHEIGHT", inspect.getsource(NativeWindow._apply_list_height))
         self.assertIn("Sichern…", inspect.getsource(NativeWindow._install_index_menu))
@@ -171,6 +185,24 @@ class HelpShortcutTests(unittest.TestCase):
         self.assertEqual(shortcut_action(VK_ESCAPE, help_open=True, help_target=True), "close-help")
         self.assertEqual(shortcut_action(VK_ESCAPE, help_open=True, help_target=False), "close-help")
         self.assertEqual(shortcut_action(VK_ESCAPE, help_open=False, help_target=False), "hide")
+        self.assertEqual(enter_action("report", "johnson", selected=0, count=1), "search")
+        self.assertEqual(enter_action("johnson", "johnson", selected=0, count=4), "open")
+        self.assertEqual(enter_action("johnson", "johnson", selected=3, count=4), "open")
+        self.assertEqual(enter_action("johnson", "johnson", selected=-1, count=4), "none")
+        self.assertEqual(enter_action("johnson", None, selected=0, count=1), "search")
+        self.assertNotEqual(enter_action("report", "johnson", selected=0, count=1), "open")
+        self.assertEqual(escape_action("johnson", 0), "reset")
+        self.assertEqual(escape_action("", 2), "reset")
+        self.assertEqual(escape_action("", 0), "hide")
+        moved = [
+            path_for_selection(
+                [{"path": r"D:\a\Johnston notes"}, {"path": r"E:\b\Johnston notes"}],
+                index,
+            )
+            for index in (0, 1)
+        ]
+        self.assertEqual(moved, [r"D:\a\Johnston notes", r"E:\b\Johnston notes"])
+        self.assertNotEqual(moved[0], moved[1])
         self.assertIsNone(shortcut_action(VK_DOWN, help_open=True, help_target=True))
         self.assertEqual(shortcut_action(VK_RETURN, help_open=False, help_target=False), "open")
         self.assertIsNone(shortcut_action(VK_RETURN, help_open=True, help_target=True))
@@ -190,8 +222,13 @@ class HelpShortcutTests(unittest.TestCase):
             "Umschalt+F10",
             "notepad.exe",
             "SendTo",
+            "Suche zurücksetzen",
         ):
             self.assertIn(label, help_text())
+        self.assertIn(
+            "Suche zurücksetzen und das erste Escape löschen die Anfrage und die Treffer, während Enter nur einen Treffer der aktuellen Anfrage öffnet.",
+            help_text(),
+        )
 
 
 class IconTests(unittest.TestCase):

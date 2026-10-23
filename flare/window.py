@@ -44,8 +44,10 @@ LB_RESETCONTENT = 0x0184
 LB_ADDSTRING = 0x0180
 LB_SETCURSEL = 0x0186
 LB_GETCURSEL = 0x0188
+LB_GETCOUNT = 0x018B
 LB_GETITEMRECT = 0x0198
 LB_SETITEMHEIGHT = 0x01A0
+LB_GETITEMHEIGHT = 0x01A1
 LB_ITEMFROMPOINT = 0x01A9
 LB_ERR = -1
 WM_SETREDRAW = 0x000B
@@ -99,6 +101,7 @@ IDC_MENU_LOAD = 302
 IDC_MENU_COMPARE = 303
 IDC_MENU_COPY = 304
 IDC_MENU_CREATE = 305
+IDC_MENU_RESET = 306
 IDC_CTX_OPEN = 311
 IDC_CTX_REVEAL = 312
 IDC_CTX_COPY = 313
@@ -440,6 +443,43 @@ def search_status(mode: str, took_ms: float, count: int, path: str = "") -> str:
     return text
 
 
+def selectable_rows(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Jeder zurückgegebene Treffer ist eine Zeile. Gleicher Name, anderer Pfad bleibt."""
+    return [dict(hit) for hit in results]
+
+
+def path_for_selection(results: list[dict[str, Any]], index: int) -> str:
+    """Pfad der Zeile `index`. Daneben oder außerhalb gibt es keinen Pfad."""
+    if index < 0 or index >= len(results):
+        return ""
+    return row_path(results[index])
+
+
+def rows_after_reset(labels: list[str]) -> list[str]:
+    """Nach LB_RESETCONTENT genau diese Zeilen. Sichtbar ist die Trefferzahl."""
+    return list(labels)
+
+
+def enter_action(query: str, list_query: str | None, *, selected: int, count: int) -> str:
+    """Enter öffnet nur eine Auswahl, die zur aktuellen Anfrage gehört.
+
+    Weicht die Liste ab, lautet das Ergebnis „search“: suchen, ersten Treffer
+    markieren, auf diesem Enter nichts öffnen. „open“ nur bei gleicher Anfrage.
+    """
+    if list_query != query:
+        return "search"
+    if count <= 0 or selected < 0 or selected >= count:
+        return "none"
+    return "open"
+
+
+def escape_action(query: str, hit_count: int) -> str:
+    """Erstes Escape leert Anfrage oder Treffer. Das nächste blendet aus."""
+    if str(query or "") or int(hit_count) > 0:
+        return "reset"
+    return "hide"
+
+
 def split_lparam(value: int) -> tuple[int, int]:
     """X und Y aus einem Win32-LPARAM, jeweils vorzeichenbehaftet 16 Bit."""
     raw = int(value) & 0xFFFFFFFF
@@ -457,6 +497,23 @@ def make_lparam(x: int, y: int) -> int:
 
 
 _SEND_PTR: Any = None
+_SEND_MSG: Any = None
+
+
+def _send_msg(hwnd: int, message: int, wparam: int = 0, lparam: int = 0) -> int:
+    """SendMessageW mit zeigerbreitem WPARAM. LB_SETCURSEL -1 löscht die Auswahl."""
+    global _SEND_MSG
+    if _SEND_MSG is None:
+        kind = ctypes.WINFUNCTYPE(
+            LRESULT,
+            wintypes.HWND,
+            wintypes.UINT,
+            ctypes.c_size_t,
+            ctypes.c_ssize_t,
+        )
+        _SEND_MSG = kind(("SendMessageW", ctypes.windll.user32))
+    mask = (1 << (8 * ctypes.sizeof(ctypes.c_void_p))) - 1
+    return int(_SEND_MSG(int(hwnd), int(message), int(wparam) & mask, int(lparam)))
 
 
 def _send_ptr(hwnd: int, message: int, wparam: int, lparam: Any) -> int:
@@ -901,7 +958,10 @@ class NativeWindow:
         self.results: list[dict[str, Any]] = []
         self._rows: list[str] = []
         self._result_status: tuple[str, float, int] | None = None
-        self.selected = 0
+        self.selected = -1
+        # Anfrage, für die die Liste gefüllt wurde. None heißt: noch nicht, oder der Text hat sich geändert.
+        self._list_query: str | None = None
+        self._suspend_query = False
         self._pending_show = False
         self._proc: Any = None
         self._wndproc_type: Any = None
@@ -993,7 +1053,11 @@ class NativeWindow:
             self._open_menu_for_current_selection(force=True)
             return True
         if action == "hide":
-            self._hide()
+            query = self._query() if sys.platform == "win32" else ""
+            if escape_action(query, len(self.results)) == "reset":
+                self._reset_search()
+            else:
+                self._hide()
             return True
         if action == "down":
             self._move(1)
@@ -1123,7 +1187,7 @@ class NativeWindow:
         measured = self._font_cell()
         if measured is not None:
             height = max(height, list_item_height(measured[0], measured[1]))
-        ctypes.windll.user32.SendMessageW(self.list, LB_SETITEMHEIGHT, 0, height)
+        _send_msg(self.list, LB_SETITEMHEIGHT, 0, height)
 
     def _font_cell(self) -> tuple[int, int] | None:
         if not self.list or not self._font or sys.platform != "win32":
@@ -1166,7 +1230,24 @@ class NativeWindow:
                 gdi32.SelectObject(hdc, old)
             if not ok:
                 return None
-            return int(metrics.tmHeight), int(metrics.tmExternalLeading)
+            text_h = int(metrics.tmHeight)
+            try:
+                class SIZE(ctypes.Structure):
+                    _fields_ = [("cx", ctypes.c_long), ("cy", ctypes.c_long)]
+
+                gdi32.GetTextExtentPoint32W.argtypes = [
+                    wintypes.HDC,
+                    wintypes.LPCWSTR,
+                    ctypes.c_int,
+                    ctypes.POINTER(SIZE),
+                ]
+                gdi32.GetTextExtentPoint32W.restype = wintypes.BOOL
+                size = SIZE()
+                if gdi32.GetTextExtentPoint32W(hdc, "AgÄyj", 5, ctypes.byref(size)):
+                    text_h = max(text_h, int(size.cy))
+            except (AttributeError, OSError):
+                pass
+            return text_h, int(metrics.tmExternalLeading)
         except (AttributeError, OSError):
             return None
         finally:
@@ -1178,10 +1259,18 @@ class NativeWindow:
         if not hwnd:
             return
         user32 = ctypes.windll.user32
+        rect = wintypes.RECT()
         try:
+            user32.GetClientRect.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.RECT)]
+            user32.GetClientRect.restype = wintypes.BOOL
+            user32.GetDC.argtypes = [wintypes.HWND]
+            user32.GetDC.restype = wintypes.HDC
+            user32.ReleaseDC.argtypes = [wintypes.HWND, wintypes.HDC]
+            user32.ReleaseDC.restype = ctypes.c_int
+            user32.FillRect.argtypes = [wintypes.HDC, ctypes.POINTER(wintypes.RECT), wintypes.HBRUSH]
+            user32.FillRect.restype = ctypes.c_int
             user32.InvalidateRect.argtypes = [wintypes.HWND, ctypes.c_void_p, wintypes.BOOL]
             user32.InvalidateRect.restype = wintypes.BOOL
-            user32.InvalidateRect(hwnd, None, True)
             user32.RedrawWindow.argtypes = [
                 wintypes.HWND,
                 ctypes.c_void_p,
@@ -1189,6 +1278,12 @@ class NativeWindow:
                 wintypes.UINT,
             ]
             user32.RedrawWindow.restype = wintypes.BOOL
+            if self._field_brush and user32.GetClientRect(hwnd, ctypes.byref(rect)):
+                hdc = user32.GetDC(hwnd)
+                if hdc:
+                    user32.FillRect(hdc, ctypes.byref(rect), self._field_brush)
+                    user32.ReleaseDC(hwnd, hdc)
+            user32.InvalidateRect(hwnd, None, True)
             user32.RedrawWindow(hwnd, None, None, RDW_INVALIDATE | RDW_ERASE | RDW_UPDATENOW)
         except (AttributeError, OSError):
             return
@@ -1223,6 +1318,7 @@ class NativeWindow:
         user32.AppendMenuW(popup, MF_STRING, IDC_MENU_COPY, "Kopieren…")
         user32.AppendMenuW(popup, MF_STRING, IDC_MENU_CREATE, "Anlegen…")
         user32.AppendMenuW(bar, MF_POPUP, int(popup), "Index")
+        user32.AppendMenuW(bar, MF_STRING, IDC_MENU_RESET, "Suche zurücksetzen")
         info = user32.CreatePopupMenu()
         if info:
             user32.AppendMenuW(info, MF_STRING | MF_GRAYED | MF_DISABLED, 0, "Andreas Meyer")
@@ -1649,8 +1745,12 @@ class NativeWindow:
                 self._index_copy()
             elif ident == IDC_MENU_CREATE:
                 self._index_create()
+            elif ident == IDC_MENU_RESET:
+                self._reset_search()
             elif ident == 100 and code == EN_CHANGE:
-                user32.SetTimer(hwnd, 1, 30, None)
+                if not self._suspend_query:
+                    self._on_query_edited()
+                    user32.SetTimer(hwnd, 1, 30, None)
             elif ident == 101 and code == BN_CLICKED:
                 self.similar = user32.SendMessageW(self.check, BM_GETCHECK, 0, 0) == BST_CHECKED
                 self._run_search()
@@ -1710,36 +1810,122 @@ class NativeWindow:
             ctypes.windll.user32.ShowWindow(self.hwnd, SW_HIDE)
 
     def _query(self) -> str:
+        if not self.edit or sys.platform != "win32":
+            return ""
         buf = ctypes.create_unicode_buffer(512)
         ctypes.windll.user32.GetWindowTextW(self.edit, buf, 512)
         return buf.value
 
-    def _run_search(self) -> None:
+    def _read_similar(self) -> None:
+        if not self.check or sys.platform != "win32":
+            return
         try:
-            payload = self._search(self._query(), self.similar)
+            checked = _send_msg(self.check, BM_GETCHECK, 0, 0) == BST_CHECKED
+        except (AttributeError, OSError):
+            return
+        self.similar = bool(checked)
+
+    def _on_query_edited(self) -> None:
+        """EN_CHANGE: Auswahl weg, bevor Öffnen den alten Index sehen kann."""
+        self._clear_list_state(stamp=None)
+
+    def _reset_search(self) -> None:
+        """Anfrage, Liste und Auswahl leer. Das Fenster bleibt offen."""
+        self._suspend_query = True
+        try:
+            if sys.platform == "win32" and self.hwnd:
+                try:
+                    ctypes.windll.user32.KillTimer(self.hwnd, 1)
+                except (AttributeError, OSError):
+                    pass
+            if sys.platform == "win32" and self.edit:
+                ctypes.windll.user32.SetWindowTextW(self.edit, "")
+            self._clear_list_state(stamp="")
+            if sys.platform == "win32" and self.edit:
+                ctypes.windll.user32.SetFocus(self.edit)
+            self._paint_status()
+        finally:
+            self._suspend_query = False
+            if sys.platform == "win32" and self.hwnd:
+                try:
+                    ctypes.windll.user32.KillTimer(self.hwnd, 1)
+                except (AttributeError, OSError):
+                    pass
+
+    def _clear_list_state(self, stamp: str | None) -> None:
+        self.results = []
+        self._rows = []
+        self.selected = -1
+        self._list_query = stamp
+        self._result_status = None
+        if sys.platform == "win32" and self.list:
+            _send_msg(self.list, LB_SETCURSEL, -1, 0)
+            _send_msg(self.list, WM_SETREDRAW, 0, 0)
+            try:
+                _send_msg(self.list, LB_RESETCONTENT, 0, 0)
+            finally:
+                _send_msg(self.list, WM_SETREDRAW, 1, 0)
+                self._erase_list()
+        if stamp is None:
+            self._set_status("")
+
+    def _run_search(self) -> None:
+        if sys.platform == "win32" and self.hwnd:
+            try:
+                ctypes.windll.user32.KillTimer(self.hwnd, 1)
+            except (AttributeError, OSError):
+                pass
+        self._read_similar()
+        query = self._query() if sys.platform == "win32" else ""
+        try:
+            payload = self._search(query, self.similar)
         except Exception:
             return
-        self.results = list(payload.get("results") or [])
-        self.selected = 0
+        if sys.platform == "win32" and self._query() != query:
+            return
+        self.results = selectable_rows(list(payload.get("results") or []))
         labels = result_labels(self.results)
-        self._rows = replace_list_rows(self._rows, labels)
+        self._rows = rows_after_reset(replace_list_rows(self._rows, labels))
         took = payload.get("took_ms")
         if took is not None:
             mode = "Ähnlichkeit" if self.similar else "Suche"
             self._result_status = (mode, float(took), len(self.results))
-        user32 = ctypes.windll.user32
-        user32.SendMessageW(self.list, WM_SETREDRAW, 0, 0)
+        select = 0 if self.results else -1
+        self._list_query = query
+        self.selected = select
+        suspended = self._suspend_query
+        self._suspend_query = True
         try:
-            user32.SendMessageW(self.list, LB_RESETCONTENT, 0, 0)
-            for label in self._rows:
-                user32.SendMessageW(self.list, LB_ADDSTRING, 0, label)
-            if self.results:
-                user32.SendMessageW(self.list, LB_SETCURSEL, 0, 0)
+            self._fill_listbox(select)
         finally:
-            user32.SendMessageW(self.list, WM_SETREDRAW, 1, 0)
-            self._erase_list()
+            self._suspend_query = suspended
         if took is not None:
             self._apply_result_status()
+
+    def _fill_listbox(self, select: int) -> None:
+        """LB_RESETCONTENT, dann genau eine Zeile pro Treffer. Nichts daneben."""
+        if sys.platform != "win32" or not self.list:
+            return
+        self._apply_list_height()
+        _send_msg(self.list, LB_SETCURSEL, -1, 0)
+        _send_msg(self.list, WM_SETREDRAW, 0, 0)
+        try:
+            _send_msg(self.list, LB_RESETCONTENT, 0, 0)
+            held = [ctypes.create_unicode_buffer(label) for label in self._rows]
+            for buf in held:
+                _send_ptr(self.list, LB_ADDSTRING, 0, buf)
+            count = _send_msg(self.list, LB_GETCOUNT, 0, 0)
+            if count != len(self._rows):
+                _send_msg(self.list, LB_RESETCONTENT, 0, 0)
+                for buf in held:
+                    _send_ptr(self.list, LB_ADDSTRING, 0, buf)
+            if 0 <= select < len(self._rows):
+                _send_msg(self.list, LB_SETCURSEL, select, 0)
+            else:
+                _send_msg(self.list, LB_SETCURSEL, -1, 0)
+        finally:
+            _send_msg(self.list, WM_SETREDRAW, 1, 0)
+            self._erase_list()
 
     def _paint_status(self) -> None:
         if self._query():
@@ -1779,12 +1965,7 @@ class NativeWindow:
             self._paint_status()
 
     def _selected_path(self) -> str:
-        if not self.results:
-            return ""
-        index = self.selected
-        if index < 0 or index >= len(self.results):
-            return ""
-        return str(self.results[index].get("path") or "")
+        return path_for_selection(self.results, self.selected)
 
     def _apply_result_status(self) -> None:
         if self._result_status is None:
@@ -1792,34 +1973,57 @@ class NativeWindow:
         mode, took, count = self._result_status
         self._set_status(search_status(mode, took, count, self._selected_path()))
 
+    def _live_selection(self) -> int:
+        """Auswahl nur, wenn die Liste zur Anfrage im Suchfeld gehört."""
+        query = self._query() if sys.platform == "win32" else ""
+        if self._list_query != query:
+            return -1
+        choice = self.selected
+        if sys.platform == "win32" and self.list:
+            try:
+                current = _send_msg(self.list, LB_GETCURSEL, 0, 0)
+            except (AttributeError, OSError):
+                current = -1
+            if current >= 0:
+                choice = current
+        if choice < 0 or choice >= len(self.results):
+            return -1
+        return choice
+
     def _sync_selection(self) -> None:
-        if not self.list:
+        if not self.list or self._suspend_query:
             return
-        choice = int(ctypes.windll.user32.SendMessageW(self.list, LB_GETCURSEL, 0, 0))
-        if choice >= 0:
-            self.selected = choice
-        if self._query():
+        choice = self._live_selection()
+        self.selected = choice
+        if self._list_query == self._query():
             self._apply_result_status()
 
     def _move(self, delta: int) -> None:
-        if not self.results:
+        if not self.results or self._list_query != self._query():
             return
         self.selected = max(0, min(len(self.results) - 1, self.selected + delta))
-        ctypes.windll.user32.SendMessageW(self.list, LB_SETCURSEL, self.selected, 0)
+        _send_msg(self.list, LB_SETCURSEL, self.selected, 0)
         if self._query():
             self._apply_result_status()
 
     def _open_selected(self) -> None:
-        if not self.list:
+        if sys.platform == "win32" and not self.list:
             return
-        try:
-            choice = int(ctypes.windll.user32.SendMessageW(self.list, LB_GETCURSEL, 0, 0))
-        except (AttributeError, OSError):
-            choice = LB_ERR
-        if choice >= 0:
-            self.selected = choice
-        if not self.results or self.selected < 0 or self.selected >= len(self.results):
+        query = self._query() if sys.platform == "win32" else ""
+        selected = self.selected
+        if self._list_query == query:
+            selected = self._live_selection()
+        action = enter_action(query, self._list_query, selected=selected, count=len(self.results))
+        if action == "search":
+            self._run_search()
             return
+        if action != "open":
+            return
+        if self._query() != query or self._list_query != query:
+            return
+        if selected < 0 or selected >= len(self.results):
+            return
+        self.selected = selected
         hit = self.results[self.selected]
         try:
             self._open_hit(hit)

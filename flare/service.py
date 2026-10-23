@@ -23,7 +23,7 @@ from flare.launch import launch_target
 from flare.paths import data_dir as default_data_dir
 from flare.paths import norm, place_key
 from flare.rank import Ranker
-from flare.search import search, search_index_file
+from flare.search import search, search_index_file, ui_result_limit
 from flare.server import EventBus, Server
 from flare.store import Index, replace_live_index
 from flare.watch import NullWatcher, start_watcher
@@ -209,7 +209,7 @@ class Service:
             self.shutdown()
 
     def _ui_search(self, text: str, similar: bool) -> dict[str, Any]:
-        return self.search(text, 12, similar)
+        return self.search(text, ui_result_limit(similar), similar)
 
     def _ui_open(self, hit: dict[str, Any]) -> None:
         if hit.get("kind") == "calc":

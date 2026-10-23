@@ -14,6 +14,11 @@ from flare.store import Index, open_index
 _TOKEN = re.compile(r"\w+", re.UNICODE)
 _FUZZY_MIN = 0.5
 _SIMILAR_ALL = 3000
+# FTS-LIMIT 80 verliert nahe Namen, sobald häufige Trigramme die Liste füllen.
+_SIMILAR_CANDIDATES = 400
+# Das Fenster zeigt bei „Ähnliche Namen“ mehr als die gewöhnlichen 12 Zeilen.
+PLAIN_UI_LIMIT = 12
+SIMILAR_UI_LIMIT = 50
 
 
 def phrase_query(text: str) -> str | None:
@@ -106,14 +111,69 @@ def _fuzzy_surface(name: str) -> str:
     return stem if len(stem) >= 3 else name
 
 
+def ui_result_limit(similar: bool) -> int:
+    """Zeilen im Suchfenster. Ähnliche Namen bis 50, sonst 12. Nicht tausende."""
+    return SIMILAR_UI_LIMIT if similar else PLAIN_UI_LIMIT
+
+
 def _similar_pool(index: Index, text: str) -> list[dict[str, Any]]:
-    """Bis 3000 Einträge der ganze Katalog, darüber FTS-Trigramm-Kandidaten."""
+    """Kandidaten für „Ähnliche Namen“.
+
+    Kleine Kataloge werden ganz bewertet. Große Kataloge nehmen den
+    Trigramm-Index, nicht die ersten FTS-Zeilen: die verdrängen Johnston,
+    sobald „son“ und „ohn“ das LIMIT füllen.
+    """
     if index.counts()["items"] <= _SIMILAR_ALL:
         return index.all_items(_SIMILAR_ALL)
+    ranked = index.similar_candidates(text, _SIMILAR_CANDIDATES)
+    if ranked:
+        return ranked
     fuzzy = fuzzy_query(text)
     if not fuzzy:
         return []
-    return index.fts(fuzzy, 80)
+    return index.fts(fuzzy, _SIMILAR_CANDIDATES)
+
+
+def merge_similar(lexical: list[dict[str, Any]], near: list[dict[str, Any]], limit: int) -> list[dict[str, Any]]:
+    """Lexikalische Treffer und nahe Namen teilen sich das Limit.
+
+    Solange beide zusammen in das Limit passen, bleibt jeder nahe Name eine
+    eigene Zeile. Die Hälfte ist nur die Balance, wenn beide Seiten überlaufen,
+    nicht eine kleinere Deckelung für die Ähnlichkeit.
+    """
+    limit = max(1, min(int(limit), SIMILAR_UI_LIMIT))
+    if not near:
+        return list(lexical[:limit])
+    seen: set[Any] = set()
+    merged: list[dict[str, Any]] = []
+
+    def add(hit: dict[str, Any]) -> bool:
+        if len(merged) >= limit:
+            return False
+        ident = hit.get("id")
+        if ident is not None and ident in seen:
+            return True
+        if ident is not None:
+            seen.add(ident)
+        merged.append(hit)
+        return True
+
+    if len(lexical) + len(near) <= limit:
+        for hit in lexical:
+            add(hit)
+        for hit in near:
+            add(hit)
+        return merged
+    lex_keep = min(len(lexical), max(1, limit // 2))
+    for hit in lexical[:lex_keep]:
+        add(hit)
+    for hit in near:
+        if not add(hit):
+            return merged
+    for hit in lexical[lex_keep:]:
+        if not add(hit):
+            return merged
+    return merged
 
 
 def _detail(item: dict[str, Any]) -> str:
@@ -184,7 +244,7 @@ def search(
     similar: bool = False,
 ) -> dict[str, Any]:
     started = time.perf_counter()
-    limit = max(1, min(int(limit), 50))
+    limit = max(1, min(int(limit), SIMILAR_UI_LIMIT))
     text = query.strip()
     hits: dict[int, dict[str, Any]] = {}
 
@@ -311,16 +371,7 @@ def search(
         lexical = [hit for hit in ordered if hit["via"] != "similar"]
         near = [hit for hit in ordered if hit["via"] == "similar"]
         if near:
-            lex_slots = max(1, limit // 2)
-            merged = lexical[:lex_slots] + near[: limit - min(len(lexical), lex_slots)]
-            seen = {hit["id"] for hit in merged}
-            for hit in lexical[lex_slots:] + near:
-                if len(merged) >= limit:
-                    break
-                if hit["id"] not in seen:
-                    merged.append(hit)
-                    seen.add(hit["id"])
-            ordered = merged
+            ordered = merge_similar(lexical, near, limit)
     calc = try_calc(text) if text else None
     if calc is not None:
         ordered.insert(

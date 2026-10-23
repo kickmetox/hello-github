@@ -401,6 +401,83 @@ class SimilarityTests(unittest.TestCase):
             finally:
                 index.close()
 
+    def test_johnson_similar_hits_are_selectable_rows(self) -> None:
+        from flare.search import _FUZZY_MIN, ui_result_limit
+        from flare.window import path_for_selection, rows_after_reset, search_status, selectable_rows
+
+        self.assertGreaterEqual(_FUZZY_MIN, 0.5)
+        self.assertEqual(ui_result_limit(False), 12)
+        self.assertEqual(ui_result_limit(True), 50)
+        self.assertGreater(ui_result_limit(True), ui_result_limit(False))
+        with tempfile.TemporaryDirectory() as tmp:
+            index = Index(Path(tmp) / "index.db")
+            try:
+                rows: list[tuple[str, str]] = [
+                    (f"personal-song-{number:03d}", rf"C:\noise\personal-song-{number:03d}.txt")
+                    for number in range(400)
+                ]
+                rows.append(("Chris Johnson notes", r"C:\docs\Chris Johnson notes"))
+                for number in range(20):
+                    rows.append((f"Johnston {number:02d}", rf"C:\people\Johnston {number:02d}.txt"))
+                rows.append(("Johnston notes", r"D:\a\Johnston notes"))
+                rows.append(("Johnston notes", r"E:\b\Johnston notes"))
+                for name, path in rows:
+                    index.con.execute(
+                        """
+                        INSERT INTO items(kind, name, name_fold, path, dir, ext, mtime_ns, size, tier)
+                        VALUES ('file', ?, ?, ?, ?, '.txt', 1, 1, 1)
+                        """,
+                        (name, name.casefold(), path, str(Path(path).parent)),
+                    )
+                index.con.commit()
+                index._load_names()
+                ranker = Ranker(allow_cuda=False)
+                try:
+                    plain = search(index, ranker, "johnson", limit=ui_result_limit(False), similar=False)
+                    self.assertTrue(all(hit.get("via") != "similar" for hit in plain["results"]), plain)
+                    self._assert_johnson_rows(
+                        search(index, ranker, "johnson", limit=ui_result_limit(True), similar=True)
+                    )
+                    narrow = search(index, ranker, "johnson", limit=12, similar=True)
+                    self.assertGreater(len(narrow["results"]), 1)
+                    self.assertLess(len(narrow["results"]), 23)
+                    index.counts = lambda: {"items": 3001, "dirs": 1}
+                    wide = search(index, ranker, "johnson", limit=ui_result_limit(True), similar=True)
+                    shown = self._assert_johnson_rows(wide)
+                    self.assertEqual(rows_after_reset([hit["name"] for hit in shown]), [hit["name"] for hit in shown])
+                    self.assertEqual(len(shown), len(rows_after_reset([hit["name"] for hit in shown])))
+                finally:
+                    ranker.close()
+            finally:
+                index.close()
+
+    def _assert_johnson_rows(self, payload: dict) -> list[dict]:
+        from flare.window import path_for_selection, search_status, selectable_rows
+
+        rows = selectable_rows(payload["results"])
+        self.assertEqual(len(rows), len(payload["results"]))
+        self.assertGreater(len(rows), 1)
+        names = [row["name"] for row in rows]
+        self.assertIn("Chris Johnson notes", names)
+        self.assertGreater(names.count("Johnston notes"), 1)
+        johnston = [row for row in rows if str(row["name"]).startswith("Johnston")]
+        self.assertGreaterEqual(len(johnston), 22, names)
+        self.assertTrue(all(float(row["similarity"]) >= 0.5 for row in johnston), johnston)
+        self.assertTrue(all(row["via"] == "similar" for row in johnston), johnston)
+        lexical = [row for row in rows if row["name"] == "Chris Johnson notes"]
+        self.assertTrue(lexical and lexical[0]["via"] != "similar", lexical)
+        paths = [path_for_selection(rows, index) for index in range(len(rows))]
+        self.assertEqual(len(paths), len(set(paths)))
+        self.assertIn(r"D:\a\Johnston notes", paths)
+        self.assertIn(r"E:\b\Johnston notes", paths)
+        first = paths.index(r"D:\a\Johnston notes")
+        second = paths.index(r"E:\b\Johnston notes")
+        self.assertNotEqual(
+            search_status("Ähnlichkeit", payload["took_ms"], len(rows), path_for_selection(rows, first)),
+            search_status("Ähnlichkeit", payload["took_ms"], len(rows), path_for_selection(rows, second)),
+        )
+        return rows
+
     def test_name_index_only_returns_sharing_trigrams(self) -> None:
         names = NameIndex()
         names.load(
