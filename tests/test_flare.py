@@ -16,11 +16,11 @@ os.environ.setdefault("FLARE_FORCE_CPU", "1")
 from flare.autostart import install_autostart, launch_command, remove_autostart
 from flare.calc import try_calc
 from flare.client import Client
-from flare.crawl import Crawler, should_skip_dir
+from flare.crawl import Crawler, application_roots, should_skip_dir, _user_dirs
 from flare.paths import norm
 from flare.governor import Governor, read_cpu_times, sleep_budget
 from flare.hotkey import hotkey_label, parse_hotkey
-from flare.launch import parse_desktop, parse_lnk
+from flare.launch import parse_lnk
 from flare.rank import Ranker, overlap_scores, trigrams
 from flare.search import lexical_score, search
 from flare.service import Service
@@ -97,15 +97,6 @@ class IndexTests(unittest.TestCase):
         (modules / "pkg.js").write_text("nope", encoding="utf-8")
         (self.root / "id_rsa").write_text("secret", encoding="utf-8")
         (self.root / ".env").write_text("TOKEN=1", encoding="utf-8")
-        desktop = self.root / "demo.desktop"
-        desktop.write_text(
-            "[Desktop Entry]\nType=Application\nName=Demo App\nName[de]=Demo Programm\nExec=demo --flag\n",
-            encoding="utf-8",
-        )
-        (self.root / "hidden.desktop").write_text(
-            "[Desktop Entry]\nType=Application\nName=Versteckt\nNoDisplay=true\nExec=hidden\n",
-            encoding="utf-8",
-        )
         lnk = self.root / "Werkzeug.lnk"
         lnk.write_bytes(_build_lnk(r"C:\Tools\Demo.exe"))
         self.db = Path(self.tmp.name) / "index.db"
@@ -136,7 +127,7 @@ class IndexTests(unittest.TestCase):
         self._fill()
         self.assertGreater(self.crawler.readdirs, 0)
         empty = search(self.index, Ranker(allow_cuda=False), "")["results"]
-        self.assertTrue(any(hit["name"] == "Demo Programm" for hit in empty), empty)
+        self.assertTrue(any(hit["name"] == "Werkzeug" for hit in empty), empty)
         self.assertFalse(any(hit["name"] == "[" for hit in empty))
         names = {hit["name"] for hit in search(self.index, Ranker(allow_cuda=False), "rechnung")["results"]}
         self.assertIn("Rechnung-2026.txt", names)
@@ -146,9 +137,8 @@ class IndexTests(unittest.TestCase):
         self.assertTrue(content and content[0]["via"] == "content")
         fuzzy = search(self.index, Ranker(allow_cuda=False), "dokumnet")["results"]
         self.assertTrue(any(hit["name"] == "Dokumentation.txt" for hit in fuzzy), fuzzy)
-        apps = search(self.index, Ranker(allow_cuda=False), "demo programm")["results"]
-        self.assertTrue(any(hit["kind"] == "app" and hit["name"] == "Demo Programm" for hit in apps), apps)
-        self.assertFalse(any(hit["name"] == "Versteckt" for hit in search(self.index, Ranker(allow_cuda=False), "versteckt")["results"]))
+        apps = search(self.index, Ranker(allow_cuda=False), "werkzeug")["results"]
+        self.assertTrue(any(hit["kind"] == "app" and hit["name"] == "Werkzeug" for hit in apps), apps)
         self.assertFalse(any("geheim" in hit["name"] for hit in search(self.index, Ranker(allow_cuda=False), "geheim")["results"]))
         self.assertFalse(any(hit["name"] == "pkg.js" for hit in search(self.index, Ranker(allow_cuda=False), "pkg")["results"]))
         self.assertFalse(any(hit["name"] == "id_rsa" for hit in search(self.index, Ranker(allow_cuda=False), "id_rsa")["results"]))
@@ -218,17 +208,12 @@ class IndexTests(unittest.TestCase):
         self.assertTrue(any(hit["name"] == "datei-1499.txt" for hit in payload["results"]))
         self.assertLess(sorted(samples)[len(samples) // 2], 40.0, samples)
 
-    def test_lnk_and_desktop_parsers(self) -> None:
+    def test_lnk_parser(self) -> None:
         parsed = parse_lnk(str(self.root / "Werkzeug.lnk"))
         self.assertIsNotNone(parsed)
         assert parsed is not None
         self.assertEqual(parsed["kind"], "app")
         self.assertIn("Demo.exe", parsed["launch"])
-        desktop = parse_desktop(str(self.root / "demo.desktop"))
-        self.assertIsNotNone(desktop)
-        assert desktop is not None
-        self.assertEqual(desktop["name"], "Demo Programm")
-        self.assertIsNone(parse_desktop(str(self.root / "hidden.desktop")))
 
 
 class ScheduleTests(unittest.TestCase):
@@ -311,18 +296,44 @@ class ServiceTests(unittest.TestCase):
 
 
 class AutostartTests(unittest.TestCase):
-    def test_desktop_file_roundtrip(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            home = Path(tmp)
-            path = install_autostart(home)
-            text = Path(path).read_text(encoding="utf-8")
-            self.assertIn("--background", text)
-            self.assertIn("flare.py", text)
-            self.assertIn("X-GNOME-Autostart-enabled=true", text)
-            command = launch_command(True)
-            self.assertIn("--background", command)
-            remove_autostart(home)
-            self.assertFalse(Path(path).exists())
+    def test_run_key_roundtrip(self) -> None:
+        import sys
+        from unittest import mock
+
+        fake = mock.MagicMock()
+        with mock.patch.object(sys, "platform", "win32"), mock.patch.dict(sys.modules, {"winreg": fake}):
+            where = install_autostart()
+            self.assertEqual(where, r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run\Flare")
+            value = fake.SetValueEx.call_args[0][4]
+            self.assertIn("--background", value)
+            self.assertIn("flare.py", value)
+            remove_autostart()
+        fake.DeleteValue.assert_called_once()
+
+    def test_autostart_requires_windows(self) -> None:
+        import sys
+
+        if sys.platform == "win32":
+            return
+        with self.assertRaises(RuntimeError):
+            install_autostart()
+
+    def test_cli_requires_windows(self) -> None:
+        import sys
+
+        from flare.cli import main
+
+        if sys.platform == "win32":
+            return
+        self.assertEqual(main(["status"]), 2)
+
+    def test_default_roots_are_windows_only(self) -> None:
+        import sys
+
+        if sys.platform == "win32":
+            return
+        self.assertEqual(_user_dirs(), [])
+        self.assertEqual(application_roots(), [])
 
     def test_frozen_windows_command_uses_the_exe(self) -> None:
         import sys

@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import json
 import os
-import re
-import shlex
 import struct
 import subprocess
 import sys
@@ -14,7 +12,6 @@ from typing import Any
 
 from flare.paths import norm, parent_of
 
-_FIELD_CODES = re.compile(r"%[fFuUdDnNickvm]")
 _SECRET_NAMES = {
     ".env",
     ".netrc",
@@ -34,64 +31,6 @@ def is_secret_name(name: str) -> bool:
         return True
     suffix = Path(lowered).suffix
     return suffix in _SECRET_EXTS
-
-
-def unescape_desktop(value: str) -> str:
-    return (
-        value.replace("\\s", " ")
-        .replace("\\n", "\n")
-        .replace("\\t", "\t")
-        .replace("\\\\", "\\")
-    )
-
-
-def parse_exec(raw: str) -> list[str]:
-    cleaned = _FIELD_CODES.sub("", unescape_desktop(raw)).replace("%%", "%").strip()
-    if not cleaned:
-        return []
-    try:
-        return shlex.split(cleaned, posix=True)
-    except ValueError:
-        return []
-
-
-def parse_desktop(path: str) -> dict[str, Any] | None:
-    try:
-        text = Path(path).read_text(encoding="utf-8", errors="replace")
-    except OSError:
-        return None
-    section = ""
-    data: dict[str, str] = {}
-    for line in text.splitlines():
-        line = line.strip()
-        if not line or line.startswith("#"):
-            continue
-        if line.startswith("[") and line.endswith("]"):
-            section = line[1:-1].strip()
-            continue
-        if section != "Desktop Entry" or "=" not in line:
-            continue
-        key, value = line.split("=", 1)
-        data[key.strip()] = value.strip()
-    if data.get("Type", "Application") not in {"Application", "Link"}:
-        return None
-    if data.get("NoDisplay", "").lower() == "true":
-        return None
-    if data.get("Hidden", "").lower() == "true":
-        return None
-    name = data.get("Name[de]") or data.get("Name")
-    argv = parse_exec(data.get("Exec", ""))
-    if not name or not argv:
-        return None
-    full = norm(path)
-    return {
-        "kind": "app",
-        "name": name,
-        "path": full,
-        "dir": parent_of(full),
-        "ext": ".desktop",
-        "launch": json.dumps(argv, ensure_ascii=False),
-    }
 
 
 def _cstring(buf: bytes, offset: int) -> str | None:
@@ -179,13 +118,5 @@ def launch_target(item: dict[str, Any]) -> None:
         subprocess.Popen(argv, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
         return
     path = launch or item["path"]
-    if item.get("kind") == "app" and os.access(path, os.X_OK) and sys.platform != "win32":
-        subprocess.Popen([path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
-        return
     if sys.platform == "win32":
         os.startfile(path)  # type: ignore[attr-defined]
-        return
-    opener = "xdg-open" if os.access(path, os.F_OK) else None
-    if opener is None:
-        return
-    subprocess.Popen([opener, path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)

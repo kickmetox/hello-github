@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "flare"
 version = "1.0.0"
-description = "Leichter Spotlight-ähnlicher Starter für Programme und Dateien"
+description = "Spotlight-ähnlicher Starter für Windows 11"
 readme = "README.md"
 requires-python = ">=3.11"
 

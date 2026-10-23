@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Any
 
 from flare.governor import Governor, lower_background_thread
-from flare.launch import is_secret_name, parse_desktop, parse_lnk
+from flare.launch import is_secret_name, parse_lnk
 from flare.paths import is_inside, norm, parent_of
 from flare.store import Index
 
@@ -112,79 +112,87 @@ def read_text_sample(path: str, size: int) -> str | None:
     return blob.decode("utf-8", "replace")
 
 
-def _user_dirs() -> list[tuple[str, int]]:
-    home = Path.home()
-    found: list[tuple[str, int]] = []
-    if sys.platform == "win32":
-        profile = Path(os.environ.get("USERPROFILE", str(home)))
-        names = [
-            (0, "Desktop"),
-            (1, "Documents"),
-            (1, "Downloads"),
-            (1, "Pictures"),
-            (1, "Music"),
-            (1, "Videos"),
+# Known Folder IDs: Desktop, Documents, Downloads, Pictures, Music, Videos, Profile.
+_KNOWN_FOLDERS = (
+    (0, "{B4BFCC3A-DB2C-424C-B029-7FE99A87C641}"),
+    (1, "{FDD39AD0-476A-45D4-8CDE-E9A6B0C1F19E}"),
+    (1, "{374DE290-123F-4565-9164-39C4925E467B}"),
+    (1, "{33E28130-4E1C-4673-AEFE-9B033B0F0A3A}"),
+    (1, "{4BD8D571-6D19-48D3-BE97-422220080E43}"),
+    (1, "{18989B1D-99B5-455B-841C-AB7C74E4DDFC}"),
+    (2, "{5E6C858F-0E22-4760-9AFE-EA3317B67173}"),
+)
+
+
+def _known_folder(guid: str) -> str | None:
+    import ctypes
+    from ctypes import wintypes
+
+    class GUID(ctypes.Structure):
+        _fields_ = [
+            ("Data1", wintypes.DWORD),
+            ("Data2", wintypes.WORD),
+            ("Data3", wintypes.WORD),
+            ("Data4", ctypes.c_ubyte * 8),
         ]
-        for tier, name in names:
-            found.append((str(profile / name), tier))
-        one = profile / "OneDrive"
-        if one.is_dir():
-            found.append((str(one), 1))
-        found.append((str(profile), 2))
+
+    folder = GUID()
+    ole32 = ctypes.WinDLL("ole32", use_last_error=True)
+    if ole32.CLSIDFromString(guid, ctypes.byref(folder)) != 0:
+        return None
+    shell32 = ctypes.WinDLL("shell32", use_last_error=True)
+    shell32.SHGetKnownFolderPath.argtypes = [
+        ctypes.POINTER(GUID),
+        wintypes.DWORD,
+        wintypes.HANDLE,
+        ctypes.POINTER(ctypes.c_wchar_p),
+    ]
+    shell32.SHGetKnownFolderPath.restype = ctypes.HRESULT
+    ptr = ctypes.c_wchar_p()
+    if shell32.SHGetKnownFolderPath(ctypes.byref(folder), 0, None, ctypes.byref(ptr)) != 0:
+        return None
+    path = ptr.value
+    ole32.CoTaskMemFree(ptr)
+    return path or None
+
+
+def _user_dirs() -> list[tuple[str, int]]:
+    if sys.platform != "win32":
+        return []
+    found: list[tuple[str, int]] = []
+    for tier, guid in _KNOWN_FOLDERS:
+        try:
+            path = _known_folder(guid)
+        except OSError:
+            path = None
+        if path:
+            found.append((path, tier))
+    if found:
         return found
-    xdg_map = {
-        "XDG_DESKTOP_DIR": 1,
-        "XDG_DOCUMENTS_DIR": 1,
-        "XDG_DOWNLOAD_DIR": 1,
-        "XDG_PICTURES_DIR": 1,
-    }
-    config = Path.home() / ".config" / "user-dirs.dirs"
-    parsed: dict[str, str] = {}
-    try:
-        for line in config.read_text(encoding="utf-8", errors="replace").splitlines():
-            if not line.startswith("XDG_") or "=" not in line:
-                continue
-            key, value = line.split("=", 1)
-            value = value.strip().strip('"').replace("$HOME", str(home))
-            parsed[key.strip()] = value
-    except OSError:
-        parsed = {}
-    for key, tier in xdg_map.items():
-        found.append((parsed.get(key, ""), tier))
+    profile = Path(os.environ.get("USERPROFILE", str(Path.home())))
     for tier, name in (
-        (1, "Desktop"),
-        (1, "Schreibtisch"),
+        (0, "Desktop"),
         (1, "Documents"),
-        (1, "Dokumente"),
         (1, "Downloads"),
         (1, "Pictures"),
-        (1, "Bilder"),
+        (1, "Music"),
+        (1, "Videos"),
     ):
-        found.append((str(home / name), tier))
-    found.append((str(home), 2))
+        found.append((str(profile / name), tier))
+    found.append((str(profile), 2))
     return found
 
 
 def application_roots() -> list[tuple[str, int]]:
-    roots: list[tuple[str, int]] = []
-    if sys.platform == "win32":
-        appdata = os.environ.get("APPDATA", "")
-        programdata = os.environ.get("PROGRAMDATA", r"C:\ProgramData")
-        candidates = [
-            Path(appdata) / "Microsoft" / "Windows" / "Start Menu" if appdata else None,
-            Path(programdata) / "Microsoft" / "Windows" / "Start Menu",
-        ]
-        for candidate in candidates:
-            if candidate is not None:
-                roots.append((str(candidate), 0))
-        return roots
-    for candidate in (
-        Path("/usr/share/applications"),
-        Path("/usr/local/share/applications"),
-        Path.home() / ".local" / "share" / "applications",
-    ):
-        roots.append((str(candidate), 0))
-    return roots
+    if sys.platform != "win32":
+        return []
+    appdata = os.environ.get("APPDATA", "")
+    programdata = os.environ.get("PROGRAMDATA", r"C:\ProgramData")
+    candidates = [
+        Path(appdata) / "Microsoft" / "Windows" / "Start Menu" if appdata else None,
+        Path(programdata) / "Microsoft" / "Windows" / "Start Menu",
+    ]
+    return [(str(candidate), 0) for candidate in candidates if candidate is not None]
 
 
 def dedupe_roots(pairs: list[tuple[str, int]]) -> list[tuple[str, int]]:
@@ -487,15 +495,6 @@ class Crawler:
             except OSError:
                 continue
             mtime_ns = getattr(st_file, "st_mtime_ns", int(st_file.st_mtime * 1e9))
-            if lowered.endswith(".desktop"):
-                parsed = parse_desktop(full)
-                if parsed is None:
-                    continue
-                parsed["mtime_ns"] = mtime_ns
-                parsed["size"] = st_file.st_size
-                parsed["tier"] = min(tier, 0)
-                items.append(parsed)
-                continue
             if lowered.endswith(".lnk"):
                 parsed = parse_lnk(full)
                 if parsed is None:

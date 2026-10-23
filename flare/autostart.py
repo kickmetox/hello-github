@@ -1,8 +1,7 @@
-"""Start mit der Anmeldung. Windows: Run-Schlüssel. Linux: XDG-Autostart."""
+"""Start mit der Windows-Anmeldung über den Run-Schlüssel."""
 
 from __future__ import annotations
 
-import os
 import shlex
 import subprocess
 import sys
@@ -36,69 +35,37 @@ def launch_command(background: bool = True) -> str:
     return shlex.join(args)
 
 
-def autostart_path(config_home: Path | None = None) -> Path:
-    if config_home is None:
-        xdg = os.environ.get("XDG_CONFIG_HOME")
-        config_home = Path(xdg) if xdg else Path.home() / ".config"
-    return config_home / "autostart" / "flare.desktop"
+_RUN_KEY = r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run\Flare"
+_RUN_PATH = r"Software\Microsoft\Windows\CurrentVersion\Run"
 
 
-def install_autostart(config_home: Path | None = None) -> str:
+def _require_windows() -> None:
+    if sys.platform != "win32":
+        raise RuntimeError("Autostart gibt es nur unter Windows 11.")
+
+
+def install_autostart() -> str:
+    _require_windows()
+    import winreg
+
     command = launch_command(True)
-    if sys.platform == "win32":
-        import winreg
-
-        key = winreg.OpenKey(
-            winreg.HKEY_CURRENT_USER,
-            r"Software\Microsoft\Windows\CurrentVersion\Run",
-            0,
-            winreg.KEY_SET_VALUE,
-        )
-        try:
-            winreg.SetValueEx(key, "Flare", 0, winreg.REG_SZ, command)
-        finally:
-            key.Close()
-        return r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run\Flare"
-    path = autostart_path(config_home)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        "\n".join(
-            [
-                "[Desktop Entry]",
-                "Type=Application",
-                "Version=1.0",
-                "Name=Flare",
-                "Comment=Spotlight-ähnliche Suche",
-                f"Exec={command}",
-                "Terminal=false",
-                "X-GNOME-Autostart-enabled=true",
-                "Categories=Utility;",
-                "",
-            ]
-        ),
-        encoding="utf-8",
-    )
-    return str(path)
+    key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, _RUN_PATH, 0, winreg.KEY_SET_VALUE)
+    try:
+        winreg.SetValueEx(key, "Flare", 0, winreg.REG_SZ, command)
+    finally:
+        key.Close()
+    return _RUN_KEY
 
 
-def remove_autostart(config_home: Path | None = None) -> str:
-    if sys.platform == "win32":
-        import winreg
+def remove_autostart() -> str:
+    _require_windows()
+    import winreg
 
-        key = winreg.OpenKey(
-            winreg.HKEY_CURRENT_USER,
-            r"Software\Microsoft\Windows\CurrentVersion\Run",
-            0,
-            winreg.KEY_SET_VALUE,
-        )
-        try:
-            winreg.DeleteValue(key, "Flare")
-        except FileNotFoundError:
-            pass
-        finally:
-            key.Close()
-        return r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run\Flare"
-    path = autostart_path(config_home)
-    if path.exists():
-        path.unlink()
-    return str(path)
+    key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, _RUN_PATH, 0, winreg.KEY_SET_VALUE)
+    try:
+        winreg.DeleteValue(key, "Flare")
+    except FileNotFoundError:
+        pass
+    finally:
+        key.Close()
+    return _RUN_KEY

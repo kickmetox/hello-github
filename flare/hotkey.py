@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import logging
-import os
-import select
 import sys
 import threading
 from collections.abc import Callable
@@ -77,10 +75,8 @@ class HotkeyThread:
             mods, _key = parse_hotkey(self.spec)
             if sys.platform == "win32":
                 self._win(mods)
-            elif sys.platform.startswith("linux") and os.environ.get("DISPLAY"):
-                self._x11(mods)
             else:
-                self.error = "kein globales Kürzel auf dieser Sitzung"
+                self.error = "globales Kürzel nur unter Windows 11"
         except Exception as exc:  # noqa: BLE001 - Hotkey darf den Dienst nicht beenden
             self.error = str(exc)
             log.warning("hotkey unavailable: %s", exc)
@@ -113,71 +109,4 @@ class HotkeyThread:
                 self.stop.wait(0.05)
         finally:
             user32.UnregisterHotKey(None, hotkey_id)
-            self.active = False
-
-    def _x11(self, mods: set[str]) -> None:
-        import ctypes
-
-        lib = ctypes.CDLL("libX11.so.6")
-        lib.XOpenDisplay.restype = ctypes.c_void_p
-        lib.XOpenDisplay.argtypes = [ctypes.c_char_p]
-        display = lib.XOpenDisplay(None)
-        if not display:
-            self.error = "XOpenDisplay fehlgeschlagen"
-            return
-        error_handler = ctypes.CFUNCTYPE(ctypes.c_int, ctypes.c_void_p, ctypes.c_void_p)(lambda *_a: 0)
-        lib.XSetErrorHandler.argtypes = [ctypes.c_void_p]
-        lib.XSetErrorHandler(error_handler)
-        self._x11_error_handler = error_handler
-        lib.XDefaultRootWindow.restype = ctypes.c_ulong
-        lib.XDefaultRootWindow.argtypes = [ctypes.c_void_p]
-        root = lib.XDefaultRootWindow(display)
-        lib.XKeysymToKeycode.restype = ctypes.c_ubyte
-        lib.XKeysymToKeycode.argtypes = [ctypes.c_void_p, ctypes.c_ulong]
-        keycode = lib.XKeysymToKeycode(display, 0x0020)
-        base = 0
-        if "shift" in mods:
-            base |= 1
-        if "ctrl" in mods:
-            base |= 4
-        if "alt" in mods:
-            base |= 8
-        if "super" in mods:
-            base |= 64
-        masks = [base, base | 2, base | 16, base | 2 | 16]  # Caps, Num
-        lib.XGrabKey.argtypes = [
-            ctypes.c_void_p, ctypes.c_int, ctypes.c_uint, ctypes.c_ulong,
-            ctypes.c_int, ctypes.c_int, ctypes.c_int,
-        ]
-        for mask in masks:
-            lib.XGrabKey(display, keycode, mask, root, False, 1, 1)
-        lib.XSelectInput.argtypes = [ctypes.c_void_p, ctypes.c_ulong, ctypes.c_long]
-        lib.XFlush.argtypes = [ctypes.c_void_p]
-        lib.XFlush(display)
-        lib.XConnectionNumber.restype = ctypes.c_int
-        lib.XConnectionNumber.argtypes = [ctypes.c_void_p]
-        lib.XPending.restype = ctypes.c_int
-        lib.XPending.argtypes = [ctypes.c_void_p]
-        fd = lib.XConnectionNumber(display)
-        self.active = True
-
-        event = ctypes.create_string_buffer(256)
-        lib.XNextEvent.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
-        try:
-            while not self.stop.is_set():
-                while lib.XPending(display):
-                    lib.XNextEvent(display, event)
-                    event_type = ctypes.cast(event, ctypes.POINTER(ctypes.c_int))[0]
-                    if event_type == 2:  # KeyPress
-                        self.on_press()
-                try:
-                    select.select([fd], [], [], 0.3)
-                except OSError:
-                    return
-        finally:
-            lib.XUngrabKey.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_uint, ctypes.c_ulong]
-            for mask in masks:
-                lib.XUngrabKey(display, keycode, mask, root)
-            lib.XCloseDisplay.argtypes = [ctypes.c_void_p]
-            lib.XCloseDisplay(display)
             self.active = False

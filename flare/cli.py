@@ -29,7 +29,7 @@ def load_config(folder: Path | None = None) -> dict[str, Any]:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="flare",
-        description="Spotlight-ähnliche Suche über Programme und Dateien.",
+        description="Spotlight-ähnliche Suche für Windows 11.",
     )
     parser.add_argument("--version", action="version", version=f"flare {__version__}")
     parser.add_argument("--data-dir", type=Path, help="Katalog statt des Standardordners")
@@ -78,6 +78,9 @@ def _print_hits(payload: dict[str, Any], as_json: bool) -> None:
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
+    if sys.platform != "win32":
+        print("Flare ist nur für Windows 11.", file=sys.stderr)
+        return 2
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.INFO,
         format="%(levelname)s %(name)s: %(message)s",

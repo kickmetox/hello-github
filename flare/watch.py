@@ -1,8 +1,7 @@
-"""Änderungen an heißen Ordnern, ohne das ganze Profil zu pollen.
+"""Änderungen an heißen Ordnern unter Windows 11.
 
-Linux: inotify auf die bereits bekannten Ordner.
-Windows: eine Meldung pro Wurzel (Unterbaum). Der Katalog prüft danach nur
-Ordner, deren mtime sich geändert hat.
+Eine Meldung pro Wurzel (Unterbaum). Der Katalog prüft danach nur Ordner,
+deren mtime sich geändert hat.
 """
 
 from __future__ import annotations
