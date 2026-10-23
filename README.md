@@ -5,7 +5,7 @@ Dateien in einem eigenen Fenster, läuft im Hintergrund und lässt sich aus
 anderen Programmen abfragen.
 
 Kompletter Arbeitsbaum als Zip (Quellcode, Tests, Build und Installer):
-[flare-workspace-complete.zip](https://github.com/kickmetox/hello-github/raw/cursor/flare-spotlight-a293/flare-workspace-complete.zip)
+[flare-workspace-install.zip](https://github.com/kickmetox/hello-github/raw/cursor/flare-spotlight-a293/flare-workspace-install.zip)
 
 Das Fenster ist ein normales Win32-Fenster. Es startet keinen Browser.
 Schließen blendet es nur aus; der Index läuft weiter, Strg+Alt+Leertaste holt es zurück.
@@ -23,9 +23,11 @@ wenn schon genaue Treffer da sind. Der Web-Knopf merkt sich die Wahl
 Installer für 64-Bit-Windows 11: `dist/windows/Flare-Setup-1.0.0.exe`.
 
 Er richtet Flare ohne Administrator unter `%LOCALAPPDATA%\Programs\Flare` ein,
-legt einen Startmenü-Eintrag an und kann „Mit Windows starten“ setzen. Der
-Katalog bleibt getrennt unter `%LOCALAPPDATA%\Flare` und wird beim Entfernen
-nicht gelöscht. Die Einrichtung ist nicht signiert, Windows SmartScreen kann
+legt einen Startmenü-Eintrag an und kann „Mit Windows starten“ setzen. Läuft
+Flare schon, beendet das Setup `Flare.exe`, wartet kurz und ersetzt danach
+`_internal`, damit gesperrte DLLs die Einrichtung nicht anhalten. Der Katalog
+bleibt getrennt unter `%LOCALAPPDATA%\Flare` und wird beim Entfernen nicht
+gelöscht. Die Einrichtung ist nicht signiert, Windows SmartScreen kann
 deshalb nachfragen.
 
 Danach liegt Flare im Startmenü. Strg+Alt+Leertaste öffnet die Suche aus

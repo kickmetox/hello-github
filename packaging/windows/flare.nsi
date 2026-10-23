@@ -56,8 +56,45 @@ VIAddVersionKey /LANG=1031 "ProductVersion" "${VERSION}"
 VIAddVersionKey /LANG=1031 "CompanyName" "Flare"
 VIAddVersionKey /LANG=1031 "LegalCopyright" "Flare"
 
+; Laufende Flare.exe beenden, damit PyInstaller-DLLs unter $INSTDIR\_internal
+; nicht gesperrt bleiben. Ein fehlender Prozess oder ein fehlendes
+; taskkill.exe (etwa unter Wine) darf die Einrichtung nicht abbrechen.
+!macro StopFlare ID
+  DetailPrint "Laufende Flare-Instanz wird beendet ..."
+  ClearErrors
+  IfFileExists "$SYSDIR\taskkill.exe" 0 stopflare_notask_${ID}
+    ExecWait '"$SYSDIR\taskkill.exe" /F /IM "${EXE}"' $0
+  stopflare_notask_${ID}:
+  ClearErrors
+  Sleep 2000
+!macroend
+
+!macro ClearReadOnly ID
+  IfFileExists "$INSTDIR" 0 clearro_done_${ID}
+    ClearErrors
+    IfFileExists "$SYSDIR\attrib.exe" 0 clearro_noattrib_${ID}
+      ExecWait '"$SYSDIR\attrib.exe" -R /S /D "$INSTDIR\*.*"' $0
+    clearro_noattrib_${ID}:
+    ClearErrors
+    SetFileAttributes "$INSTDIR" NORMAL
+  clearro_done_${ID}:
+!macroend
+
 Section "Flare" SecMain
   SectionIn RO
+  !insertmacro StopFlare install
+  !insertmacro ClearReadOnly install
+  ; Alten _internal-Baum entfernen, bevor die neue Ladung extrahiert wird.
+  ; Sonst kann eine halb überschriebene DLL gesperrt bleiben.
+  ; Der Katalog unter $LOCALAPPDATA\Flare wird nicht gelöscht.
+  IfFileExists "$INSTDIR\_internal" 0 install_nointernal
+    RMDir /r "$INSTDIR\_internal"
+    IfFileExists "$INSTDIR\_internal" 0 install_nointernal
+      Sleep 1000
+      RMDir /r "$INSTDIR\_internal"
+  install_nointernal:
+  ClearErrors
+  SetOverwrite on
   SetOutPath "$INSTDIR"
   File /r "${PAYLOAD}\*.*"
   WriteUninstaller "$INSTDIR\Uninstall.exe"
@@ -82,7 +119,7 @@ Section "Mit Windows starten" SecAuto
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "Flare" "$\"$INSTDIR\${EXE}$\" --background"
 SectionEnd
 
-LangString DESC_Main ${LANG_GERMAN} "Programm, Suche und Startmenü-Eintrag. Der Katalog bleibt unter %LOCALAPPDATA%\Flare erhalten."
+LangString DESC_Main ${LANG_GERMAN} "Programm, Suche und Startmenü-Eintrag. Eine laufende Flare.exe wird vorher beendet. Der Katalog bleibt unter %LOCALAPPDATA%\Flare erhalten."
 LangString DESC_Auto ${LANG_GERMAN} "Startet Flare bei der Anmeldung im Hintergrund. Strg+Alt+Leertaste öffnet die Suche."
 
 !insertmacro MUI_FUNCTION_DESCRIPTION_BEGIN
@@ -91,10 +128,15 @@ LangString DESC_Auto ${LANG_GERMAN} "Startet Flare bei der Anmeldung im Hintergr
 !insertmacro MUI_FUNCTION_DESCRIPTION_END
 
 Section "Uninstall"
+  !insertmacro StopFlare uninstall
+  !insertmacro ClearReadOnly uninstall
   DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "Flare"
   Delete "$SMPROGRAMS\Flare.lnk"
   Delete "$INSTDIR\Uninstall.exe"
-  RMDir /r "$INSTDIR"
+  ; Nur das Programmverzeichnis. Der Suchindex unter $LOCALAPPDATA\Flare bleibt.
+  StrCmp "$INSTDIR" "$LOCALAPPDATA\Flare" uninstall_keepdata
+    RMDir /r "$INSTDIR"
+  uninstall_keepdata:
   DeleteRegKey HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Flare"
   DeleteRegKey HKCU "Software\Flare"
 SectionEnd
