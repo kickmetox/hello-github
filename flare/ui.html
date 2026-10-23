@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Flare</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; min-height: 100%;
+    font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
+    background: radial-gradient(900px 420px at 50% -10%, #32323a, #101012 58%);
+    color: #f5f5f7;
+  }
+  .wrap { width: min(680px, calc(100% - 28px)); margin: 11vh auto 32px; }
+  .panel {
+    background: rgba(36, 36, 40, 0.94);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 16px;
+    box-shadow: 0 30px 80px rgba(0,0,0,.45);
+    overflow: hidden;
+  }
+  .field { display: flex; align-items: center; gap: 10px; padding: 0 16px; }
+  .mark {
+    width: 18px; height: 18px; border: 2px solid #d1d1d6; border-radius: 50%;
+    position: relative; flex: none;
+  }
+  .mark:after {
+    content: ""; position: absolute; width: 7px; height: 2px; background: #d1d1d6;
+    right: -5px; bottom: -1px; transform: rotate(45deg); border-radius: 1px;
+  }
+  input {
+    flex: 1; border: 0; outline: 0; background: transparent; color: white;
+    font-size: 22px; padding: 16px 0; min-width: 0;
+  }
+  input::placeholder { color: #8e8e93; }
+  .list { border-top: 1px solid rgba(255,255,255,0.06); max-height: min(420px, 52vh); overflow: auto; }
+  .row {
+    width: 100%; text-align: left; border: 0; background: transparent; color: inherit;
+    display: grid; grid-template-columns: 28px 1fr auto; gap: 12px; align-items: center;
+    padding: 9px 14px; cursor: pointer; font: inherit;
+  }
+  .row.active { background: #0a84ff; }
+  .glyph { width: 28px; height: 28px; border-radius: 8px; background: rgba(255,255,255,.08); display: grid; place-items: center; }
+  .row.active .glyph { background: rgba(255,255,255,.18); }
+  .name { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .name mark { background: transparent; color: white; font-weight: 700; }
+  .sub { color: #98989d; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+  .row.active .sub { color: rgba(255,255,255,.86); }
+  .kind { color: #98989d; font-size: 11px; }
+  .row.active .kind { color: white; }
+  .empty { padding: 22px 18px 26px; color: #8e8e93; }
+  .foot {
+    display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+    padding: 8px 14px 10px; color: #8e8e93; font-size: 12px;
+    border-top: 1px solid rgba(255,255,255,0.06);
+  }
+  @media (max-width: 640px) {
+    .wrap { margin-top: 4vh; }
+    input { font-size: 18px; }
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="panel" role="search">
+      <div class="field">
+        <div class="mark" aria-hidden="true"></div>
+        <input id="q" autocomplete="off" spellcheck="false" placeholder="Suchen …" aria-label="Suchen" aria-controls="list">
+      </div>
+      <div id="list" class="list" role="listbox"></div>
+      <div class="foot">
+        <span id="status">Index wird aufgebaut</span>
+        <span id="hint">↑↓ auswählen · Enter öffnen · Esc leeren</span>
+      </div>
+    </div>
+  </div>
+<script>
+const q = document.getElementById("q");
+const list = document.getElementById("list");
+const statusEl = document.getElementById("status");
+let results = [];
+let selected = 0;
+let since = 0;
+let timer = 0;
+
+const glyphs = {
+  app: "▣",
+  dir: "▸",
+  file: "◻",
+  calc: "=",
+};
+
+function el(tag, cls, text) {
+  const node = document.createElement(tag);
+  if (cls) node.className = cls;
+  if (text != null) node.textContent = text;
+  return node;
+}
+
+function highlight(text, query) {
+  const frag = document.createDocumentFragment();
+  const needle = query.trim();
+  if (!needle) {
+    frag.append(document.createTextNode(text));
+    return frag;
+  }
+  const lower = text.toLocaleLowerCase();
+  const want = needle.toLocaleLowerCase();
+  let from = 0;
+  let at = lower.indexOf(want);
+  if (at < 0) {
+    frag.append(document.createTextNode(text));
+    return frag;
+  }
+  while (at >= 0) {
+    frag.append(document.createTextNode(text.slice(from, at)));
+    frag.append(el("mark", "", text.slice(at, at + want.length)));
+    from = at + want.length;
+    at = lower.indexOf(want, from);
+  }
+  frag.append(document.createTextNode(text.slice(from)));
+  return frag;
+}
+
+function render() {
+  list.replaceChildren();
+  if (!results.length) {
+    const empty = el("div", "empty", q.value.trim() ? "Nichts gefunden" : "Programme, Dateien, Ordner");
+    list.append(empty);
+    return;
+  }
+  results.forEach((hit, index) => {
+    const row = el("button", "row" + (index === selected ? " active" : ""));
+    row.type = "button";
+    row.setAttribute("role", "option");
+    row.setAttribute("aria-selected", index === selected ? "true" : "false");
+    const glyph = el("div", "glyph", glyphs[hit.kind] || "◻");
+    const text = el("div");
+    const name = el("div", "name");
+    name.append(highlight(hit.name, q.value));
+    const sub = el("div", "sub", hit.snippet || hit.detail || hit.path);
+    text.append(name, sub);
+    const kind = el("div", "kind", hit.kind === "app" ? "Programm" : hit.kind === "dir" ? "Ordner" : hit.kind === "calc" ? "Rechnung" : "Datei");
+    row.append(glyph, text, kind);
+    row.addEventListener("mouseenter", () => { selected = index; mark(); });
+    row.addEventListener("click", () => openIndex(index));
+    list.append(row);
+  });
+}
+
+function mark() {
+  [...list.querySelectorAll(".row")].forEach((row, index) => {
+    row.classList.toggle("active", index === selected);
+    row.setAttribute("aria-selected", index === selected ? "true" : "false");
+  });
+  const active = list.querySelector(".row.active");
+  if (active) active.scrollIntoView({ block: "nearest" });
+}
+
+async function search() {
+  const query = q.value;
+  const response = await fetch("/api/search?q=" + encodeURIComponent(query) + "&limit=8");
+  const data = await response.json();
+  results = data.results || [];
+  selected = 0;
+  render();
+}
+
+async function openIndex(index) {
+  const hit = results[index];
+  if (!hit) return;
+  if (hit.kind === "calc") {
+    try { await navigator.clipboard.writeText(hit.value || hit.name); } catch (e) {}
+    statusEl.textContent = "Ergebnis kopiert";
+    return;
+  }
+  await fetch("/api/open", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id: hit.id }),
+  });
+}
+
+q.addEventListener("input", () => {
+  clearTimeout(timer);
+  timer = setTimeout(() => { search().catch(() => {}); }, 30);
+});
+q.addEventListener("keydown", (event) => {
+  if (event.key === "ArrowDown") {
+    event.preventDefault();
+    selected = Math.min(selected + 1, Math.max(results.length - 1, 0));
+    mark();
+  } else if (event.key === "ArrowUp") {
+    event.preventDefault();
+    selected = Math.max(selected - 1, 0);
+    mark();
+  } else if (event.key === "Enter") {
+    event.preventDefault();
+    openIndex(selected);
+  } else if (event.key === "Escape") {
+    q.value = "";
+    search().catch(() => {});
+  }
+});
+
+async function refreshStatus() {
+  try {
+    const data = await (await fetch("/api/status")).json();
+    const mode = data.backend === "cpu+cuda" ? "CPU+CUDA" : "CPU";
+    const phase = data.phase === "scan" ? "Index läuft" : "Bereit";
+    statusEl.textContent = data.items + " Einträge · " + mode + " · " + phase + " · " + (data.hotkey_label || "");
+  } catch (e) {}
+}
+
+async function events() {
+  for (;;) {
+    try {
+      const response = await fetch("/api/events?since=" + since);
+      const data = await response.json();
+      since = data.seq || since;
+      if (data.event && data.event.type === "focus") {
+        q.focus();
+        q.select();
+      }
+    } catch (e) {
+      await new Promise((resolve) => setTimeout(resolve, 800));
+    }
+  }
+}
+
+q.focus();
+search().catch(() => {});
+refreshStatus();
+setInterval(refreshStatus, 1500);
+events();
+</script>
+</body>
+</html>
