@@ -396,6 +396,24 @@ class Index:
             (like_pattern(folded), limit),
         )
 
+    def contains(self, folded: str, limit: int) -> list[dict[str, Any]]:
+        """Datei- und Ordnernamen, die die Anfrage irgendwo enthalten.
+
+        `name_fold` ist bereits klein geschrieben, `case_sensitive_like` bleibt an.
+        Das führende `%` sucht mitten im Namen, nicht nur am Anfang.
+        """
+        if len(folded) < 3:
+            return []
+        return self._all(
+            f"""
+            SELECT {ITEM_COLS} FROM items
+            WHERE name_fold LIKE ? ESCAPE '!'
+            ORDER BY use_count DESC, name_fold ASC
+            LIMIT ?
+            """,
+            ("%" + like_pattern(folded), max(0, int(limit))),
+        )
+
     def fts(self, match: str, limit: int) -> list[dict[str, Any]]:
         with self.lock:
             try:

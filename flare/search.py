@@ -16,8 +16,8 @@ _FUZZY_MIN = 0.5
 _SIMILAR_ALL = 3000
 # FTS-LIMIT 80 verliert nahe Namen, sobald häufige Trigramme die Liste füllen.
 _SIMILAR_CANDIDATES = 400
-# Das Fenster zeigt bei „Ähnliche Namen“ mehr als die gewöhnlichen 12 Zeilen.
-PLAIN_UI_LIMIT = 12
+# Mit und ohne „Ähnliche Namen“ genug Zeilen für dreißig Treffer im Namen.
+PLAIN_UI_LIMIT = 50
 SIMILAR_UI_LIMIT = 50
 
 
@@ -112,7 +112,7 @@ def _fuzzy_surface(name: str) -> str:
 
 
 def ui_result_limit(similar: bool) -> int:
-    """Zeilen im Suchfenster. Ähnliche Namen bis 50, sonst 12. Nicht tausende."""
+    """Zeilen im Suchfenster. Mit und ohne Ähnlichkeit bis 50. Nicht tausende."""
     return SIMILAR_UI_LIMIT if similar else PLAIN_UI_LIMIT
 
 
@@ -296,9 +296,26 @@ def search(
                     via="prefix",
                 ),
             )
+        # Teilstring irgendwo im Namen, nicht nur am Anfang. Das FTS-LIMIT
+        # ist ungeordnet und kann einen langen Namen verdrängen.
+        if len(folded_query) >= 3:
+            for item in index.contains(folded_query, max(limit, 64)):
+                consider(
+                    item,
+                    "trigram",
+                    lexical_score(
+                        text,
+                        item["name"],
+                        item["path"],
+                        kind=item["kind"],
+                        tier=item["tier"],
+                        use_count=item["use_count"],
+                        via="trigram",
+                    ),
+                )
         phrase = phrase_query(text)
         if phrase:
-            for item in index.fts(phrase, 40):
+            for item in index.fts(phrase, max(limit, 64)):
                 consider(
                     item,
                     "trigram",

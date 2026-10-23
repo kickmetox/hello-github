@@ -406,9 +406,9 @@ class SimilarityTests(unittest.TestCase):
         from flare.window import path_for_selection, rows_after_reset, search_status, selectable_rows
 
         self.assertGreaterEqual(_FUZZY_MIN, 0.5)
-        self.assertEqual(ui_result_limit(False), 12)
+        self.assertEqual(ui_result_limit(False), 50)
         self.assertEqual(ui_result_limit(True), 50)
-        self.assertGreater(ui_result_limit(True), ui_result_limit(False))
+        self.assertGreaterEqual(ui_result_limit(False), 30)
         with tempfile.TemporaryDirectory() as tmp:
             index = Index(Path(tmp) / "index.db")
             try:
@@ -477,6 +477,80 @@ class SimilarityTests(unittest.TestCase):
             search_status("Ähnlichkeit", payload["took_ms"], len(rows), path_for_selection(rows, second)),
         )
         return rows
+
+    def test_johnson_infix_names_are_returned_with_and_without_similar(self) -> None:
+        from flare.search import ui_result_limit
+
+        examples = [
+            "Letter Chris Johnson",
+            "Reisekosten Johnson Nov18.pdf",
+            "Meeting Professor Christopher Johnson_GdF.docx",
+            "Failure in Safety-Critical Systems, by Chris Johnson",
+        ]
+        self.assertGreaterEqual(ui_result_limit(False), 30)
+        self.assertGreaterEqual(ui_result_limit(True), 30)
+        self.assertTrue(
+            all(
+                "johnson" in name.casefold() and not name.casefold().startswith("johnson")
+                for name in examples
+            )
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            index = Index(Path(tmp) / "index.db")
+            try:
+                stored: list[tuple[str, str, str]] = [
+                    (name, rf"C:\docs\{name}", "file") for name in examples
+                ]
+                stored.append(("Ablage Johnson", r"C:\docs\Ablage Johnson", "dir"))
+                stored.append(("Johnson Start.txt", r"C:\docs\Johnson Start.txt", "file"))
+                for number in range(25):
+                    name = f"Akte {number:02d} Johnson"
+                    stored.append((name, rf"C:\akten\{name}", "file"))
+                stored.append(("Johnston nur ähnlich", r"C:\people\Johnston nur ähnlich.txt", "file"))
+                for number in range(40):
+                    name = f"personal-song-{number:03d}"
+                    stored.append((name, rf"C:\noise\{name}.txt", "file"))
+                for name, path, kind in stored:
+                    index.con.execute(
+                        """
+                        INSERT INTO items(kind, name, name_fold, path, dir, ext, mtime_ns, size, tier)
+                        VALUES (?, ?, ?, ?, ?, ?, 1, 1, 1)
+                        """,
+                        (kind, name, name.casefold(), path, str(Path(path).parent), Path(name).suffix.casefold()),
+                    )
+                index.con.commit()
+                index._load_names()
+                ranker = Ranker(allow_cuda=False)
+                try:
+                    for similar in (False, True):
+                        payload = search(
+                            index,
+                            ranker,
+                            "johnson",
+                            limit=ui_result_limit(similar),
+                            similar=similar,
+                        )
+                        names = [hit["name"] for hit in payload["results"]]
+                        for example in examples:
+                            self.assertIn(example, names, names)
+                            hit = next(row for row in payload["results"] if row["name"] == example)
+                            self.assertNotEqual(hit["via"], "similar", hit)
+                        self.assertIn("Ablage Johnson", names)
+                        folder = next(row for row in payload["results"] if row["name"] == "Ablage Johnson")
+                        self.assertEqual(folder["kind"], "dir")
+                        infix = [name for name in names if "johnson" in name.casefold()]
+                        self.assertGreaterEqual(len(infix), 30, names)
+                        self.assertLessEqual(len(payload["results"]), 50)
+                    plain = search(index, ranker, "johnson", limit=ui_result_limit(False), similar=False)
+                    plain_names = [hit["name"] for hit in plain["results"]]
+                    self.assertIn("Johnson Start.txt", plain_names)
+                    self.assertNotIn("Johnston nur ähnlich", plain_names)
+                    wide = search(index, ranker, "johnson", limit=ui_result_limit(True), similar=True)
+                    self.assertIn("Johnston nur ähnlich", [hit["name"] for hit in wide["results"]])
+                finally:
+                    ranker.close()
+            finally:
+                index.close()
 
     def test_name_index_only_returns_sharing_trigrams(self) -> None:
         names = NameIndex()
@@ -827,6 +901,63 @@ class VolumeTests(unittest.TestCase):
                 self.assertIn("readme.txt", _names(index, "readme"))
                 self.assertFalse(_names(index, "nurwurzel"))
                 self.assertEqual(crawler.readdirs, 1)
+            finally:
+                index.close()
+
+    def test_fixed_nonsystem_drive_is_recursive_mapped_stays_one_level(self) -> None:
+        drives = [
+            DriveInfo("C:\\", DRIVE_FIXED, "Windows", True),
+            DriveInfo("D:\\", DRIVE_FIXED, "DATA", True),
+            DriveInfo("Z:\\", DRIVE_REMOTE, "NAS", True),
+        ]
+        full = dict(select_drive_roots(drives, system_drive="C:\\", index_network=False))
+        shallow = dict(shallow_remote_roots(drives, system_drive="C:\\", index_network=False))
+        self.assertEqual(full.get("D:\\"), 1)
+        self.assertNotIn("C:\\", full)
+        self.assertNotIn("Z:\\", full)
+        self.assertNotIn("D:\\", shallow)
+        self.assertEqual(shallow.get("Z:\\"), 2)
+        self.assertFalse(
+            should_sample_content(enabled=True, tier=1, offline=False, names_only=True)
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            fixed = Path(tmp) / "D"
+            nested = fixed / "Ebene1" / "Ebene2"
+            nested.mkdir(parents=True)
+            (nested / "Budget-Johnson.txt").write_text("xqcontenttoken festplatte\n", encoding="utf-8")
+            mapped = Path(tmp) / "Z"
+            (mapped / "Ordner").mkdir(parents=True)
+            (mapped / "Sichtbar.txt").write_text("xqcontenttoken netz\n", encoding="utf-8")
+            (mapped / "Ordner" / "Versteckt.txt").write_text("xqcontenttoken tief\n", encoding="utf-8")
+            index = Index(Path(tmp) / "index.db")
+            try:
+                crawler = Crawler(
+                    index,
+                    Governor(fast=True),
+                    [(str(fixed), 1), (str(mapped), 2)],
+                    threading.Event(),
+                    content=True,
+                    index_path=False,
+                    names_only=[str(fixed), str(mapped)],
+                    shallow_roots=[str(mapped)],
+                )
+                crawler.prime()
+                crawler.drain()
+                stored = {row[0] for row in index.con.execute("SELECT name FROM items")}
+                self.assertIn("Budget-Johnson.txt", stored)
+                self.assertIn("Ebene2", stored)
+                self.assertIn("Ebene1", stored)
+                self.assertIn("Sichtbar.txt", stored)
+                self.assertIn("Ordner", stored)
+                self.assertNotIn("Versteckt.txt", stored)
+                self.assertIn("Budget-Johnson.txt", _names(index, "Budget-Johnson"))
+                self.assertIn("Ebene2", _names(index, "Ebene2"))
+                self.assertNotIn("Versteckt", _names(index, "Versteckt"))
+                self.assertFalse(_names(index, "xqcontenttoken"))
+                self.assertEqual(index.con.execute("SELECT COUNT(*) FROM content").fetchone()[0], 0)
+                self.assertTrue(index.knows_dir(norm(nested)))
+                self.assertTrue(index.knows_dir(norm(fixed / "Ebene1")))
+                self.assertEqual(crawler.readdirs, 4)
             finally:
                 index.close()
 
