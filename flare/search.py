@@ -13,6 +13,7 @@ from flare.store import Index
 
 _TOKEN = re.compile(r"\w+", re.UNICODE)
 _FUZZY_MIN = 0.5
+_SIMILAR_ALL = 3000
 
 
 def phrase_query(text: str) -> str | None:
@@ -83,6 +84,16 @@ def _fuzzy_surface(name: str) -> str:
     return stem if len(stem) >= 3 else name
 
 
+def _similar_pool(index: Index, text: str) -> list[dict[str, Any]]:
+    """Bis 3000 Einträge der ganze Katalog, darüber FTS-Trigramm-Kandidaten."""
+    if index.counts()["items"] <= _SIMILAR_ALL:
+        return index.all_items(_SIMILAR_ALL)
+    fuzzy = fuzzy_query(text)
+    if not fuzzy:
+        return []
+    return index.fts(fuzzy, 80)
+
+
 def _detail(item: dict[str, Any]) -> str:
     if item["kind"] == "app":
         return "Programm"
@@ -91,7 +102,13 @@ def _detail(item: dict[str, Any]) -> str:
     return item.get("dir") or item["path"]
 
 
-def _hit(item: dict[str, Any], via: str, score: float, snippet: str = "") -> dict[str, Any]:
+def _hit(
+    item: dict[str, Any],
+    via: str,
+    score: float,
+    snippet: str = "",
+    similarity: float | None = None,
+) -> dict[str, Any]:
     hit = {
         "id": item["id"],
         "kind": item["kind"],
@@ -103,6 +120,8 @@ def _hit(item: dict[str, Any], via: str, score: float, snippet: str = "") -> dic
     }
     if snippet:
         hit["snippet"] = snippet
+    if similarity is not None:
+        hit["similarity"] = round(similarity, 2)
     return hit
 
 
@@ -119,18 +138,30 @@ def _snippet(text: str, query: str) -> str:
     return clip
 
 
-def search(index: Index, ranker: Ranker, query: str, limit: int = 8) -> dict[str, Any]:
+def search(
+    index: Index,
+    ranker: Ranker,
+    query: str,
+    limit: int = 8,
+    similar: bool = False,
+) -> dict[str, Any]:
     started = time.perf_counter()
     limit = max(1, min(int(limit), 50))
     text = query.strip()
     hits: dict[int, dict[str, Any]] = {}
 
-    def consider(item: dict[str, Any], via: str, score: float, snippet: str = "") -> None:
+    def consider(
+        item: dict[str, Any],
+        via: str,
+        score: float,
+        snippet: str = "",
+        similarity: float | None = None,
+    ) -> None:
         if score <= 0:
             return
         current = hits.get(item["id"])
         if current is None or score > current["score"]:
-            hits[item["id"]] = _hit(item, via, score, snippet)
+            hits[item["id"]] = _hit(item, via, score, snippet, similarity)
 
     if not text:
         for item in index.recent(limit):
@@ -182,31 +213,56 @@ def search(index: Index, ranker: Ranker, query: str, limit: int = 8) -> dict[str
                     _snippet(body, text),
                 )
         strong = [hit for hit in hits.values() if hit["score"] >= 240]
-        fuzzy = fuzzy_query(text) if len(strong) < limit else None
-        if fuzzy:
-            candidates = index.fts(fuzzy, 80)
-            pending = [item for item in candidates if item["id"] not in hits]
+        if similar:
+            pending = [item for item in _similar_pool(index, text) if item["id"] not in hits]
             if pending:
-                scores = ranker.fuzzy_scores(text, [_fuzzy_surface(item["name"]) for item in pending])
+                scores = ranker.similarity_scores(text, [_fuzzy_surface(item["name"]) for item in pending])
                 for item, cosine in zip(pending, scores):
                     if cosine < _FUZZY_MIN:
                         continue
-                    bonus = lexical_score(
-                        text,
-                        item["name"],
-                        item["path"],
-                        kind=item["kind"],
-                        tier=item["tier"],
-                        use_count=item["use_count"],
-                        via="fuzzy",
-                    )
-                    # lexical_score ist 0, wenn die Zeichenfolge nicht vorkommt.
-                    base = 120.0 + cosine * 420.0 + max(bonus, 0.0) * 0.05
+                    base = 120.0 + cosine * 420.0
                     if item["kind"] == "app":
                         base += 20.0
-                    consider(item, "fuzzy", base)
+                    consider(item, "similar", base, similarity=cosine)
+        elif len(strong) < limit:
+            fuzzy = fuzzy_query(text)
+            if fuzzy:
+                candidates = index.fts(fuzzy, 80)
+                pending = [item for item in candidates if item["id"] not in hits]
+                if pending:
+                    scores = ranker.fuzzy_scores(text, [_fuzzy_surface(item["name"]) for item in pending])
+                    for item, cosine in zip(pending, scores):
+                        if cosine < _FUZZY_MIN:
+                            continue
+                        bonus = lexical_score(
+                            text,
+                            item["name"],
+                            item["path"],
+                            kind=item["kind"],
+                            tier=item["tier"],
+                            use_count=item["use_count"],
+                            via="fuzzy",
+                        )
+                        base = 120.0 + cosine * 420.0 + max(bonus, 0.0) * 0.05
+                        if item["kind"] == "app":
+                            base += 20.0
+                        consider(item, "fuzzy", base)
 
     ordered = sorted(hits.values(), key=lambda hit: (-hit["score"], hit["name"].casefold()))
+    if similar and text:
+        lexical = [hit for hit in ordered if hit["via"] != "similar"]
+        near = [hit for hit in ordered if hit["via"] == "similar"]
+        if near:
+            lex_slots = max(1, limit // 2)
+            merged = lexical[:lex_slots] + near[: limit - min(len(lexical), lex_slots)]
+            seen = {hit["id"] for hit in merged}
+            for hit in lexical[lex_slots:] + near:
+                if len(merged) >= limit:
+                    break
+                if hit["id"] not in seen:
+                    merged.append(hit)
+                    seen.add(hit["id"])
+            ordered = merged
     calc = try_calc(text) if text else None
     if calc is not None:
         ordered.insert(
@@ -227,5 +283,6 @@ def search(index: Index, ranker: Ranker, query: str, limit: int = 8) -> dict[str
         "query": text,
         "backend": ranker.mode,
         "took_ms": round(took_ms, 2),
+        "similar": bool(similar and text),
         "results": ordered[:limit],
     }

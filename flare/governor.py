@@ -75,11 +75,11 @@ def lower_background_thread() -> None:
 
 
 class Governor:
-    def __init__(self, duty: float = 0.08, fast: bool = False) -> None:
-        self.base_duty = min(0.50, max(0.02, duty))
+    def __init__(self, duty: float = 0.35, fast: bool = False) -> None:
+        self.base_duty = min(0.85, max(0.05, duty))
         self.fast = fast
         self.started = time.perf_counter()
-        self.boost_seconds = 8.0
+        self.boost_seconds = 20.0
         self.last_sample = 0.0
         self.last_idle = 1.0
         self.wake = threading.Event()
@@ -87,7 +87,7 @@ class Governor:
     @property
     def duty(self) -> float:
         if (time.perf_counter() - self.started) < self.boost_seconds:
-            return max(self.base_duty, 0.40)
+            return max(self.base_duty, 0.85)
         return self.base_duty
 
     def pause(self, work_s: float, stop: threading.Event | None = None) -> None:

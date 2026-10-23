@@ -35,6 +35,22 @@
     font-size: 22px; padding: 16px 0; min-width: 0;
   }
   input::placeholder { color: #8e8e93; }
+  .similar {
+    flex: none;
+    border: 1px solid rgba(255,255,255,0.16);
+    background: transparent;
+    color: #d1d1d6;
+    border-radius: 999px;
+    padding: 6px 12px;
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .similar[aria-pressed="true"] {
+    background: #0a84ff;
+    border-color: #0a84ff;
+    color: white;
+  }
   .list { border-top: 1px solid rgba(255,255,255,0.06); max-height: min(420px, 52vh); overflow: auto; }
   .row {
     width: 100%; text-align: left; border: 0; background: transparent; color: inherit;
@@ -68,6 +84,7 @@
       <div class="field">
         <div class="mark" aria-hidden="true"></div>
         <input id="q" autocomplete="off" spellcheck="false" placeholder="Suchen …" aria-label="Suchen" aria-controls="list">
+        <button id="similar" class="similar" type="button" aria-pressed="false" title="Ähnliche Namen anzeigen">Ähnlich</button>
       </div>
       <div id="list" class="list" role="listbox"></div>
       <div class="foot">
@@ -80,10 +97,26 @@
 const q = document.getElementById("q");
 const list = document.getElementById("list");
 const statusEl = document.getElementById("status");
+const similarBtn = document.getElementById("similar");
 let results = [];
 let selected = 0;
 let since = 0;
 let timer = 0;
+let similar = false;
+
+function readSimilar() {
+  try { return localStorage.getItem("flare-similar") === "1"; }
+  catch (e) { return false; }
+}
+
+function writeSimilar(on) {
+  try { localStorage.setItem("flare-similar", on ? "1" : "0"); }
+  catch (e) {}
+}
+
+function applySimilar() {
+  similarBtn.setAttribute("aria-pressed", similar ? "true" : "false");
+}
 
 const glyphs = {
   app: "▣",
@@ -140,7 +173,12 @@ function render() {
     const text = el("div");
     const name = el("div", "name");
     name.append(highlight(hit.name, q.value));
-    const sub = el("div", "sub", hit.snippet || hit.detail || hit.path);
+    let subText = hit.snippet || hit.detail || hit.path;
+    if (hit.via === "similar" && typeof hit.similarity === "number") {
+      const pct = Math.round(hit.similarity * 100);
+      subText = "ähnlich " + String(pct).padStart(2, "0") + " %";
+    }
+    const sub = el("div", "sub", subText);
     text.append(name, sub);
     const kind = el("div", "kind", hit.kind === "app" ? "Programm" : hit.kind === "dir" ? "Ordner" : hit.kind === "calc" ? "Rechnung" : "Datei");
     row.append(glyph, text, kind);
@@ -161,7 +199,9 @@ function mark() {
 
 async function search() {
   const query = q.value;
-  const response = await fetch("/api/search?q=" + encodeURIComponent(query) + "&limit=8");
+  let url = "/api/search?q=" + encodeURIComponent(query) + "&limit=8";
+  if (similar) url += "&similar=1";
+  const response = await fetch(url);
   const data = await response.json();
   results = data.results || [];
   selected = 0;
@@ -182,6 +222,13 @@ async function openIndex(index) {
     body: JSON.stringify({ id: hit.id }),
   });
 }
+
+similarBtn.addEventListener("click", () => {
+  similar = !similar;
+  writeSimilar(similar);
+  applySimilar();
+  search().catch(() => {});
+});
 
 q.addEventListener("input", () => {
   clearTimeout(timer);
@@ -230,6 +277,8 @@ async function events() {
   }
 }
 
+similar = readSimilar();
+applySimilar();
 q.focus();
 search().catch(() => {});
 refreshStatus();

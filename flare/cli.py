@@ -46,6 +46,7 @@ def build_parser() -> argparse.ArgumentParser:
     query.add_argument("--json", action="store_true")
     query.add_argument("--limit", type=int, default=8)
     query.add_argument("--open", action="store_true", help="besten Treffer öffnen")
+    query.add_argument("--similar", action="store_true", help="ähnliche Namen mitsuchen")
 
     opened = sub.add_parser("open", help="Treffer über die id öffnen")
     opened.add_argument("id", type=int)
@@ -72,7 +73,11 @@ def _print_hits(payload: dict[str, Any], as_json: bool) -> None:
         return
     for hit in results:
         ident = "-" if hit.get("id") is None else str(hit["id"])
-        print(f"{ident:>6}  {hit['kind']:<5}  {hit['name']}  {hit.get('path', '')}")
+        extra = ""
+        similarity = hit.get("similarity")
+        if hit.get("via") == "similar" and isinstance(similarity, (int, float)):
+            extra = f"  ähnlich {int(round(float(similarity) * 100)):02d} %"
+        print(f"{ident:>6}  {hit['kind']:<5}  {hit['name']}  {hit.get('path', '')}{extra}")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -86,7 +91,7 @@ def main(argv: list[str] | None = None) -> int:
         format="%(levelname)s %(name)s: %(message)s",
     )
     if args.cmd == "query":
-        payload = _client(args).search(args.text, args.limit)
+        payload = _client(args).search(args.text, args.limit, similar=args.similar)
         _print_hits(payload, args.json)
         if args.open and payload.get("results"):
             first = payload["results"][0]

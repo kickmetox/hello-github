@@ -3,9 +3,6 @@
 from __future__ import annotations
 
 import logging
-import os
-import shutil
-import subprocess
 import sys
 import threading
 import time
@@ -27,71 +24,6 @@ from flare.watch import NullWatcher, start_watcher
 log = logging.getLogger("flare")
 
 
-def find_browser() -> str | None:
-    names = [
-        "google-chrome",
-        "google-chrome-stable",
-        "chromium",
-        "chromium-browser",
-        "microsoft-edge",
-        "msedge",
-    ]
-    for name in names:
-        found = shutil.which(name)
-        if found:
-            return found
-    if sys.platform == "win32":
-        roots = [
-            os.environ.get("PROGRAMFILES", r"C:\Program Files"),
-            os.environ.get("PROGRAMFILES(X86)", r"C:\Program Files (x86)"),
-            os.environ.get("LOCALAPPDATA", ""),
-        ]
-        tails = [
-            Path("Google") / "Chrome" / "Application" / "chrome.exe",
-            Path("Microsoft") / "Edge" / "Application" / "msedge.exe",
-        ]
-        for root in roots:
-            if not root:
-                continue
-            for tail in tails:
-                candidate = Path(root) / tail
-                if candidate.exists():
-                    return str(candidate)
-    return None
-
-
-def spawn_ui(url: str, profile: Path) -> subprocess.Popen[bytes] | None:
-    browser = find_browser()
-    if browser is None:
-        import webbrowser
-
-        webbrowser.open(url)
-        return None
-    profile.mkdir(parents=True, exist_ok=True)
-    command = [
-        browser,
-        f"--app={url}",
-        "--window-size=740,640",
-        "--no-first-run",
-        "--no-default-browser-check",
-        "--disable-extensions",
-        f"--user-data-dir={profile}",
-    ]
-    return subprocess.Popen(
-        command,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        start_new_session=True,
-    )
-
-
-def _raise_window() -> None:
-    wmctrl = shutil.which("wmctrl")
-    if not wmctrl:
-        return
-    subprocess.run([wmctrl, "-a", "Flare"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
-
-
 class Service:
     def __init__(
         self,
@@ -110,7 +42,7 @@ class Service:
         cfg = config or {}
         self.data_path = Path(data_dir) if data_dir else default_data_dir()
         self.data_path.mkdir(parents=True, exist_ok=True)
-        duty = float(cfg.get("duty", 0.08))
+        duty = float(cfg.get("duty", 0.35))
         content = bool(cfg.get("content", True))
         self.hotkey_spec = str(cfg.get("hotkey", "ctrl+alt+space"))
         try:
@@ -136,7 +68,7 @@ class Service:
         self.content = content
         self.httpd: Server | None = None
         self.port = 0
-        self.ui_proc: subprocess.Popen[bytes] | None = None
+        self.window: Any = None
         self.crawler: Crawler | None = None
         self.watcher: Any = None
         self.hotkey_thread: HotkeyThread | None = None
@@ -198,15 +130,39 @@ class Service:
             log.exception("index thread stopped")
 
     def run_forever(self) -> None:
+        show = self.open_immediately
+        self.open_immediately = False
         self.start()
         try:
-            while not self.stop.wait(3600):
-                pass
+            if self.allow_ui and sys.platform == "win32":
+                from flare.window import NativeWindow
+
+                self.window = NativeWindow(self._ui_search, self._ui_open, self._ui_status)
+                self.window.run(self.stop, visible=show)
+            else:
+                while not self.stop.wait(3600):
+                    pass
         finally:
             self.shutdown()
 
-    def search(self, text: str, limit: int = 8) -> dict[str, Any]:
-        return search(self.index, self.ranker, text, limit)
+    def _ui_search(self, text: str, similar: bool) -> dict[str, Any]:
+        return self.search(text, 12, similar)
+
+    def _ui_open(self, hit: dict[str, Any]) -> None:
+        if hit.get("kind") == "calc":
+            return
+        if hit.get("id") is None:
+            return
+        self.open_result({"id": int(hit["id"])})
+
+    def _ui_status(self) -> str:
+        data = self.status()
+        mode = "CPU+CUDA" if data["backend"] == "cpu+cuda" else "CPU"
+        phase = "Index läuft" if data["phase"] == "scan" else "Bereit"
+        return f"{data['items']} Einträge · {mode} · {phase} · {data.get('hotkey_label', '')}"
+
+    def search(self, text: str, limit: int = 8, similar: bool = False) -> dict[str, Any]:
+        return search(self.index, self.ranker, text, limit, similar)
 
     def status(self) -> dict[str, Any]:
         counts = self.index.counts()
@@ -241,12 +197,8 @@ class Service:
 
     def activate(self) -> None:
         self.bus.push({"type": "focus"})
-        if not self.allow_ui or not self.port:
-            return
-        if self.ui_proc is not None and self.ui_proc.poll() is None:
-            _raise_window()
-            return
-        self.ui_proc = spawn_ui(self.url, self.data_path / "chrome-profile")
+        if self.window is not None:
+            self.window.show()
 
     def reindex(self) -> None:
         self.index.invalidate_all()

@@ -1,13 +1,19 @@
 # Flare
 
 Spotlight-ähnlicher Starter für Windows 11. Er sucht Programme, Ordner und
-Dateien, läuft im Hintergrund und lässt sich aus anderen Programmen abfragen.
+Dateien in einem eigenen Fenster, läuft im Hintergrund und lässt sich aus
+anderen Programmen abfragen.
 
 Kompletter Arbeitsbaum als Zip (Quellcode, Tests, Build und Installer):
-[flare-workspace-complete.zip](https://github.com/kickmetox/hello-github/raw/cursor/flare-spotlight-a293/flare-workspace-complete.zip)
+[flare-workspace-native.zip](https://github.com/kickmetox/hello-github/raw/cursor/flare-spotlight-a293/flare-workspace-native.zip)
 
+Das Fenster ist ein normales Win32-Fenster. Es startet keinen Browser.
+Schließen blendet es nur aus; der Index läuft weiter, Strg+Alt+Leertaste holt es zurück.
 Standardkürzel: **Strg+Alt+Leertaste**. Es greift, während ein anderes Fenster
 den Fokus hat. In `config.json` steht das Kürzel als `ctrl+alt+space`.
+„Ähnliche Namen“ schaltet die Trigramm-Suche ein. Nahe Dateinamen bleiben
+sichtbar, auch wenn schon genaue Treffer da sind. Ab 32 Kandidaten rechnet
+die Grafikkarte mit, wenn `nvcuda.dll` einen Rechner meldet.
 
 ## Einrichtung
 
@@ -65,7 +71,7 @@ ein. Das Fenster öffnet erst das Kürzel.
 Der Dienst hört nur auf `127.0.0.1`, Port `47731` (oder dem nächsten freien).
 
 ```bat
-py -3 flare.py query --json "rechnung"
+py -3 flare.py query --similar --json "bericht"
 py -3 flare.py query "rechnung" --open
 curl -s "http://127.0.0.1:47731/api/search?q=rechnung"
 curl -s -X POST "http://127.0.0.1:47731/api/activate"
@@ -75,7 +81,7 @@ curl -s -X POST "http://127.0.0.1:47731/api/activate"
 from flare.client import Client
 
 client = Client()
-print(client.search("rechnung"))
+print(client.search("bericht", similar=True))
 client.open_id(client.search("rechnung")["results"][0]["id"])
 ```
 
@@ -83,7 +89,7 @@ Läuft kein Dienst, liest `Client.search` die Datenbank nur lesend.
 
 | Methode | Pfad | Bedeutung |
 | --- | --- | --- |
-| GET | `/api/search?q=&limit=` | Trefferliste |
+| GET | `/api/search?q=&limit=&similar=1` | Trefferliste, mit `similar=1` auch nahe Namen |
 | GET | `/api/status` | Einträge, CPU/CUDA, Indexphase |
 | POST | `/api/open` | `{"id": 12}` öffnet einen Katalogtreffer |
 | POST | `/api/activate` | Fenster holen |
@@ -108,10 +114,10 @@ die ersten 4 KiB, nur bekannte Textendungen.
 
 ## Last
 
-Der Index-Thread hält ein Tastverhältnis von etwa 8 %. Die ersten Sekunden
-liegen bei 40 %, damit Programme und Dokumente schnell da sind. Ist die CPU
-bereits belegt (Idle unter 20 %), wird zusätzlich gewartet. Der Index-Thread
-läuft im Windows-Hintergrundmodus. Volle Läufe wiederholen sich alle
+Der Index-Thread hält ein Tastverhältnis von etwa 35 %. Die ersten 20 Sekunden
+liegen bei 85 %, damit Programme und Dokumente schnell da sind. Ist die CPU
+bereits belegt (Idle unter 20 %), wird zusätzlich gewartet. Schreiben in den
+Katalog läuft gesammelt, der Seitencache ist groß. Volle Läufe wiederholen sich alle
 90 Sekunden (Programme), 5 Minuten (heiße Ordner) und 20 Minuten (Rest).
 
 Unveränderte Ordner kosten beim nächsten Lauf nur `stat` plus die gespeicherte
@@ -125,8 +131,10 @@ FTS5-Trigramme für Teilstrings. Tippfehler werden nur nachgezogen, wenn die
 genauen Treffer nicht reichen, und nur über den Anteil gemeinsamer Trigramme.
 
 CUDA wird benutzt, wenn `nvcuda.dll` einen Rechner meldet. Dann bewertet ein
-kleiner PTX-Kern größere Tippfehler-Mengen auf der GPU. Ohne Treiber bleibt es
-bei derselben Rechnung auf der CPU. `FLARE_FORCE_CPU=1` schaltet die GPU aus.
+kleiner PTX-Kern ab 32 Kandidaten die Trigramm-Nähe auf der GPU. Dieselbe
+Rechnung läuft sonst auf der CPU. Die Ähnlichkeitssuche holt die Kandidaten
+aus einem umgekehrten Trigramm-Index, nicht aus einem Lauf über alle Dateien.
+`FLARE_FORCE_CPU=1` schaltet die GPU aus.
 
 ## Konfiguration
 
@@ -135,7 +143,7 @@ bei derselben Rechnung auf der CPU. `FLARE_FORCE_CPU=1` schaltet die GPU aus.
 ```json
 {
   "hotkey": "ctrl+alt+space",
-  "duty": 0.08,
+  "duty": 0.35,
   "content": true,
   "port": 47731,
   "extra_roots": []

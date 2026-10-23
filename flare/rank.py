@@ -122,6 +122,22 @@ def overlap_scores(query_grams: list[int], name_grams: list[list[int]]) -> list[
     return scores
 
 
+def dice_scores(query_grams: list[int], name_grams: list[list[int]]) -> list[float]:
+    """Sørensen-Dice über Trigramme. Symmetrisch, damit nahe Namen beiderseits treffen."""
+    query_set = set(query_grams)
+    width = len(query_set)
+    scores: list[float] = []
+    for grams in name_grams:
+        name_set = set(grams)
+        union = width + len(name_set)
+        if union == 0:
+            scores.append(0.0)
+            continue
+        overlap = sum(1 for gram in query_set if gram in name_set)
+        scores.append((2.0 * overlap) / union)
+    return scores
+
+
 class _CudaRanker:
     """Driver-API ohne Toolkit. Ein Kontext, ein Modul, kurze Läufe."""
 
@@ -303,3 +319,11 @@ class Ranker:
                 self._cuda = None
                 self.mode = "cpu"
         return overlap_scores(query_grams, name_grams)
+
+    def similarity_scores(self, query: str, names: list[str]) -> list[float]:
+        """Nähe eines Namens zur Anfrage. Recall läuft ab 32 Kandidaten auf der GPU."""
+        recall = self.fuzzy_scores(query, names)
+        query_grams = trigrams(query)
+        name_grams = [trigrams(name) for name in names]
+        dice = dice_scores(query_grams, name_grams)
+        return [max(left, right) for left, right in zip(dice, recall)]

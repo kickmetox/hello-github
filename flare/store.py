@@ -8,6 +8,7 @@ import time
 from pathlib import Path
 from typing import Any
 
+from flare.ngram import NameIndex
 from flare.paths import sqlite_uri
 
 SCHEMA = """
@@ -131,13 +132,15 @@ class Index:
             self.con.execute("PRAGMA journal_mode=WAL")
             self.con.execute("PRAGMA synchronous=NORMAL")
             self.con.execute("PRAGMA temp_store=MEMORY")
-            self.con.execute("PRAGMA cache_size=-16000")
-            self.con.execute("PRAGMA mmap_size=67108864")
+            self.con.execute("PRAGMA cache_size=-65536")
+            self.con.execute("PRAGMA mmap_size=268435456")
             self.con.execute("PRAGMA case_sensitive_like=ON")
             self._migrate()
             self.con.execute(
                 "CREATE TEMP TABLE IF NOT EXISTS flare_seen(path TEXT PRIMARY KEY)"
             )
+        self.names = NameIndex()
+        self._load_names()
 
     def close(self) -> None:
         with self.lock:
@@ -150,6 +153,24 @@ class Index:
         self.con.executescript(SCHEMA)
         self.con.execute("PRAGMA user_version=2")
         self.con.commit()
+
+    def _load_names(self) -> None:
+        rows = [dict(row) for row in self.con.execute(f"SELECT {ITEM_COLS} FROM items")]
+        self.names.load(rows)
+
+    def similar_candidates(self, query: str, limit: int = 240) -> list[dict[str, Any]]:
+        with self.lock:
+            return self.names.candidates(query, limit)
+
+    def all_items(self, limit: int) -> list[dict[str, Any]]:
+        return self._all(
+            f"""
+            SELECT {ITEM_COLS} FROM items
+            ORDER BY use_count DESC, name_fold ASC
+            LIMIT ?
+            """,
+            (max(0, int(limit)),),
+        )
 
     def _all(self, sql: str, args: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
         with self.lock:
@@ -166,6 +187,7 @@ class Index:
     ) -> None:
         with self.lock:
             self.con.execute("BEGIN IMMEDIATE")
+            gone_paths: list[str] = []
             try:
                 deduped: dict[str, dict[str, Any]] = {}
                 for item in items:
@@ -188,7 +210,8 @@ class Index:
                         "SELECT path FROM dirs WHERE parent=?", (directory,)
                     )
                 }
-                for gone in old_children.difference(child_dirs):
+                gone_paths = list(old_children.difference(child_dirs))
+                for gone in gone_paths:
                     self._delete_tree(gone)
                 for child in child_dirs:
                     self.con.execute(
@@ -218,31 +241,43 @@ class Index:
             except Exception:
                 self.con.rollback()
                 raise
+            for gone in gone_paths:
+                self.names.drop_tree(gone)
+            current = [
+                dict(row)
+                for row in self.con.execute(
+                    f"SELECT {ITEM_COLS} FROM items WHERE dir=?",
+                    (directory,),
+                )
+            ]
+            self.names.sync_dir(directory, current)
 
     def _upsert_items(self, items: list[dict[str, Any]]) -> None:
-        for item in items:
-            self.con.execute(
-                """
-                INSERT INTO items(
-                  kind, name, name_fold, path, dir, ext, launch, mtime_ns, size, tier
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(path) DO UPDATE SET
-                  kind=excluded.kind,
-                  name=excluded.name,
-                  name_fold=excluded.name_fold,
-                  dir=excluded.dir,
-                  ext=excluded.ext,
-                  launch=excluded.launch,
-                  mtime_ns=excluded.mtime_ns,
-                  size=excluded.size,
-                  tier=MIN(items.tier, excluded.tier)
-                WHERE items.mtime_ns != excluded.mtime_ns
-                   OR items.size != excluded.size
-                   OR items.name != excluded.name
-                   OR items.kind != excluded.kind
-                   OR IFNULL(items.launch, '') != IFNULL(excluded.launch, '')
-                   OR items.tier != excluded.tier
-                """,
+        if not items:
+            return
+        self.con.executemany(
+            """
+            INSERT INTO items(
+              kind, name, name_fold, path, dir, ext, launch, mtime_ns, size, tier
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(path) DO UPDATE SET
+              kind=excluded.kind,
+              name=excluded.name,
+              name_fold=excluded.name_fold,
+              dir=excluded.dir,
+              ext=excluded.ext,
+              launch=excluded.launch,
+              mtime_ns=excluded.mtime_ns,
+              size=excluded.size,
+              tier=MIN(items.tier, excluded.tier)
+            WHERE items.mtime_ns != excluded.mtime_ns
+               OR items.size != excluded.size
+               OR items.name != excluded.name
+               OR items.kind != excluded.kind
+               OR IFNULL(items.launch, '') != IFNULL(excluded.launch, '')
+               OR items.tier != excluded.tier
+            """,
+            [
                 (
                     item["kind"],
                     item["name"],
@@ -254,8 +289,10 @@ class Index:
                     int(item.get("mtime_ns") or 0),
                     int(item.get("size") or 0),
                     int(item["tier"]),
-                ),
-            )
+                )
+                for item in items
+            ],
+        )
 
     def _delete_tree(self, path: str) -> None:
         import os

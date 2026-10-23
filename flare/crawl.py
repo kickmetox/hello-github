@@ -17,7 +17,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from flare.governor import Governor, lower_background_thread
+from flare.governor import Governor
 from flare.launch import is_secret_name, parse_lnk
 from flare.paths import is_inside, norm, parent_of
 from flare.store import Index
@@ -313,7 +313,6 @@ class Crawler:
         return False
 
     def run(self) -> None:
-        lower_background_thread()
         self.prime()
         while not self.stop.is_set():
             item = self._pop()

@@ -21,7 +21,8 @@ from flare.paths import norm
 from flare.governor import Governor, read_cpu_times, sleep_budget
 from flare.hotkey import hotkey_label, parse_hotkey
 from flare.launch import parse_lnk
-from flare.rank import Ranker, overlap_scores, trigrams
+from flare.ngram import NameIndex
+from flare.rank import Ranker, dice_scores, overlap_scores, trigrams
 from flare.search import lexical_score, search
 from flare.service import Service
 from flare.store import Index
@@ -57,6 +58,12 @@ class RankingTests(unittest.TestCase):
         bad = overlap_scores(trigrams("dokumnet"), [trigrams("Netzteil")])[0]
         self.assertGreaterEqual(good, 0.5)
         self.assertLess(bad, 0.5)
+        ranker = Ranker(allow_cuda=False)
+        near = ranker.similarity_scores("bericht", ["Berricht"])[0]
+        far = ranker.similarity_scores("bericht", ["Netzteil"])[0]
+        self.assertGreaterEqual(near, 0.5)
+        self.assertLess(far, 0.5)
+        self.assertGreater(dice_scores(trigrams("bericht"), [trigrams("Berricht")])[0], 0.4)
 
     def test_calc(self) -> None:
         self.assertEqual(try_calc("2+2*3"), "8")
@@ -214,6 +221,61 @@ class IndexTests(unittest.TestCase):
         assert parsed is not None
         self.assertEqual(parsed["kind"], "app")
         self.assertIn("Demo.exe", parsed["launch"])
+
+
+class SimilarityTests(unittest.TestCase):
+    def test_similar_mode_keeps_near_names(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "docs"
+            root.mkdir()
+            for index in range(8):
+                (root / f"bericht-{index}.txt").write_text("x", encoding="utf-8")
+            (root / "Berricht-extra.txt").write_text("x", encoding="utf-8")
+            (root / "Netzteil.txt").write_text("x", encoding="utf-8")
+            index = Index(Path(tmp) / "index.db")
+            try:
+                crawler = Crawler(
+                    index,
+                    Governor(fast=True),
+                    [(str(root), 1)],
+                    threading.Event(),
+                    content=False,
+                    index_path=False,
+                )
+                crawler.prime()
+                crawler.drain()
+                ranker = Ranker(allow_cuda=False)
+                plain = search(index, ranker, "bericht", limit=8)
+                self.assertFalse(any(hit["name"] == "Berricht-extra.txt" for hit in plain["results"]), plain)
+                sim = search(index, ranker, "bericht", limit=8, similar=True)
+                near = [hit for hit in sim["results"] if hit["name"] == "Berricht-extra.txt"]
+                self.assertTrue(near and near[0]["via"] == "similar", sim)
+                self.assertGreaterEqual(near[0]["similarity"], 0.5)
+                self.assertFalse(any(hit["name"] == "Netzteil.txt" for hit in sim["results"]))
+                self.assertTrue(any(hit["name"].startswith("bericht-") for hit in sim["results"]))
+            finally:
+                index.close()
+
+    def test_name_index_only_returns_sharing_trigrams(self) -> None:
+        names = NameIndex()
+        names.load(
+            [
+                {"id": 1, "name": "Berricht-extra.txt", "path": "/a", "dir": "/"},
+                {"id": 2, "name": "Netzteil.txt", "path": "/b", "dir": "/"},
+            ]
+        )
+        found = {row["name"] for row in names.candidates("bericht")}
+        self.assertIn("Berricht-extra.txt", found)
+        self.assertNotIn("Netzteil.txt", found)
+
+    def test_window_is_not_a_browser(self) -> None:
+        import flare.service as service
+        import flare.window as window
+
+        self.assertFalse(hasattr(service, "spawn_ui"))
+        self.assertFalse(hasattr(service, "find_browser"))
+        if os.name != "nt":
+            self.assertFalse(window.supported())
 
 
 class ScheduleTests(unittest.TestCase):

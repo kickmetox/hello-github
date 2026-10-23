@@ -32,12 +32,15 @@ class Client:
         except OSError:
             return None
 
-    def search(self, text: str, limit: int = 8) -> dict[str, Any]:
+    def search(self, text: str, limit: int = 8, similar: bool = False) -> dict[str, Any]:
         port = self.port()
         if port is not None:
-            query = urllib.parse.urlencode({"q": text, "limit": str(limit)})
+            params = {"q": text, "limit": str(limit)}
+            if similar:
+                params["similar"] = "1"
+            query = urllib.parse.urlencode(params)
             return self._json("GET", port, f"/api/search?{query}")
-        return self._local_search(text, limit)
+        return self._local_search(text, limit, similar)
 
     def status(self) -> dict[str, Any]:
         port = self.port()
@@ -76,14 +79,14 @@ class Client:
         payload = self._json("POST", port, "/api/reindex", {})
         return bool(payload.get("ok"))
 
-    def _local_search(self, text: str, limit: int) -> dict[str, Any]:
+    def _local_search(self, text: str, limit: int, similar: bool = False) -> dict[str, Any]:
         db = self.data_dir / "index.db"
         if not db.exists():
-            return {"query": text, "backend": "cpu", "took_ms": 0, "results": []}
+            return {"query": text, "backend": "cpu", "took_ms": 0, "similar": similar, "results": []}
         index = Index(db, readonly=True)
         ranker = Ranker(allow_cuda=False)
         try:
-            return search(index, ranker, text, limit)
+            return search(index, ranker, text, limit, similar)
         finally:
             ranker.close()
             index.close()

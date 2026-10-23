@@ -67,7 +67,8 @@ class Handler(BaseHTTPRequestHandler):
         if parsed.path == "/api/search":
             text = query.get("q", [""])[0]
             limit = _limit(query.get("limit", ["8"])[0])
-            self._json(200, self.app.search(text, limit))
+            flag = query.get("similar", ["0"])[0].lower()
+            self._json(200, self.app.search(text, limit, flag in {"1", "true", "yes", "on"}))
             return
         if parsed.path == "/api/status":
             self._json(200, self.app.status())
