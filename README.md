@@ -4,7 +4,7 @@ Spotlight-ähnlicher Starter für Windows 11. Er sucht Programme, Ordner und
 Dateien, läuft im Hintergrund und lässt sich aus anderen Programmen abfragen.
 
 Kompletter Arbeitsbaum als Zip (Quellcode, Tests, Build und Installer):
-[flare-workspace.zip](https://github.com/kickmetox/hello-github/raw/cursor/flare-spotlight-a293/flare-workspace.zip)
+[flare-workspace-complete.zip](https://github.com/kickmetox/hello-github/raw/cursor/flare-spotlight-a293/flare-workspace-complete.zip)
 
 Standardkürzel: **Strg+Alt+Leertaste**. Es greift, während ein anderes Fenster
 den Fokus hat. In `config.json` steht das Kürzel als `ctrl+alt+space`.
