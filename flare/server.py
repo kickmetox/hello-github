@@ -3,13 +3,24 @@
 from __future__ import annotations
 
 import json
+import sys
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 
-HTML = (Path(__file__).with_name("ui.html")).read_text(encoding="utf-8").encode("utf-8")
+
+def ui_path() -> Path:
+    meipass = getattr(sys, "_MEIPASS", None)
+    if meipass:
+        bundled = Path(meipass) / "flare" / "ui.html"
+        if bundled.is_file():
+            return bundled
+    return Path(__file__).with_name("ui.html")
+
+
+HTML = ui_path().read_text(encoding="utf-8").encode("utf-8")
 
 
 class EventBus:

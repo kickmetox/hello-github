@@ -324,6 +324,22 @@ class AutostartTests(unittest.TestCase):
             remove_autostart(home)
             self.assertFalse(Path(path).exists())
 
+    def test_frozen_windows_command_uses_the_exe(self) -> None:
+        import sys
+        from unittest import mock
+
+        exe = r"C:\Users\a\AppData\Local\Programs\Flare\Flare.exe"
+        with (
+            mock.patch.object(sys, "frozen", True, create=True),
+            mock.patch.object(sys, "platform", "win32"),
+            mock.patch.object(sys, "executable", exe),
+        ):
+            command = launch_command(True)
+        self.assertIn("Flare.exe", command)
+        self.assertIn("--background", command)
+        self.assertNotIn("flare.py", command)
+        self.assertNotIn("-m", command)
+
 
 if __name__ == "__main__":
     unittest.main()

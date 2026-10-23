@@ -6,6 +6,18 @@ läuft im Hintergrund und lässt sich aus anderen Programmen abfragen.
 Standardkürzel: **Strg+Alt+Leertaste**. Es greift, während ein anderes Fenster
 den Fokus hat. In `config.json` steht das Kürzel als `ctrl+alt+space`.
 
+## Windows 11
+
+Installer für 64-Bit-Windows 11: `dist/windows/Flare-Setup-1.0.0.exe`.
+
+Er richtet Flare ohne Administrator unter `%LOCALAPPDATA%\Programs\Flare` ein, legt einen Startmenü-Eintrag an und kann „Mit Windows starten“ setzen. Der Katalog bleibt getrennt unter `%LOCALAPPDATA%\Flare` und wird beim Entfernen nicht gelöscht. Die Einrichtung ist nicht signiert, Windows SmartScreen kann deshalb nachfragen.
+
+Neu bauen (Linux, mit Wine und NSIS):
+
+```bash
+bash packaging/windows/build.sh
+```
+
 ## Starten
 
 ```bash

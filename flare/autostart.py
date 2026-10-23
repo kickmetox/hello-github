@@ -10,6 +10,14 @@ from pathlib import Path
 
 
 def launch_command(background: bool = True) -> str:
+    # PyInstaller setzt sys.frozen. Dann ist sys.executable bereits Flare.exe.
+    if getattr(sys, "frozen", False):
+        args = [sys.executable]
+        if background:
+            args.append("--background")
+        if sys.platform == "win32":
+            return subprocess.list2cmdline(args)
+        return shlex.join(args)
     exe = Path(sys.executable)
     if sys.platform == "win32":
         pythonw = exe.with_name("pythonw.exe")
