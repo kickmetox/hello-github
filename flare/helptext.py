@@ -27,14 +27,15 @@ def description() -> str:
         "Andere Programme fragen über 127.0.0.1, Port 47731, nach. "
         "Der Knopf Hilfe und die Taste F1 öffnen diesen Text. "
         "Escape schließt die Hilfe und kehrt zur Suche zurück. "
-        "Mehrere Kopien des Index lassen sich speichern, kopieren und vergleichen. "
-        "Die Befehle heißen index-save, index-copy und index-compare. "
+        "Mehrere Kopien des Index lassen sich speichern, laden, kopieren und vergleichen. "
+        "Die Befehle heißen index-save, index-load, index-copy und index-compare. "
         "Ein eigener Index ist eine separate Datei für ein anderes Programm, "
         "zum Beispiel eine Dokumentenverwaltung. "
         "Dafür gibt es index-create, index-add mit --root oder --list und query --index. "
         "Eigene Indizes speichern nur Namen. "
         "Die Knöpfe „Index anlegen“, „Index speichern“, „Index kopieren“ und „Index vergleichen“ "
         "liegen in diesem Fenster. "
+        "Das Menü Index im Suchfenster bietet Speichern, Laden und Vergleichen. "
         "Der persönliche Index liegt unter %LOCALAPPDATA%\\Flare und bleibt beim Entfernen erhalten."
     )
 
@@ -53,7 +54,7 @@ def features() -> list[str]:
         "Übersprungen werden node_modules, .git, versteckte Ordner und Geheimnisdateien.",
         "Index-Last etwa 85 % in den ersten 20 Sekunden, danach etwa 35 %. Ist die CPU beschäftigt, wartet Flare zusätzlich.",
         "Andere Programme: HTTP auf 127.0.0.1 Port 47731, flare.py query und flare.client.Client.",
-        "Einrichtung pro Benutzer unter %LOCALAPPDATA%\\Programs\\Flare. Der Index liegt automatisch unter %LOCALAPPDATA%\\Flare und wird beim Entfernen nicht gelöscht. Mehrere Kopien lassen sich speichern, kopieren und vergleichen: index-save, index-copy und index-compare. Im Hilfefenster die Knöpfe „Index speichern“, „Index kopieren“ und „Index vergleichen“. Das Setup beendet ein laufendes Flare.exe, bevor es DLLs kopiert.",
+        "Einrichtung pro Benutzer unter %LOCALAPPDATA%\\Programs\\Flare. Der Index liegt automatisch unter %LOCALAPPDATA%\\Flare und wird beim Entfernen nicht gelöscht. Mehrere Kopien lassen sich speichern, kopieren und vergleichen: index-save, index-load, index-copy und index-compare. Im Hilfefenster die Knöpfe „Index speichern“, „Index kopieren“ und „Index vergleichen“. Das Menü Index im Suchfenster bietet Speichern, Laden und Vergleichen. Das Setup beendet ein laufendes Flare.exe, bevor es DLLs kopiert.",
         "Ein eigener Index ist eine separate Datei für ein anderes Programm, zum Beispiel eine Dokumentenverwaltung. index-create legt sie leer an, index-add --root liest Ordnernamen und index-add --list eine Pfadliste, query --index durchsucht sie. Eigene Indizes speichern nur Namen. Der persönliche Index bleibt unter %LOCALAPPDATA%\\Flare. „Index anlegen“ schreibt eine leere Datei.",
         "Rechnung wie 2+2*3. Enter öffnet einen Treffer, Escape blendet die Suche aus.",
         "Hilfe über den Knopf Hilfe oder F1. Escape schließt die Hilfe und kehrt zur Suche zurück.",

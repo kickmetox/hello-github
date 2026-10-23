@@ -52,8 +52,11 @@ class HelpTextTests(unittest.TestCase):
             "Index kopieren",
             "Index vergleichen",
             "index-save",
+            "index-load",
             "index-copy",
             "index-compare",
+            "Menü Index",
+            "Laden",
             "index-create",
             "index-add",
             "--root",
@@ -79,6 +82,17 @@ class HelpShortcutTests(unittest.TestCase):
         self.assertNotIn("WINFUNCTYPE", inspect.getsource(window.choose_index_save_path))
         self.assertNotIn("WINFUNCTYPE", inspect.getsource(window.choose_index_open_path))
         self.assertIn("flare-index.db", inspect.getsource(window.choose_index_save_path))
+        menu = inspect.getsource(window.NativeWindow._install_index_menu)
+        self.assertNotIn("WINFUNCTYPE", menu)
+        self.assertNotIn("wstring_at", menu)
+        self.assertIn("CreateMenu", menu)
+        for label in ("Speichern…", "Laden…", "Vergleichen…", "Kopieren…", "Anlegen…", "Index"):
+            self.assertIn(label, menu)
+        confirm = inspect.getsource(window.confirm_index_replace)
+        self.assertIn("MessageBoxW", confirm)
+        self.assertIn("Der laufende Index wird durch diese Datei ersetzt. Fortfahren?", confirm)
+        self.assertNotIn("WINFUNCTYPE", confirm)
+        self.assertNotIn("wstring_at", inspect.getsource(window))
         help_source = inspect.getsource(window.HelpWindow)
         self.assertIn("Index speichern", help_source)
         self.assertIn("Index kopieren", help_source)
@@ -88,6 +102,7 @@ class HelpShortcutTests(unittest.TestCase):
         if os.name != "nt":
             self.assertIsNone(window.choose_index_save_path(0))
             self.assertIsNone(window.choose_index_open_path(0))
+            self.assertFalse(window.confirm_index_replace(0))
 
     def test_f1_opens_help_and_escape_closes_it(self) -> None:
         self.assertEqual(shortcut_action(VK_F1, help_open=False, help_target=False), "help")

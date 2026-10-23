@@ -19,7 +19,15 @@ from flare.crawl import collect_list_names, collect_root_names
 from flare.paths import config_dir, data_dir
 from flare.search import search_index_file
 from flare.service import Service, roots_from_args
-from flare.store import Index, add_names, compare_indexes, copy_index, create_index, format_index_compare
+from flare.store import (
+    Index,
+    add_names,
+    compare_indexes,
+    copy_index,
+    create_index,
+    format_index_compare,
+    load_index_at,
+)
 
 
 def load_config(folder: Path | None = None) -> dict[str, Any]:
@@ -63,6 +71,8 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("remove-autostart", help="Autostart entfernen")
     saved = sub.add_parser("index-save", help="Index zusätzlich in eine Datei schreiben")
     saved.add_argument("dest", metavar="ZIELDATEI")
+    loaded = sub.add_parser("index-load", help="gespeicherten Index als laufenden Index laden")
+    loaded.add_argument("source", metavar="ZIELDATEI")
     copied = sub.add_parser("index-copy", help="eine Indexdatei in eine andere kopieren")
     copied.add_argument("source", metavar="QUELLE")
     copied.add_argument("dest", metavar="ZIEL")
@@ -94,6 +104,18 @@ def _index_save(args: argparse.Namespace) -> int:
     finally:
         index.close()
     print(saved)
+    return 0
+
+
+def _index_load(args: argparse.Namespace) -> int:
+    folder = Path(args.data_dir or data_dir())
+    live = folder / "index.db"
+    try:
+        loaded = load_index_at(live, args.source)
+    except (OSError, ValueError, sqlite3.Error) as exc:
+        print(f"Laden fehlgeschlagen: {exc}", file=sys.stderr)
+        return 1
+    print(loaded)
     return 0
 
 
@@ -232,6 +254,8 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.cmd == "index-save":
         return _index_save(args)
+    if args.cmd == "index-load":
+        return _index_load(args)
     if args.cmd == "index-copy":
         return _index_copy(args)
     if args.cmd == "index-compare":

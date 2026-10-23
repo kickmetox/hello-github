@@ -408,6 +408,14 @@ class Crawler:
         # Laufwerke und Cloud-Spiegel: nur Namen, Nachschau höchstens im Tier-1-Takt.
         self._names_only = {norm(path) for path in (names_only or [])}
         self._names_only.update(self._dynamic)
+        self._write_gate = threading.Lock()
+
+    def pause_writes(self) -> None:
+        """Scans anhalten, solange der laufende Index ausgetauscht wird."""
+        self._write_gate.acquire()
+
+    def resume_writes(self) -> None:
+        self._write_gate.release()
 
     def add(self, path: str, tier: int, *, descend: bool, priority: int | None = None) -> None:
         path = norm(path) if not path.startswith(":") else path
@@ -474,26 +482,28 @@ class Crawler:
     def run(self) -> None:
         self.prime()
         while not self.stop.is_set():
-            self.poll_drives()
-            item = self._pop()
+            with self._write_gate:
+                self.poll_drives()
+                item = self._pop()
+                if item is not None:
+                    path, tier, descend = item
+                    self.phase = "scan"
+                    started = time.perf_counter()
+                    try:
+                        if path == _PATH_DIR:
+                            self.ingest_path()
+                        else:
+                            self.scan_dir(path, tier, descend)
+                    except Exception:
+                        log.exception("scan failed: %s", path)
+                    if self.queued() == 0:
+                        self.phase = "idle"
             if item is None:
                 self.phase = "idle"
                 self._maybe_schedule()
                 if self.stop.wait(0.4):
                     return
                 continue
-            path, tier, descend = item
-            self.phase = "scan"
-            started = time.perf_counter()
-            try:
-                if path == _PATH_DIR:
-                    self.ingest_path()
-                else:
-                    self.scan_dir(path, tier, descend)
-            except Exception:
-                log.exception("scan failed: %s", path)
-            if self.queued() == 0:
-                self.phase = "idle"
             self.governor.pause(time.perf_counter() - started, self.stop)
             if self.readdirs and self.readdirs % 400 == 0:
                 self.index.checkpoint()
@@ -503,14 +513,15 @@ class Crawler:
         """Synchron bis die Warteschlange leer ist. Für Tests und den Erstlauf."""
         count = 0
         while count < limit:
-            item = self._pop()
-            if item is None:
-                break
-            path, tier, descend = item
-            if path == _PATH_DIR:
-                self.ingest_path()
-            else:
-                self.scan_dir(path, tier, descend)
+            with self._write_gate:
+                item = self._pop()
+                if item is None:
+                    break
+                path, tier, descend = item
+                if path == _PATH_DIR:
+                    self.ingest_path()
+                else:
+                    self.scan_dir(path, tier, descend)
             count += 1
         return count
 

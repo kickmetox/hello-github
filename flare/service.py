@@ -25,7 +25,7 @@ from flare.paths import norm, place_key
 from flare.rank import Ranker
 from flare.search import search, search_index_file
 from flare.server import EventBus, Server
-from flare.store import Index
+from flare.store import Index, replace_live_index
 from flare.watch import NullWatcher, start_watcher
 
 log = logging.getLogger("flare")
@@ -188,6 +188,7 @@ class Service:
                     self._ui_open,
                     self._ui_status,
                     self.save_index_copy,
+                    self.load_index_copy,
                 )
                 self.window.run(self.stop, visible=show)
             else:
@@ -258,6 +259,19 @@ class Service:
     def save_index_copy(self, dest: str) -> str:
         """Zusätzliche Kopie. Die laufende Datenbank bleibt liegen."""
         return str(self.index.backup(dest))
+
+    def load_index_copy(self, source: str) -> str:
+        """Laufenden Index durch eine Datei ersetzen. Die Quelle bleibt liegen."""
+        paused = False
+        crawler = self.crawler
+        if crawler is not None:
+            crawler.pause_writes()
+            paused = True
+        try:
+            return str(replace_live_index(self.index, source))
+        finally:
+            if paused and crawler is not None:
+                crawler.resume_writes()
 
     def reindex(self) -> None:
         self.index.invalidate_all()

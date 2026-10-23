@@ -188,19 +188,22 @@ Datenträgerbezeichnung. Sie werden nicht indiziert. `index_network` steht
 standardmäßig auf `false`; `true` liest gemappte Netzlaufwerke nur nach Namen.
 
 Der laufende Index ist `%LOCALAPPDATA%\Flare\index.db`. Er bleibt beim
-Entfernen liegen und wird beim Start weiterverwendet. Mehrere Kopien lassen
-sich speichern, kopieren und vergleichen:
+Entfernen liegen und wird beim Start weiterverwendet. Im Suchfenster bietet
+das Menü Index die Punkte Speichern, Laden, Vergleichen, Kopieren und Anlegen.
+Mehrere Kopien lassen sich speichern, laden, kopieren und vergleichen:
 
 ```bash
 py -3 flare.py index-save ZIELDATEI
+py -3 flare.py index-load ZIELDATEI
 py -3 flare.py index-copy QUELLE ZIEL
 py -3 flare.py index-compare A B
 ```
 
-Im Hilfefenster die Knöpfe „Index speichern“, „Index kopieren“ und
-„Index vergleichen“. Der Vergleich zählt Pfade, die nur in einer Kopie stehen
-oder sich in Größe oder Änderungszeit unterscheiden, und zeigt je Gruppe
-höchstens 20 Beispiele.
+`index-load` ersetzt den laufenden Index durch die gewählte Datei. Eine Datei
+ohne Flare-Index lässt ihn unverändert. Im Hilfefenster bleiben die Knöpfe
+„Index speichern“, „Index kopieren“ und „Index vergleichen“. Der Vergleich
+zählt Pfade, die nur in einer Kopie stehen oder sich in Größe oder
+Änderungszeit unterscheiden, und zeigt je Gruppe höchstens 20 Beispiele.
 
 Ein eigener Index ist eine separate Datei für ein anderes Programm, zum
 Beispiel eine Dokumentenverwaltung. Er speichert nur Namen. Der persönliche

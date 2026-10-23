@@ -111,7 +111,12 @@ class Index:
         self.path = Path(path)
         self.readonly = readonly
         self.lock = threading.RLock()
-        if readonly:
+        self._open_connection()
+        self.names = NameIndex()
+        self._load_names()
+
+    def _open_connection(self) -> None:
+        if self.readonly:
             self.con = sqlite3.connect(
                 sqlite_uri(self.path, "ro"),
                 uri=True,
@@ -129,19 +134,16 @@ class Index:
         self.con.execute("PRAGMA foreign_keys=ON")
         self.con.execute("PRAGMA busy_timeout=4000")
         self.con.execute("PRAGMA case_sensitive_like=ON")
-        if not readonly:
+        if not self.readonly:
             self.con.execute("PRAGMA journal_mode=WAL")
             self.con.execute("PRAGMA synchronous=NORMAL")
             self.con.execute("PRAGMA temp_store=MEMORY")
             self.con.execute("PRAGMA cache_size=-65536")
             self.con.execute("PRAGMA mmap_size=268435456")
-            self.con.execute("PRAGMA case_sensitive_like=ON")
             self._migrate()
             self.con.execute(
                 "CREATE TEMP TABLE IF NOT EXISTS flare_seen(path TEXT PRIMARY KEY)"
             )
-        self.names = NameIndex()
-        self._load_names()
 
     def close(self) -> None:
         with self.lock:
@@ -512,6 +514,111 @@ class Index:
             finally:
                 dest_con.close()
         return target
+
+    def replace_from(self, source: str | Path) -> Path:
+        """Laufende Datei durch einen Snapshot ersetzen.
+
+        Die Quelle bleibt liegen. Ein WAL wird nicht roh kopiert. Eine Datei
+        ohne Flare-Index lässt diese Datenbank unverändert. Der Namensindex
+        wird danach neu aus der Tabelle items geladen.
+        """
+        if self.readonly:
+            raise ValueError("Laufender Index ist nur lesbar")
+        src = Path(source)
+        _require_index_file(src)
+        if src.resolve() == self.path.resolve():
+            raise ValueError("Quelle ist der laufende Index")
+        with self.lock:
+            self._install_snapshot(src)
+        return self.path
+
+    def _install_snapshot(self, src: Path) -> None:
+        row = self.con.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchone()
+        if row is not None and int(row[0]) != 0:
+            raise sqlite3.OperationalError("Checkpoint beschäftigt")
+        self.con.close()
+        try:
+            _remove_sidecars(self.path)
+            _backup_file_into(src, self.path)
+            _remove_sidecars(self.path)
+        except Exception:
+            self._open_connection()
+            self._load_names()
+            raise
+        self._open_connection()
+        self._load_names()
+
+
+def replace_live_index(index: Index, source: str | Path) -> Path:
+    """Offenen Katalog durch eine Snapshot-Datei ersetzen. Die Quelle bleibt."""
+    return index.replace_from(source)
+
+
+def load_index_at(live: str | Path, source: str | Path) -> Path:
+    """Indexdatei durch einen Snapshot ersetzen.
+
+    Die Quelle wird geprüft, bevor die laufende Datei geöffnet oder angelegt
+    wird. Dieselbe Ersetzung nutzt das Menü über replace_live_index.
+    """
+    src = Path(source)
+    dest = Path(live)
+    _require_index_file(src)
+    if dest.exists() and dest.resolve() == src.resolve():
+        raise ValueError("Quelle ist der laufende Index")
+    index = Index(dest)
+    try:
+        replace_live_index(index, src)
+    finally:
+        index.close()
+    return dest
+
+
+def _require_index_file(path: Path) -> None:
+    if not path.is_file():
+        raise ValueError(f"Index fehlt: {path}")
+    try:
+        con = sqlite3.connect(sqlite_uri(path, "ro"), uri=True, timeout=3)
+    except sqlite3.Error as exc:
+        raise ValueError(f"Index lässt sich nicht öffnen: {path}") from exc
+    try:
+        try:
+            row = con.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='items'"
+            ).fetchone()
+        except sqlite3.Error as exc:
+            raise ValueError(f"Index lässt sich nicht öffnen: {path}") from exc
+    finally:
+        con.close()
+    if row is None:
+        raise ValueError(f"Index ohne Tabelle items: {path}")
+
+
+def _remove_sidecars(path: Path) -> None:
+    for suffix in ("-wal", "-shm"):
+        sidecar = path.with_name(path.name + suffix)
+        if sidecar.is_file():
+            sidecar.unlink()
+
+
+def _backup_file_into(source: Path, dest: Path) -> None:
+    """Inhalt von source nach dest über sqlite3.Connection.backup schreiben.
+
+    Es wird keine WAL-Datei roh kopiert. Das Ziel läuft dafür im
+    Rollback-Journal, damit ein altes WAL beim Schließen nicht zurückgespielt
+    wird.
+    """
+    src_con = sqlite3.connect(sqlite_uri(source, "ro"), uri=True, timeout=5)
+    try:
+        dest_con = sqlite3.connect(dest, timeout=5)
+        try:
+            dest_con.execute("PRAGMA journal_mode=DELETE").fetchone()
+            src_con.backup(dest_con)
+            dest_con.commit()
+            dest_con.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchone()
+        finally:
+            dest_con.close()
+    finally:
+        src_con.close()
 
 
 _COMPARE_SAMPLE = 20

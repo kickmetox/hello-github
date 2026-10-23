@@ -1009,7 +1009,9 @@ class VolumeTests(unittest.TestCase):
         import flare.service as service
         import flare.volumes as volumes
 
-        for module in (crawl, service, volumes):
+        import flare.window as window
+
+        for module in (crawl, service, volumes, window):
             source = inspect.getsource(module)
             self.assertNotIn("wstring_at", source)
             self.assertNotIn("lower_background_thread", source)
@@ -1147,6 +1149,176 @@ class IndexCopyCompareTests(unittest.TestCase):
             self.assertEqual(bare, 1)
             self.assertIn("ohne Tabelle", err_empty.getvalue())
             self.assertNotIn("Traceback", err_empty.getvalue())
+
+
+class IndexLoadTests(unittest.TestCase):
+    def test_load_replaces_live_items_and_keeps_the_snapshot(self) -> None:
+        import io
+        from contextlib import redirect_stderr, redirect_stdout
+
+        from flare.cli import main
+        from flare.store import replace_live_index
+
+        with tempfile.TemporaryDirectory() as tmp:
+            data = Path(tmp) / "data"
+            data.mkdir()
+            live = data / "index.db"
+            snap = Path(tmp) / "kopie" / "flare-index.db"
+            _seed_index(live, [("/docs/altname.txt", 3, 5), ("/docs/weg.txt", 4, 6)])
+            _seed_index(snap, [("/docs/geladen.txt", 9, 11)])
+            snap_bytes = snap.read_bytes()
+            index = Index(live)
+            try:
+                self.assertEqual(
+                    {row["name"] for row in index.names._rows.values()},
+                    {"altname.txt", "weg.txt"},
+                )
+                index.con.execute(
+                    """
+                    INSERT INTO items(kind, name, name_fold, path, dir, ext, mtime_ns, size, tier)
+                    VALUES ('file', 'nurwal.txt', 'nurwal.txt', '/docs/nurwal.txt', '/docs', '.txt', 1, 1, 1)
+                    """
+                )
+                index.con.commit()
+                wal = live.with_name(live.name + "-wal")
+                self.assertTrue(wal.is_file())
+                self.assertGreater(wal.stat().st_size, 0)
+                replaced = replace_live_index(index, snap)
+                self.assertEqual(Path(replaced), live)
+                names = {row["name"] for row in index.names._rows.values()}
+                self.assertEqual(names, {"geladen.txt"})
+                self.assertEqual(index.counts()["items"], 1)
+                self.assertIn("geladen.txt", _names(index, "geladen"))
+                self.assertNotIn("altname.txt", _names(index, "altname"))
+                self.assertNotIn("nurwal.txt", _names(index, "nurwal"))
+            finally:
+                index.close()
+            self.assertTrue(snap.is_file())
+            self.assertEqual(snap.read_bytes(), snap_bytes)
+            again = Index(live, readonly=True)
+            copy = Index(snap, readonly=True)
+            try:
+                self.assertEqual(again.counts()["items"], 1)
+                self.assertIn("geladen.txt", _names(again, "geladen"))
+                self.assertNotIn("altname.txt", _names(again, "altname"))
+                self.assertIn("geladen.txt", _names(copy, "geladen"))
+                self.assertNotIn("altname.txt", _names(copy, "altname"))
+            finally:
+                again.close()
+                copy.close()
+            out = io.StringIO()
+            with redirect_stdout(out):
+                code = main(["--data-dir", str(data), "index-load", str(snap)])
+            self.assertEqual(code, 0)
+            self.assertIn(str(live), out.getvalue())
+            self.assertEqual(snap.read_bytes(), snap_bytes)
+            via_cli = Index(live, readonly=True)
+            try:
+                self.assertIn("geladen.txt", _names(via_cli, "geladen"))
+                self.assertEqual(via_cli.counts()["items"], 1)
+            finally:
+                via_cli.close()
+
+    def test_load_rejects_a_non_index_without_changing_the_live_database(self) -> None:
+        import io
+        import sqlite3
+        from contextlib import redirect_stderr
+
+        from flare.cli import main
+        from flare.store import replace_live_index
+
+        with tempfile.TemporaryDirectory() as tmp:
+            data = Path(tmp) / "data"
+            data.mkdir()
+            live = data / "index.db"
+            _seed_index(live, [("/docs/bleibt.txt", 2, 7)])
+            before = live.read_bytes()
+            wal = live.with_name(live.name + "-wal")
+            shm = live.with_name(live.name + "-shm")
+            wal_before = wal.read_bytes() if wal.is_file() else None
+            shm_before = shm.read_bytes() if shm.is_file() else None
+            fake = Path(tmp) / "kein.db"
+            fake.write_text("das ist kein index\n", encoding="utf-8")
+            empty = Path(tmp) / "leer.db"
+            sqlite3.connect(empty).close()
+            err = io.StringIO()
+            with redirect_stderr(err):
+                code = main(["--data-dir", str(data), "index-load", str(fake)])
+            self.assertNotEqual(code, 0)
+            self.assertIn("Laden fehlgeschlagen", err.getvalue())
+            self.assertNotIn("Traceback", err.getvalue())
+            self.assertEqual(live.read_bytes(), before)
+            self.assertEqual(wal.read_bytes() if wal.is_file() else None, wal_before)
+            self.assertEqual(shm.read_bytes() if shm.is_file() else None, shm_before)
+            err_empty = io.StringIO()
+            with redirect_stderr(err_empty):
+                bare = main(["--data-dir", str(data), "index-load", str(empty)])
+            self.assertNotEqual(bare, 0)
+            self.assertIn("ohne Tabelle", err_empty.getvalue())
+            self.assertNotIn("Traceback", err_empty.getvalue())
+            self.assertEqual(live.read_bytes(), before)
+            index = Index(live)
+            try:
+                remembered = {row["name"] for row in index.names._rows.values()}
+                main_bytes = live.read_bytes()
+                with self.assertRaises(ValueError):
+                    replace_live_index(index, fake)
+                self.assertEqual({row["name"] for row in index.names._rows.values()}, remembered)
+                self.assertEqual(live.read_bytes(), main_bytes)
+                self.assertIn("bleibt.txt", _names(index, "bleibt"))
+            finally:
+                index.close()
+            self.assertTrue(fake.is_file())
+            self.assertEqual(fake.read_text(encoding="utf-8"), "das ist kein index\n")
+
+    def test_service_load_uses_the_open_index(self) -> None:
+        from flare.store import replace_live_index
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "leer"
+            root.mkdir()
+            data = Path(tmp) / "data"
+            snap = Path(tmp) / "snap.db"
+            _seed_index(snap, [("/virtual/geladen.txt", 8, 8)])
+            service = Service(
+                data_dir=data,
+                roots=[(str(root), 1)],
+                open_immediately=False,
+                allow_ui=False,
+                hotkey=False,
+                watch=False,
+                index_path=False,
+                fast=True,
+                port=0,
+            )
+            try:
+                service.index.con.execute(
+                    """
+                    INSERT INTO items(kind, name, name_fold, path, dir, ext, mtime_ns, size, tier)
+                    VALUES ('file', 'weg.txt', 'weg.txt', '/virtual/weg.txt', '/virtual', '.txt', 1, 1, 1)
+                    """
+                )
+                service.index.con.commit()
+                service.index._load_names()
+                service.start()
+                loaded = service.load_index_copy(str(snap))
+                self.assertEqual(loaded, str(service.index.path))
+                names = {row["name"] for row in service.index.names._rows.values()}
+                self.assertEqual(names, {"geladen.txt"})
+                self.assertTrue(snap.is_file())
+                self.assertIn("geladen.txt", _names(service.index, "geladen"))
+                self.assertNotIn("weg.txt", _names(service.index, "weg"))
+            finally:
+                service.shutdown()
+            import inspect
+
+            import flare.cli as cli
+            import flare.service as service_mod
+
+            self.assertIn("replace_live_index", inspect.getsource(service_mod.Service.load_index_copy))
+            self.assertIn("load_index_at", inspect.getsource(cli._index_load))
+            self.assertIn("replace_live_index", inspect.getsource(replace_live_index))
+            self.assertNotIn("shutil", inspect.getsource(replace_live_index))
 
 
 class CustomIndexTests(unittest.TestCase):

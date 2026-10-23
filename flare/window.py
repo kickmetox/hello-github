@@ -66,6 +66,15 @@ IDC_SAVE_INDEX = 201
 IDC_COPY_INDEX = 203
 IDC_COMPARE_INDEX = 204
 IDC_CREATE_INDEX = 205
+IDC_MENU_SAVE = 301
+IDC_MENU_LOAD = 302
+IDC_MENU_COMPARE = 303
+IDC_MENU_COPY = 304
+IDC_MENU_CREATE = 305
+MB_YESNO = 0x0004
+IDYES = 6
+MF_STRING = 0x0000
+MF_POPUP = 0x0010
 SM_CXSCREEN = 0
 SM_CYSCREEN = 1
 
@@ -107,6 +116,122 @@ def choose_index_save_path(owner: int = 0, title: str = "Index speichern") -> st
 def choose_index_open_path(owner: int = 0, title: str = "Index öffnen") -> str | None:
     """Öffnen-Dialog. Nur unter Windows, und erst beim Klick, nicht beim Import."""
     return _index_file_dialog(owner, save=False, title=title, suggested="")
+
+
+def confirm_index_replace(owner: int = 0) -> bool:
+    """Ja/Nein, bevor der laufende Index ersetzt wird. Nur unter Windows."""
+    if sys.platform != "win32":
+        return False
+    user32 = ctypes.windll.user32
+    user32.MessageBoxW.argtypes = [
+        wintypes.HWND,
+        wintypes.LPCWSTR,
+        wintypes.LPCWSTR,
+        wintypes.UINT,
+    ]
+    user32.MessageBoxW.restype = ctypes.c_int
+    answer = user32.MessageBoxW(
+        owner or None,
+        "Der laufende Index wird durch diese Datei ersetzt. Fortfahren?",
+        "Index laden",
+        MB_YESNO,
+    )
+    return int(answer) == IDYES
+
+
+def _save_index_as(
+    owner: int,
+    save: Callable[[str], str] | None,
+    set_status: Callable[[str], None],
+) -> None:
+    path = choose_index_save_path(owner)
+    if not path:
+        return
+    if save is None:
+        set_status("Speichern fehlgeschlagen.")
+        return
+    try:
+        save(path)
+    except Exception:
+        set_status("Speichern fehlgeschlagen.")
+        return
+    set_status("Index gespeichert.")
+
+
+def _load_index_from(
+    owner: int,
+    load: Callable[[str], str] | None,
+    set_status: Callable[[str], None],
+    refreshed: Callable[[], None],
+) -> None:
+    path = choose_index_open_path(owner, "Index laden")
+    if not path:
+        return
+    if not confirm_index_replace(owner):
+        return
+    if load is None:
+        set_status("Laden fehlgeschlagen.")
+        return
+    try:
+        load(path)
+    except ValueError as exc:
+        text = str(exc)
+        if "ohne Tabelle" in text or "lässt sich nicht öffnen" in text or "Index fehlt" in text:
+            set_status("Datei ist kein Flare-Index.")
+        else:
+            set_status("Laden fehlgeschlagen.")
+        return
+    except Exception:
+        set_status("Laden fehlgeschlagen.")
+        return
+    refreshed()
+
+
+def _create_index_as(owner: int, set_status: Callable[[str], None]) -> None:
+    path = choose_index_save_path(owner, "Index anlegen")
+    if not path:
+        return
+    try:
+        create_index(path)
+    except Exception:
+        set_status("Anlegen fehlgeschlagen.")
+        return
+    set_status("Index angelegt.")
+
+
+def _copy_index_as(owner: int, set_status: Callable[[str], None]) -> None:
+    source = choose_index_open_path(owner, "Index kopieren")
+    if not source:
+        return
+    dest = choose_index_save_path(owner, "Index kopieren")
+    if not dest:
+        return
+    try:
+        copy_index(source, dest)
+    except Exception:
+        set_status("Kopieren fehlgeschlagen.")
+        return
+    set_status("Index kopiert.")
+
+
+def _compare_indexes_as(
+    owner: int,
+    set_status: Callable[[str], None],
+    show_report: Callable[[str], None],
+) -> None:
+    left = choose_index_open_path(owner, "Erster Index")
+    if not left:
+        return
+    right = choose_index_open_path(owner, "Zweiter Index")
+    if not right:
+        return
+    try:
+        report = format_index_compare(compare_indexes(left, right))
+    except Exception:
+        set_status("Vergleich fehlgeschlagen.")
+        return
+    set_status("Vergleich fertig.")
+    show_report(report)
 
 
 def _index_file_dialog(owner: int, *, save: bool, title: str, suggested: str) -> str | None:
@@ -463,63 +588,25 @@ class HelpWindow:
         if self.save_status:
             ctypes.windll.user32.SetWindowTextW(self.save_status, text)
 
+    def show_report(self, report: str) -> None:
+        if not self.body:
+            return
+        user32 = ctypes.windll.user32
+        user32.SetWindowTextW(self.body, report)
+        user32.SetFocus(self.body)
+        user32.SendMessageW(self.body, EM_SETSEL, 0, 0)
+
     def _save_index(self) -> None:
-        path = choose_index_save_path(self.hwnd)
-        if not path:
-            return
-        save = getattr(self.owner, "save_index", None)
-        if save is None:
-            self._set_status("Speichern fehlgeschlagen.")
-            return
-        try:
-            save(path)
-        except Exception:
-            self._set_status("Speichern fehlgeschlagen.")
-            return
-        self._set_status("Index gespeichert.")
+        _save_index_as(self.hwnd, getattr(self.owner, "save_index", None), self._set_status)
 
     def _create_index(self) -> None:
-        path = choose_index_save_path(self.hwnd, "Index anlegen")
-        if not path:
-            return
-        try:
-            create_index(path)
-        except Exception:
-            self._set_status("Anlegen fehlgeschlagen.")
-            return
-        self._set_status("Index angelegt.")
+        _create_index_as(self.hwnd, self._set_status)
 
     def _copy_index(self) -> None:
-        source = choose_index_open_path(self.hwnd, "Index kopieren")
-        if not source:
-            return
-        dest = choose_index_save_path(self.hwnd, "Index kopieren")
-        if not dest:
-            return
-        try:
-            copy_index(source, dest)
-        except Exception:
-            self._set_status("Kopieren fehlgeschlagen.")
-            return
-        self._set_status("Index kopiert.")
+        _copy_index_as(self.hwnd, self._set_status)
 
     def _compare_indexes(self) -> None:
-        left = choose_index_open_path(self.hwnd, "Erster Index")
-        if not left:
-            return
-        right = choose_index_open_path(self.hwnd, "Zweiter Index")
-        if not right:
-            return
-        try:
-            report = format_index_compare(compare_indexes(left, right))
-        except Exception:
-            self._set_status("Vergleich fehlgeschlagen.")
-            return
-        self._set_status("Vergleich fertig.")
-        if self.body:
-            ctypes.windll.user32.SetWindowTextW(self.body, report)
-            ctypes.windll.user32.SetFocus(self.body)
-            ctypes.windll.user32.SendMessageW(self.body, EM_SETSEL, 0, 0)
+        _compare_indexes_as(self.hwnd, self._set_status, self.show_report)
 
 
 class NativeWindow:
@@ -529,6 +616,7 @@ class NativeWindow:
         open_hit: OpenFn,
         status: StatusFn,
         save_index: Callable[[str], str] | None = None,
+        load_index: Callable[[str], str] | None = None,
     ) -> None:
         self._search = search
         self._open_hit = open_hit
@@ -548,7 +636,9 @@ class NativeWindow:
         self._field_brush = 0
         self._font = 0
         self.help_btn = 0
+        self._menu = 0
         self.save_index = save_index
+        self.load_index = load_index
         self._help = HelpWindow(self)
 
     def show(self) -> None:
@@ -698,6 +788,7 @@ class NativeWindow:
         self.list = self._child("LISTBOX", "", 102, LBS_NOTIFY | LBS_NOINTEGRALHEIGHT | WS_VSCROLL | WS_BORDER)
         self.label = self._child("STATIC", "Index wird aufgebaut", 103, 0)
         self.help_btn = self._child("BUTTON", "Hilfe", IDC_HELP, BS_PUSHBUTTON)
+        self._install_index_menu()
         self._layout()
         user32.SetTimer(hwnd, 2, 1000, None)
         return True
@@ -721,6 +812,41 @@ class NativeWindow:
         if self._font:
             user32.SendMessageW(hwnd, WM_SETFONT, self._font, 1)
         return hwnd
+
+    def _install_index_menu(self) -> None:
+        """Menüleiste nur unter Windows und erst beim Erzeugen des Fensters."""
+        if sys.platform != "win32" or not self.hwnd:
+            return
+        user32 = ctypes.windll.user32
+        user32.CreateMenu.argtypes = []
+        user32.CreateMenu.restype = wintypes.HMENU
+        user32.CreatePopupMenu.argtypes = []
+        user32.CreatePopupMenu.restype = wintypes.HMENU
+        user32.AppendMenuW.argtypes = [
+            wintypes.HMENU,
+            wintypes.UINT,
+            ctypes.c_size_t,
+            wintypes.LPCWSTR,
+        ]
+        user32.AppendMenuW.restype = wintypes.BOOL
+        user32.SetMenu.argtypes = [wintypes.HWND, wintypes.HMENU]
+        user32.SetMenu.restype = wintypes.BOOL
+        user32.DrawMenuBar.argtypes = [wintypes.HWND]
+        user32.DrawMenuBar.restype = wintypes.BOOL
+        bar = user32.CreateMenu()
+        popup = user32.CreatePopupMenu()
+        if not bar or not popup:
+            return
+        user32.AppendMenuW(popup, MF_STRING, IDC_MENU_SAVE, "Speichern…")
+        user32.AppendMenuW(popup, MF_STRING, IDC_MENU_LOAD, "Laden…")
+        user32.AppendMenuW(popup, MF_STRING, IDC_MENU_COMPARE, "Vergleichen…")
+        user32.AppendMenuW(popup, MF_STRING, IDC_MENU_COPY, "Kopieren…")
+        user32.AppendMenuW(popup, MF_STRING, IDC_MENU_CREATE, "Anlegen…")
+        user32.AppendMenuW(bar, MF_POPUP, int(popup), "Index")
+        if not user32.SetMenu(self.hwnd, bar):
+            return
+        self._menu = bar
+        user32.DrawMenuBar(self.hwnd)
 
     def _layout(self) -> None:
         if not self.hwnd:
@@ -747,9 +873,19 @@ class NativeWindow:
             self._layout()
             return 0
         if msg == WM_COMMAND:
-            code = (wparam >> 16) & 0xFFFF
-            ident = wparam & 0xFFFF
-            if ident == 100 and code == EN_CHANGE:
+            code = (int(wparam) >> 16) & 0xFFFF
+            ident = int(wparam) & 0xFFFF
+            if ident == IDC_MENU_SAVE:
+                self._index_save()
+            elif ident == IDC_MENU_LOAD:
+                self._index_load()
+            elif ident == IDC_MENU_COMPARE:
+                self._index_compare()
+            elif ident == IDC_MENU_COPY:
+                self._index_copy()
+            elif ident == IDC_MENU_CREATE:
+                self._index_create()
+            elif ident == 100 and code == EN_CHANGE:
                 user32.SetTimer(hwnd, 1, 30, None)
             elif ident == 101 and code == BN_CLICKED:
                 self.similar = user32.SendMessageW(self.check, BM_GETCHECK, 0, 0) == BST_CHECKED
@@ -831,6 +967,34 @@ class NativeWindow:
         except Exception:
             return
         ctypes.windll.user32.SetWindowTextW(self.label, text)
+
+    def _set_status(self, text: str) -> None:
+        if self.label:
+            ctypes.windll.user32.SetWindowTextW(self.label, text)
+
+    def _index_save(self) -> None:
+        _save_index_as(self.hwnd, self.save_index, self._set_status)
+
+    def _index_load(self) -> None:
+        _load_index_from(self.hwnd, self.load_index, self._set_status, self._refresh_after_load)
+
+    def _index_compare(self) -> None:
+        _compare_indexes_as(self.hwnd, self._set_status, self._show_report)
+
+    def _index_copy(self) -> None:
+        _copy_index_as(self.hwnd, self._set_status)
+
+    def _index_create(self) -> None:
+        _create_index_as(self.hwnd, self._set_status)
+
+    def _show_report(self, report: str) -> None:
+        self._help.open()
+        self._help.show_report(report)
+
+    def _refresh_after_load(self) -> None:
+        self._run_search()
+        if not self._query():
+            self._paint_status()
 
     def _move(self, delta: int) -> None:
         if not self.results:
