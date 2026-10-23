@@ -423,6 +423,26 @@ def list_item_height(font_px: int, external_leading: int = 0) -> int:
     return cell + 4
 
 
+def item_height_covers_list(item_height: int, client_height: int, count: int) -> bool:
+    """True, wenn die erste markierte Zeile so hoch ist, dass sie den Rest verdeckt."""
+    return int(count) > 1 and int(client_height) > 0 and int(item_height) >= int(client_height)
+
+
+def row_height_for_list(font_px: int, external_leading: int = 0, client_height: int = 0) -> int:
+    """Eine Textzeile. Niemals die ganze Listenhöhe, sonst bleibt nur der erste Treffer sichtbar."""
+    height = list_item_height(font_px, external_leading)
+    if item_height_covers_list(height, client_height, 2):
+        return max(8, int(client_height) // 8)
+    return height
+
+
+def rows_shown_for_count(stored: int, list_count: int) -> int:
+    """LB_GETCOUNT muss die Trefferzahl sein. Jede dieser Zeilen wird gemalt."""
+    if int(list_count) != int(stored):
+        return 0
+    return int(stored)
+
+
 def result_labels(results: list[dict[str, Any]]) -> list[str]:
     """Sichtbarer Text einer Trefferliste. Nur der Name, nicht der Pfad."""
     labels: list[str] = []
@@ -1216,11 +1236,25 @@ class NativeWindow:
         """Die Zeile muss die Schrift fassen, sonst malen sich die Treffer übereinander."""
         if not self.list:
             return
-        height = list_item_height(LIST_FONT_PX, 0)
+        client_h = self._list_client_height()
+        height = row_height_for_list(LIST_FONT_PX, 0, client_h)
         measured = self._font_cell()
         if measured is not None:
-            height = max(height, list_item_height(measured[0], measured[1]))
+            height = max(height, row_height_for_list(measured[0], measured[1], client_h))
+        if item_height_covers_list(height, client_h, 2):
+            height = row_height_for_list(LIST_FONT_PX, 0, client_h)
         _send_msg(self.list, LB_SETITEMHEIGHT, 0, height)
+
+    def _list_client_height(self) -> int:
+        if sys.platform != "win32" or not self.list:
+            return 0
+        rect = wintypes.RECT()
+        try:
+            if not ctypes.windll.user32.GetClientRect(self.list, ctypes.byref(rect)):
+                return 0
+        except (AttributeError, OSError):
+            return 0
+        return max(0, int(rect.bottom) - int(rect.top))
 
     def _font_cell(self) -> tuple[int, int] | None:
         if not self.list or not self._font or sys.platform != "win32":
@@ -1287,37 +1321,21 @@ class NativeWindow:
             user32.ReleaseDC(self.list, hdc)
 
     def _erase_list(self) -> None:
-        """Clientfläche löschen, damit alte Zeilen nicht unter den neuen stehen bleiben."""
+        """Redraw ist wieder an. Jede Zeile malen, ohne die Liste mit einem Vollflächen-Fill zu überdecken.
+
+        InvalidateRect mit Löschen, dann UpdateWindow, damit die Zeilen ohne Klick erscheinen.
+        """
         hwnd = self.list
         if not hwnd:
             return
         user32 = ctypes.windll.user32
-        rect = wintypes.RECT()
         try:
-            user32.GetClientRect.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.RECT)]
-            user32.GetClientRect.restype = wintypes.BOOL
-            user32.GetDC.argtypes = [wintypes.HWND]
-            user32.GetDC.restype = wintypes.HDC
-            user32.ReleaseDC.argtypes = [wintypes.HWND, wintypes.HDC]
-            user32.ReleaseDC.restype = ctypes.c_int
-            user32.FillRect.argtypes = [wintypes.HDC, ctypes.POINTER(wintypes.RECT), wintypes.HBRUSH]
-            user32.FillRect.restype = ctypes.c_int
             user32.InvalidateRect.argtypes = [wintypes.HWND, ctypes.c_void_p, wintypes.BOOL]
             user32.InvalidateRect.restype = wintypes.BOOL
-            user32.RedrawWindow.argtypes = [
-                wintypes.HWND,
-                ctypes.c_void_p,
-                ctypes.c_void_p,
-                wintypes.UINT,
-            ]
-            user32.RedrawWindow.restype = wintypes.BOOL
-            if self._field_brush and user32.GetClientRect(hwnd, ctypes.byref(rect)):
-                hdc = user32.GetDC(hwnd)
-                if hdc:
-                    user32.FillRect(hdc, ctypes.byref(rect), self._field_brush)
-                    user32.ReleaseDC(hwnd, hdc)
+            user32.UpdateWindow.argtypes = [wintypes.HWND]
+            user32.UpdateWindow.restype = wintypes.BOOL
             user32.InvalidateRect(hwnd, None, True)
-            user32.RedrawWindow(hwnd, None, None, RDW_INVALIDATE | RDW_ERASE | RDW_UPDATENOW)
+            user32.UpdateWindow(hwnd)
         except (AttributeError, OSError):
             return
 
@@ -1991,6 +2009,7 @@ class NativeWindow:
         self._apply_list_height()
         _send_msg(self.list, LB_SETCURSEL, -1, 0)
         _send_msg(self.list, WM_SETREDRAW, 0, 0)
+        count = 0
         try:
             _send_msg(self.list, LB_RESETCONTENT, 0, 0)
             held = [ctypes.create_unicode_buffer(label) for label in self._rows]
@@ -2001,13 +2020,31 @@ class NativeWindow:
                 _send_msg(self.list, LB_RESETCONTENT, 0, 0)
                 for buf in held:
                     _send_ptr(self.list, LB_ADDSTRING, 0, buf)
-            if 0 <= select < len(self._rows):
-                _send_msg(self.list, LB_SETCURSEL, select, 0)
-            else:
-                _send_msg(self.list, LB_SETCURSEL, -1, 0)
+                count = _send_msg(self.list, LB_GETCOUNT, 0, 0)
         finally:
+            # War das Zeichnen aus, wieder an. Sonst bleibt nur die Auswahl sichtbar.
             _send_msg(self.list, WM_SETREDRAW, 1, 0)
-            self._erase_list()
+        self._keep_rows_uncovered(count)
+        if 0 <= select < len(self._rows):
+            _send_msg(self.list, LB_SETCURSEL, select, 0)
+        else:
+            _send_msg(self.list, LB_SETCURSEL, -1, 0)
+        self._erase_list()
+
+    def _keep_rows_uncovered(self, count: int) -> None:
+        """Die erste Zeile bleibt eine Textzeile. Sie darf die übrigen nicht übermalen."""
+        if not self.list or count <= 1:
+            return
+        client_h = self._list_client_height()
+        current = _send_msg(self.list, LB_GETITEMHEIGHT, 0, 0)
+        if current < 0 or not item_height_covers_list(current, client_h, count):
+            return
+        _send_msg(
+            self.list,
+            LB_SETITEMHEIGHT,
+            0,
+            row_height_for_list(LIST_FONT_PX, 0, client_h),
+        )
 
     def _paint_status(self) -> None:
         if self._query():

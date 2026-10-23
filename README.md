@@ -166,7 +166,7 @@ Großschreibung. Ein ganzes Wort, begrenzt durch Anfang, Ende oder ein Zeichen
 das kein Buchstabe und keine Ziffer ist, steht weit vor einem Infix in einem
 langen Token. Gibt es mindestens ein ganzes Wort, füllen solche Hash-Treffer
 die Liste nicht. Längere Teilstrings nutzen zusätzlich FTS5-Trigramme. Das
-Fenster zeigt bis zu 200 Treffer, die Statuszeile nennt die Zahl. Ein exakter
+Fenster zeigt bis zu 1000 Treffer, die Statuszeile nennt die Zahl. Ein exakter
 Name steht vor einem Präfix, ein Präfix vor einem Infix wie `xchange` in
 `DataExchangeHost`. Tippfehler werden nur nachgezogen, wenn weder ein exakter
 Name noch ein Präfix oder ein ganzes kurzes Wort vorhanden ist und die starken

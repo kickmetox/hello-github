@@ -17,8 +17,9 @@ _SIMILAR_ALL = 3000
 # FTS-LIMIT 80 verliert nahe Namen, sobald häufige Trigramme die Liste füllen.
 _SIMILAR_CANDIDATES = 400
 # Das Fenster soll eine Anfrage mit vielen Worttreffern zeigen, nicht nur eine Handvoll.
-PLAIN_UI_LIMIT = 200
-SIMILAR_UI_LIMIT = 200
+# 734 Namen wie IFATSEA müssen scrollbar sein, nicht bei 19 oder 200 enden.
+PLAIN_UI_LIMIT = 1000
+SIMILAR_UI_LIMIT = 1000
 # Kurzes Token: ganzes Wort weit über einem Infix in einem langen Hash.
 _SHORT_TOKEN = 4
 _LONG_TOKEN = 12
@@ -176,7 +177,7 @@ def _fuzzy_surface(name: str) -> str:
 
 
 def ui_result_limit(similar: bool) -> int:
-    """Zeilen im Suchfenster. Mit und ohne Ähnlichkeit bis 200."""
+    """Zeilen im Suchfenster. Mit und ohne Ähnlichkeit bis 1000."""
     return SIMILAR_UI_LIMIT if similar else PLAIN_UI_LIMIT
 
 
@@ -330,13 +331,13 @@ def search(
             consider(item, "recent", 100.0 + min(item["use_count"], 30))
     else:
         folded_query = text.casefold()
-        # Drei Zeichen laufen über LIKE auf dem Namen, nicht über eine
-        # FTS5-Trigramm-Phrase. Die Kandidatenliste fasst das Fensterlimit,
-        # sonst verdrängen Hash-Infixe die echten Wörter.
-        fetch = max(limit, PLAIN_UI_LIMIT) if 0 < len(folded_query) <= _SHORT_TOKEN else max(limit, 64)
-        # Exakte Namen zuerst und ohne das Präfix-Limit, sonst verdrängen
+        # LIKE auf dem Namen, nicht eine FTS5-Trigramm-Phrase. Kurze und
+        # längere Wörter holen das Fensterlimit, sonst bleibt es bei einer
+        # Handvoll Präfixen (19, 40, 64), obwohl hunderte Ordner den Namen tragen.
+        fetch = max(limit, PLAIN_UI_LIMIT)
+        # Exakte Namen zuerst und ohne ein kleineres Präfix-Limit, sonst verdrängen
         # häufig genutzte längere Namen den Ordner aus der Kandidatenliste.
-        for item in index.exact(folded_query, max(limit, 64)):
+        for item in index.exact(folded_query, fetch):
             consider(
                 item,
                 "prefix",
@@ -350,7 +351,7 @@ def search(
                     via="prefix",
                 ),
             )
-        for item in index.prefix(folded_query, fetch if len(folded_query) <= _SHORT_TOKEN else 40):
+        for item in index.prefix(folded_query, fetch):
             consider(
                 item,
                 "prefix",
@@ -383,7 +384,7 @@ def search(
                 )
         phrase = phrase_query(text)
         if phrase:
-            for item in index.fts(phrase, max(limit, 64)):
+            for item in index.fts(phrase, fetch):
                 consider(
                     item,
                     "trigram",

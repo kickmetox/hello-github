@@ -166,6 +166,61 @@ class RankingTests(unittest.TestCase):
                 index.close()
                 ranker.close()
 
+    def test_ifatsea_whole_word_returns_more_than_nineteen(self) -> None:
+        names = [
+            "IFATSEA",
+            "IFATSEA EUROGROUP BELGRADE SERBIA",
+            "Presentation IFATSEA EG 2022",
+            "IFATSEA Licensing Sub-Committee",
+            "IFATSEA GA Accra 2019",
+            "IFATSEA Eurogroup Meeting 2019",
+            "IFATSEA EG 2021",
+            "IFATSEA ERM Slovenia 2018",
+            "IFATSEA General Assembly 2016",
+            "Calling Notice - IFATSEA General Assembly",
+            "IFATSEA 2017",
+            "IFATSEA MONTREAL 2017",
+            "IFATSEA Strategic Meeting Athens",
+            "Mails IFATSEA",
+            "IFATSEA - ICAO Workshop",
+            "ifatsea_media",
+        ]
+        names.extend(f"IFATSEA Ordner {number:03d}" for number in range(24))
+        self.assertGreater(len(names), 19)
+        with tempfile.TemporaryDirectory() as tmp:
+            index = Index(Path(tmp) / "index.db")
+            ranker = Ranker(allow_cuda=False)
+            try:
+                items = [
+                    {
+                        "kind": "dir",
+                        "name": name,
+                        "path": rf"D:\Dokumente\Ebene\{number:03d}\{name}",
+                        "dir": rf"D:\Dokumente\Ebene\{number:03d}",
+                        "ext": "",
+                        "launch": None,
+                        "mtime_ns": 1,
+                        "size": 0,
+                        "tier": 1,
+                    }
+                    for number, name in enumerate(names)
+                ]
+                index.reconcile_dir(r"D:\Dokumente\Ebene", r"D:\Dokumente", 1, 1, items, [])
+                from flare.search import ui_result_limit
+
+                self.assertEqual(ui_result_limit(False), 1000)
+                found = search(index, ranker, "IFATSEA", limit=ui_result_limit(False), similar=False)
+                got = [hit["name"] for hit in found["results"]]
+                for name in names:
+                    self.assertIn(name, got)
+                self.assertEqual(len(got), len(names))
+                self.assertGreater(len(got), 19)
+                self.assertLessEqual(len(got), ui_result_limit(False))
+                self.assertEqual(found["results"][0]["kind"], "dir")
+            finally:
+                index.close()
+                ranker.close()
+
     def test_exact_xchange_outranks_infix_and_is_not_dropped(self) -> None:
         exact = lexical_score(
             "Xchange", "Xchange", r"F:\Xchange", kind="dir", tier=2, use_count=0, via="prefix"
@@ -539,8 +594,8 @@ class SimilarityTests(unittest.TestCase):
         from flare.window import path_for_selection, rows_after_reset, search_status, selectable_rows
 
         self.assertGreaterEqual(_FUZZY_MIN, 0.5)
-        self.assertEqual(ui_result_limit(False), 200)
-        self.assertEqual(ui_result_limit(True), 200)
+        self.assertEqual(ui_result_limit(False), 1000)
+        self.assertEqual(ui_result_limit(True), 1000)
         self.assertGreaterEqual(ui_result_limit(False), 30)
         with tempfile.TemporaryDirectory() as tmp:
             index = Index(Path(tmp) / "index.db")

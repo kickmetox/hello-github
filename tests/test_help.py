@@ -189,6 +189,15 @@ class HelpShortcutTests(unittest.TestCase):
         self.assertEqual(rows_after_reset(labels), labels)
         self.assertEqual(len(rows_after_reset(labels)), len(labels))
         self.assertIn("InvalidateRect", inspect.getsource(NativeWindow._erase_list))
+        self.assertIn("UpdateWindow", inspect.getsource(NativeWindow._erase_list))
+        self.assertIn("WM_SETREDRAW, 1", inspect.getsource(NativeWindow._fill_listbox))
+        from flare.window import item_height_covers_list, row_height_for_list, rows_shown_for_count
+
+        self.assertEqual(rows_shown_for_count(19, 19), 19)
+        self.assertEqual(rows_shown_for_count(19, 1), 0)
+        self.assertFalse(item_height_covers_list(22, 400, 19))
+        self.assertTrue(item_height_covers_list(400, 400, 19))
+        self.assertLess(row_height_for_list(18, 0, 400), 400)
         self.assertIn("LB_SETITEMHEIGHT", inspect.getsource(NativeWindow._apply_list_height))
         self.assertIn("Sichern…", inspect.getsource(NativeWindow._install_index_menu))
 
