@@ -73,6 +73,9 @@ TEXT_EXT = {
 }
 
 RESCHEDULE = {0: 90.0, 1: 300.0, 2: 1200.0}
+# Gleiche mtime im selben Zeitquant verdeckt ein schnelles Löschen. Spätestens
+# nach diesem Alter wird der Ordner trotzdem neu gelesen.
+READDIR_MAX_AGE_NS = 15 * 60 * 1_000_000_000
 _PATH_DIR = ":path"
 
 
@@ -237,6 +240,7 @@ class Crawler:
         self._seq = 0
         self._next_full = {0: 0.0, 1: 0.0, 2: 0.0}
         self._claimed = list(self.roots)
+        self.readdir_max_age_ns = READDIR_MAX_AGE_NS
 
     def add(self, path: str, tier: int, *, descend: bool, priority: int | None = None) -> None:
         path = norm(path) if not path.startswith(":") else path
@@ -321,6 +325,8 @@ class Crawler:
                     self.scan_dir(path, tier, descend)
             except Exception:
                 log.exception("scan failed: %s", path)
+            if self.queued() == 0:
+                self.phase = "idle"
             self.governor.pause(time.perf_counter() - started, self.stop)
             if self.readdirs and self.readdirs % 400 == 0:
                 self.index.checkpoint()
@@ -343,12 +349,16 @@ class Crawler:
 
     def _maybe_schedule(self) -> None:
         now = time.monotonic()
-        for path, tier in self.roots:
-            if now >= self._next_full[tier]:
-                self.add(path, tier, descend=True, priority=tier)
-                self._next_full[tier] = now + RESCHEDULE[tier]
-        if self.index_path and now >= self._next_full[0]:
+        due = {tier for tier, when in self._next_full.items() if now >= when}
+        if not due:
+            return
+        if 0 in due and self.index_path:
             self.add(_PATH_DIR, 0, descend=False, priority=0)
+        for path, tier in self.roots:
+            if tier in due:
+                self.add(path, tier, descend=True, priority=tier)
+        for tier in due:
+            self._next_full[tier] = now + RESCHEDULE[tier]
 
     def ingest_path(self) -> None:
         rows: list[dict[str, Any]] = []
@@ -373,7 +383,10 @@ class Crawler:
                         continue
                 elif not os.access(entry.path, os.X_OK):
                     continue
-                full = norm(entry.path)
+                try:
+                    full = norm(os.path.realpath(entry.path))
+                except OSError:
+                    full = norm(entry.path)
                 try:
                     st = entry.stat(follow_symlinks=True)
                 except OSError:
@@ -406,9 +419,10 @@ class Crawler:
             return
         if not stat.S_ISDIR(st.st_mode):
             return
-        known, dirty = self.index.dir_info(path)
+        known, dirty, readdir_ns = self.index.dir_info(path)
         current_mtime = getattr(st, "st_mtime_ns", int(st.st_mtime * 1e9))
-        if known is not None and known == current_mtime and not dirty:
+        stale = (time.time_ns() - readdir_ns) >= self.readdir_max_age_ns
+        if known is not None and known == current_mtime and not dirty and not stale:
             if descend:
                 for child in self.index.child_dirs(path):
                     self.add(child, tier, descend=True, priority=tier)

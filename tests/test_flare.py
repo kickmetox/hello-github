@@ -17,6 +17,7 @@ from flare.autostart import install_autostart, launch_command, remove_autostart
 from flare.calc import try_calc
 from flare.client import Client
 from flare.crawl import Crawler, should_skip_dir
+from flare.paths import norm
 from flare.governor import Governor, read_cpu_times, sleep_budget
 from flare.hotkey import hotkey_label, parse_hotkey
 from flare.launch import parse_desktop, parse_lnk
@@ -134,6 +135,9 @@ class IndexTests(unittest.TestCase):
     def test_index_search_and_incremental(self) -> None:
         self._fill()
         self.assertGreater(self.crawler.readdirs, 0)
+        empty = search(self.index, Ranker(allow_cuda=False), "")["results"]
+        self.assertTrue(any(hit["name"] == "Demo Programm" for hit in empty), empty)
+        self.assertFalse(any(hit["name"] == "[" for hit in empty))
         names = {hit["name"] for hit in search(self.index, Ranker(allow_cuda=False), "rechnung")["results"]}
         self.assertIn("Rechnung-2026.txt", names)
         buro = search(self.index, Ranker(allow_cuda=False), "büro")["results"]
@@ -166,13 +170,34 @@ class IndexTests(unittest.TestCase):
         self.assertEqual(again["use_count"], 1)
 
         (self.root / "neu.txt").write_text("frisch", encoding="utf-8")
+        time.sleep(0.05)
         self.crawler.enqueue_all()
         self.crawler.drain()
         self.assertTrue(any(hit["name"] == "neu.txt" for hit in search(self.index, Ranker(allow_cuda=False), "neu")["results"]))
+        time.sleep(0.05)
         (self.root / "neu.txt").unlink()
+        time.sleep(0.05)
         self.crawler.enqueue_all()
         self.crawler.drain()
         self.assertFalse(any(hit["name"] == "neu.txt" for hit in search(self.index, Ranker(allow_cuda=False), "neu.txt")["results"]))
+        self.crawler.readdir_max_age_ns = 0
+        self.crawler.readdirs = 0
+        self.crawler.enqueue_all()
+        self.crawler.drain()
+        self.assertGreater(self.crawler.readdirs, 0)
+
+    def test_dirty_flag_sees_delete_without_mtime_change(self) -> None:
+        self._fill()
+        (self.root / "Rechnung-2026.txt").unlink()
+        directory = norm(self.root)
+        mtime, _dirty, _read = self.index.dir_info(directory)
+        assert mtime is not None
+        os.utime(self.root, ns=(mtime, mtime))
+        self.index.mark_dirty(directory)
+        self.crawler.enqueue_all()
+        self.crawler.drain()
+        hits = search(self.index, Ranker(allow_cuda=False), "rechnung")["results"]
+        self.assertFalse(any(hit["name"] == "Rechnung-2026.txt" for hit in hits))
 
     def test_many_files_stay_fast(self) -> None:
         bulk = self.root / "stapel"
@@ -204,6 +229,37 @@ class IndexTests(unittest.TestCase):
         assert desktop is not None
         self.assertEqual(desktop["name"], "Demo Programm")
         self.assertIsNone(parse_desktop(str(self.root / "hidden.desktop")))
+
+
+class ScheduleTests(unittest.TestCase):
+    def test_path_rescan_is_spaced(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "docs"
+            root.mkdir()
+            (root / "notiz.txt").write_text("x", encoding="utf-8")
+            index = Index(Path(tmp) / "index.db")
+            try:
+                crawler = Crawler(
+                    index,
+                    Governor(fast=True),
+                    [(str(root), 1)],
+                    threading.Event(),
+                    content=False,
+                    index_path=True,
+                )
+                crawler.prime()
+                crawler.drain()
+                for _ in range(4):
+                    crawler._maybe_schedule()
+                self.assertEqual(crawler.queued(), 0)
+                crawler._next_full[0] = 0
+                crawler._maybe_schedule()
+                self.assertEqual(crawler.queued(), 1)
+                crawler._maybe_schedule()
+                self.assertEqual(crawler.queued(), 1)
+                self.assertGreater(crawler._next_full[0], time.monotonic())
+            finally:
+                index.close()
 
 
 class ServiceTests(unittest.TestCase):

@@ -97,6 +97,8 @@ Unveränderte Ordner kosten beim nächsten Lauf nur `stat` plus die gespeicherte
 Kindliste, kein `readdir`. Heiße Ordner hängt Linux per inotify an (begrenzt,
 damit die Watch-Tabelle klein bleibt). Windows bekommt eine Änderungsanzeige
 pro heißer Wurzel; gelesen wird danach nur, wo sich die Ordner-mtime geändert hat.
+Liegen Anlegen und Löschen im selben Zeitstempel, zieht das Watcher-Flag den
+Ordner sofort neu. Ohne Meldung passiert das spätestens nach 15 Minuten.
 
 Die Suche nutzt den B-Tree für Präfixe (auch ein oder zwei Zeichen) und
 FTS5-Trigramme für Teilstrings. Tippfehler werden nur nachgezogen, wenn die

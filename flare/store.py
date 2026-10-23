@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import sqlite3
 import threading
+import time
 from pathlib import Path
 from typing import Any
 
@@ -80,12 +81,17 @@ CREATE TABLE dirs (
   parent TEXT NOT NULL,
   mtime_ns INTEGER NOT NULL,
   tier INTEGER NOT NULL,
-  dirty INTEGER NOT NULL DEFAULT 0
+  dirty INTEGER NOT NULL DEFAULT 0,
+  readdir_ns INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX dirs_parent ON dirs(parent);
 """
 
 ITEM_COLS = "id, kind, name, path, dir, ext, launch, tier, used_at, use_count"
+
+
+def _show_in_empty(name: str) -> bool:
+    return sum(char.isalpha() for char in name) >= 2
 
 
 def like_pattern(prefix: str) -> str:
@@ -139,10 +145,10 @@ class Index:
 
     def _migrate(self) -> None:
         version = self.con.execute("PRAGMA user_version").fetchone()[0]
-        if version == 1:
+        if version == 2:
             return
         self.con.executescript(SCHEMA)
-        self.con.execute("PRAGMA user_version=1")
+        self.con.execute("PRAGMA user_version=2")
         self.con.commit()
 
     def _all(self, sql: str, args: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
@@ -161,11 +167,17 @@ class Index:
         with self.lock:
             self.con.execute("BEGIN IMMEDIATE")
             try:
+                deduped: dict[str, dict[str, Any]] = {}
+                for item in items:
+                    deduped[item["path"]] = item
+                items = list(deduped.values())
                 self._upsert_items(items)
                 self.con.execute("DELETE FROM flare_seen")
                 seen = [(item["path"],) for item in items]
                 if seen:
-                    self.con.executemany("INSERT INTO flare_seen(path) VALUES (?)", seen)
+                    self.con.executemany(
+                        "INSERT OR IGNORE INTO flare_seen(path) VALUES (?)", seen
+                    )
                 self.con.execute(
                     "DELETE FROM items WHERE dir=? AND path NOT IN (SELECT path FROM flare_seen)",
                     (directory,),
@@ -191,15 +203,16 @@ class Index:
                     )
                 self.con.execute(
                     """
-                    INSERT INTO dirs(path, parent, mtime_ns, tier, dirty)
-                    VALUES (?, ?, ?, ?, 0)
+                    INSERT INTO dirs(path, parent, mtime_ns, tier, dirty, readdir_ns)
+                    VALUES (?, ?, ?, ?, 0, ?)
                     ON CONFLICT(path) DO UPDATE SET
                       parent=excluded.parent,
                       mtime_ns=excluded.mtime_ns,
                       tier=MIN(dirs.tier, excluded.tier),
-                      dirty=0
+                      dirty=0,
+                      readdir_ns=excluded.readdir_ns
                     """,
-                    (directory, parent, mtime_ns, tier),
+                    (directory, parent, mtime_ns, tier, time.time_ns()),
                 )
                 self.con.commit()
             except Exception:
@@ -272,14 +285,14 @@ class Index:
             )
             self.con.commit()
 
-    def dir_info(self, path: str) -> tuple[int | None, bool]:
+    def dir_info(self, path: str) -> tuple[int | None, bool, int]:
         with self.lock:
             row = self.con.execute(
-                "SELECT mtime_ns, dirty FROM dirs WHERE path=?", (path,)
+                "SELECT mtime_ns, dirty, readdir_ns FROM dirs WHERE path=?", (path,)
             ).fetchone()
         if row is None:
-            return None, True
-        return int(row["mtime_ns"]), bool(row["dirty"])
+            return None, True, 0
+        return int(row["mtime_ns"]), bool(row["dirty"]), int(row["readdir_ns"])
 
     def knows_dir(self, path: str) -> bool:
         with self.lock:
@@ -372,21 +385,49 @@ class Index:
         )
         if rows:
             return rows
-        rows = self._all(
+        desktop = [
+            row
+            for row in self._all(
+                f"""
+                SELECT {ITEM_COLS} FROM items
+                WHERE kind='app' AND dir != ':path'
+                ORDER BY name_fold ASC
+                LIMIT 200
+                """
+            )
+            if _show_in_empty(row["name"])
+        ]
+        files = self._all(
             f"""
             SELECT {ITEM_COLS} FROM items
-            WHERE kind='app'
-            ORDER BY name_fold ASC
+            WHERE kind != 'app' AND tier <= 1
+            ORDER BY kind='dir' DESC, name_fold ASC
             LIMIT ?
             """,
             (limit,),
         )
-        if rows:
-            return rows
-        return self._all(
-            f"SELECT {ITEM_COLS} FROM items ORDER BY tier ASC, name_fold ASC LIMIT ?",
-            (limit,),
-        )
+        picked = desktop[:limit]
+        have = {row["id"] for row in picked}
+        for row in files:
+            if len(picked) >= limit:
+                break
+            if row["id"] not in have:
+                picked.append(row)
+        if picked:
+            return picked
+        named = [
+            row
+            for row in self._all(
+                f"""
+                SELECT {ITEM_COLS} FROM items
+                WHERE kind='app' AND dir=':path'
+                ORDER BY name_fold ASC
+                LIMIT 80
+                """
+            )
+            if _show_in_empty(row["name"])
+        ]
+        return named[:limit]
 
     def counts(self) -> dict[str, int]:
         with self.lock:
