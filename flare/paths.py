@@ -11,6 +11,25 @@ def norm(path: str | os.PathLike[str]) -> str:
     return os.path.normcase(os.path.abspath(os.fspath(path)))
 
 
+def place_key(path: str) -> str:
+    """Dieselbe Stelle, Symlinks eingeschlossen."""
+    try:
+        return norm(os.path.realpath(path))
+    except OSError:
+        return norm(path)
+
+
+def prefix_with_sep(path: str, sep: str) -> str:
+    """Kinder-Präfix. Ein Stamm, der schon auf den Trenner endet, wird nicht verdoppelt."""
+    if path.endswith(sep):
+        return path
+    return path + sep
+
+
+def child_prefix(path: str) -> str:
+    return prefix_with_sep(norm(path), os.sep)
+
+
 def parent_of(path: str) -> str:
     parent = os.path.dirname(path)
     return parent if parent else path
@@ -19,7 +38,9 @@ def parent_of(path: str) -> str:
 def is_inside(child: str, parent: str) -> bool:
     child_n = norm(child)
     parent_n = norm(parent)
-    return child_n == parent_n or child_n.startswith(parent_n + os.sep)
+    if child_n == parent_n:
+        return True
+    return child_n.startswith(child_prefix(parent))
 
 
 def data_dir() -> Path:

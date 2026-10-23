@@ -7,9 +7,9 @@ ganzen Katalog.
 
 from __future__ import annotations
 
-import os
 from typing import Any
 
+from flare.paths import child_prefix, norm
 from flare.rank import trigrams
 
 
@@ -35,7 +35,8 @@ class NameIndex:
             self._set(row)
 
     def drop_tree(self, path: str) -> None:
-        prefix = path + os.sep
+        path = norm(path)
+        prefix = child_prefix(path)
         gone = [
             item_id
             for item_id, row in self._rows.items()

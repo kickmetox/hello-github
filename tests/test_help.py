@@ -37,6 +37,16 @@ class HelpTextTests(unittest.TestCase):
             "2+2*3",
             "85 %",
             "35 %",
+            "exclude_drives",
+            "index_network",
+            "OneDrive",
+            "Dropbox",
+            "Google Drive",
+            "USB-Sticks",
+            "Keine Websuche",
+            "E-Mail",
+            "Kontakte",
+            "Chats",
         ):
             self.assertIn(fact, joined)
 

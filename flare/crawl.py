@@ -14,13 +14,15 @@ import stat
 import sys
 import threading
 import time
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
 from flare.governor import Governor
 from flare.launch import is_secret_name, parse_lnk
-from flare.paths import is_inside, norm, parent_of
+from flare.paths import is_inside, norm, parent_of, place_key
 from flare.store import Index
+from flare.volumes import is_offline_file, should_sample_content
 
 log = logging.getLogger("flare")
 
@@ -73,6 +75,8 @@ TEXT_EXT = {
 }
 
 RESCHEDULE = {0: 90.0, 1: 300.0, 2: 1200.0}
+# GetLogicalDriveStringsW / GetDriveTypeW, kein enger Takt.
+DRIVE_POLL_S = 12.0
 # Gleiche mtime im selben Zeitquant verdeckt ein schnelles Löschen. Spätestens
 # nach diesem Alter wird der Ordner trotzdem neu gelesen.
 READDIR_MAX_AGE_NS = 15 * 60 * 1_000_000_000
@@ -205,11 +209,26 @@ def dedupe_roots(pairs: list[tuple[str, int]]) -> list[tuple[str, int]]:
         if not os.path.isdir(raw):
             continue
         path = norm(raw)
-        if path in seen:
+        key = place_key(raw)
+        if key in seen:
             continue
-        seen.add(path)
+        seen.add(key)
         kept.append((path, tier))
     return kept
+
+
+def merge_volume_roots(
+    base: list[tuple[str, int]],
+    drives: list[tuple[str, int]] | None = None,
+    cloud: list[str] | None = None,
+) -> tuple[list[tuple[str, int]], list[str]]:
+    """Wurzeln plus die Laufwerke, die beim Abziehen wieder entfernt werden."""
+    drive_pairs = list(drives or [])
+    cloud_pairs = [(path, 1) for path in (cloud or []) if path]
+    merged = dedupe_roots(list(base) + cloud_pairs + drive_pairs)
+    drive_keys = {place_key(path) for path, _tier in drive_pairs}
+    dynamic = [path for path, _tier in merged if place_key(path) in drive_keys]
+    return merged, dynamic
 
 
 def default_roots(extra: list[tuple[str, int]] | None = None) -> list[tuple[str, int]]:
@@ -231,6 +250,8 @@ class Crawler:
         index_path: bool = True,
         data_dir: str | None = None,
         watcher: Any | None = None,
+        drive_poll: Callable[[], list[tuple[str, int]]] | None = None,
+        dynamic_roots: list[str] | None = None,
     ) -> None:
         self.index = index
         self.governor = governor
@@ -249,6 +270,11 @@ class Crawler:
         self._next_full = {0: 0.0, 1: 0.0, 2: 0.0}
         self._claimed = list(self.roots)
         self.readdir_max_age_ns = READDIR_MAX_AGE_NS
+        self._drive_poll = drive_poll
+        self._next_drive_poll = 0.0
+        dynamic_norm = {norm(path) for path in (dynamic_roots or [])}
+        self._static_roots = {path for path, _tier in self.roots if path not in dynamic_norm}
+        self._dynamic = {path: tier for path, tier in self.roots if path in dynamic_norm}
 
     def add(self, path: str, tier: int, *, descend: bool, priority: int | None = None) -> None:
         path = norm(path) if not path.startswith(":") else path
@@ -315,6 +341,7 @@ class Crawler:
     def run(self) -> None:
         self.prime()
         while not self.stop.is_set():
+            self.poll_drives()
             item = self._pop()
             if item is None:
                 self.phase = "idle"
@@ -353,6 +380,80 @@ class Crawler:
                 self.scan_dir(path, tier, descend)
             count += 1
         return count
+
+    def poll_drives(self, *, force: bool = False) -> None:
+        """Angehängte und abgehängte Laufwerke. Win32 höchstens alle 12 Sekunden."""
+        if self._drive_poll is None:
+            return
+        now = time.monotonic()
+        if not force and now < self._next_drive_poll:
+            return
+        self._next_drive_poll = now + DRIVE_POLL_S
+        try:
+            found = list(self._drive_poll())
+        except OSError:
+            log.debug("drive poll failed", exc_info=True)
+            return
+        self.apply_drives(found)
+
+    def apply_drives(self, found: list[tuple[Any, ...]]) -> None:
+        current: dict[str, tuple[int, bool]] = {}
+        for item in found:
+            if len(item) >= 3:
+                raw, tier, walk = item[0], int(item[1]), bool(item[2])
+            else:
+                raw, tier = item[0], int(item[1])
+                walk = True
+            if not raw:
+                continue
+            path = norm(raw)
+            previous = current.get(path)
+            if previous is None or int(tier) < previous[0]:
+                current[path] = (int(tier), walk)
+        for path in list(self._dynamic):
+            if path not in current:
+                self._drop_drive(path)
+        for path, (tier, walk) in current.items():
+            if path in self._dynamic or not walk:
+                continue
+            self._adopt_drive(path, tier)
+
+    def _adopt_drive(self, path: str, tier: int) -> None:
+        if path in self._static_roots:
+            return
+        try:
+            present = os.path.isdir(path)
+        except OSError:
+            return
+        if not present:
+            return
+        self._dynamic[path] = tier
+        if not any(existing == path for existing, _tier in self.roots):
+            self.roots.append((path, tier))
+        if not any(existing == path for existing, _tier in self._claimed):
+            self._claimed.append((path, tier))
+        self.add(path, tier, descend=True, priority=tier)
+        log.info("drive added: %s", path)
+
+    def _drop_drive(self, path: str) -> None:
+        self._dynamic.pop(path, None)
+        if path in self._static_roots:
+            return
+        self.roots = [(existing, tier) for existing, tier in self.roots if existing != path]
+        self._claimed = [(existing, tier) for existing, tier in self._claimed if existing != path]
+        self._discard_queued(path)
+        self.index.drop_tree(path)
+        log.info("drive removed: %s", path)
+
+    def _discard_queued(self, root: str) -> None:
+        with self._lock:
+            drop = [
+                queued
+                for queued in self._desired
+                if not queued.startswith(":") and is_inside(queued, root)
+            ]
+            for queued in drop:
+                del self._desired[queued]
 
     def _maybe_schedule(self) -> None:
         now = time.monotonic()
@@ -439,6 +540,7 @@ class Crawler:
         self.readdirs += 1
         files: list[os.DirEntry[str]] = []
         subdirs: list[str] = []
+        markers = sys.platform != "win32" and os.path.isdir(os.path.join(path, ".flare-offline"))
         try:
             iterator = os.scandir(path)
         except OSError:
@@ -516,7 +618,8 @@ class Crawler:
                     "tier": tier,
                 }
             )
-            if self.content and tier <= 1:
+            offline = is_offline_file(full, st_file, marker_dir=markers)
+            if should_sample_content(enabled=self.content, tier=tier, offline=offline):
                 sample = read_text_sample(full, st_file.st_size)
                 if sample:
                     samples.append((full, sample))

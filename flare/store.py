@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import sqlite3
 import threading
 import time
@@ -9,7 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from flare.ngram import NameIndex
-from flare.paths import sqlite_uri
+from flare.paths import child_prefix, norm, sqlite_uri
 
 SCHEMA = """
 DROP TABLE IF EXISTS content_fts;
@@ -294,10 +295,23 @@ class Index:
             ],
         )
 
-    def _delete_tree(self, path: str) -> None:
-        import os
+    def drop_tree(self, path: str) -> None:
+        """Baum aus dem Katalog nehmen. Der Dateisystemstamm bleibt unangetastet."""
+        path = norm(path)
+        if not path or path == norm(os.sep):
+            return
+        with self.lock:
+            self.con.execute("BEGIN IMMEDIATE")
+            try:
+                self._delete_tree(path)
+                self.con.commit()
+            except Exception:
+                self.con.rollback()
+                raise
+            self.names.drop_tree(path)
 
-        prefix = like_pattern(path + os.sep)
+    def _delete_tree(self, path: str) -> None:
+        prefix = like_pattern(child_prefix(path))
         self.con.execute(
             "DELETE FROM items WHERE path=? OR dir=? OR dir LIKE ? ESCAPE '!'",
             (path, path, prefix),

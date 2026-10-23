@@ -9,7 +9,14 @@ import time
 from pathlib import Path
 from typing import Any
 
-from flare.crawl import Crawler, dedupe_roots, default_roots
+from flare.crawl import Crawler, dedupe_roots, default_roots, merge_volume_roots
+from flare.volumes import (
+    drive_roots_for_config,
+    drive_snapshot_for_config,
+    exclude_drive_list,
+    index_network_enabled,
+    windows_cloud_roots,
+)
 from flare.governor import Governor
 from flare.hotkey import HotkeyThread, hotkey_label
 from flare.launch import launch_target
@@ -51,10 +58,25 @@ class Service:
             self.hotkey_spec = "ctrl+alt+space"
         self.port_pref = int(port if port is not None else cfg.get("port", 47731))
         extra = [(str(path), 1) for path in cfg.get("extra_roots", []) if isinstance(path, str)]
+        self.index_network = index_network_enabled(cfg)
+        self.exclude_drives = exclude_drive_list(cfg)
+        self._drive_poll = None
+        dynamic: list[str] = []
         if roots is None:
-            self.roots = default_roots(extra)
+            base = default_roots(extra)
+            drives: list[tuple[str, int]] = []
+            cloud: list[str] = []
+            if sys.platform == "win32":
+                drives = drive_roots_for_config(
+                    index_network=self.index_network,
+                    exclude=self.exclude_drives,
+                )
+                cloud = windows_cloud_roots()
+                self._drive_poll = self._poll_drives
+            self.roots, dynamic = merge_volume_roots(base, drives, cloud)
         else:
             self.roots = dedupe_roots(list(roots) + extra)
+        self._dynamic_roots = dynamic
         self.index = Index(self.data_path / "index.db")
         self.ranker = Ranker()
         self.bus = EventBus()
@@ -112,6 +134,8 @@ class Service:
             index_path=self.index_path,
             data_dir=str(self.data_path),
             watcher=self.watcher,
+            drive_poll=self._drive_poll,
+            dynamic_roots=self._dynamic_roots,
         )
         crawler = threading.Thread(target=self._crawl, name="flare-index", daemon=True)
         crawler.start()
@@ -121,6 +145,12 @@ class Service:
             self.hotkey_thread.start()
         if self.open_immediately:
             self.activate()
+
+    def _poll_drives(self) -> list[tuple[str, int, bool]]:
+        return drive_snapshot_for_config(
+            index_network=self.index_network,
+            exclude=self.exclude_drives,
+        )
 
     def _crawl(self) -> None:
         assert self.crawler is not None

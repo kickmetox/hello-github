@@ -115,9 +115,20 @@ Eine reine Rechnung wie `2+2*3` steht oben; Enter kopiert das Ergebnis.
 Zuerst Programme aus dem Startmenü (`.lnk`) und aus `PATH` (`.exe`, `.bat`,
 `.cmd`, `.com`). Danach die bekannten Ordner Desktop, Dokumente, Downloads,
 Bilder, Musik und Videos, auch wenn Windows sie nach OneDrive verschoben hat.
-Anschließend das Benutzerprofil. Ausgelassen werden unter anderem
-`node_modules`, `.git`, versteckte Ordner, Caches und Schlüsseldateien
-(`id_rsa`, `.env`, `*.pem`).
+Anschließend das Benutzerprofil. Externe Festplatten und USB-Sticks werden
+eigene Wurzeln, auch wenn eine externe Platte als festes Laufwerk erscheint.
+Lokale Ordner von OneDrive, Dropbox und Google Drive kommen dazu, soweit sie
+auf der Platte liegen. Nur-online-Platzhalter zählen mit Namen, ihr Inhalt
+wird nicht geladen.
+
+Das Systemlaufwerk wird nicht vollständig gelesen. CD-Laufwerke entfallen.
+Gemappte Netzlaufwerke bleiben aus, solange `index_network` nicht `true` ist;
+dann nur Dateinamen, mit derselben Last wie das Benutzerprofil. Freigaben
+ohne Laufwerksbuchstaben sucht Flare nicht. Keine Websuche, keine E-Mail,
+keine Kontakte und keine Chats.
+
+Ausgelassen werden unter anderem `node_modules`, `.git`, versteckte Ordner,
+Caches und Schlüsseldateien (`id_rsa`, `.env`, `*.pem`).
 
 Dateinamen immer. Textinhalt nur in den heißen Ordnern, nur bis 64 KiB, nur
 die ersten 4 KiB, nur bekannte Textendungen.
@@ -163,9 +174,15 @@ starken Treffer nicht reichen.
   "duty": 0.35,
   "content": true,
   "port": 47731,
-  "extra_roots": []
+  "extra_roots": [],
+  "exclude_drives": [],
+  "index_network": false
 }
 ```
+
+`exclude_drives` ist die Ausschlussliste: Laufwerke wie `"E:\\"` oder eine
+Datenträgerbezeichnung. Sie werden nicht indiziert. `index_network` steht
+standardmäßig auf `false`; `true` liest gemappte Netzlaufwerke nur nach Namen.
 
 Der Katalog liegt unter `%LOCALAPPDATA%\Flare\`.
 

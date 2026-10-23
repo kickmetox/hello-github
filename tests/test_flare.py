@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import struct
 import tempfile
@@ -16,8 +17,31 @@ os.environ.setdefault("FLARE_FORCE_CPU", "1")
 from flare.autostart import install_autostart, launch_command, remove_autostart
 from flare.calc import try_calc
 from flare.client import Client
-from flare.crawl import Crawler, application_roots, should_skip_dir, _user_dirs
-from flare.paths import norm
+from flare.crawl import Crawler, DRIVE_POLL_S, application_roots, dedupe_roots, merge_volume_roots, should_skip_dir, _user_dirs
+from flare.paths import is_inside, norm, place_key, prefix_with_sep
+from flare.volumes import (
+    DRIVE_CDROM,
+    DRIVE_FIXED,
+    DRIVE_RAMDISK,
+    DRIVE_REMOTE,
+    DRIVE_REMOVABLE,
+    FILE_ATTRIBUTE_OFFLINE,
+    FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS,
+    DriveInfo,
+    discover_cloud_roots,
+    drive_roots_for_config,
+    exclude_drive_list,
+    index_network_enabled,
+    is_offline_stat,
+    list_windows_drives,
+    normalize_drive_root,
+    read_onedrive_folders,
+    select_drive_roots,
+    should_sample_content,
+    tracked_drives,
+    windows_cloud_roots,
+    windows_system_drive,
+)
 from flare.governor import Governor, read_cpu_times, sleep_budget
 from flare.hotkey import hotkey_label, parse_hotkey
 from flare.launch import parse_lnk
@@ -468,6 +492,394 @@ class AutostartTests(unittest.TestCase):
         self.assertIn("--background", command)
         self.assertNotIn("flare.py", command)
         self.assertNotIn("-m", command)
+
+
+def _names(index: Index, text: str) -> set[str]:
+    return {hit["name"] for hit in search(index, Ranker(allow_cuda=False), text)["results"]}
+
+
+class VolumeTests(unittest.TestCase):
+    def _sample_drives(self) -> list[DriveInfo]:
+        return [
+            DriveInfo("E:\\", DRIVE_REMOVABLE, "STICK", True),
+            DriveInfo("D:\\", DRIVE_FIXED, "DATA", True),
+            DriveInfo("C:\\", DRIVE_FIXED, "Windows", True),
+            DriveInfo("F:\\", DRIVE_CDROM, "DVD", True),
+            DriveInfo("Z:\\", DRIVE_REMOTE, "NAS", True),
+            DriveInfo("G:\\", DRIVE_REMOVABLE, None, True),
+            DriveInfo("H:\\", DRIVE_FIXED, "LOCKED", False),
+            DriveInfo("R:\\", DRIVE_RAMDISK, "RAM", True),
+            DriveInfo("Y:\\", DRIVE_REMOTE, None, False),
+        ]
+
+    def test_removable_and_nonsystem_fixed_drives_are_included(self) -> None:
+        chosen = dict(
+            select_drive_roots(
+                self._sample_drives(),
+                system_drive=r"C:\Windows",
+                index_network=False,
+                exclude=[],
+            )
+        )
+        self.assertEqual(chosen["E:\\"], 1)
+        self.assertEqual(chosen["D:\\"], 1)
+        self.assertNotIn("C:\\", chosen)
+        self.assertNotIn("F:\\", chosen)
+        self.assertNotIn("Z:\\", chosen)
+        self.assertNotIn("G:\\", chosen)
+        self.assertNotIn("H:\\", chosen)
+        self.assertNotIn("R:\\", chosen)
+
+    def test_system_drive_is_not_a_full_disk_root(self) -> None:
+        self.assertEqual(normalize_drive_root(r"C:\Windows"), "C:\\")
+        self.assertEqual(normalize_drive_root("c:"), "C:\\")
+        self.assertEqual(normalize_drive_root("E:/"), "E:\\")
+        chosen = select_drive_roots(
+            [DriveInfo("C:\\", DRIVE_FIXED, "OS", True), DriveInfo("E:\\", DRIVE_REMOVABLE, "STICK", True)],
+            system_drive="C:",
+        )
+        self.assertEqual([root for root, _tier in chosen], ["E:\\"])
+        without_system = select_drive_roots(
+            [DriveInfo("C:\\", DRIVE_FIXED, "OS", True), DriveInfo("E:\\", DRIVE_REMOVABLE, "STICK", True)],
+            system_drive="",
+        )
+        self.assertEqual([root for root, _tier in without_system], ["E:\\"])
+
+    def test_cdrom_is_skipped(self) -> None:
+        chosen = select_drive_roots(
+            [DriveInfo("F:\\", DRIVE_CDROM, "DVD", True)],
+            system_drive="C:\\",
+            index_network=True,
+        )
+        self.assertEqual(chosen, [])
+
+    def test_exclude_drives_honored(self) -> None:
+        chosen = {
+            root
+            for root, _tier in select_drive_roots(
+                self._sample_drives(),
+                system_drive=r"C:\Windows",
+                index_network=False,
+                exclude=["e:/", "DATA"],
+            )
+        }
+        self.assertNotIn("E:\\", chosen)
+        self.assertNotIn("D:\\", chosen)
+        self.assertEqual(exclude_drive_list({}), [])
+        self.assertEqual(exclude_drive_list({"exclude_drives": [" E:\\ ", 3, ""]}), ["E:\\"])
+
+    def test_index_network_defaults_to_skip_remote(self) -> None:
+        self.assertFalse(index_network_enabled({}))
+        self.assertFalse(index_network_enabled({"index_network": False}))
+        quiet = {
+            root: tier
+            for root, tier in select_drive_roots(
+                self._sample_drives(),
+                system_drive="C:\\",
+            )
+        }
+        self.assertNotIn("Z:\\", quiet)
+        self.assertNotIn("Y:\\", quiet)
+        enabled = {
+            root: tier
+            for root, tier in select_drive_roots(
+                self._sample_drives(),
+                system_drive="C:\\",
+                index_network=True,
+            )
+        }
+        self.assertEqual(enabled["Z:\\"], 2)
+        self.assertNotIn("Y:\\", enabled)
+        tracked = {
+            root: (tier, walk)
+            for root, tier, walk in tracked_drives(
+                self._sample_drives(),
+                system_drive=r"C:\Windows",
+                index_network=True,
+            )
+        }
+        self.assertEqual(tracked["H:\\"], (1, False))
+        self.assertEqual(tracked["G:\\"], (1, False))
+        self.assertEqual(tracked["Y:\\"], (2, False))
+        self.assertNotIn("F:\\", tracked)
+        self.assertNotIn("C:\\", tracked)
+        self.assertFalse(should_sample_content(enabled=True, tier=2, offline=False))
+        self.assertTrue(should_sample_content(enabled=True, tier=1, offline=False))
+        self.assertTrue(index_network_enabled({"index_network": True}))
+
+    def test_cloud_roots_added_once(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            one = home / "OneDrive"
+            desktop = one / "Desktop"
+            desktop.mkdir(parents=True)
+            drop = home / "Dropbox"
+            drop.mkdir()
+            biz = home / "DropboxBiz"
+            biz.mkdir()
+            gdrive = home / "Google Drive"
+            my_drive = gdrive / "My Drive"
+            my_drive.mkdir(parents=True)
+            appdata = home / "Roaming"
+            local = home / "Local"
+            (appdata / "Dropbox").mkdir(parents=True)
+            (local / "Dropbox").mkdir(parents=True)
+            info = {
+                "personal": {"path": str(drop)},
+                "business": {"path": str(biz)},
+            }
+            (appdata / "Dropbox" / "info.json").write_text(json.dumps(info), encoding="utf-8")
+            (local / "Dropbox" / "info.json").write_text(
+                json.dumps({"personal": {"path": str(drop)}}),
+                encoding="utf-8",
+            )
+            drivefs = local / "Google" / "DriveFS" / "99" / "My Drive"
+            drivefs.mkdir(parents=True)
+            env = {
+                "USERPROFILE": str(home),
+                "APPDATA": str(appdata),
+                "LOCALAPPDATA": str(local),
+                "OneDrive": str(one),
+                "OneDriveConsumer": str(one),
+                "OneDriveCommercial": str(home / "fehlt"),
+            }
+
+            def read_text(path: str) -> str | None:
+                if not os.path.isfile(path):
+                    return None
+                return Path(path).read_text(encoding="utf-8")
+
+            found = discover_cloud_roots(
+                env,
+                exists=os.path.isdir,
+                read_text=read_text,
+                registry_folders=[str(one), str(one)],
+                listdir=os.listdir,
+                existing_roots=[str(desktop)],
+            )
+            keys = set(found)
+            self.assertEqual(len(found), len(keys))
+            self.assertIn(place_key(one), keys)
+            self.assertEqual(found.count(place_key(one)), 1)
+            self.assertIn(place_key(drop), keys)
+            self.assertEqual(found.count(place_key(drop)), 1)
+            self.assertIn(place_key(biz), keys)
+            self.assertIn(place_key(gdrive), keys)
+            self.assertNotIn(place_key(my_drive), keys)
+            self.assertIn(place_key(drivefs), keys)
+            self.assertNotIn(place_key(desktop), keys)
+            self.assertTrue(all("fehlt" not in path for path in found))
+            again = discover_cloud_roots(
+                env,
+                exists=os.path.isdir,
+                read_text=read_text,
+                registry_folders=[str(one)],
+                listdir=os.listdir,
+                existing_roots=[str(one)],
+            )
+            self.assertNotIn(place_key(one), again)
+
+            link = home / "link"
+            link.symlink_to(one, target_is_directory=True)
+            merged = dedupe_roots([(str(link), 1), (str(one), 0)])
+            self.assertEqual(len(merged), 1)
+            self.assertEqual(merged[0][1], 0)
+            roots, dynamic = merge_volume_roots([], [(str(one), 1)], [str(link)])
+            self.assertEqual(len(roots), 1)
+            self.assertEqual(dynamic, [roots[0][0]])
+
+    def test_offline_attribute_skips_content(self) -> None:
+        class Stat:
+            def __init__(self, attrs: int) -> None:
+                self.st_file_attributes = attrs
+
+        self.assertTrue(is_offline_stat(Stat(FILE_ATTRIBUTE_OFFLINE)))
+        self.assertTrue(is_offline_stat(Stat(FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS)))
+        self.assertTrue(is_offline_stat(Stat(FILE_ATTRIBUTE_OFFLINE | 0x20)))
+        self.assertFalse(is_offline_stat(Stat(0x20)))
+        self.assertFalse(is_offline_stat(Stat(0)))
+        self.assertFalse(should_sample_content(enabled=True, tier=1, offline=True))
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "cloud"
+            root.mkdir()
+            (root / "wolke.txt").write_text("einzigartigerplatzhalter\n", encoding="utf-8")
+            (root / "sichtbar.txt").write_text("sichtbarerinhalt\n", encoding="utf-8")
+            marker = root / ".flare-offline"
+            marker.mkdir()
+            (marker / "wolke.txt").write_text("", encoding="utf-8")
+            index = Index(Path(tmp) / "index.db")
+            try:
+                crawler = Crawler(
+                    index,
+                    Governor(fast=True),
+                    [(str(root), 1)],
+                    threading.Event(),
+                    content=True,
+                    index_path=False,
+                )
+                crawler.prime()
+                crawler.drain()
+                self.assertIn("wolke.txt", _names(index, "wolke"))
+                self.assertFalse(_names(index, "einzigartigerplatzhalter"))
+                self.assertTrue(_names(index, "sichtbarerinhalt"))
+            finally:
+                index.close()
+
+    def test_network_tier_indexes_names_only(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "nas"
+            root.mkdir()
+            (root / "freigabe.txt").write_text("netzinhaltgeheim\n", encoding="utf-8")
+            index = Index(Path(tmp) / "index.db")
+            try:
+                crawler = Crawler(
+                    index,
+                    Governor(fast=True),
+                    [(str(root), 2)],
+                    threading.Event(),
+                    content=True,
+                    index_path=False,
+                )
+                crawler.prime()
+                crawler.drain()
+                self.assertIn("freigabe.txt", _names(index, "freigabe"))
+                self.assertFalse(_names(index, "netzinhaltgeheim"))
+            finally:
+                index.close()
+
+    def test_removing_a_drive_drops_its_items(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            stick = Path(tmp) / "E"
+            nested = stick / "nested"
+            nested.mkdir(parents=True)
+            (stick / "foto.txt").write_text("bildwort\n", encoding="utf-8")
+            (nested / "deep.txt").write_text("tief\n", encoding="utf-8")
+            (stick / ".env").write_text("TOKEN=1\n", encoding="utf-8")
+            modules = stick / "node_modules"
+            modules.mkdir()
+            (modules / "pkg.js").write_text("nope\n", encoding="utf-8")
+            docs = Path(tmp) / "docs"
+            docs.mkdir()
+            (docs / "bleib.txt").write_text("bleibt\n", encoding="utf-8")
+            state = {"drives": [(str(stick), 1)]}
+
+            def poll() -> list[tuple[str, int]]:
+                return list(state["drives"])
+
+            index = Index(Path(tmp) / "index.db")
+            try:
+                crawler = Crawler(
+                    index,
+                    Governor(fast=True),
+                    [(str(docs), 1), (str(stick), 1)],
+                    threading.Event(),
+                    content=True,
+                    index_path=False,
+                    drive_poll=poll,
+                    dynamic_roots=[str(stick)],
+                )
+                crawler.prime()
+                crawler.drain()
+                self.assertIn("foto.txt", _names(index, "foto"))
+                self.assertIn("deep.txt", _names(index, "deep"))
+                content_hits = search(index, Ranker(allow_cuda=False), "bildwort")["results"]
+                self.assertTrue(
+                    any(hit["name"] == "foto.txt" and hit["via"] == "content" for hit in content_hits),
+                    content_hits,
+                )
+                self.assertIn("bleib.txt", _names(index, "bleib"))
+                self.assertFalse(_names(index, ".env"))
+                self.assertFalse(_names(index, "pkg.js"))
+                index.drop_tree(os.sep)
+                self.assertIn("foto.txt", _names(index, "foto"))
+                self.assertIn("bleib.txt", _names(index, "bleib"))
+                state["drives"] = [(str(stick), 1, False)]
+                crawler.poll_drives(force=True)
+                self.assertIn("foto.txt", _names(index, "foto"))
+                self.assertIn("deep.txt", _names(index, "deep"))
+                state["drives"] = []
+                crawler.poll_drives(force=True)
+                self.assertFalse(_names(index, "foto"))
+                self.assertFalse(_names(index, "deep"))
+                self.assertFalse(_names(index, "bildwort"))
+                self.assertIsNone(index.dir_info(norm(stick))[0])
+                self.assertIsNone(index.dir_info(norm(nested))[0])
+                self.assertIn("bleib.txt", _names(index, "bleib"))
+                state["drives"] = [(str(stick), 1)]
+                crawler.poll_drives(force=True)
+                crawler.drain()
+                self.assertIn("foto.txt", _names(index, "foto"))
+                self.assertIn("deep.txt", _names(index, "deep"))
+            finally:
+                index.close()
+
+    def test_drive_poll_is_spaced(self) -> None:
+        self.assertGreaterEqual(DRIVE_POLL_S, 10)
+        self.assertLessEqual(DRIVE_POLL_S, 15)
+        calls = {"n": 0}
+
+        def poll() -> list[tuple[str, int]]:
+            calls["n"] += 1
+            return []
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "docs"
+            root.mkdir()
+            index = Index(Path(tmp) / "index.db")
+            try:
+                crawler = Crawler(
+                    index,
+                    Governor(fast=True),
+                    [(str(root), 1)],
+                    threading.Event(),
+                    index_path=False,
+                    drive_poll=poll,
+                )
+                crawler.poll_drives()
+                crawler.poll_drives()
+                self.assertEqual(calls["n"], 1)
+                crawler.poll_drives(force=True)
+                self.assertEqual(calls["n"], 2)
+
+                def boom() -> list[tuple[str, int]]:
+                    raise OSError("laufwerk")
+
+                crawler._drive_poll = boom
+                crawler.poll_drives(force=True)
+                self.assertEqual(calls["n"], 2)
+            finally:
+                index.close()
+
+    def test_child_prefix_does_not_double_a_drive_root(self) -> None:
+        self.assertEqual(prefix_with_sep("E:\\", "\\"), "E:\\")
+        self.assertTrue("E:\\foto".startswith(prefix_with_sep("E:\\", "\\")))
+        self.assertEqual(prefix_with_sep("C:\\Users\\me", "\\"), "C:\\Users\\me\\")
+        self.assertFalse("C:\\Users\\meter".startswith(prefix_with_sep("C:\\Users\\me", "\\")))
+        self.assertTrue(is_inside(os.path.join(tempfile.gettempdir(), "a", "b"), os.path.join(tempfile.gettempdir(), "a")))
+
+    def test_win32_helpers_stay_quiet_off_windows(self) -> None:
+        import sys
+
+        if sys.platform == "win32":
+            return
+        self.assertEqual(list_windows_drives(), [])
+        self.assertEqual(windows_cloud_roots(), [])
+        self.assertEqual(drive_roots_for_config(), [])
+        self.assertEqual(read_onedrive_folders(), [])
+        self.assertEqual(windows_system_drive(), "")
+
+    def test_indexer_does_not_lower_the_thread_or_read_wstring(self) -> None:
+        import inspect
+
+        import flare.crawl as crawl
+        import flare.service as service
+        import flare.volumes as volumes
+
+        for module in (crawl, service, volumes):
+            source = inspect.getsource(module)
+            self.assertNotIn("wstring_at", source)
+            self.assertNotIn("lower_background_thread", source)
 
 
 if __name__ == "__main__":
