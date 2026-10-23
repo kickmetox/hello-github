@@ -6,8 +6,9 @@ import os
 import unittest
 
 from flare.helptext import description, features, help_text, short_description
-from flare.window import VK_DOWN, VK_ESCAPE, VK_F1, VK_RETURN, help_text as window_help
-from flare.window import shortcut_action
+from flare.launch import explorer_command_line, explorer_select_args, reveal_in_explorer
+from flare.window import VK_APPS, VK_DOWN, VK_ESCAPE, VK_F1, VK_F10, VK_RETURN, help_text as window_help
+from flare.window import copy_unicode_text, hit_row, row_path, shortcut_action
 
 
 class HelpTextTests(unittest.TestCase):
@@ -166,6 +167,13 @@ class HelpShortcutTests(unittest.TestCase):
         self.assertIsNone(shortcut_action(VK_DOWN, help_open=True, help_target=True))
         self.assertEqual(shortcut_action(VK_RETURN, help_open=False, help_target=False), "open")
         self.assertIsNone(shortcut_action(VK_RETURN, help_open=True, help_target=True))
+        self.assertEqual(shortcut_action(VK_APPS, help_open=False, help_target=False), "context")
+        self.assertEqual(shortcut_action(VK_F10, help_open=False, help_target=False, shift=True), "context")
+        self.assertIsNone(shortcut_action(VK_F10, help_open=False, help_target=False, shift=False))
+        self.assertIsNone(shortcut_action(VK_APPS, help_open=True, help_target=True))
+        self.assertEqual(shortcut_action(VK_APPS, help_open=True, help_target=False), "context")
+        for label in ("Öffnen", "Speicherort öffnen", "Pfad kopieren", "Rechtsklick", "Umschalt+F10"):
+            self.assertIn(label, help_text())
 
 
 class IconTests(unittest.TestCase):
@@ -232,6 +240,97 @@ class IconTests(unittest.TestCase):
         self.assertIn("icon=icon", spec)
         self.assertIn('MUI_ICON "${__FILEDIR__}\\flare.ico"', nsi)
         self.assertIn('MUI_UNICON "${__FILEDIR__}\\flare.ico"', nsi)
+
+
+class ResultMenuTests(unittest.TestCase):
+    def test_empty_space_and_missing_path_do_not_qualify(self) -> None:
+        self.assertEqual(hit_row(0, 0, 3, 0, 0, 200, 24, 12, 8), 0)
+        self.assertIsNone(hit_row(2, 0, 3, 0, 48, 200, 72, 12, 90))
+        self.assertIsNone(hit_row(0, 1, 3, 0, 0, 200, 24, 12, 8))
+        self.assertIsNone(hit_row(4, 0, 3, 0, 0, 200, 24, 12, 8))
+        self.assertEqual(row_path({"path": r"F:\Xchange"}), r"F:\Xchange")
+        self.assertEqual(row_path({"kind": "calc", "path": ""}), "")
+        self.assertEqual(row_path(None), "")
+
+    def test_context_menu_is_created_only_on_windows(self) -> None:
+        import inspect
+
+        import flare.window as window
+
+        popup = inspect.getsource(window.NativeWindow._popup_result_menu)
+        self.assertIn('sys.platform != "win32"', popup)
+        self.assertIn("CreatePopupMenu", popup)
+        for label in ("Öffnen", "Speicherort öffnen", "Pfad kopieren"):
+            self.assertIn(f'"{label}"', popup)
+        listing = inspect.getsource(window.NativeWindow._list_wndproc)
+        self.assertIn("WM_CONTEXTMENU", listing)
+        self.assertIn("WM_RBUTTONUP", listing)
+        parent = inspect.getsource(window.NativeWindow._wndproc)
+        self.assertIn("WM_CONTEXTMENU", parent)
+        self.assertIn("WM_RBUTTONUP", parent)
+        self.assertIn("CF_UNICODETEXT", inspect.getsource(window.copy_unicode_text))
+        self.assertIn("utf-16-le", inspect.getsource(window.copy_unicode_text))
+        self.assertNotIn("wstring_at", inspect.getsource(window))
+        self.assertIn("Sichern…", inspect.getsource(window.NativeWindow._install_index_menu))
+        self.assertIn("Andreas Meyer", inspect.getsource(window.NativeWindow._install_index_menu))
+        if os.name != "nt":
+            self.assertFalse(copy_unicode_text(r"D:\notes.txt"))
+
+    def test_explorer_select_quotes_spaces_for_files_and_folders(self) -> None:
+        import inspect
+        import sys
+        from unittest import mock
+
+        file_args = explorer_select_args(r"D:\notes.txt")
+        folder_args = explorer_select_args(r"C:\Users\Andreas\Documents")
+        spaced = explorer_select_args(r"C:\Program Files\Flare Setup\readme.txt")
+        spaced_folder = explorer_select_args(r"C:\Program Files")
+        root_args = explorer_select_args(r"F:\\")
+        self.assertEqual(file_args, ["explorer.exe", r"/select,D:\notes.txt"])
+        self.assertEqual(folder_args, ["explorer.exe", r"/select,C:\Users\Andreas\Documents"])
+        self.assertEqual(spaced, ["explorer.exe", '/select,"C:\\Program Files\\Flare Setup\\readme.txt"'])
+        self.assertEqual(spaced_folder, ["explorer.exe", '/select,"C:\\Program Files"'])
+        self.assertEqual(root_args, ["explorer.exe", "F:\\"])
+        self.assertNotIn("/select", root_args[1])
+        self.assertEqual(explorer_select_args("E:"), ["explorer.exe", "E:\\"])
+        self.assertEqual(
+            explorer_select_args(r"F:\Xchange"),
+            ["explorer.exe", r"/select,F:\Xchange"],
+        )
+        self.assertEqual(
+            explorer_command_line(spaced),
+            'explorer.exe /select,"C:\\Program Files\\Flare Setup\\readme.txt"',
+        )
+        self.assertEqual(explorer_select_args(""), [])
+        built = inspect.getsource(explorer_select_args)
+        for banned in ("os.walk", "listdir", "scandir", "exists"):
+            self.assertNotIn(banned, built)
+        reveal = inspect.getsource(reveal_in_explorer)
+        for banned in ("os.walk", "listdir", "scandir", "rglob"):
+            self.assertNotIn(banned, reveal)
+        self.assertEqual(reveal_in_explorer(""), "Pfad fehlt.")
+        self.assertEqual(reveal_in_explorer(r"D:\no\such\notes.txt"), "Datei fehlt.")
+        with (
+            mock.patch.object(sys, "platform", "win32"),
+            mock.patch("flare.launch.os.path.exists", return_value=True),
+            mock.patch("flare.launch.subprocess.Popen", side_effect=OSError("missing")),
+        ):
+            self.assertEqual(reveal_in_explorer(r"D:\notes.txt"), "Explorer startet nicht.")
+        with (
+            mock.patch.object(sys, "platform", "win32"),
+            mock.patch("flare.launch.os.path.exists", return_value=True),
+            mock.patch("flare.launch.subprocess.Popen") as popen,
+        ):
+            self.assertIsNone(reveal_in_explorer(r"C:\Users\Andreas\Documents"))
+            self.assertEqual(popen.call_args.args[0], r"explorer.exe /select,C:\Users\Andreas\Documents")
+            self.assertIsNone(reveal_in_explorer(r"C:\Program Files\readme.txt"))
+            self.assertEqual(
+                popen.call_args.args[0],
+                'explorer.exe /select,"C:\\Program Files\\readme.txt"',
+            )
+            self.assertIsNone(reveal_in_explorer(r"E:\\"))
+            self.assertEqual(popen.call_args.args[0], "explorer.exe E:\\")
+            self.assertFalse(popen.call_args.kwargs.get("shell", False))
 
 
 if __name__ == "__main__":

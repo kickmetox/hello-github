@@ -5,11 +5,13 @@ from __future__ import annotations
 import ctypes
 import sys
 import threading
+import time
 from ctypes import wintypes
 from pathlib import Path
 from typing import Any, Callable
 
 from flare.helptext import help_text
+from flare.launch import reveal_in_explorer
 from flare.store import compare_indexes, copy_index, create_index, format_index_compare
 
 WM_DESTROY = 0x0002
@@ -23,6 +25,9 @@ WM_CTLCOLOREDIT = 0x0133
 WM_CTLCOLORLISTBOX = 0x0134
 WM_CTLCOLORSTATIC = 0x0138
 WM_SETFONT = 0x0030
+WM_CONTEXTMENU = 0x007B
+WM_SYSKEYDOWN = 0x0104
+WM_RBUTTONUP = 0x0205
 WM_FLARE_SHOW = 0x8001
 
 EN_CHANGE = 0x0300
@@ -32,7 +37,10 @@ LB_RESETCONTENT = 0x0184
 LB_ADDSTRING = 0x0180
 LB_SETCURSEL = 0x0186
 LB_GETCURSEL = 0x0188
+LB_GETITEMRECT = 0x0198
 LB_SETITEMHEIGHT = 0x01A0
+LB_ITEMFROMPOINT = 0x01A9
+LB_ERR = -1
 WM_SETREDRAW = 0x000B
 LBN_SELCHANGE = 1
 RDW_INVALIDATE = 0x0001
@@ -68,9 +76,12 @@ SW_SHOW = 5
 PM_REMOVE = 1
 VK_RETURN = 0x0D
 VK_ESCAPE = 0x1B
+VK_SHIFT = 0x10
 VK_UP = 0x26
 VK_DOWN = 0x28
+VK_APPS = 0x5D
 VK_F1 = 0x70
+VK_F10 = 0x79
 IDC_HELP = 104
 IDC_SAVE_INDEX = 201
 IDC_COPY_INDEX = 203
@@ -81,6 +92,15 @@ IDC_MENU_LOAD = 302
 IDC_MENU_COMPARE = 303
 IDC_MENU_COPY = 304
 IDC_MENU_CREATE = 305
+IDC_CTX_OPEN = 311
+IDC_CTX_REVEAL = 312
+IDC_CTX_COPY = 313
+CF_UNICODETEXT = 13
+GMEM_MOVEABLE = 0x0002
+TPM_RETURNCMD = 0x0100
+TPM_RIGHTBUTTON = 0x0002
+TPM_NONOTIFY = 0x0080
+GWLP_WNDPROC = -4
 MB_YESNO = 0x0004
 IDYES = 6
 MF_STRING = 0x0000
@@ -409,11 +429,128 @@ def search_status(mode: str, took_ms: float, count: int, path: str = "") -> str:
     return text
 
 
-def shortcut_action(key: int, *, help_open: bool, help_target: bool) -> str | None:
+def split_lparam(value: int) -> tuple[int, int]:
+    """X und Y aus einem Win32-LPARAM, jeweils vorzeichenbehaftet 16 Bit."""
+    raw = int(value) & 0xFFFFFFFF
+    x = raw & 0xFFFF
+    y = (raw >> 16) & 0xFFFF
+    if x >= 0x8000:
+        x -= 0x10000
+    if y >= 0x8000:
+        y -= 0x10000
+    return x, y
+
+
+def make_lparam(x: int, y: int) -> int:
+    return ((int(y) & 0xFFFF) << 16) | (int(x) & 0xFFFF)
+
+
+_SEND_PTR: Any = None
+
+
+def _send_ptr(hwnd: int, message: int, wparam: int, lparam: Any) -> int:
+    """SendMessageW mit Zeigerbreite. Ein nacktes int würde auf 64 Bit abgeschnitten."""
+    global _SEND_PTR
+    if _SEND_PTR is None:
+        kind = ctypes.WINFUNCTYPE(
+            LRESULT, wintypes.HWND, wintypes.UINT, wintypes.WPARAM, ctypes.c_void_p
+        )
+        _SEND_PTR = kind(("SendMessageW", ctypes.windll.user32))
+    if isinstance(lparam, int):
+        return int(_SEND_PTR(hwnd, message, wparam, lparam))
+    return int(_SEND_PTR(hwnd, message, wparam, ctypes.cast(lparam, ctypes.c_void_p)))
+
+
+def hit_row(
+    index: int,
+    outside: int,
+    count: int,
+    left: int,
+    top: int,
+    right: int,
+    bottom: int,
+    x: int,
+    y: int,
+) -> int | None:
+    """Zeile unter dem Zeiger. Leerfläche und außerhalb ergeben kein Menü."""
+    if outside or count <= 0:
+        return None
+    if index < 0 or index >= count:
+        return None
+    if right <= left or bottom <= top:
+        return None
+    if x < left or x >= right or y < top or y >= bottom:
+        return None
+    return index
+
+
+def row_path(item: dict[str, Any] | None) -> str:
+    """Voller Pfad einer Zeile. Leer heißt: kein Kontextmenü."""
+    if not item:
+        return ""
+    return str(item.get("path") or "").strip()
+
+
+def copy_unicode_text(text: str, owner: int = 0) -> bool:
+    """CF_UNICODETEXT in die Zwischenablage. Unter Linux immer False."""
+    if sys.platform != "win32":
+        return False
+    user32 = ctypes.windll.user32
+    kernel32 = ctypes.windll.kernel32
+    try:
+        user32.OpenClipboard.argtypes = [wintypes.HWND]
+        user32.OpenClipboard.restype = wintypes.BOOL
+        user32.EmptyClipboard.restype = wintypes.BOOL
+        user32.CloseClipboard.restype = wintypes.BOOL
+        user32.SetClipboardData.argtypes = [wintypes.UINT, ctypes.c_void_p]
+        user32.SetClipboardData.restype = ctypes.c_void_p
+        kernel32.GlobalAlloc.argtypes = [wintypes.UINT, ctypes.c_size_t]
+        kernel32.GlobalAlloc.restype = ctypes.c_void_p
+        kernel32.GlobalLock.argtypes = [ctypes.c_void_p]
+        kernel32.GlobalLock.restype = ctypes.c_void_p
+        kernel32.GlobalUnlock.argtypes = [ctypes.c_void_p]
+        kernel32.GlobalUnlock.restype = wintypes.BOOL
+        kernel32.GlobalFree.argtypes = [ctypes.c_void_p]
+        kernel32.GlobalFree.restype = ctypes.c_void_p
+    except (AttributeError, OSError):
+        return False
+    payload = str(text).encode("utf-16-le") + b"\x00\x00"
+    if not user32.OpenClipboard(owner or None):
+        return False
+    handle = None
+    locked = False
+    try:
+        if not user32.EmptyClipboard():
+            return False
+        handle = kernel32.GlobalAlloc(GMEM_MOVEABLE, len(payload))
+        if not handle:
+            return False
+        dest = kernel32.GlobalLock(handle)
+        if not dest:
+            return False
+        locked = True
+        ctypes.memmove(dest, payload, len(payload))
+        kernel32.GlobalUnlock(handle)
+        locked = False
+        if not user32.SetClipboardData(CF_UNICODETEXT, handle):
+            return False
+        handle = None
+        return True
+    except (AttributeError, OSError):
+        return False
+    finally:
+        if locked and handle:
+            kernel32.GlobalUnlock(handle)
+        if handle:
+            kernel32.GlobalFree(handle)
+        user32.CloseClipboard()
+
+
+def shortcut_action(key: int, *, help_open: bool, help_target: bool, shift: bool = False) -> str | None:
     """Tasten im Suchfenster, ohne ein HWND zu erzeugen.
 
     „help“ öffnet die Hilfe. „close-help“ schließt sie und kehrt zur Suche
-    zurück. None gibt die Taste an das Hilfe-Fenster weiter.
+    zurück. „context“ öffnet das Treffer-Menü. None gibt die Taste weiter.
     """
     if key == VK_F1:
         return "help"
@@ -423,6 +560,8 @@ def shortcut_action(key: int, *, help_open: bool, help_target: bool) -> str | No
         return None
     if key == VK_RETURN:
         return "open"
+    if key == VK_APPS or (key == VK_F10 and shift):
+        return "context"
     if key == VK_ESCAPE:
         return "hide"
     if key == VK_DOWN:
@@ -761,6 +900,11 @@ class NativeWindow:
         self._menu = 0
         self._icon_big = 0
         self._icon_small = 0
+        self._list_proc_cb: Any = None
+        self._old_list_proc: Any = None
+        self._result_menu_open = False
+        self._ignore_context_until = 0.0
+        self._point_api = False
         self.save_index = save_index
         self.load_index = load_index
         self._help = HelpWindow(self)
@@ -794,7 +938,9 @@ class NativeWindow:
                     hwnd = getattr(msg, "hWnd", None)
                     if hwnd is None:
                         hwnd = getattr(msg, "hwnd", 0)
-                    if msg.message == WM_KEYDOWN and self._shortcut(int(msg.wParam), int(hwnd or 0)):
+                    if msg.message in (WM_KEYDOWN, WM_SYSKEYDOWN) and self._shortcut(
+                        int(msg.wParam), int(hwnd or 0)
+                    ):
                         continue
                     user32.TranslateMessage(ctypes.byref(msg))
                     user32.DispatchMessageW(ctypes.byref(msg))
@@ -805,10 +951,20 @@ class NativeWindow:
                 user32.DestroyWindow(self.hwnd)
 
     def _shortcut(self, key: int, hwnd: int = 0) -> bool:
+        shift = False
+        if key in (VK_F10, VK_APPS) and sys.platform == "win32":
+            try:
+                user32 = ctypes.windll.user32
+                user32.GetKeyState.argtypes = [ctypes.c_int]
+                user32.GetKeyState.restype = ctypes.c_short
+                shift = bool(int(user32.GetKeyState(VK_SHIFT)) & 0x8000)
+            except (AttributeError, OSError):
+                shift = False
         action = shortcut_action(
             key,
             help_open=bool(self._help.hwnd),
             help_target=self._help.targets(hwnd),
+            shift=shift,
         )
         if action == "help":
             self._open_help()
@@ -818,6 +974,9 @@ class NativeWindow:
             return True
         if action == "open":
             self._open_selected()
+            return True
+        if action == "context":
+            self._open_menu_for_current_selection(force=True)
             return True
         if action == "hide":
             self._hide()
@@ -917,6 +1076,7 @@ class NativeWindow:
         self.label = self._child("STATIC", "Index wird aufgebaut", 103, 0)
         self.help_btn = self._child("BUTTON", "Hilfe", IDC_HELP, BS_PUSHBUTTON)
         self._install_index_menu()
+        self._subclass_result_list()
         self._layout()
         user32.SetTimer(hwnd, 2, 1000, None)
         return True
@@ -1059,6 +1219,321 @@ class NativeWindow:
         self._menu = bar
         user32.DrawMenuBar(self.hwnd)
 
+    def _subclass_result_list(self) -> None:
+        """Rechtsklick erreicht die Liste, nicht das Hauptfenster. Nur unter Windows."""
+        if sys.platform != "win32" or not self.list or self._wndproc_type is None:
+            return
+        user32 = ctypes.windll.user32
+        setter = getattr(user32, "SetWindowLongPtrW", None)
+        if setter is None:
+            return
+        try:
+            setter.argtypes = [wintypes.HWND, ctypes.c_int, ctypes.c_void_p]
+            setter.restype = ctypes.c_void_p
+            user32.CallWindowProcW.argtypes = [
+                ctypes.c_void_p,
+                wintypes.HWND,
+                wintypes.UINT,
+                wintypes.WPARAM,
+                wintypes.LPARAM,
+            ]
+            user32.CallWindowProcW.restype = LRESULT
+            callback = self._wndproc_type(self._list_wndproc)
+            self._list_proc_cb = callback
+            previous = setter(self.list, GWLP_WNDPROC, ctypes.cast(callback, ctypes.c_void_p))
+        except (AttributeError, OSError):
+            self._list_proc_cb = None
+            return
+        if not previous:
+            self._list_proc_cb = None
+            return
+        self._old_list_proc = previous
+
+    def _list_wndproc(self, hwnd: int, msg: int, wparam: int, lparam: int) -> int:
+        if msg in (WM_RBUTTONUP, WM_CONTEXTMENU):
+            try:
+                self._on_list_context(msg, int(lparam))
+            except Exception:
+                self._set_status("Aktion fehlgeschlagen.")
+            return 0
+        old = self._old_list_proc
+        if not old:
+            return int(_prepare_user32().DefWindowProcW(hwnd, msg, wparam, lparam))
+        return int(ctypes.windll.user32.CallWindowProcW(old, hwnd, msg, wparam, lparam))
+
+    def _bind_point_calls(self) -> None:
+        if self._point_api or sys.platform != "win32":
+            return
+        user32 = ctypes.windll.user32
+        user32.ClientToScreen.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.POINT)]
+        user32.ClientToScreen.restype = wintypes.BOOL
+        user32.ScreenToClient.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.POINT)]
+        user32.ScreenToClient.restype = wintypes.BOOL
+        self._point_api = True
+
+    def _list_client_to_screen(self, x: int, y: int) -> tuple[int, int]:
+        if sys.platform != "win32" or not self.list:
+            return int(x), int(y)
+        self._bind_point_calls()
+        pt = wintypes.POINT(int(x), int(y))
+        try:
+            if ctypes.windll.user32.ClientToScreen(self.list, ctypes.byref(pt)):
+                return int(pt.x), int(pt.y)
+        except (AttributeError, OSError):
+            return int(x), int(y)
+        return int(x), int(y)
+
+    def _screen_to_list(self, x: int, y: int) -> tuple[int, int] | None:
+        if sys.platform != "win32" or not self.list:
+            return None
+        self._bind_point_calls()
+        pt = wintypes.POINT(int(x), int(y))
+        try:
+            if not ctypes.windll.user32.ScreenToClient(self.list, ctypes.byref(pt)):
+                return None
+        except (AttributeError, OSError):
+            return None
+        return int(pt.x), int(pt.y)
+
+    def _parent_client_to_list(self, x: int, y: int) -> tuple[int, int] | None:
+        if sys.platform != "win32" or not self.hwnd or not self.list:
+            return None
+        self._bind_point_calls()
+        pt = wintypes.POINT(int(x), int(y))
+        user32 = ctypes.windll.user32
+        try:
+            if not user32.ClientToScreen(self.hwnd, ctypes.byref(pt)):
+                return None
+            if not user32.ScreenToClient(self.list, ctypes.byref(pt)):
+                return None
+        except (AttributeError, OSError):
+            return None
+        return int(pt.x), int(pt.y)
+
+    def _list_client_contains(self, x: int, y: int) -> bool:
+        if sys.platform != "win32" or not self.list:
+            return False
+        rect = wintypes.RECT()
+        try:
+            if not ctypes.windll.user32.GetClientRect(self.list, ctypes.byref(rect)):
+                return False
+        except (AttributeError, OSError):
+            return False
+        return rect.left <= x < rect.right and rect.top <= y < rect.bottom
+
+    def _row_at_client(self, x: int, y: int) -> int | None:
+        """Trefferzeile unter Listenkoordinaten. Leerfläche bleibt None."""
+        if sys.platform != "win32" or not self.list or not self.results:
+            return None
+        user32 = ctypes.windll.user32
+        try:
+            raw = int(user32.SendMessageW(self.list, LB_ITEMFROMPOINT, 0, make_lparam(x, y)))
+        except (AttributeError, OSError):
+            return None
+        raw &= 0xFFFFFFFF
+        index = raw & 0xFFFF
+        outside = (raw >> 16) & 0xFFFF
+        rect = wintypes.RECT()
+        try:
+            got = _send_ptr(self.list, LB_GETITEMRECT, index, ctypes.byref(rect))
+        except (AttributeError, OSError):
+            return None
+        if (got & 0xFFFFFFFF) == 0xFFFFFFFF:
+            return None
+        return hit_row(index, outside, len(self.results), rect.left, rect.top, rect.right, rect.bottom, x, y)
+
+    def _select_result(self, index: int) -> bool:
+        if index < 0 or index >= len(self.results):
+            return False
+        if not row_path(self.results[index]):
+            return False
+        self.selected = index
+        if self.list and sys.platform == "win32":
+            try:
+                ctypes.windll.user32.SendMessageW(self.list, LB_SETCURSEL, index, 0)
+            except (AttributeError, OSError):
+                return False
+        if self._query():
+            self._apply_result_status()
+        return True
+
+    def _open_list_menu_at_client(self, x: int, y: int, screen: tuple[int, int], *, force: bool = False) -> bool:
+        index = self._row_at_client(x, y)
+        if index is None or not self._select_result(index):
+            return False
+        self._popup_result_menu(screen[0], screen[1], force=force)
+        return True
+
+    def _row_screen_point(self, index: int) -> tuple[int, int]:
+        if sys.platform != "win32" or not self.list:
+            return 0, 0
+        rect = wintypes.RECT()
+        user32 = ctypes.windll.user32
+        try:
+            got = _send_ptr(self.list, LB_GETITEMRECT, index, ctypes.byref(rect))
+        except (AttributeError, OSError):
+            got = LB_ERR
+        if (got & 0xFFFFFFFF) != 0xFFFFFFFF and rect.bottom > rect.top:
+            return self._list_client_to_screen(rect.left + 8, rect.bottom)
+        return self._list_client_to_screen(8, 8)
+
+    def _open_menu_for_current_selection(self, *, force: bool = False) -> None:
+        if sys.platform != "win32" or not self.list:
+            return
+        index = self.selected
+        try:
+            choice = int(ctypes.windll.user32.SendMessageW(self.list, LB_GETCURSEL, 0, 0))
+        except (AttributeError, OSError):
+            choice = LB_ERR
+        if choice >= 0:
+            index = choice
+        if not self._select_result(index):
+            return
+        x, y = self._row_screen_point(index)
+        self._popup_result_menu(x, y, force=force)
+
+    def _on_list_context(self, msg: int, lparam: int) -> None:
+        if sys.platform != "win32":
+            return
+        if msg == WM_RBUTTONUP:
+            x, y = split_lparam(lparam)
+            self._open_list_menu_at_client(x, y, self._list_client_to_screen(x, y))
+            return
+        if msg == WM_CONTEXTMENU:
+            x, y = split_lparam(lparam)
+            if x == -1 and y == -1:
+                self._open_menu_for_current_selection()
+                return
+            local = self._screen_to_list(x, y)
+            if local is None:
+                return
+            self._open_list_menu_at_client(local[0], local[1], (x, y))
+
+    def _on_parent_context(self, msg: int, wparam: int, lparam: int) -> bool:
+        """True, wenn die Nachricht zur Trefferliste gehört und hier endet."""
+        if sys.platform != "win32" or not self.list:
+            return False
+        if msg == WM_RBUTTONUP:
+            local = self._parent_client_to_list(*split_lparam(lparam))
+            if local is None or not self._list_client_contains(*local):
+                return False
+            self._open_list_menu_at_client(local[0], local[1], self._list_client_to_screen(*local))
+            return True
+        if msg != WM_CONTEXTMENU:
+            return False
+        x, y = split_lparam(lparam)
+        if x == -1 and y == -1:
+            self._open_menu_for_current_selection()
+            return True
+        target = int(wparam) if wparam else 0
+        list_hwnd = int(self.list)
+        if target not in (0, int(self.hwnd or 0), list_hwnd):
+            return False
+        local = self._screen_to_list(x, y)
+        if local is None or not self._list_client_contains(*local):
+            return target == list_hwnd
+        self._open_list_menu_at_client(local[0], local[1], (x, y))
+        return True
+
+    def _popup_result_menu(self, x: int, y: int, *, force: bool = False) -> None:
+        """Kontextmenü nur unter Windows und nur für eine Zeile mit Pfad."""
+        if sys.platform != "win32" or not self.hwnd:
+            return
+        if self._result_menu_open:
+            return
+        now = time.monotonic()
+        if not force and now < self._ignore_context_until:
+            return
+        user32 = ctypes.windll.user32
+        try:
+            user32.CreatePopupMenu.argtypes = []
+            user32.CreatePopupMenu.restype = wintypes.HMENU
+            user32.AppendMenuW.argtypes = [
+                wintypes.HMENU,
+                wintypes.UINT,
+                ctypes.c_size_t,
+                wintypes.LPCWSTR,
+            ]
+            user32.AppendMenuW.restype = wintypes.BOOL
+            user32.TrackPopupMenu.argtypes = [
+                wintypes.HMENU,
+                wintypes.UINT,
+                ctypes.c_int,
+                ctypes.c_int,
+                ctypes.c_int,
+                wintypes.HWND,
+                ctypes.c_void_p,
+            ]
+            user32.TrackPopupMenu.restype = ctypes.c_int
+            user32.DestroyMenu.argtypes = [wintypes.HMENU]
+            user32.DestroyMenu.restype = wintypes.BOOL
+        except (AttributeError, OSError):
+            self._set_status("Aktion fehlgeschlagen.")
+            return
+        menu = user32.CreatePopupMenu()
+        if not menu:
+            return
+        self._result_menu_open = True
+        command = 0
+        try:
+            user32.AppendMenuW(menu, MF_STRING, IDC_CTX_OPEN, "Öffnen")
+            user32.AppendMenuW(menu, MF_STRING, IDC_CTX_REVEAL, "Speicherort öffnen")
+            user32.AppendMenuW(menu, MF_STRING, IDC_CTX_COPY, "Pfad kopieren")
+            user32.SetForegroundWindow(self.hwnd)
+            command = int(
+                user32.TrackPopupMenu(
+                    menu,
+                    TPM_RETURNCMD | TPM_RIGHTBUTTON | TPM_NONOTIFY,
+                    int(x),
+                    int(y),
+                    0,
+                    self.hwnd,
+                    None,
+                )
+            )
+        except (AttributeError, OSError):
+            self._set_status("Aktion fehlgeschlagen.")
+            command = 0
+        finally:
+            try:
+                user32.DestroyMenu(menu)
+            except (AttributeError, OSError):
+                pass
+            self._result_menu_open = False
+            self._ignore_context_until = time.monotonic() + 0.3
+            try:
+                user32.PostMessageW(self.hwnd, 0, 0, 0)
+            except (AttributeError, OSError):
+                pass
+        if command == IDC_CTX_OPEN:
+            self._open_selected()
+        elif command == IDC_CTX_REVEAL:
+            self._reveal_selected()
+        elif command == IDC_CTX_COPY:
+            self._copy_selected_path()
+
+    def _reveal_selected(self) -> None:
+        path = self._selected_path()
+        if not path:
+            return
+        try:
+            status = reveal_in_explorer(path)
+        except Exception:
+            self._set_status("Explorer startet nicht.")
+            return
+        if status:
+            self._set_status(status)
+
+    def _copy_selected_path(self) -> None:
+        path = self._selected_path()
+        if not path:
+            return
+        try:
+            copied = copy_unicode_text(path, int(self.hwnd or 0))
+        except Exception:
+            copied = False
+        self._set_status("Pfad kopiert" if copied else "Pfad nicht kopiert.")
+
     def _layout(self) -> None:
         if not self.hwnd:
             return
@@ -1115,6 +1590,14 @@ class NativeWindow:
             elif wparam == 2:
                 self._paint_status()
             return 0
+        if msg in (WM_CONTEXTMENU, WM_RBUTTONUP):
+            try:
+                handled = self._on_parent_context(msg, int(wparam), int(lparam))
+            except Exception:
+                self._set_status("Aktion fehlgeschlagen.")
+                return 0
+            if handled:
+                return 0
         if msg in {WM_CTLCOLOREDIT, WM_CTLCOLORLISTBOX, WM_CTLCOLORSTATIC}:
             gdi32 = ctypes.windll.gdi32
             gdi32.SetTextColor(wparam, 0x00F2F2F2)
@@ -1249,12 +1732,30 @@ class NativeWindow:
             self._apply_result_status()
 
     def _open_selected(self) -> None:
-        choice = int(ctypes.windll.user32.SendMessageW(self.list, LB_GETCURSEL, 0, 0))
+        if not self.list:
+            return
+        try:
+            choice = int(ctypes.windll.user32.SendMessageW(self.list, LB_GETCURSEL, 0, 0))
+        except (AttributeError, OSError):
+            choice = LB_ERR
         if choice >= 0:
             self.selected = choice
-        if not self.results:
+        if not self.results or self.selected < 0 or self.selected >= len(self.results):
             return
         hit = self.results[self.selected]
-        self._open_hit(hit)
+        try:
+            self._open_hit(hit)
+        except OSError as exc:
+            missing = isinstance(exc, FileNotFoundError)
+            missing = missing or getattr(exc, "errno", None) in (2, 3)
+            missing = missing or getattr(exc, "winerror", None) in (2, 3)
+            self._set_status("Datei fehlt." if missing else "Öffnen fehlgeschlagen.")
+            return
+        except Exception:
+            self._set_status("Öffnen fehlgeschlagen.")
+            return
         if hit.get("kind") == "calc":
-            ctypes.windll.user32.SetWindowTextW(self.label, "Ergebnis kopiert")
+            try:
+                ctypes.windll.user32.SetWindowTextW(self.label, "Ergebnis kopiert")
+            except (AttributeError, OSError):
+                return

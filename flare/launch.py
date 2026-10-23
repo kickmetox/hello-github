@@ -120,3 +120,78 @@ def launch_target(item: dict[str, Any]) -> None:
     path = launch or item["path"]
     if sys.platform == "win32":
         os.startfile(path)  # type: ignore[attr-defined]
+
+
+def _drive_root_text(text: str) -> bool:
+    """C: oder C:\\ haben keinen Elternordner. Andere Pfade schon."""
+    bare = text.rstrip("\\")
+    return len(bare) == 2 and bare[0].isalpha() and bare[1] == ":"
+
+
+def windows_path(path: str) -> str:
+    """Voller Windows-Pfad mit Backslash. Ein Laufwerksstamm endet auf \\."""
+    text = str(path or "").replace("/", "\\").strip("\x00").strip()
+    if _drive_root_text(text):
+        return text.rstrip("\\")[0] + ":\\"
+    return text.rstrip("\\")
+
+
+def is_drive_root(path: str) -> bool:
+    return _drive_root_text(str(path or "").replace("/", "\\").strip("\x00").strip())
+
+
+def quote_explorer_path(path: str) -> str:
+    """Pfad für explorer /select,. Leerzeichen stehen in Anführungszeichen."""
+    text = windows_path(path)
+    if any(ch.isspace() for ch in text) or '"' in text:
+        return '"' + text.replace('"', "") + '"'
+    return text
+
+
+def explorer_select_args(path: str) -> list[str]:
+    """Argumente für explorer.exe.
+
+    Datei und Ordner: explorer.exe /select, mit dem vollen Pfad.
+    Ein Laufwerksstamm ohne Elternordner wird selbst geöffnet, ohne /select.
+    """
+    full = windows_path(path)
+    if not full:
+        return []
+    if is_drive_root(full):
+        return ["explorer.exe", full]
+    return ["explorer.exe", "/select," + quote_explorer_path(full)]
+
+
+def explorer_command_line(args: list[str]) -> str:
+    """Kommandozeile, die explorer so erwartet. Die Quotes stecken schon im Argument."""
+    return " ".join(args)
+
+
+def reveal_in_explorer(path: str) -> str | None:
+    """Explorer mit dem Eintrag öffnen. Kein Walk und kein Index.
+
+    None bei Erfolg. Sonst ein kurzer deutscher Status.
+    """
+    args = explorer_select_args(path)
+    if len(args) < 2:
+        return "Pfad fehlt."
+    probe = windows_path(path)
+    try:
+        found = os.path.exists(probe)
+    except OSError:
+        found = False
+    if not found:
+        return "Datei fehlt."
+    if sys.platform != "win32":
+        return "Explorer startet nicht."
+    command = explorer_command_line(args)
+    try:
+        subprocess.Popen(
+            command,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+    except OSError:
+        return "Explorer startet nicht."
+    return None

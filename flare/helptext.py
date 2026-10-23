@@ -21,6 +21,8 @@ def description() -> str:
         "Das Fenster ist ein normales Win32-Fenster in diesem Prozess. "
         "Es startet weder Chrome noch Edge. Schließen oder Escape blendet das Fenster "
         "nur aus; der Index läuft im Hintergrund weiter. Enter öffnet den markierten Treffer. "
+        "Ein Rechtsklick auf einen Treffer öffnet Öffnen, Speicherort öffnen und Pfad kopieren. "
+        "Umschalt+F10 und die Kontextmenütaste öffnen dasselbe Menü für die aktuelle Auswahl. "
         "Eine Rechnung wie 2+2*3 erscheint als Treffer, Enter kopiert das Ergebnis. "
         "Das Kontrollkästchen „Ähnliche Namen“ sucht auch nahe Dateinamen. "
         "Dieselbe Suche gibt es als --similar und als similar=1. "
