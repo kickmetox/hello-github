@@ -104,6 +104,8 @@ class Service:
         self.use_hotkey = hotkey
         self.use_watch = watch
         self.index_path = index_path
+        raw_editor = cfg.get("editor", "")
+        self.editor = raw_editor.strip() if isinstance(raw_editor, str) else ""
         self.content = content
         self.httpd: Server | None = None
         self.port = 0
@@ -197,6 +199,7 @@ class Service:
                     self._ui_status,
                     self.save_index_copy,
                     self.load_index_copy,
+                    editor=self.editor,
                 )
                 self.window.run(self.stop, visible=show)
             else:

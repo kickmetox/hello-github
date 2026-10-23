@@ -6,7 +6,14 @@ import os
 import unittest
 
 from flare.helptext import description, features, help_text, short_description
-from flare.launch import explorer_command_line, explorer_select_args, reveal_in_explorer
+from flare.launch import (
+    editor_command,
+    explorer_command_line,
+    explorer_select_args,
+    list_sendto_entries,
+    quote_command_path,
+    reveal_in_explorer,
+)
 from flare.window import VK_APPS, VK_DOWN, VK_ESCAPE, VK_F1, VK_F10, VK_RETURN, help_text as window_help
 from flare.window import copy_unicode_text, hit_row, row_path, shortcut_action
 
@@ -172,7 +179,18 @@ class HelpShortcutTests(unittest.TestCase):
         self.assertIsNone(shortcut_action(VK_F10, help_open=False, help_target=False, shift=False))
         self.assertIsNone(shortcut_action(VK_APPS, help_open=True, help_target=True))
         self.assertEqual(shortcut_action(VK_APPS, help_open=True, help_target=False), "context")
-        for label in ("Öffnen", "Speicherort öffnen", "Pfad kopieren", "Rechtsklick", "Umschalt+F10"):
+        for label in (
+            "Öffnen",
+            "Speicherort öffnen",
+            "Im Editor bearbeiten",
+            "Senden an",
+            "Pfad kopieren",
+            "Als Pfad kopieren",
+            "Rechtsklick",
+            "Umschalt+F10",
+            "notepad.exe",
+            "SendTo",
+        ):
             self.assertIn(label, help_text())
 
 
@@ -260,8 +278,21 @@ class ResultMenuTests(unittest.TestCase):
         popup = inspect.getsource(window.NativeWindow._popup_result_menu)
         self.assertIn('sys.platform != "win32"', popup)
         self.assertIn("CreatePopupMenu", popup)
-        for label in ("Öffnen", "Speicherort öffnen", "Pfad kopieren"):
-            self.assertIn(f'"{label}"', popup)
+        labels = (
+            "Öffnen",
+            "Speicherort öffnen",
+            "Im Editor bearbeiten",
+            "Senden an",
+            "Pfad kopieren",
+            "Als Pfad kopieren",
+        )
+        places = []
+        for label in labels:
+            token = f'"{label}"'
+            self.assertIn(token, popup)
+            places.append(popup.index(token))
+        self.assertEqual(places, sorted(places))
+        self.assertIn("Keine Ziele", popup)
         listing = inspect.getsource(window.NativeWindow._list_wndproc)
         self.assertIn("WM_CONTEXTMENU", listing)
         self.assertIn("WM_RBUTTONUP", listing)
@@ -331,6 +362,80 @@ class ResultMenuTests(unittest.TestCase):
             self.assertIsNone(reveal_in_explorer(r"E:\\"))
             self.assertEqual(popen.call_args.args[0], "explorer.exe E:\\")
             self.assertFalse(popen.call_args.kwargs.get("shell", False))
+
+    def test_quoted_path_keeps_backslashes_and_quotes_spaces(self) -> None:
+        plain = quote_command_path(r"F:\Xchange")
+        spaced = quote_command_path(r"C:\Program Files\Flare Setup\readme.txt")
+        self.assertEqual(plain, '"F:\\Xchange"')
+        self.assertIn("\\", plain)
+        self.assertFalse(plain.startswith("F:"))
+        self.assertEqual(spaced, '"C:\\Program Files\\Flare Setup\\readme.txt"')
+        self.assertTrue(spaced.startswith('"') and spaced.endswith('"'))
+        self.assertIn(" ", spaced)
+        self.assertNotIn("/", spaced)
+        self.assertIn("\\", spaced)
+
+    def test_sendto_listing_skips_desktop_ini(self) -> None:
+        import inspect
+        import tempfile
+        from pathlib import Path
+
+        source = inspect.getsource(list_sendto_entries)
+        self.assertNotIn("os.walk", source)
+        self.assertNotIn("rglob", source)
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "desktop.ini").write_text("[.ShellClassInfo]", encoding="utf-8")
+            (root / "Desktop.ini").write_text("doppelt", encoding="utf-8")
+            (root / ".hidden.lnk").write_text("hidden", encoding="utf-8")
+            (root / "Notepad.lnk").write_text("notepad", encoding="utf-8")
+            (root / "Mail Recipient.lnk").write_text("mail", encoding="utf-8")
+            entries = list_sendto_entries(root)
+            empty = Path(tmp) / "leer"
+            empty.mkdir()
+            self.assertEqual(list_sendto_entries(empty), [])
+        self.assertEqual([item["name"] for item in entries], ["Mail Recipient", "Notepad"])
+        self.assertTrue(all("desktop.ini" not in item["path"].casefold() for item in entries))
+        self.assertTrue(all(not item["name"].startswith(".") for item in entries))
+        self.assertEqual(list_sendto_entries(None), [])
+        self.assertEqual(list_sendto_entries(root / "fehlt"), [])
+
+    def test_editor_command_uses_config_then_environment_and_refuses_a_directory(self) -> None:
+        argv, status = editor_command(
+            r"D:\notes.txt",
+            config={"editor": "config-editor"},
+            environ={"EDITOR": "env-editor"},
+            is_dir=False,
+        )
+        self.assertEqual(argv, ["config-editor", r"D:\notes.txt"])
+        self.assertIsNone(status)
+        argv, status = editor_command(
+            r"D:\notes.txt",
+            config={"editor": "  "},
+            environ={"EDITOR": "env-editor"},
+            is_dir=False,
+        )
+        self.assertEqual(argv, ["env-editor", r"D:\notes.txt"])
+        self.assertIsNone(status)
+        argv, status = editor_command(r"D:\notes.txt", config={}, environ={}, is_dir=False)
+        self.assertEqual(argv, ["notepad.exe", r"D:\notes.txt"])
+        self.assertIsNone(status)
+        argv, status = editor_command(
+            r"D:\Ordner",
+            config={"editor": "config-editor"},
+            environ={"EDITOR": "env-editor"},
+            is_dir=True,
+        )
+        self.assertIsNone(argv)
+        self.assertEqual(status, "Ordner lassen sich nicht bearbeiten.")
+        argv, status = editor_command(
+            r"D:\notes.txt",
+            config={"editor": r"C:\kein\editor.exe"},
+            environ={"EDITOR": "env-editor"},
+            is_dir=False,
+        )
+        self.assertIsNone(argv)
+        self.assertEqual(status, "Editor fehlt.")
 
 
 if __name__ == "__main__":

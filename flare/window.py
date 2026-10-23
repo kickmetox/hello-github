@@ -11,7 +11,14 @@ from pathlib import Path
 from typing import Any, Callable
 
 from flare.helptext import help_text
-from flare.launch import reveal_in_explorer
+from flare.launch import (
+    launch_sendto,
+    list_sendto_entries,
+    open_with_editor,
+    quote_command_path,
+    reveal_in_explorer,
+    sendto_folder,
+)
 from flare.store import compare_indexes, copy_index, create_index, format_index_compare
 
 WM_DESTROY = 0x0002
@@ -95,6 +102,10 @@ IDC_MENU_CREATE = 305
 IDC_CTX_OPEN = 311
 IDC_CTX_REVEAL = 312
 IDC_CTX_COPY = 313
+IDC_CTX_EDIT = 314
+IDC_CTX_COPY_QUOTED = 315
+IDC_CTX_SEND_BASE = 400
+IDC_CTX_SEND_LIMIT = 80
 CF_UNICODETEXT = 13
 GMEM_MOVEABLE = 0x0002
 TPM_RETURNCMD = 0x0100
@@ -876,6 +887,7 @@ class NativeWindow:
         status: StatusFn,
         save_index: Callable[[str], str] | None = None,
         load_index: Callable[[str], str] | None = None,
+        editor: str | None = None,
     ) -> None:
         self._search = search
         self._open_hit = open_hit
@@ -907,6 +919,8 @@ class NativeWindow:
         self._point_api = False
         self.save_index = save_index
         self.load_index = load_index
+        self.editor = str(editor or "").strip()
+        self._sendto_targets: list[dict[str, str]] = []
         self._help = HelpWindow(self)
 
     def show(self) -> None:
@@ -1475,10 +1489,28 @@ class NativeWindow:
             return
         self._result_menu_open = True
         command = 0
+        submenu = 0
+        submenu_attached = False
         try:
             user32.AppendMenuW(menu, MF_STRING, IDC_CTX_OPEN, "Öffnen")
             user32.AppendMenuW(menu, MF_STRING, IDC_CTX_REVEAL, "Speicherort öffnen")
+            user32.AppendMenuW(menu, MF_STRING, IDC_CTX_EDIT, "Im Editor bearbeiten")
+            submenu = int(user32.CreatePopupMenu() or 0)
+            self._sendto_targets = list_sendto_entries(sendto_folder())[:IDC_CTX_SEND_LIMIT]
+            if submenu:
+                if not self._sendto_targets:
+                    user32.AppendMenuW(submenu, MF_STRING | MF_GRAYED | MF_DISABLED, 0, "Keine Ziele")
+                else:
+                    for offset, entry in enumerate(self._sendto_targets):
+                        user32.AppendMenuW(
+                            submenu,
+                            MF_STRING,
+                            IDC_CTX_SEND_BASE + offset,
+                            entry["name"],
+                        )
+                submenu_attached = bool(user32.AppendMenuW(menu, MF_POPUP, submenu, "Senden an"))
             user32.AppendMenuW(menu, MF_STRING, IDC_CTX_COPY, "Pfad kopieren")
+            user32.AppendMenuW(menu, MF_STRING, IDC_CTX_COPY_QUOTED, "Als Pfad kopieren")
             user32.SetForegroundWindow(self.hwnd)
             command = int(
                 user32.TrackPopupMenu(
@@ -1496,6 +1528,8 @@ class NativeWindow:
             command = 0
         finally:
             try:
+                if submenu and not submenu_attached:
+                    user32.DestroyMenu(submenu)
                 user32.DestroyMenu(menu)
             except (AttributeError, OSError):
                 pass
@@ -1509,8 +1543,14 @@ class NativeWindow:
             self._open_selected()
         elif command == IDC_CTX_REVEAL:
             self._reveal_selected()
+        elif command == IDC_CTX_EDIT:
+            self._edit_selected()
         elif command == IDC_CTX_COPY:
             self._copy_selected_path()
+        elif command == IDC_CTX_COPY_QUOTED:
+            self._copy_selected_path_quoted()
+        elif IDC_CTX_SEND_BASE <= command < IDC_CTX_SEND_BASE + len(self._sendto_targets):
+            self._send_selected(command - IDC_CTX_SEND_BASE)
 
     def _reveal_selected(self) -> None:
         path = self._selected_path()
@@ -1525,14 +1565,52 @@ class NativeWindow:
             self._set_status(status)
 
     def _copy_selected_path(self) -> None:
+        self._copy_text(self._selected_path())
+
+    def _copy_selected_path_quoted(self) -> None:
         path = self._selected_path()
         if not path:
             return
+        self._copy_text(quote_command_path(path))
+
+    def _copy_text(self, text: str) -> None:
+        if not text:
+            return
         try:
-            copied = copy_unicode_text(path, int(self.hwnd or 0))
+            copied = copy_unicode_text(text, int(self.hwnd or 0))
         except Exception:
             copied = False
         self._set_status("Pfad kopiert" if copied else "Pfad nicht kopiert.")
+
+    def _edit_selected(self) -> None:
+        path = self._selected_path()
+        if not path:
+            return
+        hit = {}
+        if 0 <= self.selected < len(self.results):
+            hit = self.results[self.selected]
+        try:
+            status = open_with_editor(path, editor=self.editor, kind=str(hit.get("kind") or ""))
+        except Exception:
+            self._set_status("Editor fehlt.")
+            return
+        if status:
+            self._set_status(status)
+
+    def _send_selected(self, index: int) -> None:
+        if index < 0 or index >= len(self._sendto_targets):
+            return
+        target = str(self._sendto_targets[index].get("path") or "")
+        path = self._selected_path()
+        if not target or not path:
+            return
+        try:
+            status = launch_sendto(target, path)
+        except Exception:
+            self._set_status("Senden fehlgeschlagen.")
+            return
+        if status:
+            self._set_status(status)
 
     def _layout(self) -> None:
         if not self.hwnd:

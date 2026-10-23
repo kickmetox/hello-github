@@ -195,3 +195,187 @@ def reveal_in_explorer(path: str) -> str | None:
     except OSError:
         return "Explorer startet nicht."
     return None
+
+
+def quote_command_path(path: str) -> str:
+    """Pfad für die Kommandozeile. Backslashes bleiben, der Text steht in Anführungszeichen."""
+    text = windows_path(path)
+    if not text:
+        text = str(path or "").strip()
+    return '"' + text.replace('"', "") + '"'
+
+
+def sendto_folder() -> str:
+    """SendTo des aktuellen Benutzers. Leer, wenn APPDATA fehlt."""
+    appdata = os.environ.get("APPDATA")
+    if not appdata:
+        return ""
+    return str(Path(appdata) / "Microsoft" / "Windows" / "SendTo")
+
+
+def _entry_hidden(path: Path) -> bool:
+    if path.name.startswith("."):
+        return True
+    try:
+        attrs = int(getattr(path.stat(), "st_file_attributes", 0) or 0)
+    except OSError:
+        return False
+    return bool(attrs & 0x2)
+
+
+def list_sendto_entries(folder: str | os.PathLike[str] | None) -> list[dict[str, str]]:
+    """Verknüpfungen und Programme in einem SendTo-Ordner.
+
+    desktop.ini und versteckte Dateien entfallen. Fehlt der Ordner, ist die Liste leer.
+    Nur die eine Ebene, kein Walk.
+    """
+    if not folder:
+        return []
+    root = Path(folder)
+    try:
+        if not root.is_dir():
+            return []
+        children = list(root.iterdir())
+    except OSError:
+        return []
+    found: list[dict[str, str]] = []
+    for path in children:
+        try:
+            if not path.is_file():
+                continue
+        except OSError:
+            continue
+        if path.name.casefold() == "desktop.ini":
+            continue
+        if _entry_hidden(path):
+            continue
+        suffix = path.suffix.casefold()
+        label = path.stem if suffix in {".lnk", ".exe", ".bat", ".cmd", ".com"} else path.name
+        if not label:
+            label = path.name
+        found.append({"name": label, "path": str(path)})
+    found.sort(key=lambda item: item["name"].casefold())
+    return found
+
+
+def sendto_command(target: str, item_path: str) -> list[str]:
+    """Programm oder Verknüpfung plus der volle Pfad des Treffers."""
+    program = windows_path(target) or str(target or "").strip()
+    argument = windows_path(item_path) or str(item_path or "").strip()
+    if not program or not argument:
+        return []
+    return [program, argument]
+
+
+def launch_sendto(target: str, item_path: str) -> str | None:
+    """SendTo-Eintrag mit dem Treffer starten. Kein Walk. Deutscher Status bei Fehler."""
+    args = sendto_command(target, item_path)
+    if len(args) < 2:
+        return "Senden fehlgeschlagen."
+    program, argument = args
+    try:
+        present = os.path.exists(program)
+    except OSError:
+        present = False
+    if not present:
+        return "Ziel fehlt."
+    if sys.platform != "win32":
+        return "Senden fehlgeschlagen."
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        shell32 = ctypes.WinDLL("shell32", use_last_error=True)
+        shell32.ShellExecuteW.argtypes = [
+            wintypes.HWND,
+            wintypes.LPCWSTR,
+            wintypes.LPCWSTR,
+            wintypes.LPCWSTR,
+            wintypes.LPCWSTR,
+            ctypes.c_int,
+        ]
+        shell32.ShellExecuteW.restype = ctypes.c_void_p
+        code = int(shell32.ShellExecuteW(None, "open", program, quote_command_path(argument), None, 1) or 0)
+    except (AttributeError, OSError):
+        return "Senden fehlgeschlagen."
+    if code in (2, 3):
+        return "Ziel fehlt."
+    if code <= 32:
+        return "Senden fehlgeschlagen."
+    return None
+
+
+def editor_program(config: dict[str, Any] | None = None, environ: dict[str, str] | None = None) -> str:
+    """config editor, sonst EDITOR, sonst notepad.exe."""
+    chosen = str((config or {}).get("editor") or "").strip()
+    if chosen:
+        return chosen
+    env = os.environ if environ is None else environ
+    from_env = str(env.get("EDITOR") or "").strip()
+    if from_env:
+        return from_env
+    return "notepad.exe"
+
+
+def _editor_is_path(program: str) -> bool:
+    if "\\" in program or "/" in program:
+        return True
+    return len(program) >= 2 and program[1] == ":"
+
+
+def editor_command(
+    path: str,
+    *,
+    config: dict[str, Any] | None = None,
+    environ: dict[str, str] | None = None,
+    is_dir: bool | None = None,
+) -> tuple[list[str] | None, str | None]:
+    """Befehl für Im Editor bearbeiten. Ein Ordner wird nicht geöffnet."""
+    full = windows_path(path)
+    if not full:
+        return None, "Pfad fehlt."
+    directory = is_dir
+    if directory is None:
+        try:
+            directory = os.path.isdir(full)
+        except OSError:
+            directory = False
+    if directory:
+        return None, "Ordner lassen sich nicht bearbeiten."
+    program = editor_program(config, environ)
+    if not program:
+        return None, "Editor fehlt."
+    if _editor_is_path(program):
+        try:
+            present = os.path.exists(program)
+        except OSError:
+            present = False
+        if not present:
+            return None, "Editor fehlt."
+    return [program, full], None
+
+
+def open_with_editor(path: str, *, editor: str = "", kind: str = "") -> str | None:
+    """Datei im Editor öffnen. Ordner und ein fehlender Editor bleiben ein Status."""
+    if kind == "dir":
+        is_dir: bool | None = True
+    elif kind in {"file", "app"}:
+        is_dir = False
+    else:
+        is_dir = None
+    config = {"editor": editor} if str(editor or "").strip() else {}
+    argv, status = editor_command(path, config=config, is_dir=is_dir)
+    if status or not argv:
+        return status or "Editor fehlt."
+    if sys.platform != "win32":
+        return "Editor fehlt."
+    try:
+        subprocess.Popen(
+            argv,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+    except OSError:
+        return "Editor fehlt."
+    return None
