@@ -373,7 +373,11 @@ class NativeWindow:
                     if msg.message == WM_QUIT:
                         stop.set()
                         return
-                    if msg.message == WM_KEYDOWN and self._shortcut(int(msg.wParam), int(msg.hwnd or 0)):
+                    # wintypes.MSG heißt hWnd. hwnd gibt es nicht und wirft beim ersten Tastendruck.
+                    hwnd = getattr(msg, "hWnd", None)
+                    if hwnd is None:
+                        hwnd = getattr(msg, "hwnd", 0)
+                    if msg.message == WM_KEYDOWN and self._shortcut(int(msg.wParam), int(hwnd or 0)):
                         continue
                     user32.TranslateMessage(ctypes.byref(msg))
                     user32.DispatchMessageW(ctypes.byref(msg))
