@@ -5,10 +5,11 @@ Dateien in einem eigenen Fenster, läuft im Hintergrund und lässt sich aus
 anderen Programmen abfragen.
 
 Kompletter Arbeitsbaum als Zip (Quellcode, Tests, Build und Installer):
-[flare-workspace-fertig.zip](https://github.com/kickmetox/hello-github/raw/cursor/flare-spotlight-a293/flare-workspace-fertig.zip)
+[flare-workspace-kontext.zip](https://github.com/kickmetox/hello-github/raw/cursor/flare-spotlight-a293/flare-workspace-kontext.zip)
 
 Das Fenster ist ein normales Win32-Fenster. Es startet keinen Browser.
 Schließen blendet es nur aus; der Index läuft weiter, Strg+Alt+Leertaste holt es zurück.
+Ein Rechtsklick auf einen Treffer öffnet Öffnen, Speicherort öffnen und Pfad kopieren.
 Standardkürzel: **Strg+Alt+Leertaste**. Es greift, während ein anderes Fenster
 den Fokus hat. In `config.json` steht das Kürzel als `ctrl+alt+space`.
 **Hilfe** im Fenster oder die Taste F1 öffnet im selben Programm eine
