@@ -7,12 +7,15 @@ from PyInstaller.utils.hooks import collect_submodules
 
 root = os.path.abspath(os.path.join(SPECPATH, "..", ".."))
 icon = os.path.join(SPECPATH, "flare.ico")
+datas = [(os.path.join(root, "flare", "ui.html"), "flare")]
+if os.path.exists(icon):
+    datas.append((icon, "."))
 
 a = Analysis(
     [os.path.join(root, "flare.py")],
     pathex=[root],
     binaries=[],
-    datas=[(os.path.join(root, "flare", "ui.html"), "flare")],
+    datas=datas,
     hiddenimports=collect_submodules("flare"),
     hookspath=[],
     hooksconfig={},

@@ -6,6 +6,7 @@ import ctypes
 import sys
 import threading
 from ctypes import wintypes
+from pathlib import Path
 from typing import Any, Callable
 
 from flare.helptext import help_text
@@ -84,6 +85,15 @@ MB_YESNO = 0x0004
 IDYES = 6
 MF_STRING = 0x0000
 MF_POPUP = 0x0010
+MF_GRAYED = 0x0001
+MF_DISABLED = 0x0002
+WM_SETICON = 0x0080
+ICON_SMALL = 0
+ICON_BIG = 1
+IMAGE_ICON = 1
+LR_LOADFROMFILE = 0x0010
+GCLP_HICON = -14
+GCLP_HICONSM = -34
 SM_CXSCREEN = 0
 SM_CYSCREEN = 1
 
@@ -115,6 +125,71 @@ def _prepare_user32():
 
 def supported() -> bool:
     return sys.platform == "win32"
+
+
+def flare_icon_path() -> str:
+    """flare.ico neben der eingefrorenen exe, im PyInstaller-Ordner oder im Quellbaum."""
+    candidates: list[Path] = []
+    meipass = getattr(sys, "_MEIPASS", None)
+    if meipass:
+        candidates.append(Path(meipass) / "flare.ico")
+    if getattr(sys, "frozen", False):
+        exe_dir = Path(sys.executable).resolve().parent
+        candidates.append(exe_dir / "flare.ico")
+        candidates.append(exe_dir / "_internal" / "flare.ico")
+    candidates.append(Path(__file__).resolve().parents[1] / "packaging" / "windows" / "flare.ico")
+    for path in candidates:
+        if path.is_file():
+            return str(path)
+    return ""
+
+
+def load_flare_icons() -> tuple[int, int]:
+    """Großes und kleines HICON. Unter Linux und ohne Datei (0, 0)."""
+    if sys.platform != "win32":
+        return 0, 0
+    path = flare_icon_path()
+    if not path:
+        return 0, 0
+    user32 = ctypes.windll.user32
+    try:
+        user32.LoadImageW.argtypes = [
+            wintypes.HINSTANCE,
+            wintypes.LPCWSTR,
+            wintypes.UINT,
+            ctypes.c_int,
+            ctypes.c_int,
+            wintypes.UINT,
+        ]
+        user32.LoadImageW.restype = wintypes.HANDLE
+        big = int(user32.LoadImageW(None, path, IMAGE_ICON, 32, 32, LR_LOADFROMFILE) or 0)
+        small = int(user32.LoadImageW(None, path, IMAGE_ICON, 16, 16, LR_LOADFROMFILE) or 0)
+    except (AttributeError, OSError):
+        return 0, 0
+    return big, small
+
+
+def apply_flare_icons(hwnd: int, big: int, small: int) -> None:
+    """Titelleiste, Taskleiste und Alt-Tab: WM_SETICON groß und klein, dazu das Klassenicon."""
+    if sys.platform != "win32" or not hwnd or not (big or small):
+        return
+    user32 = ctypes.windll.user32
+    try:
+        if big:
+            user32.SendMessageW(hwnd, WM_SETICON, ICON_BIG, big)
+        if small:
+            user32.SendMessageW(hwnd, WM_SETICON, ICON_SMALL, small)
+        set_class = getattr(user32, "SetClassLongPtrW", None)
+        if set_class is None:
+            return
+        set_class.argtypes = [wintypes.HWND, ctypes.c_int, ctypes.c_ssize_t]
+        set_class.restype = ctypes.c_size_t
+        if big:
+            set_class(hwnd, GCLP_HICON, big)
+        if small:
+            set_class(hwnd, GCLP_HICONSM, small)
+    except (AttributeError, OSError):
+        return
 
 
 def choose_index_save_path(owner: int = 0, title: str = "Index speichern") -> str | None:
@@ -375,6 +450,8 @@ class HelpWindow:
         self._field_brush = 0
         self._return_focus = True
         self._class_ready = False
+        self._icon_big = 0
+        self._icon_small = 0
 
     def targets(self, hwnd: int) -> bool:
         if not hwnd or not self.hwnd:
@@ -450,6 +527,7 @@ class HelpWindow:
         if not hwnd:
             return False
         self.hwnd = int(hwnd)
+        apply_flare_icons(self.hwnd, self._icon_big, self._icon_small)
         style = (
             WS_CHILD
             | WS_VISIBLE
@@ -533,9 +611,11 @@ class HelpWindow:
                 ("lpszClassName", wintypes.LPCWSTR),
             ]
 
+        self._icon_big, self._icon_small = load_flare_icons()
         wc = WNDCLASSW()
         wc.lpfnWndProc = self._proc
         wc.hInstance = ctypes.windll.kernel32.GetModuleHandleW(None)
+        wc.hIcon = self._icon_big
         wc.hCursor = user32.LoadCursorW(None, 32512)
         wc.hbrBackground = self._brush
         wc.lpszClassName = "FlareHelp"
@@ -679,6 +759,8 @@ class NativeWindow:
         self._font = 0
         self.help_btn = 0
         self._menu = 0
+        self._icon_big = 0
+        self._icon_small = 0
         self.save_index = save_index
         self.load_index = load_index
         self._help = HelpWindow(self)
@@ -796,9 +878,11 @@ class NativeWindow:
         instance = ctypes.windll.kernel32.GetModuleHandleW(None)
         self._brush = gdi32.CreateSolidBrush(0x00121212)
         self._field_brush = gdi32.CreateSolidBrush(0x00222226)
+        self._icon_big, self._icon_small = load_flare_icons()
         wc = WNDCLASSW()
         wc.lpfnWndProc = self._proc
         wc.hInstance = instance
+        wc.hIcon = self._icon_big
         wc.hCursor = user32.LoadCursorW(None, 32512)
         wc.hbrBackground = self._brush
         wc.lpszClassName = class_name
@@ -823,6 +907,7 @@ class NativeWindow:
         if not hwnd:
             return False
         self.hwnd = hwnd
+        apply_flare_icons(int(hwnd), self._icon_big, self._icon_small)
         _WINDOWS[int(hwnd)] = self
         self._font = gdi32.CreateFontW(-LIST_FONT_PX, 0, 0, 0, 400, 0, 0, 0, 1, 0, 0, 5, 0, "Segoe UI")
         self.edit = self._child("EDIT", "", 100, ES_AUTOHSCROLL | WS_BORDER)
@@ -958,12 +1043,17 @@ class NativeWindow:
         popup = user32.CreatePopupMenu()
         if not bar or not popup:
             return
-        user32.AppendMenuW(popup, MF_STRING, IDC_MENU_SAVE, "Speichern…")
+        user32.AppendMenuW(popup, MF_STRING, IDC_MENU_SAVE, "Sichern…")
         user32.AppendMenuW(popup, MF_STRING, IDC_MENU_LOAD, "Laden…")
         user32.AppendMenuW(popup, MF_STRING, IDC_MENU_COMPARE, "Vergleichen…")
         user32.AppendMenuW(popup, MF_STRING, IDC_MENU_COPY, "Kopieren…")
         user32.AppendMenuW(popup, MF_STRING, IDC_MENU_CREATE, "Anlegen…")
         user32.AppendMenuW(bar, MF_POPUP, int(popup), "Index")
+        info = user32.CreatePopupMenu()
+        if info:
+            user32.AppendMenuW(info, MF_STRING | MF_GRAYED | MF_DISABLED, 0, "Andreas Meyer")
+            user32.AppendMenuW(info, MF_STRING | MF_GRAYED | MF_DISABLED, 0, "ame@sellerbach.de")
+            user32.AppendMenuW(bar, MF_POPUP, int(info), "Info")
         if not user32.SetMenu(self.hwnd, bar):
             return
         self._menu = bar
