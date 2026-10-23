@@ -1,5 +1,6 @@
 ; Flare-Installer für Windows 11 x64. Bauen mit makensis, auch unter Linux.
 Unicode true
+Target amd64-unicode
 ManifestDPIAware true
 SetCompressor /SOLID lzma
 
