@@ -251,8 +251,16 @@ class SimilarityTests(unittest.TestCase):
                 near = [hit for hit in sim["results"] if hit["name"] == "Berricht-extra.txt"]
                 self.assertTrue(near and near[0]["via"] == "similar", sim)
                 self.assertGreaterEqual(near[0]["similarity"], 0.5)
+                self.assertLessEqual(near[0]["similarity"], 1)
                 self.assertFalse(any(hit["name"] == "Netzteil.txt" for hit in sim["results"]))
-                self.assertTrue(any(hit["name"].startswith("bericht-") for hit in sim["results"]))
+                lexical = [hit for hit in sim["results"] if hit["via"] != "similar"]
+                self.assertGreaterEqual(len(lexical), len(sim["results"]) // 2)
+                self.assertTrue(any(hit["name"].startswith("bericht-") for hit in lexical))
+                index.counts = lambda: {"items": 3001, "dirs": 1}
+                via_fts = search(index, ranker, "bericht", limit=8, similar=True)
+                fts_near = [hit for hit in via_fts["results"] if hit["name"] == "Berricht-extra.txt"]
+                self.assertTrue(fts_near and fts_near[0]["via"] == "similar", via_fts)
+                self.assertFalse(any(hit["name"] == "Netzteil.txt" for hit in via_fts["results"]))
             finally:
                 index.close()
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import os
 import signal
 import sys
 from pathlib import Path
@@ -80,7 +81,31 @@ def _print_hits(payload: dict[str, Any], as_json: bool) -> None:
         print(f"{ident:>6}  {hit['kind']:<5}  {hit['name']}  {hit.get('path', '')}{extra}")
 
 
+def _ensure_stdio() -> None:
+    """Fenster-EXE: --version trotzdem ausgeben, sonst stdout nicht leer lassen."""
+    if sys.platform != "win32" or (sys.stdout is not None and sys.stderr is not None):
+        return
+    import ctypes
+
+    kernel = ctypes.windll.kernel32
+    line = ctypes.wstring_at(kernel.GetCommandLineW())
+    if "--version" in line or "--help" in line:
+        if not kernel.GetConsoleWindow():
+            kernel.AllocConsole()
+        try:
+            sys.stdout = open("CONOUT$", "w", encoding="utf-8", buffering=1)
+            sys.stderr = open("CONOUT$", "w", encoding="utf-8", buffering=1)
+            return
+        except OSError:
+            pass
+    if sys.stdout is None:
+        sys.stdout = open(os.devnull, "w", encoding="utf-8")
+    if sys.stderr is None:
+        sys.stderr = open(os.devnull, "w", encoding="utf-8")
+
+
 def main(argv: list[str] | None = None) -> int:
+    _ensure_stdio()
     parser = build_parser()
     args = parser.parse_args(argv)
     if sys.platform != "win32":

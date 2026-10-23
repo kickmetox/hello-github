@@ -5,15 +5,18 @@ Dateien in einem eigenen Fenster, läuft im Hintergrund und lässt sich aus
 anderen Programmen abfragen.
 
 Kompletter Arbeitsbaum als Zip (Quellcode, Tests, Build und Installer):
-[flare-workspace-native.zip](https://github.com/kickmetox/hello-github/raw/cursor/flare-spotlight-a293/flare-workspace-native.zip)
+[flare-workspace-complete.zip](https://github.com/kickmetox/hello-github/raw/cursor/flare-spotlight-a293/flare-workspace-complete.zip)
 
 Das Fenster ist ein normales Win32-Fenster. Es startet keinen Browser.
 Schließen blendet es nur aus; der Index läuft weiter, Strg+Alt+Leertaste holt es zurück.
 Standardkürzel: **Strg+Alt+Leertaste**. Es greift, während ein anderes Fenster
 den Fokus hat. In `config.json` steht das Kürzel als `ctrl+alt+space`.
-„Ähnliche Namen“ schaltet die Trigramm-Suche ein. Nahe Dateinamen bleiben
-sichtbar, auch wenn schon genaue Treffer da sind. Ab 32 Kandidaten rechnet
-die Grafikkarte mit, wenn `nvcuda.dll` einen Rechner meldet.
+**Ähnlich** schaltet die Ähnlichkeitssuche ein, im Fenster als „Ähnliche Namen“
+und in der Web-Oberfläche als Knopf. Nahe Dateinamen bleiben sichtbar, auch
+wenn schon genaue Treffer da sind. Der Web-Knopf merkt sich die Wahl
+(`localStorage`, Schlüssel `flare-similar`) und zeigt unter solchen Treffern
+„ähnlich NN %“. Ab 32 Kandidaten rechnet die Grafikkarte den Recall, wenn
+`nvcuda.dll` einen Rechner meldet.
 
 ## Einrichtung
 
@@ -73,6 +76,7 @@ Der Dienst hört nur auf `127.0.0.1`, Port `47731` (oder dem nächsten freien).
 ```bat
 py -3 flare.py query --similar --json "bericht"
 py -3 flare.py query "rechnung" --open
+curl -s "http://127.0.0.1:47731/api/search?q=bericht&similar=1"
 curl -s "http://127.0.0.1:47731/api/search?q=rechnung"
 curl -s -X POST "http://127.0.0.1:47731/api/activate"
 ```
@@ -97,8 +101,9 @@ Läuft kein Dienst, liest `Client.search` die Datenbank nur lesend.
 | GET | `/api/events?since=` | langes Warten auf `focus` |
 
 Treffer haben `id`, `kind` (`app`, `file`, `dir`, `calc`), `name`, `path`,
-`detail`, `via`, `score`. Eine reine Rechnung wie `2+2*3` steht oben; Enter
-kopiert das Ergebnis.
+`detail`, `via`, `score`. Mit `similar=1` oder `--similar` kommt bei nahen
+Namen zusätzlich `via` = `similar` und `similarity` zwischen 0 und 1.
+Eine reine Rechnung wie `2+2*3` steht oben; Enter kopiert das Ergebnis.
 
 ## Was indiziert wird
 
@@ -131,10 +136,17 @@ FTS5-Trigramme für Teilstrings. Tippfehler werden nur nachgezogen, wenn die
 genauen Treffer nicht reichen, und nur über den Anteil gemeinsamer Trigramme.
 
 CUDA wird benutzt, wenn `nvcuda.dll` einen Rechner meldet. Dann bewertet ein
-kleiner PTX-Kern ab 32 Kandidaten die Trigramm-Nähe auf der GPU. Dieselbe
-Rechnung läuft sonst auf der CPU. Die Ähnlichkeitssuche holt die Kandidaten
-aus einem umgekehrten Trigramm-Index, nicht aus einem Lauf über alle Dateien.
-`FLARE_FORCE_CPU=1` schaltet die GPU aus.
+kleiner PTX-Kern ab 32 Kandidaten den Trigramm-Recall auf der GPU. Dieselbe
+Rechnung läuft sonst auf der CPU. `FLARE_FORCE_CPU=1` schaltet die GPU aus.
+
+Die Ähnlichkeitssuche ist ein eigener Modus (`--similar`, `similar=1`, Knopf
+**Ähnlich**). Sie bewertet nahe Namen auch dann, wenn genaue Treffer die Liste
+schon füllen. Bis 3000 Einträge wird der ganze Katalog bewertet, darüber die
+FTS-Trigramm-Kandidaten. Ein Name zählt ab 0,5, als Maximum aus Dice und
+Recall, damit Tippfehler und fast gleiche Namen beide treffen. Etwa die Hälfte
+der Plätze bleibt bei den lexikalischen Treffern, der Rest zeigt nahe Namen.
+Ohne den Schalter bleibt der bisherige Nachzug: Tippfehler nur, wenn die
+starken Treffer nicht reichen.
 
 ## Konfiguration
 
