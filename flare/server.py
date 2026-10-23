@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import sqlite3
 import sys
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -68,7 +69,17 @@ class Handler(BaseHTTPRequestHandler):
             text = query.get("q", [""])[0]
             limit = _limit(query.get("limit", ["8"])[0])
             flag = query.get("similar", ["0"])[0].lower()
-            self._json(200, self.app.search(text, limit, flag in {"1", "true", "yes", "on"}))
+            similar = flag in {"1", "true", "yes", "on"}
+            index_path = query.get("index", [""])[0].strip()
+            try:
+                if index_path:
+                    payload = self.app.search_file(index_path, text, limit, similar)
+                else:
+                    payload = self.app.search(text, limit, similar)
+            except (OSError, ValueError, sqlite3.Error) as exc:
+                self._json(400, {"error": str(exc)})
+                return
+            self._json(200, payload)
             return
         if parsed.path == "/api/status":
             self._json(200, self.app.status())

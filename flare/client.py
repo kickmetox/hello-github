@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import socket
+import urllib.error
 import urllib.parse
 import urllib.request
 from pathlib import Path
@@ -11,7 +12,7 @@ from typing import Any
 
 from flare.paths import data_dir as default_data_dir
 from flare.rank import Ranker
-from flare.search import search
+from flare.search import search, search_index_file
 from flare.store import Index
 
 
@@ -32,14 +33,27 @@ class Client:
         except OSError:
             return None
 
-    def search(self, text: str, limit: int = 8, similar: bool = False) -> dict[str, Any]:
+    def search(
+        self,
+        text: str,
+        limit: int = 8,
+        similar: bool = False,
+        index: str | Path | None = None,
+    ) -> dict[str, Any]:
         port = self.port()
         if port is not None:
             params = {"q": text, "limit": str(limit)}
             if similar:
                 params["similar"] = "1"
+            if index:
+                params["index"] = str(index)
             query = urllib.parse.urlencode(params)
             return self._json("GET", port, f"/api/search?{query}")
+        if index:
+            try:
+                return search_index_file(index, text, limit, similar)
+            except (OSError, ValueError) as exc:
+                return {"error": str(exc), "query": text, "results": []}
         return self._local_search(text, limit, similar)
 
     def status(self) -> dict[str, Any]:
@@ -99,5 +113,15 @@ class Client:
             method=method,
             headers={"Content-Type": "application/json"} if data is not None else {},
         )
-        with urllib.request.urlopen(request, timeout=self.timeout) as response:
-            return json.loads(response.read().decode("utf-8"))
+        try:
+            with urllib.request.urlopen(request, timeout=self.timeout) as response:
+                return json.loads(response.read().decode("utf-8"))
+        except urllib.error.HTTPError as exc:
+            raw = exc.read().decode("utf-8", "replace")
+            try:
+                payload = json.loads(raw)
+            except json.JSONDecodeError:
+                payload = {"error": "Suche fehlgeschlagen"}
+            if isinstance(payload, dict):
+                return payload
+            return {"error": "Suche fehlgeschlagen"}

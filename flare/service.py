@@ -23,7 +23,7 @@ from flare.launch import launch_target
 from flare.paths import data_dir as default_data_dir
 from flare.paths import norm, place_key
 from flare.rank import Ranker
-from flare.search import search
+from flare.search import search, search_index_file
 from flare.server import EventBus, Server
 from flare.store import Index
 from flare.watch import NullWatcher, start_watcher
@@ -214,6 +214,10 @@ class Service:
 
     def search(self, text: str, limit: int = 8, similar: bool = False) -> dict[str, Any]:
         return search(self.index, self.ranker, text, limit, similar)
+
+    def search_file(self, path: str, text: str, limit: int = 8, similar: bool = False) -> dict[str, Any]:
+        """Eigenen Index lesen. Der laufende Katalog bleibt unverändert."""
+        return search_index_file(path, text, limit, similar)
 
     def status(self) -> dict[str, Any]:
         counts = self.index.counts()

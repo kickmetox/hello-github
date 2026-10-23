@@ -54,6 +54,13 @@ class HelpTextTests(unittest.TestCase):
             "index-save",
             "index-copy",
             "index-compare",
+            "index-create",
+            "index-add",
+            "--root",
+            "--list",
+            "query --index",
+            "Index anlegen",
+            "Dokumentenverwaltung",
             "nur Namen",
         ):
             self.assertIn(fact, joined)
@@ -76,6 +83,7 @@ class HelpShortcutTests(unittest.TestCase):
         self.assertIn("Index speichern", help_source)
         self.assertIn("Index kopieren", help_source)
         self.assertIn("Index vergleichen", help_source)
+        self.assertIn("Index anlegen", help_source)
         self.assertIn("VK_ESCAPE", help_source)
         if os.name != "nt":
             self.assertIsNone(window.choose_index_save_path(0))

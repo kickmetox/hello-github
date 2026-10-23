@@ -202,6 +202,21 @@ Im Hilfefenster die Knöpfe „Index speichern“, „Index kopieren“ und
 oder sich in Größe oder Änderungszeit unterscheiden, und zeigt je Gruppe
 höchstens 20 Beispiele.
 
+Ein eigener Index ist eine separate Datei für ein anderes Programm, zum
+Beispiel eine Dokumentenverwaltung. Er speichert nur Namen. Der persönliche
+Index bleibt `%LOCALAPPDATA%\Flare\index.db`.
+
+```bash
+py -3 flare.py index-create ZIEL.db
+py -3 flare.py index-add ZIEL.db --root ORDNER
+py -3 flare.py index-add ZIEL.db --list LISTE.txt
+py -3 flare.py query --index ZIEL.db SUCHTEXT
+```
+
+`GET /api/search?q=SUCHTEXT&index=ABS_PATH` durchsucht dieselbe Datei. Ohne
+`index` bleibt es der laufende Katalog. „Index anlegen“ im Hilfefenster legt
+eine leere Datei an.
+
 ## Installer neu bauen
 
 Auf einem Linux-Rechner mit Wine und NSIS:

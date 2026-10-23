@@ -1149,5 +1149,247 @@ class IndexCopyCompareTests(unittest.TestCase):
             self.assertNotIn("Traceback", err_empty.getvalue())
 
 
+class CustomIndexTests(unittest.TestCase):
+    def test_index_create_opens_as_an_empty_index(self) -> None:
+        from flare.store import create_index
+
+        with tempfile.TemporaryDirectory() as tmp:
+            dest = Path(tmp) / "neu" / "ZIEL.db"
+            live = Path(tmp) / "live.db"
+            live.write_bytes(b"live-unveraendert")
+            saved = create_index(dest)
+            self.assertEqual(saved, dest)
+            self.assertEqual(live.read_bytes(), b"live-unveraendert")
+            index = Index(dest, readonly=True)
+            try:
+                self.assertEqual(index.counts(), {"items": 0, "dirs": 0})
+            finally:
+                index.close()
+
+    def test_root_add_stores_names_not_content(self) -> None:
+        from flare.crawl import collect_root_names
+        from flare.store import add_names, create_index
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "akten"
+            nested = root / "nest"
+            hidden = root / ".geheim"
+            modules = root / "node_modules"
+            nested.mkdir(parents=True)
+            hidden.mkdir()
+            modules.mkdir()
+            (root / "akte.txt").write_text("sonderakteinhalt\n", encoding="utf-8")
+            (nested / "tief.txt").write_text("tief\n", encoding="utf-8")
+            (root / ".env").write_text("TOKEN=1\n", encoding="utf-8")
+            (hidden / "weg.txt").write_text("nein\n", encoding="utf-8")
+            (modules / "pkg.js").write_text("nein\n", encoding="utf-8")
+            alias = root / "alias.txt"
+            os.symlink(root / "akte.txt", alias)
+            dest = Path(tmp) / "ZIEL.db"
+            create_index(dest)
+            items = collect_root_names(root)
+            self.assertTrue(all("text" not in item for item in items))
+            add_names(dest, items)
+            index = Index(dest, readonly=True)
+            try:
+                names = {row["name"] for row in index.con.execute("SELECT name FROM items")}
+                self.assertIn("akte.txt", names)
+                self.assertIn("tief.txt", names)
+                self.assertNotIn(".env", names)
+                self.assertNotIn("weg.txt", names)
+                self.assertNotIn("pkg.js", names)
+                linked = [
+                    row[0]
+                    for row in index.con.execute("SELECT path FROM items")
+                    if row[0].endswith("akte.txt") or row[0].endswith("alias.txt")
+                ]
+                self.assertEqual(len(linked), 1)
+                content = index.con.execute("SELECT COUNT(*) FROM content").fetchone()[0]
+                self.assertEqual(content, 0)
+            finally:
+                index.close()
+            self.assertNotIn(b"sonderakteinhalt", dest.read_bytes())
+
+    def test_list_add_ignores_comments_and_missing_paths(self) -> None:
+        from flare.crawl import collect_list_names
+        from flare.store import add_names, create_index
+
+        with tempfile.TemporaryDirectory() as tmp:
+            present = Path(tmp) / "da.txt"
+            present.write_text("nur-name\n", encoding="utf-8")
+            missing = Path(tmp) / "fehlt.txt"
+            listing = Path(tmp) / "LISTE.txt"
+            listing.write_text(
+                "\n# kommentar\n"
+                f"{present}\n"
+                f"{missing}\n"
+                "   # auch ein kommentar\n",
+                encoding="utf-8",
+            )
+            dest = Path(tmp) / "ZIEL.db"
+            create_index(dest)
+            items = collect_list_names(listing)
+            self.assertEqual([item["name"] for item in items], ["da.txt"])
+            add_names(dest, items)
+            index = Index(dest, readonly=True)
+            try:
+                names = {row["name"] for row in index.con.execute("SELECT name FROM items")}
+                self.assertEqual(names, {"da.txt"})
+                self.assertEqual(index.con.execute("SELECT COUNT(*) FROM content").fetchone()[0], 0)
+            finally:
+                index.close()
+
+    def test_second_add_keeps_paths_outside_the_root(self) -> None:
+        from flare.crawl import collect_root_names
+        from flare.paths import norm
+        from flare.store import add_names, create_index
+
+        with tempfile.TemporaryDirectory() as tmp:
+            first = Path(tmp) / "eins"
+            second = Path(tmp) / "zwei"
+            first.mkdir()
+            second.mkdir()
+            (first / "bleib.txt").write_text("a\n", encoding="utf-8")
+            (second / "neu.txt").write_text("b\n", encoding="utf-8")
+            dest = Path(tmp) / "ZIEL.db"
+            create_index(dest)
+            add_names(dest, collect_root_names(first))
+            add_names(dest, collect_root_names(second))
+            index = Index(dest, readonly=True)
+            try:
+                names = {row["name"] for row in index.con.execute("SELECT name FROM items")}
+                self.assertIn("bleib.txt", names)
+                self.assertIn("neu.txt", names)
+            finally:
+                index.close()
+            (second / "neu.txt").unlink()
+            (second / "anders.txt").write_text("c\n", encoding="utf-8")
+            add_names(dest, collect_root_names(second), prune_root=str(second))
+            index = Index(dest, readonly=True)
+            try:
+                names = {row["name"] for row in index.con.execute("SELECT name FROM items")}
+                self.assertIn("bleib.txt", names)
+                self.assertIn("anders.txt", names)
+                self.assertNotIn("neu.txt", names)
+                bleib = index.con.execute(
+                    "SELECT path FROM items WHERE name='bleib.txt'"
+                ).fetchone()[0]
+                self.assertTrue(bleib.startswith(norm(str(first))))
+            finally:
+                index.close()
+
+    def test_query_index_does_not_need_the_live_directory(self) -> None:
+        import io
+        from contextlib import redirect_stderr, redirect_stdout
+
+        from flare.cli import main
+        from flare.client import Client
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "akten"
+            root.mkdir()
+            (root / "akte.txt").write_text("sonderakteinhalt\n", encoding="utf-8")
+            dest = Path(tmp) / "ZIEL.db"
+            out = io.StringIO()
+            with redirect_stdout(out):
+                created = main(["index-create", str(dest)])
+                added = main(["index-add", str(dest), "--root", str(root)])
+            self.assertEqual(created, 0, out.getvalue())
+            self.assertEqual(added, 0, out.getvalue())
+            self.assertFalse((Path(tmp) / "index.db").exists())
+            found = io.StringIO()
+            with redirect_stdout(found):
+                code = main(["query", "--index", str(dest), "--similar", "akte"])
+            self.assertEqual(code, 0)
+            self.assertIn("akte.txt", found.getvalue())
+            self.assertNotIn("sonderakteinhalt", found.getvalue())
+            local = Client(Path(tmp) / "leer").search("akte", index=dest, similar=True)
+            self.assertTrue(any(hit["name"] == "akte.txt" for hit in local["results"]), local)
+            err = io.StringIO()
+            with redirect_stderr(err):
+                bad = main(["query", "--index", str(Path(tmp) / "fehlt.db"), "akte"])
+            self.assertEqual(bad, 1)
+            self.assertNotIn("Traceback", err.getvalue())
+            self.assertIn("Index", err.getvalue())
+
+    def test_query_index_rejects_a_non_index_file(self) -> None:
+        import io
+        from contextlib import redirect_stderr
+
+        from flare.cli import main
+
+        with tempfile.TemporaryDirectory() as tmp:
+            fake = Path(tmp) / "kein.db"
+            fake.write_text("das ist kein index\n", encoding="utf-8")
+            err = io.StringIO()
+            with redirect_stderr(err):
+                code = main(["query", "--index", str(fake), "akte"])
+            self.assertNotEqual(code, 0)
+            self.assertNotIn("Traceback", err.getvalue())
+            self.assertIn("fehlgeschlagen", err.getvalue())
+
+    def test_http_search_accepts_an_index_path(self) -> None:
+        import json
+        import urllib.error
+        import urllib.parse
+        import urllib.request
+
+        from flare.cli import main
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "akten"
+            root.mkdir()
+            (root / "akte.txt").write_text("sonderakteinhalt\n", encoding="utf-8")
+            dest = Path(tmp) / "ZIEL.db"
+            import io
+            from contextlib import redirect_stdout
+
+            out = io.StringIO()
+            with redirect_stdout(out):
+                self.assertEqual(main(["index-create", str(dest)]), 0)
+                self.assertEqual(main(["index-add", str(dest), "--root", str(root)]), 0)
+            empty = Path(tmp) / "leer"
+            empty.mkdir()
+            service = Service(
+                data_dir=Path(tmp) / "data",
+                roots=[(str(empty), 1)],
+                open_immediately=False,
+                allow_ui=False,
+                hotkey=False,
+                watch=False,
+                index_path=False,
+                fast=True,
+                port=0,
+            )
+            service.start()
+            try:
+                query = urllib.parse.urlencode({"q": "akte", "index": str(dest), "similar": "1"})
+                with urllib.request.urlopen(service.url + "api/search?" + query, timeout=2) as response:
+                    payload = json.loads(response.read().decode("utf-8"))
+                self.assertTrue(any(hit["name"] == "akte.txt" for hit in payload["results"]), payload)
+                live = service.url + "api/search?" + urllib.parse.urlencode({"q": "2+2"})
+                with urllib.request.urlopen(live, timeout=2) as response:
+                    calc = json.loads(response.read().decode("utf-8"))
+                self.assertEqual(calc["results"][0]["kind"], "calc")
+                missing = service.url + "api/search?" + urllib.parse.urlencode(
+                    {"q": "akte", "index": str(Path(tmp) / "fehlt.db")}
+                )
+                with self.assertRaises(urllib.error.HTTPError) as caught:
+                    urllib.request.urlopen(missing, timeout=2)
+                body = json.loads(caught.exception.read().decode("utf-8"))
+                self.assertIn("error", body)
+                fake = Path(tmp) / "kein.db"
+                fake.write_text("kein index\n", encoding="utf-8")
+                bad = service.url + "api/search?" + urllib.parse.urlencode(
+                    {"q": "akte", "index": str(fake)}
+                )
+                with self.assertRaises(urllib.error.HTTPError):
+                    urllib.request.urlopen(bad, timeout=2)
+                with urllib.request.urlopen(service.url + "api/health", timeout=2) as response:
+                    self.assertEqual(response.status, 200)
+            finally:
+                service.shutdown()
+
+
 if __name__ == "__main__":
     unittest.main()

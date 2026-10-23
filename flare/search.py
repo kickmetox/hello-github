@@ -9,7 +9,7 @@ from typing import Any
 
 from flare.calc import try_calc
 from flare.rank import Ranker
-from flare.store import Index
+from flare.store import Index, open_index
 
 _TOKEN = re.compile(r"\w+", re.UNICODE)
 _FUZZY_MIN = 0.5
@@ -136,6 +136,22 @@ def _snippet(text: str, query: str) -> str:
     if start > 0:
         clip = "…" + clip
     return clip
+
+
+def search_index_file(
+    path: str | Path,
+    query: str,
+    limit: int = 8,
+    similar: bool = False,
+) -> dict[str, Any]:
+    """Einen eigenen Index lesen, ohne den laufenden Katalog zu öffnen."""
+    index = open_index(path, readonly=True)
+    ranker = Ranker()
+    try:
+        return search(index, ranker, query, limit, similar)
+    finally:
+        ranker.close()
+        index.close()
 
 
 def search(

@@ -110,6 +110,126 @@ def should_skip_file(name: str) -> bool:
     return lowered.endswith("~") or lowered.endswith(".tmp")
 
 
+def collect_root_names(root: str | Path) -> list[dict[str, Any]]:
+    """Datei- und Ordnernamen unter einem Ordner. Kein Dateiinhalt.
+
+    Dieselben Stellen (realpath) zählen einmal. Versteckte Ordner, node_modules
+    und Geheimnisdateien entfallen, der angegebene Ordner selbst nicht.
+    """
+    folder = os.fspath(root)
+    if not os.path.isdir(folder):
+        raise ValueError(f"Ordner fehlt: {folder}")
+    items: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    root_key = place_key(folder)
+    _consider_name(folder, True, seen, items, keep_skipped=root_key)
+    stack = [folder]
+    while stack:
+        current = stack.pop()
+        try:
+            iterator = os.scandir(current)
+        except OSError:
+            continue
+        with iterator:
+            for entry in iterator:
+                try:
+                    is_dir = entry.is_dir(follow_symlinks=False)
+                    is_file = entry.is_file(follow_symlinks=False)
+                except OSError:
+                    continue
+                if is_dir:
+                    if should_skip_dir(entry.name):
+                        continue
+                    if _consider_name(entry.path, True, seen, items):
+                        stack.append(entry.path)
+                    continue
+                if is_file:
+                    _consider_name(entry.path, False, seen, items)
+                    continue
+                try:
+                    linked_file = entry.is_file(follow_symlinks=True)
+                except OSError:
+                    linked_file = False
+                if not linked_file:
+                    continue
+                # Dieselbe Stelle im Ordner nicht doppelt. Ein Verweis nach
+                # außen bleibt als Name erhalten.
+                target = place_key(entry.path)
+                if target == root_key or is_inside(target, folder):
+                    continue
+                _consider_name(entry.path, False, seen, items)
+    return items
+
+
+def collect_list_names(list_path: str | Path) -> list[dict[str, Any]]:
+    """Eine UTF-8-Liste, ein Pfad pro Zeile. Leerzeilen und #-Kommentare entfallen.
+
+    Nur vorhandene Pfade werden Namen. Ordner werden nicht rekursiv gelesen.
+    """
+    file = Path(list_path)
+    if not file.is_file():
+        raise ValueError(f"Liste fehlt: {file}")
+    try:
+        text = file.read_text(encoding="utf-8")
+    except UnicodeError as exc:
+        raise ValueError(f"Liste ist kein UTF-8: {file}") from exc
+    items: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        if not os.path.exists(line):
+            continue
+        is_dir = os.path.isdir(line)
+        name = os.path.basename(norm(line).rstrip("\\/")) or line
+        if is_dir:
+            if should_skip_dir(name):
+                continue
+        elif should_skip_file(name):
+            continue
+        _consider_name(line, is_dir, seen, items)
+    return items
+
+
+def _consider_name(
+    path: str,
+    is_dir: bool,
+    seen: set[str],
+    items: list[dict[str, Any]],
+    keep_skipped: str | None = None,
+) -> bool:
+    key = place_key(path)
+    if key in seen:
+        return False
+    name = os.path.basename(norm(path).rstrip("\\/")) or path
+    if keep_skipped != key:
+        if is_dir and should_skip_dir(name):
+            return False
+        if not is_dir and should_skip_file(name):
+            return False
+    try:
+        st = os.stat(path, follow_symlinks=False)
+    except OSError:
+        return False
+    seen.add(key)
+    stored = norm(path)
+    items.append(
+        {
+            "kind": "dir" if is_dir else "file",
+            "name": name,
+            "path": stored,
+            "dir": parent_of(stored),
+            "ext": "" if is_dir else Path(name).suffix.casefold(),
+            "launch": None,
+            "mtime_ns": getattr(st, "st_mtime_ns", int(st.st_mtime * 1e9)),
+            "size": 0 if is_dir else int(st.st_size),
+            "tier": 1,
+        }
+    )
+    return True
+
+
 def read_text_sample(path: str, size: int) -> str | None:
     if size <= 0 or size > 65536:
         return None

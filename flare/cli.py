@@ -15,9 +15,11 @@ from typing import Any
 from flare import __version__
 from flare.autostart import install_autostart, remove_autostart
 from flare.client import Client
+from flare.crawl import collect_list_names, collect_root_names
 from flare.paths import config_dir, data_dir
+from flare.search import search_index_file
 from flare.service import Service, roots_from_args
-from flare.store import Index, compare_indexes, copy_index, format_index_compare
+from flare.store import Index, add_names, compare_indexes, copy_index, create_index, format_index_compare
 
 
 def load_config(folder: Path | None = None) -> dict[str, Any]:
@@ -50,6 +52,7 @@ def build_parser() -> argparse.ArgumentParser:
     query.add_argument("--limit", type=int, default=8)
     query.add_argument("--open", action="store_true", help="besten Treffer öffnen")
     query.add_argument("--similar", action="store_true", help="ähnliche Namen mitsuchen")
+    query.add_argument("--index", metavar="ZIEL.db", help="diesen Index durchsuchen statt des persönlichen")
 
     opened = sub.add_parser("open", help="Treffer über die id öffnen")
     opened.add_argument("id", type=int)
@@ -66,6 +69,13 @@ def build_parser() -> argparse.ArgumentParser:
     compared = sub.add_parser("index-compare", help="zwei Indexdateien vergleichen")
     compared.add_argument("left", metavar="A")
     compared.add_argument("right", metavar="B")
+    created = sub.add_parser("index-create", help="leeren Index für ein anderes Programm anlegen")
+    created.add_argument("dest", metavar="ZIEL.db")
+    added = sub.add_parser("index-add", help="Namen in einen Index schreiben")
+    added.add_argument("dest", metavar="ZIEL.db")
+    added.add_argument("--root", metavar="ORDNER", help="Ordner, nur Namen")
+    added.add_argument("--list", metavar="LISTE.txt", help="ein Pfad pro Zeile")
+    added.add_argument("--prune-root", metavar="ORDNER", help="nicht gesehene Pfade unter diesem Ordner entfernen")
     return parser
 
 
@@ -94,6 +104,47 @@ def _index_copy(args: argparse.Namespace) -> int:
         print(f"Kopieren fehlgeschlagen: {exc}", file=sys.stderr)
         return 1
     print(saved)
+    return 0
+
+
+def _index_create(args: argparse.Namespace) -> int:
+    try:
+        saved = create_index(args.dest)
+    except (OSError, ValueError, sqlite3.Error) as exc:
+        print(f"Anlegen fehlgeschlagen: {exc}", file=sys.stderr)
+        return 1
+    print(saved)
+    return 0
+
+
+def _index_add(args: argparse.Namespace) -> int:
+    if bool(args.root) == bool(args.list):
+        print("Entweder --root oder --list angeben", file=sys.stderr)
+        return 1
+    try:
+        if args.root:
+            items = collect_root_names(args.root)
+        else:
+            items = collect_list_names(args.list)
+        result = add_names(args.dest, items, prune_root=args.prune_root)
+    except (OSError, ValueError, sqlite3.Error) as exc:
+        print(f"Hinzufügen fehlgeschlagen: {exc}", file=sys.stderr)
+        return 1
+    print(args.dest)
+    print(f"{result['names']} Namen")
+    return 0
+
+
+def _query_index(args: argparse.Namespace) -> int:
+    try:
+        payload = search_index_file(args.index, args.text, args.limit, similar=args.similar)
+    except (OSError, ValueError, sqlite3.Error) as exc:
+        print(f"Suche fehlgeschlagen: {exc}", file=sys.stderr)
+        return 1
+    _print_hits(payload, args.json)
+    if args.open and payload.get("results"):
+        print("Öffnen braucht ein laufendes Flare", file=sys.stderr)
+        return 1
     return 0
 
 
@@ -185,6 +236,12 @@ def main(argv: list[str] | None = None) -> int:
         return _index_copy(args)
     if args.cmd == "index-compare":
         return _index_compare(args)
+    if args.cmd == "index-create":
+        return _index_create(args)
+    if args.cmd == "index-add":
+        return _index_add(args)
+    if args.cmd == "query" and args.index:
+        return _query_index(args)
     # Nur Windows. Eine eingefrorene Flare.exe meldet win32 und läuft weiter.
     if sys.platform != "win32":
         print("Flare ist nur für Windows 11.", file=sys.stderr)

@@ -9,7 +9,7 @@ from ctypes import wintypes
 from typing import Any, Callable
 
 from flare.helptext import help_text
-from flare.store import compare_indexes, copy_index, format_index_compare
+from flare.store import compare_indexes, copy_index, create_index, format_index_compare
 
 WM_DESTROY = 0x0002
 WM_SIZE = 0x0005
@@ -65,6 +65,7 @@ IDC_HELP = 104
 IDC_SAVE_INDEX = 201
 IDC_COPY_INDEX = 203
 IDC_COMPARE_INDEX = 204
+IDC_CREATE_INDEX = 205
 SM_CXSCREEN = 0
 SM_CYSCREEN = 1
 
@@ -201,6 +202,7 @@ class HelpWindow:
         self.save_btn = 0
         self.copy_btn = 0
         self.compare_btn = 0
+        self.create_btn = 0
         self.save_status = 0
         self._proc: Any = None
         self._wndproc_type: Any = None
@@ -264,7 +266,7 @@ class HelpWindow:
         user32.SetWindowTextW.restype = wintypes.BOOL
         if not self._field_brush:
             self._field_brush = gdi32.CreateSolidBrush(0x00222226)
-        width, height = 640, 480
+        width, height = 860, 520
         x, y = self._origin(width, height)
         hwnd = user32.CreateWindowExW(
             0,
@@ -311,6 +313,7 @@ class HelpWindow:
             user32.SendMessageW(self.body, WM_SETFONT, self.owner._font, 1)
         if self.body:
             user32.SetWindowTextW(self.body, help_text())
+        self.create_btn = self._child("BUTTON", "Index anlegen", IDC_CREATE_INDEX, BS_PUSHBUTTON)
         self.save_btn = self._child("BUTTON", "Index speichern", IDC_SAVE_INDEX, BS_PUSHBUTTON)
         self.copy_btn = self._child("BUTTON", "Index kopieren", IDC_COPY_INDEX, BS_PUSHBUTTON)
         self.compare_btn = self._child("BUTTON", "Index vergleichen", IDC_COMPARE_INDEX, BS_PUSHBUTTON)
@@ -385,7 +388,11 @@ class HelpWindow:
         user32.GetClientRect(self.hwnd, ctypes.byref(rect))
         width = max(40, (rect.right - rect.left) - 24)
         height = max(40, (rect.bottom - rect.top) - 24)
-        buttons = [hwnd for hwnd in (self.save_btn, self.copy_btn, self.compare_btn) if hwnd]
+        buttons = [
+            hwnd
+            for hwnd in (self.create_btn, self.save_btn, self.copy_btn, self.compare_btn)
+            if hwnd
+        ]
         reserve = 76 if buttons else 0
         body_h = max(40, height - reserve)
         user32.MoveWindow(self.body, 12, 12, width, body_h, True)
@@ -407,7 +414,9 @@ class HelpWindow:
             ident = int(wparam) & 0xFFFF
             code = (int(wparam) >> 16) & 0xFFFF
             if code == BN_CLICKED:
-                if ident == IDC_SAVE_INDEX:
+                if ident == IDC_CREATE_INDEX:
+                    self._create_index()
+                elif ident == IDC_SAVE_INDEX:
                     self._save_index()
                 elif ident == IDC_COPY_INDEX:
                     self._copy_index()
@@ -468,6 +477,17 @@ class HelpWindow:
             self._set_status("Speichern fehlgeschlagen.")
             return
         self._set_status("Index gespeichert.")
+
+    def _create_index(self) -> None:
+        path = choose_index_save_path(self.hwnd, "Index anlegen")
+        if not path:
+            return
+        try:
+            create_index(path)
+        except Exception:
+            self._set_status("Anlegen fehlgeschlagen.")
+            return
+        self._set_status("Index angelegt.")
 
     def _copy_index(self) -> None:
         source = choose_index_open_path(self.hwnd, "Index kopieren")

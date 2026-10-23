@@ -686,3 +686,99 @@ def _sample_changed(con: sqlite3.Connection, limit: int) -> list[str]:
         (limit,),
     ).fetchall()
     return [str(row[0]) for row in rows]
+
+
+def create_index(dest: str | Path) -> Path:
+    """Leere Indexdatei mit demselben Schema wie der laufende Katalog.
+
+    Eine andere Datei, auch der persönliche Index, wird nicht angefasst.
+    """
+    target = Path(dest)
+    if target.exists() and not target.is_file():
+        raise ValueError(f"Ziel ist kein Dateipfad: {target}")
+    index = open_index(target, readonly=False)
+    index.close()
+    return target
+
+
+def add_names(
+    dest: str | Path,
+    items: list[dict[str, Any]],
+    *,
+    prune_root: str | None = None,
+) -> dict[str, int]:
+    """Namen einfügen oder aktualisieren. Pfade außerhalb bleiben, außer beim Prunen.
+
+    Es wird kein Dateiinhalt geschrieben. prune_root entfernt nur nicht gesehene
+    Pfade unter diesem Ordner.
+    """
+    index = open_index(Path(dest), readonly=False)
+    try:
+        unique: dict[str, dict[str, Any]] = {}
+        for item in items:
+            unique[str(item["path"])] = item
+        rows = list(unique.values())
+        with index.lock:
+            index.con.execute("BEGIN IMMEDIATE")
+            try:
+                index._upsert_items(rows)
+                pruned = 0
+                if prune_root:
+                    pruned = _prune_unseen(index, prune_root, list(unique))
+                index.con.commit()
+            except Exception:
+                index.con.rollback()
+                raise
+        return {"names": len(rows), "pruned": pruned}
+    finally:
+        index.close()
+
+
+def open_index(path: str | Path, *, readonly: bool) -> Index:
+    """Index öffnen. Eine Datei ohne items-Tabelle ist kein Flare-Index."""
+    path = Path(path)
+    if readonly and not path.is_file():
+        raise ValueError(f"Index fehlt: {path}")
+    try:
+        index = Index(path, readonly=readonly)
+    except sqlite3.Error as exc:
+        raise ValueError(f"Index lässt sich nicht öffnen: {path}") from exc
+    try:
+        row = index.con.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='items'"
+        ).fetchone()
+    except sqlite3.Error as exc:
+        index.close()
+        raise ValueError(f"Index lässt sich nicht öffnen: {path}") from exc
+    if row is None:
+        index.close()
+        raise ValueError(f"Index ohne Tabelle items: {path}")
+    return index
+
+
+def _prune_unseen(index: Index, root: str, seen: list[str]) -> int:
+    folder = norm(root)
+    prefix = like_pattern(child_prefix(folder))
+    index.con.execute("DELETE FROM flare_seen")
+    if seen:
+        index.con.executemany(
+            "INSERT OR IGNORE INTO flare_seen(path) VALUES (?)",
+            [(path,) for path in seen],
+        )
+    cursor = index.con.execute(
+        """
+        DELETE FROM items
+        WHERE (path=? OR path LIKE ? ESCAPE '!')
+          AND path NOT IN (SELECT path FROM flare_seen)
+        """,
+        (folder, prefix),
+    )
+    index.con.execute(
+        """
+        DELETE FROM dirs
+        WHERE (path=? OR path LIKE ? ESCAPE '!')
+          AND path NOT IN (SELECT path FROM flare_seen)
+        """,
+        (folder, prefix),
+    )
+    return int(cursor.rowcount if cursor.rowcount is not None else 0)
