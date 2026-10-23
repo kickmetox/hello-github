@@ -104,6 +104,41 @@ class HelpShortcutTests(unittest.TestCase):
             self.assertIsNone(window.choose_index_open_path(0))
             self.assertFalse(window.confirm_index_replace(0))
 
+    def test_list_clears_old_rows_and_status_shows_the_path(self) -> None:
+        import inspect
+
+        from flare.window import NativeWindow, list_item_height, replace_list_rows, result_labels, search_status
+
+        previous = [
+            "1min ai",
+            "7-zip file manager",
+            "administrative tools",
+            "application verifier (wow)",
+            "ashampoo pdf pro",
+            "ashampoo winoptimizer pro 29",
+        ]
+        hits = [{"name": f"hit-{i}", "path": rf"F:\hit-{i}", "via": "prefix"} for i in range(12)]
+        hits[0] = {"name": "Xchange", "path": r"F:\Xchange", "via": "prefix"}
+        labels = result_labels(hits)
+        shown = replace_list_rows(previous, labels)
+        self.assertEqual(len(shown), 12)
+        self.assertEqual(shown, labels)
+        self.assertFalse(set(previous) & set(shown))
+        self.assertEqual(shown[0], "Xchange")
+        self.assertNotIn("F:\\", shown[0])
+        self.assertEqual(
+            search_status("Suche", 3.71, 12, r"F:\Xchange"),
+            r"Suche · 3.71 ms · 12 Treffer · F:\Xchange",
+        )
+        self.assertGreaterEqual(list_item_height(18, 0), 22)
+        self.assertGreater(list_item_height(18, 2), list_item_height(18, 0))
+        source = inspect.getsource(NativeWindow._run_search)
+        self.assertIn("LB_RESETCONTENT", source)
+        self.assertIn("_erase_list", source)
+        self.assertIn("InvalidateRect", inspect.getsource(NativeWindow._erase_list))
+        self.assertIn("LB_SETITEMHEIGHT", inspect.getsource(NativeWindow._apply_list_height))
+        self.assertIn("Speichern…", inspect.getsource(NativeWindow._install_index_menu))
+
     def test_f1_opens_help_and_escape_closes_it(self) -> None:
         self.assertEqual(shortcut_action(VK_F1, help_open=False, help_target=False), "help")
         self.assertEqual(shortcut_action(VK_F1, help_open=True, help_target=True), "help")

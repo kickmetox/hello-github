@@ -371,12 +371,26 @@ class Index:
             self.con.execute("UPDATE dirs SET mtime_ns=0, dirty=1")
             self.con.commit()
 
+    def exact(self, folded: str, limit: int) -> list[dict[str, Any]]:
+        """Namen, die der Anfrage genau entsprechen. Unabhängig vom Präfix-Limit."""
+        if not folded:
+            return []
+        return self._all(
+            f"""
+            SELECT {ITEM_COLS} FROM items
+            WHERE name_fold = ?
+            ORDER BY use_count DESC, length(path) ASC
+            LIMIT ?
+            """,
+            (folded, max(0, int(limit))),
+        )
+
     def prefix(self, folded: str, limit: int) -> list[dict[str, Any]]:
         return self._all(
             f"""
             SELECT {ITEM_COLS} FROM items
             WHERE name_fold LIKE ? ESCAPE '!'
-            ORDER BY use_count DESC, length(name_fold) ASC, name_fold ASC
+            ORDER BY length(name_fold) ASC, use_count DESC, name_fold ASC
             LIMIT ?
             """,
             (like_pattern(folded), limit),

@@ -47,7 +47,7 @@ def features() -> list[str]:
         "Schließen blendet das Fenster aus, der Index läuft weiter.",
         "Ähnliche Namen über das Kontrollkästchen, --similar und similar=1; umgekehrter Trigramm-Index, CUDA über nvcuda.dll ab 32 Kandidaten, sonst die CPU.",
         "Index aus Startmenü-Verknüpfungen (.lnk), PATH-Programmen (.exe, .bat, .cmd, .com), den Ordnern Desktop, Dokumente, Downloads, Bilder, Musik, Videos und dem Benutzerprofil, dazu externe Festplatten, USB-Sticks und lokale Ordner von OneDrive, Dropbox und Google Drive. Externe Festplatten, USB-Sticks und Cloud-Ordner tragen nur Namen bei, ohne Dateiinhalt.",
-        "Das Systemlaufwerk wird nicht vollständig durchsucht. CD-Laufwerke entfallen. Gemappte Netzlaufwerke bleiben aus, bis index_network in der Konfiguration true ist; dann nur Dateinamen, mit derselben Last wie das Benutzerprofil. Freigaben ohne Laufwerksbuchstaben werden nicht aufgenommen.",
+        "Das Systemlaufwerk wird nicht vollständig durchsucht. CD-Laufwerke entfallen. Externe und andere feste Laufwerke werden nach Namen indiziert. Gemappte Netzlaufwerke tragen ohne index_network nur die Namen der obersten Ebene; mit index_network true den ganzen Baum, nur Dateinamen, mit derselben Last wie das Benutzerprofil. Laufwerke, die nicht schnell antworten, werden übersprungen. Freigaben ohne Laufwerksbuchstaben werden nicht aufgenommen.",
         "Nur-online-Dateien in Cloud-Ordnern stehen mit Namen im Index. Der Inhalt wird nicht heruntergeladen.",
         "Ausschlussliste in der Konfiguration: exclude_drives, ein Laufwerk wie E:\\ oder eine Datenträgerbezeichnung. Diese Laufwerke werden nicht indiziert.",
         "Keine Websuche. E-Mail, Kontakte, Chats und Inhalte anderer Programme werden nicht gelesen.",

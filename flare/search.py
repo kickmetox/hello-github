@@ -41,6 +41,28 @@ def fuzzy_query(text: str) -> str | None:
     return " OR ".join('"' + gram.replace('"', '""') + '"' for gram in grams)
 
 
+# Bänder liegen weiter auseinander als Art, Tier und Nutzung zusammen
+# (höchstens 40 + 36 + 180). Ein Infix kann einen exakten Namen nicht überholen.
+_EXACT = 5000.0
+_PREFIX = 4000.0
+_TOKEN_BAND = 3000.0
+_SUBSTRING = 2000.0
+_PATH = 900.0
+_CONTENT = 500.0
+
+
+def has_exact_or_prefix(query: str, names: list[str]) -> bool:
+    """True, wenn ein Name die Anfrage ist oder mit ihr beginnt."""
+    q = query.casefold().strip()
+    if not q:
+        return False
+    for name in names:
+        folded = name.casefold()
+        if folded == q or folded.startswith(q):
+            return True
+    return False
+
+
 def lexical_score(
     query: str,
     name: str,
@@ -57,17 +79,17 @@ def lexical_score(
     if not q:
         base = 100.0
     elif folded == q:
-        base = 1000.0
+        base = _EXACT
     elif folded.startswith(q):
-        base = 860.0 - min(len(folded) - len(q), 80)
+        base = _PREFIX - min(len(folded) - len(q), 80)
     elif any(token.startswith(q) for token in _TOKEN.findall(folded)):
-        base = 740.0
+        base = _TOKEN_BAND
     elif q in folded:
-        base = 580.0 - min(folded.index(q), 80)
+        base = _SUBSTRING - min(folded.index(q), 80)
     elif q in path_folded:
-        base = 320.0
+        base = _PATH
     elif via == "content":
-        base = 260.0
+        base = _CONTENT
     else:
         return 0.0
     if kind == "app":
@@ -183,7 +205,24 @@ def search(
         for item in index.recent(limit):
             consider(item, "recent", 100.0 + min(item["use_count"], 30))
     else:
-        for item in index.prefix(text.casefold(), 40):
+        folded_query = text.casefold()
+        # Exakte Namen zuerst und ohne das Präfix-Limit, sonst verdrängen
+        # häufig genutzte längere Namen den Ordner aus der Kandidatenliste.
+        for item in index.exact(folded_query, max(limit, 64)):
+            consider(
+                item,
+                "prefix",
+                lexical_score(
+                    text,
+                    item["name"],
+                    item["path"],
+                    kind=item["kind"],
+                    tier=item["tier"],
+                    use_count=item["use_count"],
+                    via="prefix",
+                ),
+            )
+        for item in index.prefix(folded_query, 40):
             consider(
                 item,
                 "prefix",
@@ -229,6 +268,9 @@ def search(
                     _snippet(body, text),
                 )
         strong = [hit for hit in hits.values() if hit["score"] >= 240]
+        # Exakter Name oder Präfix: keine unscharfen Verwandten nachziehen.
+        # „Ähnliche Namen“ bleibt ein eigener Modus und läuft darüber.
+        named = has_exact_or_prefix(text, [hit["name"] for hit in hits.values()])
         if similar:
             pending = [item for item in _similar_pool(index, text) if item["id"] not in hits]
             if pending:
@@ -240,7 +282,7 @@ def search(
                     if item["kind"] == "app":
                         base += 20.0
                     consider(item, "similar", base, similarity=cosine)
-        elif len(strong) < limit:
+        elif not named and len(strong) < limit:
             fuzzy = fuzzy_query(text)
             if fuzzy:
                 candidates = index.fts(fuzzy, 80)

@@ -11,8 +11,8 @@ from typing import Any
 
 from flare.crawl import Crawler, dedupe_roots, default_roots, merge_volume_roots, roots_worth_watching
 from flare.volumes import (
-    drive_roots_for_config,
-    drive_snapshot_for_config,
+    configured_drive_roots,
+    drive_poll_rows,
     exclude_drive_list,
     index_network_enabled,
     windows_cloud_roots,
@@ -63,25 +63,32 @@ class Service:
         self._drive_poll = None
         dynamic: list[str] = []
         names_only: list[str] = []
+        self._shallow_roots: list[str] = []
         if roots is None:
             base = default_roots(extra)
             drives: list[tuple[str, int]] = []
+            shallow_pairs: list[tuple[str, int]] = []
             cloud: list[str] = []
             if sys.platform == "win32":
-                drives = drive_roots_for_config(
+                drives, shallow_pairs = configured_drive_roots(
                     index_network=self.index_network,
                     exclude=self.exclude_drives,
                 )
                 cloud = windows_cloud_roots()
                 self._drive_poll = self._poll_drives
-            self.roots, dynamic = merge_volume_roots(base, drives, cloud)
+            self.roots, dynamic = merge_volume_roots(base, [*drives, *shallow_pairs], cloud)
             known = {place_key(path) for path, _tier in base}
             light = {place_key(path) for path, _tier in drives}
+            light.update(place_key(path) for path, _tier in shallow_pairs)
             light.update(place_key(path) for path in cloud)
             names_only = [
                 path
                 for path, _tier in self.roots
                 if place_key(path) in light and place_key(path) not in known
+            ]
+            shallow_keys = {place_key(path) for path, _tier in shallow_pairs}
+            self._shallow_roots = [
+                path for path, _tier in self.roots if place_key(path) in shallow_keys
             ]
         else:
             self.roots = dedupe_roots(list(roots) + extra)
@@ -152,6 +159,7 @@ class Service:
             drive_poll=self._drive_poll,
             dynamic_roots=self._dynamic_roots,
             names_only=self._names_only_roots,
+            shallow_roots=self._shallow_roots,
         )
         crawler = threading.Thread(target=self._crawl, name="flare-index", daemon=True)
         crawler.start()
@@ -162,8 +170,8 @@ class Service:
         if self.open_immediately:
             self.activate()
 
-    def _poll_drives(self) -> list[tuple[str, int, bool]]:
-        return drive_snapshot_for_config(
+    def _poll_drives(self) -> list[tuple[str, int, bool, bool]]:
+        return drive_poll_rows(
             index_network=self.index_network,
             exclude=self.exclude_drives,
         )

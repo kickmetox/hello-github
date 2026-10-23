@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+import threading
 from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 from typing import Any, NamedTuple
@@ -33,6 +34,11 @@ _OFFLINE_ATTRIBUTES = FILE_ATTRIBUTE_OFFLINE | FILE_ATTRIBUTE_RECALL_ON_DATA_ACC
 # Externe Platten wie heiße Ordner, Netzfreigaben wie das Benutzerprofil.
 TIER_VOLUME = 1
 TIER_NETWORK = 2
+# Laufwerke, die länger brauchen, werden ausgelassen statt den Index zu blockieren.
+DRIVE_PROBE_S = 1.0
+
+_PROBE_LOCK = threading.Lock()
+_PROBE_BUSY: set[str] = set()
 
 _ONEDRIVE_ENV = ("OneDrive", "OneDriveConsumer", "OneDriveCommercial")
 
@@ -85,6 +91,98 @@ def is_excluded(root: str, label: str, exclude: Sequence[str]) -> bool:
         if label_key and item.casefold() == label_key:
             return True
     return False
+
+
+def run_within(key: str, fn: Callable[[], Any], timeout: float) -> Any:
+    """`fn()` wenn sie rechtzeitig fertig ist, sonst None.
+
+    Eine langsame Anfrage bleibt beschäftigt, bis sie zurückkehrt. Der nächste
+    Versuch stapelt keinen weiteren Thread. OSError zählt als keine Antwort.
+    """
+    box: dict[str, Any] = {}
+    with _PROBE_LOCK:
+        if key in _PROBE_BUSY:
+            return None
+        _PROBE_BUSY.add(key)
+
+    def run() -> None:
+        try:
+            box["value"] = fn()
+        except OSError as exc:
+            box["error"] = exc
+        except Exception as exc:
+            box["error"] = exc
+        finally:
+            with _PROBE_LOCK:
+                _PROBE_BUSY.discard(key)
+
+    thread = threading.Thread(target=run, name=f"flare-probe-{key}", daemon=True)
+    thread.start()
+    thread.join(timeout if timeout > 0 else 0)
+    if thread.is_alive():
+        return None
+    error = box.get("error")
+    if isinstance(error, OSError):
+        return None
+    if error is not None:
+        raise error
+    if "value" not in box:
+        return None
+    return box["value"]
+
+
+def answers_quickly(
+    path: str,
+    timeout: float = DRIVE_PROBE_S,
+    *,
+    probe: Callable[[str], bool] | None = None,
+) -> bool:
+    """True, wenn `path` vor `timeout` antwortet. Hängende Laufwerke sind False."""
+
+    def call() -> bool:
+        if probe is not None:
+            return bool(probe(path))
+        iterator = os.scandir(path)
+        with iterator:
+            return True
+
+    return run_within(f"ask:{path}", call, timeout) is True
+
+
+def shallow_remote_roots(
+    drives: Sequence[DriveInfo],
+    *,
+    system_drive: str,
+    index_network: bool = False,
+    exclude: Sequence[str] | None = None,
+) -> list[tuple[str, int]]:
+    """Eine Verzeichnisebene auf gemappten Buchstaben, wenn der Tiefenlauf aus ist.
+
+    `index_network` bleibt der Schalter für den ganzen Baum. Ohne ihn werden
+    nur die Namen direkt unter dem Laufwerksstamm aufgenommen. Unlesbare,
+    ausgeschlossene oder nicht gemeldete Buchstaben entfallen.
+    """
+    if index_network:
+        return []
+    skipped = list(exclude or [])
+    system = normalize_drive_root(system_drive) if system_drive else ""
+    chosen: list[tuple[str, int]] = []
+    seen: set[str] = set()
+    for drive in drives:
+        if drive.drive_type != DRIVE_REMOTE:
+            continue
+        root = normalize_drive_root(drive.root)
+        if not root or root in seen:
+            continue
+        if system and root.casefold() == system.casefold():
+            continue
+        if drive.label is None or not drive.readable:
+            continue
+        if is_excluded(root, drive.label or "", skipped):
+            continue
+        seen.add(root)
+        chosen.append((root, TIER_NETWORK))
+    return chosen
 
 
 def tier_for_drive_type(drive_type: int, *, index_network: bool) -> int | None:
@@ -457,21 +555,81 @@ def drive_roots_for_config(
     index_network: bool = False,
     exclude: Sequence[str] | None = None,
 ) -> list[tuple[str, int]]:
+    full, _shallow = configured_drive_roots(index_network=index_network, exclude=exclude)
+    return full
+
+
+def configured_drive_roots(
+    *,
+    index_network: bool = False,
+    exclude: Sequence[str] | None = None,
+) -> tuple[list[tuple[str, int]], list[tuple[str, int]]]:
+    """Volle Wurzeln und, wenn der Tiefenlauf aus ist, die flache Netz-Ebene.
+
+    Eine Win32-Abfrage für beide Listen. Langsame Laufwerke stehen nicht drin.
+    """
     if sys.platform != "win32":
-        return []
+        return [], []
     try:
         view = _windows_drive_view()
     except OSError:
-        return []
+        return [], []
     if view is None:
-        return []
+        return [], []
     drives, system = view
-    return select_drive_roots(
+    skipped = list(exclude or [])
+    full = select_drive_roots(
         drives,
         system_drive=system,
         index_network=index_network,
-        exclude=list(exclude or []),
+        exclude=skipped,
     )
+    shallow = shallow_remote_roots(
+        drives,
+        system_drive=system,
+        index_network=index_network,
+        exclude=skipped,
+    )
+    return full, shallow
+
+
+def drive_poll_rows(
+    *,
+    index_network: bool = False,
+    exclude: Sequence[str] | None = None,
+) -> list[tuple[str, int, bool, bool]]:
+    """`(Stamm, Tier, lesen, flach)` für die Nachschau.
+
+    Wirft OSError, wenn die Laufwerksliste selbst fehlt. `flach` ist wahr für
+    die eine Namensebene eines gemappten Laufwerks.
+    """
+    if sys.platform != "win32":
+        return []
+    view = _windows_drive_view()
+    if view is None:
+        raise OSError("drive list unavailable")
+    drives, system = view
+    skipped = list(exclude or [])
+    rows: list[tuple[str, int, bool, bool]] = []
+    seen: set[str] = set()
+    for root, tier, walk in tracked_drives(
+        drives,
+        system_drive=system,
+        index_network=index_network,
+        exclude=skipped,
+    ):
+        rows.append((root, tier, walk, False))
+        seen.add(root.casefold())
+    for root, tier in shallow_remote_roots(
+        drives,
+        system_drive=system,
+        index_network=index_network,
+        exclude=skipped,
+    ):
+        if root.casefold() in seen:
+            continue
+        rows.append((root, tier, True, True))
+    return rows
 
 
 def drive_snapshot_for_config(
@@ -502,27 +660,35 @@ def _read_text(path: str) -> str | None:
 
 
 def _root_readable(root: str) -> bool:
-    try:
-        iterator = os.scandir(root)
-    except OSError:
-        return False
-    with iterator:
-        return True
+    return answers_quickly(root, DRIVE_PROBE_S)
 
 
 def _volume_label(kernel: Any, root: str) -> str | None:
-    """None, wenn GetVolumeInformation fehlschlägt. Leerer Name ist gültig."""
-    import ctypes
+    """None, wenn GetVolumeInformation fehlschlägt oder zu lange braucht.
 
-    name = ctypes.create_unicode_buffer(261)
-    filesystem = ctypes.create_unicode_buffer(261)
-    try:
-        ok = kernel.GetVolumeInformationW(root, name, len(name), None, None, None, filesystem, len(filesystem))
-    except OSError:
+    Ein leerer Name ist gültig. Timeout und Fehler sehen gleich aus: das
+    Laufwerk wird nicht gelesen.
+    """
+
+    def read() -> str | None:
+        import ctypes
+
+        name = ctypes.create_unicode_buffer(261)
+        filesystem = ctypes.create_unicode_buffer(261)
+        try:
+            ok = kernel.GetVolumeInformationW(
+                root, name, len(name), None, None, None, filesystem, len(filesystem)
+            )
+        except OSError:
+            return None
+        if not ok:
+            return None
+        return name.value
+
+    value = run_within(f"vol:{root}", read, DRIVE_PROBE_S)
+    if value is None:
         return None
-    if not ok:
-        return None
-    return name.value
+    return str(value)
 
 
 def _logical_drives(kernel: Any) -> list[str] | None:

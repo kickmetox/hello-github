@@ -31,6 +31,15 @@ LB_RESETCONTENT = 0x0184
 LB_ADDSTRING = 0x0180
 LB_SETCURSEL = 0x0186
 LB_GETCURSEL = 0x0188
+LB_SETITEMHEIGHT = 0x01A0
+WM_SETREDRAW = 0x000B
+LBN_SELCHANGE = 1
+RDW_INVALIDATE = 0x0001
+RDW_ERASE = 0x0004
+RDW_UPDATENOW = 0x0100
+OPAQUE = 2
+# CreateFontW(-18). Die Zeile muss diese Höhe plus Luft haben.
+LIST_FONT_PX = 18
 BM_GETCHECK = 0x00F0
 BST_CHECKED = 1
 
@@ -292,6 +301,37 @@ def _index_file_dialog(owner: int, *, save: bool, title: str, suggested: str) ->
         return None
     chosen = file_buf.value.strip()
     return chosen or None
+
+
+def list_item_height(font_px: int, external_leading: int = 0) -> int:
+    """Zeilenhöhe in Pixeln. Mindestens die Schrift, plus Luft gegen Überlappung."""
+    cell = max(1, int(font_px)) + max(0, int(external_leading))
+    return cell + 4
+
+
+def result_labels(results: list[dict[str, Any]]) -> list[str]:
+    """Sichtbarer Text einer Trefferliste. Nur der Name, nicht der Pfad."""
+    labels: list[str] = []
+    for hit in results:
+        label = str(hit.get("name") or "")
+        if hit.get("via") == "similar" and hit.get("similarity") is not None:
+            label = f"{label}   ähnlich {int(round(float(hit['similarity']) * 100))} %"
+        labels.append(label)
+    return labels
+
+
+def replace_list_rows(previous: list[str], labels: list[str]) -> list[str]:
+    """Alte Zeilen verwerfen, dann nur die neuen Treffer. Nichts bleibt darunter."""
+    return list(labels)
+
+
+def search_status(mode: str, took_ms: float, count: int, path: str = "") -> str:
+    """Statuszeile: Modus, Dauer, Trefferzahl und der Pfad der Auswahl."""
+    text = f"{mode} · {took_ms} ms · {count} Treffer"
+    cleaned = str(path or "").strip()
+    if cleaned:
+        return f"{text} · {cleaned}"
+    return text
 
 
 def shortcut_action(key: int, *, help_open: bool, help_target: bool) -> str | None:
@@ -628,6 +668,8 @@ class NativeWindow:
         self.label = 0
         self.similar = False
         self.results: list[dict[str, Any]] = []
+        self._rows: list[str] = []
+        self._result_status: tuple[str, float, int] | None = None
         self.selected = 0
         self._pending_show = False
         self._proc: Any = None
@@ -782,10 +824,11 @@ class NativeWindow:
             return False
         self.hwnd = hwnd
         _WINDOWS[int(hwnd)] = self
-        self._font = gdi32.CreateFontW(-18, 0, 0, 0, 400, 0, 0, 0, 1, 0, 0, 5, 0, "Segoe UI")
+        self._font = gdi32.CreateFontW(-LIST_FONT_PX, 0, 0, 0, 400, 0, 0, 0, 1, 0, 0, 5, 0, "Segoe UI")
         self.edit = self._child("EDIT", "", 100, ES_AUTOHSCROLL | WS_BORDER)
         self.check = self._child("BUTTON", "Ähnliche Namen", 101, BS_AUTOCHECKBOX)
         self.list = self._child("LISTBOX", "", 102, LBS_NOTIFY | LBS_NOINTEGRALHEIGHT | WS_VSCROLL | WS_BORDER)
+        self._apply_list_height()
         self.label = self._child("STATIC", "Index wird aufgebaut", 103, 0)
         self.help_btn = self._child("BUTTON", "Hilfe", IDC_HELP, BS_PUSHBUTTON)
         self._install_index_menu()
@@ -812,6 +855,84 @@ class NativeWindow:
         if self._font:
             user32.SendMessageW(hwnd, WM_SETFONT, self._font, 1)
         return hwnd
+
+    def _apply_list_height(self) -> None:
+        """Die Zeile muss die Schrift fassen, sonst malen sich die Treffer übereinander."""
+        if not self.list:
+            return
+        height = list_item_height(LIST_FONT_PX, 0)
+        measured = self._font_cell()
+        if measured is not None:
+            height = max(height, list_item_height(measured[0], measured[1]))
+        ctypes.windll.user32.SendMessageW(self.list, LB_SETITEMHEIGHT, 0, height)
+
+    def _font_cell(self) -> tuple[int, int] | None:
+        if not self.list or not self._font or sys.platform != "win32":
+            return None
+        user32 = ctypes.windll.user32
+        gdi32 = ctypes.windll.gdi32
+
+        class TEXTMETRICW(ctypes.Structure):
+            _fields_ = [
+                ("tmHeight", ctypes.c_long),
+                ("tmAscent", ctypes.c_long),
+                ("tmDescent", ctypes.c_long),
+                ("tmInternalLeading", ctypes.c_long),
+                ("tmExternalLeading", ctypes.c_long),
+                ("tmAveCharWidth", ctypes.c_long),
+                ("tmMaxCharWidth", ctypes.c_long),
+                ("tmWeight", ctypes.c_long),
+                ("tmOverhang", ctypes.c_long),
+                ("tmDigitizedAspectX", ctypes.c_long),
+                ("tmDigitizedAspectY", ctypes.c_long),
+                ("tmFirstChar", ctypes.c_wchar),
+                ("tmLastChar", ctypes.c_wchar),
+                ("tmDefaultChar", ctypes.c_wchar),
+                ("tmBreakChar", ctypes.c_wchar),
+                ("tmItalic", ctypes.c_byte),
+                ("tmUnderlined", ctypes.c_byte),
+                ("tmStruckOut", ctypes.c_byte),
+                ("tmPitchAndFamily", ctypes.c_byte),
+                ("tmCharSet", ctypes.c_byte),
+            ]
+
+        hdc = user32.GetDC(self.list)
+        if not hdc:
+            return None
+        try:
+            old = gdi32.SelectObject(hdc, self._font)
+            metrics = TEXTMETRICW()
+            ok = gdi32.GetTextMetricsW(hdc, ctypes.byref(metrics))
+            if old:
+                gdi32.SelectObject(hdc, old)
+            if not ok:
+                return None
+            return int(metrics.tmHeight), int(metrics.tmExternalLeading)
+        except (AttributeError, OSError):
+            return None
+        finally:
+            user32.ReleaseDC(self.list, hdc)
+
+    def _erase_list(self) -> None:
+        """Clientfläche löschen, damit alte Zeilen nicht unter den neuen stehen bleiben."""
+        hwnd = self.list
+        if not hwnd:
+            return
+        user32 = ctypes.windll.user32
+        try:
+            user32.InvalidateRect.argtypes = [wintypes.HWND, ctypes.c_void_p, wintypes.BOOL]
+            user32.InvalidateRect.restype = wintypes.BOOL
+            user32.InvalidateRect(hwnd, None, True)
+            user32.RedrawWindow.argtypes = [
+                wintypes.HWND,
+                ctypes.c_void_p,
+                ctypes.c_void_p,
+                wintypes.UINT,
+            ]
+            user32.RedrawWindow.restype = wintypes.BOOL
+            user32.RedrawWindow(hwnd, None, None, RDW_INVALIDATE | RDW_ERASE | RDW_UPDATENOW)
+        except (AttributeError, OSError):
+            return
 
     def _install_index_menu(self) -> None:
         """Menüleiste nur unter Windows und erst beim Erzeugen des Fensters."""
@@ -890,6 +1011,8 @@ class NativeWindow:
             elif ident == 101 and code == BN_CLICKED:
                 self.similar = user32.SendMessageW(self.check, BM_GETCHECK, 0, 0) == BST_CHECKED
                 self._run_search()
+            elif ident == 102 and code == LBN_SELCHANGE:
+                self._sync_selection()
             elif ident == 102 and code == LBN_DBLCLK:
                 self._open_selected()
             elif ident == IDC_HELP and code == BN_CLICKED:
@@ -906,6 +1029,8 @@ class NativeWindow:
             gdi32 = ctypes.windll.gdi32
             gdi32.SetTextColor(wparam, 0x00F2F2F2)
             gdi32.SetBkColor(wparam, 0x00222226 if msg != WM_CTLCOLORSTATIC else 0x00121212)
+            if msg == WM_CTLCOLORLISTBOX:
+                gdi32.SetBkMode(wparam, OPAQUE)
             return self._field_brush if msg != WM_CTLCOLORSTATIC else self._brush
         if msg == WM_CLOSE:
             self._hide()
@@ -945,19 +1070,25 @@ class NativeWindow:
             return
         self.results = list(payload.get("results") or [])
         self.selected = 0
-        user32 = ctypes.windll.user32
-        user32.SendMessageW(self.list, LB_RESETCONTENT, 0, 0)
-        for hit in self.results:
-            label = hit["name"]
-            if hit.get("via") == "similar" and hit.get("similarity") is not None:
-                label = f"{label}   ähnlich {int(round(float(hit['similarity']) * 100))} %"
-            user32.SendMessageW(self.list, LB_ADDSTRING, 0, label)
-        if self.results:
-            user32.SendMessageW(self.list, LB_SETCURSEL, 0, 0)
+        labels = result_labels(self.results)
+        self._rows = replace_list_rows(self._rows, labels)
         took = payload.get("took_ms")
         if took is not None:
             mode = "Ähnlichkeit" if self.similar else "Suche"
-            ctypes.windll.user32.SetWindowTextW(self.label, f"{mode} · {took} ms · {len(self.results)} Treffer")
+            self._result_status = (mode, float(took), len(self.results))
+        user32 = ctypes.windll.user32
+        user32.SendMessageW(self.list, WM_SETREDRAW, 0, 0)
+        try:
+            user32.SendMessageW(self.list, LB_RESETCONTENT, 0, 0)
+            for label in self._rows:
+                user32.SendMessageW(self.list, LB_ADDSTRING, 0, label)
+            if self.results:
+                user32.SendMessageW(self.list, LB_SETCURSEL, 0, 0)
+        finally:
+            user32.SendMessageW(self.list, WM_SETREDRAW, 1, 0)
+            self._erase_list()
+        if took is not None:
+            self._apply_result_status()
 
     def _paint_status(self) -> None:
         if self._query():
@@ -996,11 +1127,36 @@ class NativeWindow:
         if not self._query():
             self._paint_status()
 
+    def _selected_path(self) -> str:
+        if not self.results:
+            return ""
+        index = self.selected
+        if index < 0 or index >= len(self.results):
+            return ""
+        return str(self.results[index].get("path") or "")
+
+    def _apply_result_status(self) -> None:
+        if self._result_status is None:
+            return
+        mode, took, count = self._result_status
+        self._set_status(search_status(mode, took, count, self._selected_path()))
+
+    def _sync_selection(self) -> None:
+        if not self.list:
+            return
+        choice = int(ctypes.windll.user32.SendMessageW(self.list, LB_GETCURSEL, 0, 0))
+        if choice >= 0:
+            self.selected = choice
+        if self._query():
+            self._apply_result_status()
+
     def _move(self, delta: int) -> None:
         if not self.results:
             return
         self.selected = max(0, min(len(self.results) - 1, self.selected + delta))
         ctypes.windll.user32.SendMessageW(self.list, LB_SETCURSEL, self.selected, 0)
+        if self._query():
+            self._apply_result_status()
 
     def _open_selected(self) -> None:
         choice = int(ctypes.windll.user32.SendMessageW(self.list, LB_GETCURSEL, 0, 0))

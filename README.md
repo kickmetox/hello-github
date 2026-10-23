@@ -123,10 +123,14 @@ tragen nur Namen bei. Nur-online-Platzhalter zählen mit Namen, ihr Inhalt
 wird nicht geladen.
 
 Das Systemlaufwerk wird nicht vollständig gelesen. CD-Laufwerke entfallen.
-Gemappte Netzlaufwerke bleiben aus, solange `index_network` nicht `true` ist;
-dann nur Dateinamen, mit derselben Last wie das Benutzerprofil. Freigaben
-ohne Laufwerksbuchstaben sucht Flare nicht. Keine Websuche, keine E-Mail,
-keine Kontakte und keine Chats.
+Externe Festplatten und andere feste Laufwerke außer dem Systemlaufwerk werden
+nach Namen indiziert. Gemappte Netzlaufwerke liefern ohne `index_network` nur
+die Namen direkt am Laufwerksstamm, zum Beispiel `F:\Xchange`, ohne den Rest
+der Freigabe zu lesen. Mit `index_network` true wird der Baum gelesen, weiter
+nur Dateinamen, mit derselben Last wie das Benutzerprofil. Laufwerke, die
+nicht schnell antworten, werden übersprungen. Freigaben ohne
+Laufwerksbuchstaben sucht Flare nicht. Keine Websuche, keine E-Mail, keine
+Kontakte und keine Chats.
 
 Ausgelassen werden unter anderem `node_modules`, `.git`, versteckte Ordner,
 Caches und Schlüsseldateien (`id_rsa`, `.env`, `*.pem`).
@@ -151,8 +155,11 @@ und Löschen im selben Zeitstempel, zieht das Watcher-Flag den Ordner sofort
 neu. Ohne Meldung passiert das spätestens nach 15 Minuten.
 
 Die Suche nutzt den B-Tree für Präfixe (auch ein oder zwei Zeichen) und
-FTS5-Trigramme für Teilstrings. Tippfehler werden nur nachgezogen, wenn die
-genauen Treffer nicht reichen, und nur über den Anteil gemeinsamer Trigramme.
+FTS5-Trigramme für Teilstrings. Ein exakter Name steht vor einem Präfix, ein
+Präfix vor einem Infix wie `xchange` in `DataExchangeHost`. Tippfehler werden
+nur nachgezogen, wenn weder ein exakter Name noch ein Präfix vorhanden ist
+und die starken Treffer nicht reichen, und nur über den Anteil gemeinsamer
+Trigramme.
 
 CUDA wird benutzt, wenn `nvcuda.dll` einen Rechner meldet. Dann bewertet ein
 kleiner PTX-Kern ab 32 Kandidaten den Trigramm-Recall auf der GPU. Dieselbe
@@ -164,8 +171,9 @@ schon füllen. Bis 3000 Einträge wird der ganze Katalog bewertet, darüber die
 FTS-Trigramm-Kandidaten. Ein Name zählt ab 0,5, als Maximum aus Dice und
 Recall, damit Tippfehler und fast gleiche Namen beide treffen. Etwa die Hälfte
 der Plätze bleibt bei den lexikalischen Treffern, der Rest zeigt nahe Namen.
-Ohne den Schalter bleibt der bisherige Nachzug: Tippfehler nur, wenn die
-starken Treffer nicht reichen.
+Ohne den Schalter bleibt der Nachzug aus, sobald ein exakter Name oder ein
+Präfix da ist. Sonst kommen Tippfehler nur, wenn die starken Treffer nicht
+reichen.
 
 ## Konfiguration
 
@@ -185,7 +193,8 @@ starken Treffer nicht reichen.
 
 `exclude_drives` ist die Ausschlussliste: Laufwerke wie `"E:\\"` oder eine
 Datenträgerbezeichnung. Sie werden nicht indiziert. `index_network` steht
-standardmäßig auf `false`; `true` liest gemappte Netzlaufwerke nur nach Namen.
+standardmäßig auf `false`. Dann bleibt es bei den Namen der obersten Ebene
+eines gemappten Laufwerks. `true` liest den Baum, weiterhin nur nach Namen.
 
 Der laufende Index ist `%LOCALAPPDATA%\Flare\index.db`. Er bleibt beim
 Entfernen liegen und wird beim Start weiterverwendet. Im Suchfenster bietet

@@ -36,7 +36,9 @@ from flare.volumes import (
     list_windows_drives,
     normalize_drive_root,
     read_onedrive_folders,
+    answers_quickly,
     select_drive_roots,
+    shallow_remote_roots,
     should_sample_content,
     tracked_drives,
     windows_cloud_roots,
@@ -76,6 +78,117 @@ class RankingTests(unittest.TestCase):
         token = lexical_score("bericht", "alt-bericht.txt", "/a/x", kind="file", tier=1, use_count=0, via="trigram")
         self.assertGreater(exact, prefix)
         self.assertGreater(prefix, token)
+
+    def test_exact_xchange_outranks_infix_and_is_not_dropped(self) -> None:
+        exact = lexical_score(
+            "Xchange", "Xchange", r"F:\Xchange", kind="dir", tier=2, use_count=0, via="prefix"
+        )
+        prefix = lexical_score(
+            "Xchange",
+            "Xchange-backup",
+            r"F:\Xchange-backup",
+            kind="dir",
+            tier=1,
+            use_count=30,
+            via="prefix",
+        )
+        infix = lexical_score(
+            "Xchange",
+            "DataExchangeHost",
+            r"C:\Windows\System32\DataExchangeHost.exe",
+            kind="app",
+            tier=0,
+            use_count=30,
+            via="trigram",
+        )
+        self.assertGreater(exact, prefix)
+        self.assertGreater(prefix, infix)
+        with tempfile.TemporaryDirectory() as tmp:
+            items: list[dict] = [
+                {
+                    "kind": "dir",
+                    "name": "Xchange",
+                    "path": r"F:\Xchange",
+                    "dir": r"F:\\",
+                    "ext": "",
+                    "launch": None,
+                    "mtime_ns": 1,
+                    "size": 0,
+                    "tier": 2,
+                },
+                {
+                    "kind": "app",
+                    "name": "DataExchangeHost",
+                    "path": r"C:\Windows\System32\DataExchangeHost.exe",
+                    "dir": ":path",
+                    "ext": ".exe",
+                    "launch": None,
+                    "mtime_ns": 1,
+                    "size": 10,
+                    "tier": 0,
+                },
+                {
+                    "kind": "file",
+                    "name": "Xchang.txt",
+                    "path": r"F:\Xchang.txt",
+                    "dir": r"F:\\",
+                    "ext": ".txt",
+                    "launch": None,
+                    "mtime_ns": 1,
+                    "size": 1,
+                    "tier": 1,
+                },
+            ]
+            for number in range(45):
+                items.append(
+                    {
+                        "kind": "file",
+                        "name": f"Xchange-{number:02d}.txt",
+                        "path": rf"F:\pref\Xchange-{number:02d}.txt",
+                        "dir": r"F:\pref",
+                        "ext": ".txt",
+                        "launch": None,
+                        "mtime_ns": 1,
+                        "size": 1,
+                        "tier": 1,
+                    }
+                )
+            for number in range(40):
+                items.append(
+                    {
+                        "kind": "file",
+                        "name": f"DataXchange{number:02d}.dat",
+                        "path": rf"C:\infix\DataXchange{number:02d}.dat",
+                        "dir": r"C:\infix",
+                        "ext": ".dat",
+                        "launch": None,
+                        "mtime_ns": 1,
+                        "size": 1,
+                        "tier": 0,
+                    }
+                )
+            index = Index(Path(tmp) / "index.db")
+            ranker = Ranker(allow_cuda=False)
+            try:
+                index.reconcile_dir(r"F:\\", "", 1, 2, items, [])
+                with index.lock:
+                    index.con.execute("UPDATE items SET use_count=30 WHERE name != ?", ("Xchange",))
+                    index.con.commit()
+                wide = search(index, ranker, "Xchange", limit=50, similar=False)
+                names = [hit["name"] for hit in wide["results"]]
+                self.assertIn("Xchange", names)
+                self.assertIn("DataExchangeHost", names)
+                self.assertLess(names.index("Xchange"), names.index("DataExchangeHost"))
+                self.assertEqual(names[0], "Xchange")
+                self.assertNotIn("Xchang.txt", names)
+                tight = search(index, ranker, "Xchange", limit=3, similar=False)["results"]
+                self.assertEqual(tight[0]["name"], "Xchange")
+                self.assertLessEqual(len(tight), 3)
+                self.assertNotIn("DataExchangeHost", [hit["name"] for hit in tight])
+                self.assertNotIn("Xchang.txt", [hit["name"] for hit in tight])
+            finally:
+                index.close()
+                ranker.close()
 
     def test_typo_overlap(self) -> None:
         good = overlap_scores(trigrams("dokumnet"), [trigrams("Dokumentation")])[0]
@@ -567,6 +680,91 @@ class VolumeTests(unittest.TestCase):
         self.assertNotIn("D:\\", chosen)
         self.assertEqual(exclude_drive_list({}), [])
         self.assertEqual(exclude_drive_list({"exclude_drives": [" E:\\ ", 3, ""]}), ["E:\\"])
+
+    def test_drive_f_fixed_removable_and_mapped_root(self) -> None:
+        fixed = dict(
+            select_drive_roots(
+                [
+                    DriveInfo("C:\\", DRIVE_FIXED, "OS", True),
+                    DriveInfo("F:\\", DRIVE_FIXED, "DATA", True),
+                ],
+                system_drive="C:\\",
+                index_network=False,
+            )
+        )
+        self.assertEqual(fixed.get("F:\\"), 1)
+        self.assertNotIn("C:\\", fixed)
+        removable = dict(
+            select_drive_roots(
+                [DriveInfo("F:\\", DRIVE_REMOVABLE, "STICK", True)],
+                system_drive="C:\\",
+                index_network=False,
+            )
+        )
+        self.assertEqual(removable.get("F:\\"), 1)
+        mapped = [DriveInfo("F:\\", DRIVE_REMOTE, "SHARE", True)]
+        self.assertEqual(select_drive_roots(mapped, system_drive="C:\\", index_network=False), [])
+        self.assertEqual(
+            shallow_remote_roots(mapped, system_drive="C:\\", index_network=False),
+            [("F:\\", 2)],
+        )
+        self.assertEqual(
+            shallow_remote_roots(mapped, system_drive="C:\\", index_network=False, exclude=["F:\\"]),
+            [],
+        )
+        self.assertEqual(shallow_remote_roots(mapped, system_drive="C:\\", index_network=True), [])
+        self.assertEqual(
+            select_drive_roots(mapped, system_drive="C:\\", index_network=True),
+            [("F:\\", 2)],
+        )
+        self.assertEqual(
+            shallow_remote_roots(
+                [DriveInfo("Y:\\", DRIVE_REMOTE, None, False)],
+                system_drive="C:\\",
+                index_network=False,
+            ),
+            [],
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "F"
+            folder = root / "Xchange"
+            folder.mkdir(parents=True)
+            (folder / "deep.txt").write_text("zweiteebene\n", encoding="utf-8")
+            (root / "readme.txt").write_text("nurwurzel\n", encoding="utf-8")
+            index = Index(Path(tmp) / "index.db")
+            try:
+                crawler = Crawler(
+                    index,
+                    Governor(fast=True),
+                    [(str(root), 2)],
+                    threading.Event(),
+                    content=True,
+                    index_path=False,
+                    shallow_roots=[str(root)],
+                )
+                crawler.prime()
+                crawler.drain()
+                self.assertIn("Xchange", _names(index, "Xchange"))
+                self.assertNotIn("deep.txt", _names(index, "deep"))
+                self.assertFalse(_names(index, "zweiteebene"))
+                self.assertIn("readme.txt", _names(index, "readme"))
+                self.assertFalse(_names(index, "nurwurzel"))
+                self.assertEqual(crawler.readdirs, 1)
+            finally:
+                index.close()
+
+    def test_slow_drive_probe_is_skipped(self) -> None:
+        started = time.perf_counter()
+
+        def hang(_path: str) -> bool:
+            time.sleep(1)
+            return True
+
+        self.assertFalse(answers_quickly(r"F:\slow-probe", timeout=0.05, probe=hang))
+        self.assertLess(time.perf_counter() - started, 0.4)
+        again = time.perf_counter()
+        self.assertFalse(answers_quickly(r"F:\slow-probe", timeout=0.05, probe=lambda _path: True))
+        self.assertLess(time.perf_counter() - again, 0.2)
 
     def test_index_network_defaults_to_skip_remote(self) -> None:
         self.assertFalse(index_network_enabled({}))

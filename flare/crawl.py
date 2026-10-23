@@ -15,6 +15,7 @@ import sys
 import threading
 import time
 from collections.abc import Callable
+from contextlib import nullcontext
 from pathlib import Path
 from typing import Any
 
@@ -22,7 +23,7 @@ from flare.governor import Governor
 from flare.launch import is_secret_name, parse_lnk
 from flare.paths import is_inside, norm, parent_of, place_key
 from flare.store import Index
-from flare.volumes import is_offline_file, should_sample_content
+from flare.volumes import DRIVE_PROBE_S, is_offline_file, run_within, should_sample_content
 
 log = logging.getLogger("flare")
 
@@ -86,6 +87,8 @@ def roots_worth_watching(
     return [path for path, tier in roots if tier <= 1 and norm(path) not in skip]
 # GetLogicalDriveStringsW / GetDriveTypeW, kein enger Takt.
 DRIVE_POLL_S = 12.0
+# Eine Namensebene auf einem gemappten Laufwerk. Hängt die Freigabe, weitergehen.
+SHALLOW_LIST_S = DRIVE_PROBE_S
 # Gleiche mtime im selben Zeitquant verdeckt ein schnelles Löschen. Spätestens
 # nach diesem Alter wird der Ordner trotzdem neu gelesen.
 READDIR_MAX_AGE_NS = 15 * 60 * 1_000_000_000
@@ -228,6 +231,53 @@ def _consider_name(
         }
     )
     return True
+
+
+class _Listed:
+    """Eintrag einer beendeten, zeitlich begrenzten Verzeichnisliste."""
+
+    def __init__(self, name: str, path: str, is_dir: bool, is_file: bool) -> None:
+        self.name = name
+        self.path = path
+        self._is_dir = is_dir
+        self._is_file = is_file
+
+    def is_dir(self, follow_symlinks: bool = False) -> bool:
+        return self._is_dir
+
+    def is_file(self, follow_symlinks: bool = False) -> bool:
+        return self._is_file
+
+    def stat(self, follow_symlinks: bool = False) -> os.stat_result:
+        return os.stat(self.path, follow_symlinks=follow_symlinks)
+
+
+def list_dir_quick(path: str, timeout: float = SHALLOW_LIST_S) -> list[_Listed] | None:
+    """Namen einer Ebene, oder None wenn das Laufwerk nicht rechtzeitig antwortet."""
+
+    def read() -> list[_Listed]:
+        found: list[_Listed] = []
+        with os.scandir(path) as iterator:
+            for entry in iterator:
+                try:
+                    is_dir = entry.is_dir(follow_symlinks=False)
+                    is_file = entry.is_file(follow_symlinks=False)
+                except OSError:
+                    continue
+                found.append(_Listed(entry.name, entry.path, is_dir, is_file))
+        return found
+
+    rows = run_within(f"list:{path}", read, timeout)
+    if not isinstance(rows, list):
+        return None
+    return rows
+
+
+def stat_quick(path: str, timeout: float = SHALLOW_LIST_S) -> os.stat_result | None:
+    st = run_within(f"stat:{path}", lambda: os.stat(path, follow_symlinks=False), timeout)
+    if st is None:
+        return None
+    return st
 
 
 def read_text_sample(path: str, size: int) -> str | None:
@@ -382,6 +432,7 @@ class Crawler:
         drive_poll: Callable[[], list[tuple[str, int]]] | None = None,
         dynamic_roots: list[str] | None = None,
         names_only: list[str] | None = None,
+        shallow_roots: list[str] | None = None,
     ) -> None:
         self.index = index
         self.governor = governor
@@ -408,6 +459,9 @@ class Crawler:
         # Laufwerke und Cloud-Spiegel: nur Namen, Nachschau höchstens im Tier-1-Takt.
         self._names_only = {norm(path) for path in (names_only or [])}
         self._names_only.update(self._dynamic)
+        # Gemappte Buchstaben ohne index_network: nur die Namen direkt am Stamm.
+        self._shallow = {norm(path) for path in (shallow_roots or [])}
+        self._names_only.update(self._shallow)
         self._write_gate = threading.Lock()
 
     def pause_writes(self) -> None:
@@ -451,15 +505,18 @@ class Crawler:
         for tier, delay in RESCHEDULE.items():
             self._next_full[tier] = now + delay
         for path, tier in self.roots:
-            self.add(path, tier, descend=True, priority=tier)
+            self.add(path, tier, descend=self._root_descend(path), priority=tier)
         if self.index_path:
             self.ingest_path()
 
     def enqueue_all(self) -> None:
         for path, tier in self.roots:
-            self.add(path, tier, descend=True, priority=tier)
+            self.add(path, tier, descend=self._root_descend(path), priority=tier)
         if self.index_path:
             self.ingest_path()
+
+    def _root_descend(self, path: str) -> bool:
+        return path not in self._shallow
 
     def poke(self, path: str, descend: bool = False) -> None:
         try:
@@ -541,28 +598,31 @@ class Crawler:
         self.apply_drives(found)
 
     def apply_drives(self, found: list[tuple[Any, ...]]) -> None:
-        current: dict[str, tuple[int, bool]] = {}
+        current: dict[str, tuple[int, bool, bool]] = {}
         for item in found:
             if len(item) >= 3:
                 raw, tier, walk = item[0], int(item[1]), bool(item[2])
             else:
                 raw, tier = item[0], int(item[1])
                 walk = True
+            shallow = bool(item[3]) if len(item) >= 4 else False
             if not raw:
                 continue
             path = norm(raw)
             previous = current.get(path)
             if previous is None or int(tier) < previous[0]:
-                current[path] = (int(tier), walk)
+                current[path] = (int(tier), walk, shallow)
+            elif int(tier) == previous[0] and previous[2] and not shallow:
+                current[path] = (int(tier), walk, False)
         for path in list(self._dynamic):
             if path not in current:
                 self._drop_drive(path)
-        for path, (tier, walk) in current.items():
+        for path, (tier, walk, shallow) in current.items():
             if path in self._dynamic or not walk:
                 continue
-            self._adopt_drive(path, tier)
+            self._adopt_drive(path, tier, shallow=shallow)
 
-    def _adopt_drive(self, path: str, tier: int) -> None:
+    def _adopt_drive(self, path: str, tier: int, *, shallow: bool = False) -> None:
         if path in self._static_roots:
             return
         try:
@@ -573,15 +633,18 @@ class Crawler:
             return
         self._dynamic[path] = tier
         self._names_only.add(path)
+        if shallow:
+            self._shallow.add(path)
         if not any(existing == path for existing, _tier in self.roots):
             self.roots.append((path, tier))
         if not any(existing == path for existing, _tier in self._claimed):
             self._claimed.append((path, tier))
-        self.add(path, tier, descend=True, priority=tier)
+        self.add(path, tier, descend=not shallow, priority=tier)
         log.info("drive added: %s", path)
 
     def _drop_drive(self, path: str) -> None:
         self._dynamic.pop(path, None)
+        self._shallow.discard(path)
         if path in self._static_roots:
             return
         self._names_only.discard(path)
@@ -623,7 +686,7 @@ class Crawler:
             self.add(_PATH_DIR, 0, descend=False, priority=0)
         for path, tier in self.roots:
             if tier in due:
-                self.add(path, tier, descend=True, priority=tier)
+                self.add(path, tier, descend=self._root_descend(path), priority=tier)
         for tier in due:
             self._next_full[tier] = now + RESCHEDULE[tier]
 
@@ -680,10 +743,17 @@ class Crawler:
             return
         if self.blocked(path, tier):
             return
-        try:
-            st = os.stat(path, follow_symlinks=False)
-        except OSError:
-            return
+        shallow = path in self._shallow
+        if shallow:
+            descend = False
+            st = stat_quick(path, SHALLOW_LIST_S)
+            if st is None:
+                return
+        else:
+            try:
+                st = os.stat(path, follow_symlinks=False)
+            except OSError:
+                return
         if not stat.S_ISDIR(st.st_mode):
             return
         known, dirty, readdir_ns = self.index.dir_info(path)
@@ -699,12 +769,18 @@ class Crawler:
         files: list[os.DirEntry[str]] = []
         subdirs: list[str] = []
         markers = sys.platform != "win32" and os.path.isdir(os.path.join(path, ".flare-offline"))
-        try:
-            iterator = os.scandir(path)
-        except OSError:
-            return
-        with iterator:
-            for entry in iterator:
+        if shallow:
+            listed = list_dir_quick(path, SHALLOW_LIST_S)
+            if listed is None:
+                return
+            source: Any = nullcontext(listed)
+        else:
+            try:
+                source = os.scandir(path)
+            except OSError:
+                return
+        with source as entries:
+            for entry in entries:
                 name = entry.name
                 if name in {".", ".."}:
                     continue
@@ -798,6 +874,8 @@ class Crawler:
             self.index.mark_dirty(path)
             self.add(path, tier, descend=descend, priority=tier)
         self._watch_dir(path, tier)
+        if shallow:
+            return
         for child in subdirs:
             if descend or not self.index.knows_dir(child):
                 self.add(child, tier, descend=True, priority=tier)
