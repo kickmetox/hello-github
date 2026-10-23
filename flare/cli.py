@@ -82,32 +82,56 @@ def _print_hits(payload: dict[str, Any], as_json: bool) -> None:
 
 
 def _ensure_stdio() -> None:
-    """Fenster-EXE: --version trotzdem ausgeben, sonst stdout nicht leer lassen."""
-    if sys.platform != "win32" or (sys.stdout is not None and sys.stderr is not None):
-        return
-    import ctypes
+    """Fenster-EXE hat keine Konsole. Fehlende Ströme auf NUL legen.
 
-    kernel = ctypes.windll.kernel32
-    line = ctypes.wstring_at(kernel.GetCommandLineW())
-    if "--version" in line or "--help" in line:
-        if not kernel.GetConsoleWindow():
-            kernel.AllocConsole()
+    PyInstaller startet mit console=False (runw). Dabei sind die
+    Standardströme None. Nur os.open / open verwenden, nie einen rohen
+    Win32-Zeiger. Sonst stirbt der Prozess, bevor das Fenster aufgeht.
+    """
+    if sys.stdin is not None and sys.stdout is not None and sys.stderr is not None:
+        return
+    if sys.platform == "win32":
+        _reopen_standard_fds()
+    if sys.stdin is None:
+        sys.stdin = open(os.devnull, "r", encoding="utf-8", errors="replace")
+    if sys.stdout is None:
+        sys.stdout = open(os.devnull, "w", encoding="utf-8", errors="replace")
+    if sys.stderr is None:
+        sys.stderr = open(os.devnull, "w", encoding="utf-8", errors="replace")
+
+
+def _reopen_standard_fds() -> None:
+    """Geschlossene Handles 0/1/2 auf NUL legen. Nur os.fstat, os.open, os.dup2."""
+    targets = (
+        (0, os.O_RDONLY),
+        (1, os.O_WRONLY | os.O_APPEND),
+        (2, os.O_WRONLY | os.O_APPEND),
+    )
+    for fd, flags in targets:
         try:
-            sys.stdout = open("CONOUT$", "w", encoding="utf-8", buffering=1)
-            sys.stderr = open("CONOUT$", "w", encoding="utf-8", buffering=1)
-            return
+            os.fstat(fd)
+            continue
         except OSError:
             pass
-    if sys.stdout is None:
-        sys.stdout = open(os.devnull, "w", encoding="utf-8")
-    if sys.stderr is None:
-        sys.stderr = open(os.devnull, "w", encoding="utf-8")
+        try:
+            opened = os.open(os.devnull, flags)
+        except OSError:
+            continue
+        try:
+            if opened != fd:
+                os.dup2(opened, fd)
+        except OSError:
+            pass
+        finally:
+            if opened != fd:
+                os.close(opened)
 
 
 def main(argv: list[str] | None = None) -> int:
     _ensure_stdio()
     parser = build_parser()
     args = parser.parse_args(argv)
+    # Nur Windows. Eine eingefrorene Flare.exe meldet win32 und läuft weiter.
     if sys.platform != "win32":
         print("Flare ist nur für Windows 11.", file=sys.stderr)
         return 2

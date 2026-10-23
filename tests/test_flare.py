@@ -397,6 +397,54 @@ class AutostartTests(unittest.TestCase):
             return
         self.assertEqual(main(["status"]), 2)
 
+    def test_windowed_stdio_uses_devnull(self) -> None:
+        import inspect
+        import sys
+
+        from flare.cli import _ensure_stdio
+
+        source = inspect.getsource(_ensure_stdio)
+        for banned in ("wstring_at", "GetCommandLineW", "ReadConsole", "AllocConsole", "ctypes"):
+            self.assertNotIn(banned, source)
+        saved = (sys.stdin, sys.stdout, sys.stderr)
+        try:
+            sys.stdin = None
+            sys.stdout = None
+            sys.stderr = None
+            _ensure_stdio()
+            self.assertIsNotNone(sys.stdin)
+            self.assertIsNotNone(sys.stdout)
+            self.assertIsNotNone(sys.stderr)
+            for stream in (sys.stdin, sys.stdout, sys.stderr):
+                self.assertEqual(os.path.basename(stream.name), os.path.basename(os.devnull))
+            sys.stdout.write("ok")
+            sys.stderr.write("ok")
+            sys.stdout.flush()
+            sys.stderr.flush()
+        finally:
+            for stream in (sys.stdin, sys.stdout, sys.stderr):
+                if stream is not None and stream not in saved:
+                    stream.close()
+            sys.stdin, sys.stdout, sys.stderr = saved
+
+    def test_frozen_windows_exe_reaches_service(self) -> None:
+        import sys
+        from unittest import mock
+
+        from flare.cli import main
+
+        with tempfile.TemporaryDirectory() as tmp:
+            with (
+                mock.patch.object(sys, "platform", "win32"),
+                mock.patch.object(sys, "frozen", True, create=True),
+                mock.patch.object(sys, "executable", r"C:\Users\a\AppData\Local\Programs\Flare\Flare.exe"),
+                mock.patch("flare.cli.Service") as service_cls,
+            ):
+                code = main(["--data-dir", tmp, "--no-hotkey", "--no-watch"])
+        self.assertEqual(code, 0)
+        service_cls.assert_called_once()
+        service_cls.return_value.run_forever.assert_called_once()
+
     def test_default_roots_are_windows_only(self) -> None:
         import sys
 
