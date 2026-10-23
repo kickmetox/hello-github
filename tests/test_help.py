@@ -49,6 +49,11 @@ class HelpTextTests(unittest.TestCase):
             "Kontakte",
             "Chats",
             "Index speichern",
+            "Index kopieren",
+            "Index vergleichen",
+            "index-save",
+            "index-copy",
+            "index-compare",
             "nur Namen",
         ):
             self.assertIn(fact, joined)
@@ -60,13 +65,21 @@ class HelpShortcutTests(unittest.TestCase):
 
         import flare.window as window
 
-        source = inspect.getsource(window.choose_index_save_path)
-        self.assertIn("GetSaveFileNameW", source)
-        self.assertIn("flare-index.db", source)
-        self.assertNotIn("WINFUNCTYPE", source)
-        self.assertIn("Index speichern", inspect.getsource(window.HelpWindow))
+        dialog = inspect.getsource(window._index_file_dialog)
+        self.assertIn("GetSaveFileNameW", dialog)
+        self.assertIn("GetOpenFileNameW", dialog)
+        self.assertNotIn("WINFUNCTYPE", dialog)
+        self.assertNotIn("WINFUNCTYPE", inspect.getsource(window.choose_index_save_path))
+        self.assertNotIn("WINFUNCTYPE", inspect.getsource(window.choose_index_open_path))
+        self.assertIn("flare-index.db", inspect.getsource(window.choose_index_save_path))
+        help_source = inspect.getsource(window.HelpWindow)
+        self.assertIn("Index speichern", help_source)
+        self.assertIn("Index kopieren", help_source)
+        self.assertIn("Index vergleichen", help_source)
+        self.assertIn("VK_ESCAPE", help_source)
         if os.name != "nt":
             self.assertIsNone(window.choose_index_save_path(0))
+            self.assertIsNone(window.choose_index_open_path(0))
 
     def test_f1_opens_help_and_escape_closes_it(self) -> None:
         self.assertEqual(shortcut_action(VK_F1, help_open=False, help_target=False), "help")

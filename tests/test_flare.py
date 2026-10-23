@@ -49,7 +49,7 @@ from flare.ngram import NameIndex
 from flare.rank import Ranker, dice_scores, overlap_scores, trigrams
 from flare.search import lexical_score, search
 from flare.service import Service
-from flare.store import Index
+from flare.store import Index, compare_indexes, copy_index
 
 
 def _build_lnk(target: str) -> bytes:
@@ -1013,6 +1013,140 @@ class VolumeTests(unittest.TestCase):
             source = inspect.getsource(module)
             self.assertNotIn("wstring_at", source)
             self.assertNotIn("lower_background_thread", source)
+
+
+def _seed_index(path: Path, rows: list[tuple[str, int, int]]) -> None:
+    index = Index(path)
+    try:
+        for item_path, size, mtime in rows:
+            name = Path(item_path).name
+            index.con.execute(
+                """
+                INSERT INTO items(kind, name, name_fold, path, dir, ext, mtime_ns, size, tier)
+                VALUES ('file', ?, ?, ?, ?, '.txt', ?, ?, 1)
+                """,
+                (name, name.casefold(), item_path, str(Path(item_path).parent), mtime, size),
+            )
+        index.con.commit()
+    finally:
+        index.close()
+
+
+class IndexCopyCompareTests(unittest.TestCase):
+    def test_copy_roundtrip_keeps_the_source(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp) / "quelle.db"
+            dest = Path(tmp) / "kopie" / "ziel.db"
+            _seed_index(source, [("/docs/merkname.txt", 12, 40)])
+            saved = copy_index(source, dest)
+            self.assertEqual(Path(saved), dest)
+            self.assertTrue(source.is_file())
+            self.assertTrue(dest.is_file())
+            live = Index(source, readonly=True)
+            copy = Index(dest, readonly=True)
+            try:
+                self.assertIn("merkname.txt", _names(live, "merkname"))
+                self.assertIn("merkname.txt", _names(copy, "merkname"))
+            finally:
+                live.close()
+                copy.close()
+
+    def test_copy_onto_the_same_path_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp) / "quelle.db"
+            _seed_index(source, [("/docs/bleibt.txt", 4, 8)])
+            before = source.read_bytes()
+            with self.assertRaises(ValueError):
+                copy_index(source, source)
+            self.assertEqual(source.read_bytes(), before)
+            live = Index(source, readonly=True)
+            try:
+                self.assertIn("bleibt.txt", _names(live, "bleibt"))
+            finally:
+                live.close()
+
+    def test_compare_identical_indexes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            left = Path(tmp) / "a.db"
+            right = Path(tmp) / "b.db"
+            rows = [("/docs/gleich.txt", 3, 9), ("/docs/auch.txt", 5, 11)]
+            _seed_index(left, rows)
+            saved = copy_index(left, right)
+            report = compare_indexes(left, saved)
+            self.assertEqual(report["count_a"], 2)
+            self.assertEqual(report["count_b"], 2)
+            self.assertEqual(report["only_a"], 0)
+            self.assertEqual(report["only_b"], 0)
+            self.assertEqual(report["changed"], 0)
+            self.assertEqual(report["only_a_paths"], [])
+            self.assertEqual(report["only_b_paths"], [])
+            self.assertEqual(report["changed_paths"], [])
+
+    def test_compare_counts_added_removed_and_changed(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            left = Path(tmp) / "a.db"
+            right = Path(tmp) / "b.db"
+            only_a = [(f"/nur-a/{index:02d}.txt", 1, 1) for index in range(21)]
+            only_b = [(f"/nur-b/{index:02d}.txt", 1, 1) for index in range(21)]
+            changed_a = [(f"/anders/{index:02d}.txt", 1, 10) for index in range(21)]
+            changed_b = [(f"/anders/{index:02d}.txt", 9, 10) for index in range(21)]
+            same = [("/gleich/bleibt.txt", 4, 4)]
+            _seed_index(left, only_a + changed_a + same)
+            _seed_index(right, only_b + changed_b + same)
+            report = compare_indexes(left, right)
+            self.assertEqual(report["count_a"], 43)
+            self.assertEqual(report["count_b"], 43)
+            self.assertEqual(report["only_a"], 21)
+            self.assertEqual(report["only_b"], 21)
+            self.assertEqual(report["changed"], 21)
+            self.assertEqual(len(report["only_a_paths"]), 20)
+            self.assertEqual(len(report["only_b_paths"]), 20)
+            self.assertEqual(len(report["changed_paths"]), 20)
+            self.assertNotIn("/nur-a/20.txt", report["only_a_paths"])
+            self.assertIn("/nur-a/00.txt", report["only_a_paths"])
+            self.assertIn("/anders/00.txt", report["changed_paths"])
+            self.assertNotIn("/gleich/bleibt.txt", report["changed_paths"])
+
+    def test_cli_copy_and_compare(self) -> None:
+        import io
+        from contextlib import redirect_stderr, redirect_stdout
+
+        from flare.cli import main
+
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp) / "quelle.db"
+            dest = Path(tmp) / "ziel.db"
+            _seed_index(source, [("/docs/merkname.txt", 12, 40)])
+            out = io.StringIO()
+            with redirect_stdout(out):
+                code = main(["index-copy", str(source), str(dest)])
+            self.assertEqual(code, 0)
+            self.assertIn(str(dest), out.getvalue())
+            self.assertTrue(source.is_file())
+            report_out = io.StringIO()
+            with redirect_stdout(report_out):
+                compared = main(["index-compare", str(source), str(dest)])
+            self.assertEqual(compared, 0)
+            text = report_out.getvalue()
+            self.assertIn("Nur in A: 0", text)
+            self.assertIn("Nur in B: 0", text)
+            self.assertIn("Geändert: 0", text)
+            err = io.StringIO()
+            with redirect_stderr(err):
+                missing = main(["index-compare", str(Path(tmp) / "fehlt.db"), str(dest)])
+            self.assertEqual(missing, 1)
+            self.assertIn("Index fehlt", err.getvalue())
+            self.assertNotIn("Traceback", err.getvalue())
+            empty = Path(tmp) / "leer.db"
+            import sqlite3
+
+            sqlite3.connect(empty).close()
+            err_empty = io.StringIO()
+            with redirect_stderr(err_empty):
+                bare = main(["index-compare", str(empty), str(dest)])
+            self.assertEqual(bare, 1)
+            self.assertIn("ohne Tabelle", err_empty.getvalue())
+            self.assertNotIn("Traceback", err_empty.getvalue())
 
 
 if __name__ == "__main__":

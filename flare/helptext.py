@@ -27,7 +27,9 @@ def description() -> str:
         "Andere Programme fragen über 127.0.0.1, Port 47731, nach. "
         "Der Knopf Hilfe und die Taste F1 öffnen diesen Text. "
         "Escape schließt die Hilfe und kehrt zur Suche zurück. "
-        "Der Knopf „Index speichern“ schreibt eine zusätzliche Kopie. "
+        "Mehrere Kopien des Index lassen sich speichern, kopieren und vergleichen. "
+        "Die Befehle heißen index-save, index-copy und index-compare. "
+        "Die Knöpfe „Index speichern“, „Index kopieren“ und „Index vergleichen“ tun dasselbe. "
         "Der Index selbst liegt unter %LOCALAPPDATA%\\Flare und bleibt beim Entfernen erhalten."
     )
 
@@ -46,7 +48,7 @@ def features() -> list[str]:
         "Übersprungen werden node_modules, .git, versteckte Ordner und Geheimnisdateien.",
         "Index-Last etwa 85 % in den ersten 20 Sekunden, danach etwa 35 %. Ist die CPU beschäftigt, wartet Flare zusätzlich.",
         "Andere Programme: HTTP auf 127.0.0.1 Port 47731, flare.py query und flare.client.Client.",
-        "Einrichtung pro Benutzer unter %LOCALAPPDATA%\\Programs\\Flare. Der Index liegt automatisch unter %LOCALAPPDATA%\\Flare und wird beim Entfernen nicht gelöscht. „Index speichern“ schreibt eine zusätzliche Kopie. Das Setup beendet ein laufendes Flare.exe, bevor es DLLs kopiert.",
+        "Einrichtung pro Benutzer unter %LOCALAPPDATA%\\Programs\\Flare. Der Index liegt automatisch unter %LOCALAPPDATA%\\Flare und wird beim Entfernen nicht gelöscht. Mehrere Kopien lassen sich speichern, kopieren und vergleichen: index-save, index-copy und index-compare. Im Hilfefenster die Knöpfe „Index speichern“, „Index kopieren“ und „Index vergleichen“. Das Setup beendet ein laufendes Flare.exe, bevor es DLLs kopiert.",
         "Rechnung wie 2+2*3. Enter öffnet einen Treffer, Escape blendet die Suche aus.",
         "Hilfe über den Knopf Hilfe oder F1. Escape schließt die Hilfe und kehrt zur Suche zurück.",
     ]

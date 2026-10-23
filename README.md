@@ -188,9 +188,19 @@ Datenträgerbezeichnung. Sie werden nicht indiziert. `index_network` steht
 standardmäßig auf `false`; `true` liest gemappte Netzlaufwerke nur nach Namen.
 
 Der laufende Index ist `%LOCALAPPDATA%\Flare\index.db`. Er bleibt beim
-Entfernen liegen und wird beim Start weiterverwendet.
-`py -3 flare.py index-save ZIELDATEI` schreibt eine zusätzliche Kopie, im
-Hilfefenster der Knopf „Index speichern“.
+Entfernen liegen und wird beim Start weiterverwendet. Mehrere Kopien lassen
+sich speichern, kopieren und vergleichen:
+
+```bash
+py -3 flare.py index-save ZIELDATEI
+py -3 flare.py index-copy QUELLE ZIEL
+py -3 flare.py index-compare A B
+```
+
+Im Hilfefenster die Knöpfe „Index speichern“, „Index kopieren“ und
+„Index vergleichen“. Der Vergleich zählt Pfade, die nur in einer Kopie stehen
+oder sich in Größe oder Änderungszeit unterscheiden, und zeigt je Gruppe
+höchstens 20 Beispiele.
 
 ## Installer neu bauen
 

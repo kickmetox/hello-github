@@ -512,3 +512,177 @@ class Index:
             finally:
                 dest_con.close()
         return target
+
+
+_COMPARE_SAMPLE = 20
+
+
+def copy_index(source: str | Path, dest: str | Path) -> Path:
+    """Konsistente Kopie einer Indexdatei über sqlite3.Connection.backup.
+
+    Die Quelle wird nur gelesen und bleibt an ihrem Ort. Es wird kein WAL roh
+    kopiert und nichts verschoben oder gelöscht.
+    """
+    src = Path(source)
+    target = Path(dest)
+    if not src.is_file():
+        raise ValueError(f"Index fehlt: {src}")
+    if target.resolve() == src.resolve():
+        raise ValueError("Ziel ist die Quelle")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        src_con = sqlite3.connect(sqlite_uri(src, "ro"), uri=True, timeout=3)
+    except sqlite3.Error as exc:
+        raise ValueError(f"Index lässt sich nicht öffnen: {src}") from exc
+    try:
+        dest_con = sqlite3.connect(target)
+        try:
+            src_con.backup(dest_con)
+            dest_con.commit()
+        finally:
+            dest_con.close()
+    finally:
+        src_con.close()
+    return target
+
+
+def compare_indexes(
+    path_a: str | Path,
+    path_b: str | Path,
+    *,
+    sample: int = _COMPARE_SAMPLE,
+) -> dict[str, Any]:
+    """Zwei Indexdateien nach Pfad vergleichen.
+
+    Zählungen laufen in SQL. Zurück kommen die Anzahlen und höchstens 20
+    Beispielpfade je Gruppe, nicht der ganze Katalog.
+    """
+    left = Path(path_a)
+    right = Path(path_b)
+    limit = max(0, min(_COMPARE_SAMPLE, int(sample)))
+    con = _open_index_pair(left, right)
+    try:
+        count_a = _item_count(con, "main")
+        count_b = _item_count(con, "idxb")
+        only_a = _count_missing(con, "main", "idxb")
+        only_b = _count_missing(con, "idxb", "main")
+        changed = _count_changed(con)
+        return {
+            "count_a": count_a,
+            "count_b": count_b,
+            "only_a": only_a,
+            "only_b": only_b,
+            "changed": changed,
+            "only_a_paths": _sample_missing(con, "main", "idxb", limit),
+            "only_b_paths": _sample_missing(con, "idxb", "main", limit),
+            "changed_paths": _sample_changed(con, limit),
+        }
+    finally:
+        con.close()
+
+
+def format_index_compare(report: dict[str, Any]) -> str:
+    """Kurzer deutscher Bericht für Kommandozeile und Hilfefenster."""
+    lines = [
+        f"Einträge in A: {report['count_a']}",
+        f"Einträge in B: {report['count_b']}",
+        f"Nur in A: {report['only_a']}",
+    ]
+    lines.extend(f"  {path}" for path in report["only_a_paths"])
+    lines.append(f"Nur in B: {report['only_b']}")
+    lines.extend(f"  {path}" for path in report["only_b_paths"])
+    lines.append(f"Geändert: {report['changed']}")
+    lines.extend(f"  {path}" for path in report["changed_paths"])
+    return "\n".join(lines)
+
+
+def _open_index_pair(left: Path, right: Path) -> sqlite3.Connection:
+    if not left.is_file():
+        raise ValueError(f"Index fehlt: {left}")
+    if not right.is_file():
+        raise ValueError(f"Index fehlt: {right}")
+    try:
+        con = sqlite3.connect(sqlite_uri(left, "ro"), uri=True, timeout=3)
+    except sqlite3.Error as exc:
+        raise ValueError(f"Index lässt sich nicht öffnen: {left}") from exc
+    try:
+        con.execute("ATTACH DATABASE ? AS idxb", (sqlite_uri(right, "ro"),))
+    except sqlite3.Error as exc:
+        con.close()
+        raise ValueError(f"Index lässt sich nicht öffnen: {right}") from exc
+    try:
+        _require_items(con, "main", left)
+        _require_items(con, "idxb", right)
+    except ValueError:
+        con.close()
+        raise
+    return con
+
+
+def _require_items(con: sqlite3.Connection, schema: str, path: Path) -> None:
+    row = con.execute(
+        f"SELECT 1 FROM {schema}.sqlite_master WHERE type='table' AND name='items'"
+    ).fetchone()
+    if row is None:
+        raise ValueError(f"Index ohne Tabelle items: {path}")
+
+
+def _item_count(con: sqlite3.Connection, schema: str) -> int:
+    row = con.execute(f"SELECT COUNT(*) FROM {schema}.items").fetchone()
+    return int(row[0])
+
+
+def _count_missing(con: sqlite3.Connection, have: str, other: str) -> int:
+    row = con.execute(
+        f"""
+        SELECT COUNT(*) FROM {have}.items AS have
+        WHERE NOT EXISTS (
+          SELECT 1 FROM {other}.items AS other WHERE other.path = have.path
+        )
+        """
+    ).fetchone()
+    return int(row[0])
+
+
+def _sample_missing(con: sqlite3.Connection, have: str, other: str, limit: int) -> list[str]:
+    if limit <= 0:
+        return []
+    rows = con.execute(
+        f"""
+        SELECT have.path FROM {have}.items AS have
+        WHERE NOT EXISTS (
+          SELECT 1 FROM {other}.items AS other WHERE other.path = have.path
+        )
+        ORDER BY have.path
+        LIMIT ?
+        """,
+        (limit,),
+    ).fetchall()
+    return [str(row[0]) for row in rows]
+
+
+def _count_changed(con: sqlite3.Connection) -> int:
+    row = con.execute(
+        """
+        SELECT COUNT(*) FROM main.items AS a
+        JOIN idxb.items AS b ON b.path = a.path
+        WHERE a.size != b.size OR a.mtime_ns != b.mtime_ns
+        """
+    ).fetchone()
+    return int(row[0])
+
+
+def _sample_changed(con: sqlite3.Connection, limit: int) -> list[str]:
+    if limit <= 0:
+        return []
+    rows = con.execute(
+        """
+        SELECT a.path FROM main.items AS a
+        JOIN idxb.items AS b ON b.path = a.path
+        WHERE a.size != b.size OR a.mtime_ns != b.mtime_ns
+        ORDER BY a.path
+        LIMIT ?
+        """,
+        (limit,),
+    ).fetchall()
+    return [str(row[0]) for row in rows]

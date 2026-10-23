@@ -9,6 +9,7 @@ from ctypes import wintypes
 from typing import Any, Callable
 
 from flare.helptext import help_text
+from flare.store import compare_indexes, copy_index, format_index_compare
 
 WM_DESTROY = 0x0002
 WM_SIZE = 0x0005
@@ -62,6 +63,8 @@ VK_DOWN = 0x28
 VK_F1 = 0x70
 IDC_HELP = 104
 IDC_SAVE_INDEX = 201
+IDC_COPY_INDEX = 203
+IDC_COMPARE_INDEX = 204
 SM_CXSCREEN = 0
 SM_CYSCREEN = 1
 
@@ -95,8 +98,17 @@ def supported() -> bool:
     return sys.platform == "win32"
 
 
-def choose_index_save_path(owner: int = 0) -> str | None:
+def choose_index_save_path(owner: int = 0, title: str = "Index speichern") -> str | None:
     """Speichern-Dialog. Nur unter Windows, und erst beim Klick, nicht beim Import."""
+    return _index_file_dialog(owner, save=True, title=title, suggested="flare-index.db")
+
+
+def choose_index_open_path(owner: int = 0, title: str = "Index öffnen") -> str | None:
+    """Öffnen-Dialog. Nur unter Windows, und erst beim Klick, nicht beim Import."""
+    return _index_file_dialog(owner, save=False, title=title, suggested="")
+
+
+def _index_file_dialog(owner: int, *, save: bool, title: str, suggested: str) -> str | None:
     if sys.platform != "win32":
         return None
     comdlg32 = ctypes.WinDLL("comdlg32", use_last_error=True)
@@ -128,11 +140,8 @@ def choose_index_save_path(owner: int = 0) -> str | None:
             ("FlagsEx", wintypes.DWORD),
         ]
 
-    comdlg32.GetSaveFileNameW.argtypes = [ctypes.POINTER(OPENFILENAMEW)]
-    comdlg32.GetSaveFileNameW.restype = wintypes.BOOL
     file_buf = ctypes.create_unicode_buffer(32768)
-    file_buf.value = "flare-index.db"
-    title = "Index speichern"
+    file_buf.value = suggested
     filt = "SQLite-Datenbank\0*.db\0Alle Dateien\0*.*\0"
     ofn = OPENFILENAMEW()
     ofn.lStructSize = ctypes.sizeof(OPENFILENAMEW)
@@ -142,9 +151,18 @@ def choose_index_save_path(owner: int = 0) -> str | None:
     ofn.lpstrFile = ctypes.cast(file_buf, wintypes.LPWSTR)
     ofn.nMaxFile = len(file_buf)
     ofn.lpstrTitle = title
-    ofn.Flags = 0x00080000 | 0x00000800 | 0x00000002
     ofn.lpstrDefExt = "db"
-    if not comdlg32.GetSaveFileNameW(ctypes.byref(ofn)):
+    if save:
+        comdlg32.GetSaveFileNameW.argtypes = [ctypes.POINTER(OPENFILENAMEW)]
+        comdlg32.GetSaveFileNameW.restype = wintypes.BOOL
+        ofn.Flags = 0x00080000 | 0x00000800 | 0x00000002
+        accepted = comdlg32.GetSaveFileNameW(ctypes.byref(ofn))
+    else:
+        comdlg32.GetOpenFileNameW.argtypes = [ctypes.POINTER(OPENFILENAMEW)]
+        comdlg32.GetOpenFileNameW.restype = wintypes.BOOL
+        ofn.Flags = 0x00080000 | 0x00000800 | 0x00001000
+        accepted = comdlg32.GetOpenFileNameW(ctypes.byref(ofn))
+    if not accepted:
         return None
     chosen = file_buf.value.strip()
     return chosen or None
@@ -181,6 +199,8 @@ class HelpWindow:
         self.hwnd = 0
         self.body = 0
         self.save_btn = 0
+        self.copy_btn = 0
+        self.compare_btn = 0
         self.save_status = 0
         self._proc: Any = None
         self._wndproc_type: Any = None
@@ -292,6 +312,8 @@ class HelpWindow:
         if self.body:
             user32.SetWindowTextW(self.body, help_text())
         self.save_btn = self._child("BUTTON", "Index speichern", IDC_SAVE_INDEX, BS_PUSHBUTTON)
+        self.copy_btn = self._child("BUTTON", "Index kopieren", IDC_COPY_INDEX, BS_PUSHBUTTON)
+        self.compare_btn = self._child("BUTTON", "Index vergleichen", IDC_COMPARE_INDEX, BS_PUSHBUTTON)
         self.save_status = self._child("STATIC", "", 202, 0)
         self._layout()
         user32.ShowWindow(self.hwnd, SW_SHOW)
@@ -363,13 +385,18 @@ class HelpWindow:
         user32.GetClientRect(self.hwnd, ctypes.byref(rect))
         width = max(40, (rect.right - rect.left) - 24)
         height = max(40, (rect.bottom - rect.top) - 24)
-        reserve = 44 if self.save_btn else 0
+        buttons = [hwnd for hwnd in (self.save_btn, self.copy_btn, self.compare_btn) if hwnd]
+        reserve = 76 if buttons else 0
         body_h = max(40, height - reserve)
         user32.MoveWindow(self.body, 12, 12, width, body_h, True)
-        if self.save_btn:
-            user32.MoveWindow(self.save_btn, 12, 20 + body_h, 180, 28, True)
+        if buttons:
+            gap = 8
+            btn_w = max(80, (width - gap * (len(buttons) - 1)) // len(buttons))
+            y = 16 + body_h
+            for index, hwnd in enumerate(buttons):
+                user32.MoveWindow(hwnd, 12 + index * (btn_w + gap), y, btn_w, 28, True)
         if self.save_status:
-            user32.MoveWindow(self.save_status, 204, 24 + body_h, max(40, width - 204), 22, True)
+            user32.MoveWindow(self.save_status, 12, 48 + body_h, width, 22, True)
 
     def _wndproc(self, hwnd: int, msg: int, wparam: int, lparam: int) -> int:
         user32 = _prepare_user32()
@@ -379,8 +406,13 @@ class HelpWindow:
         if msg == WM_COMMAND:
             ident = int(wparam) & 0xFFFF
             code = (int(wparam) >> 16) & 0xFFFF
-            if ident == IDC_SAVE_INDEX and code == BN_CLICKED:
-                self._save_index()
+            if code == BN_CLICKED:
+                if ident == IDC_SAVE_INDEX:
+                    self._save_index()
+                elif ident == IDC_COPY_INDEX:
+                    self._copy_index()
+                elif ident == IDC_COMPARE_INDEX:
+                    self._compare_indexes()
             return 0
         if msg == WM_CLOSE or (msg == WM_KEYDOWN and int(wparam) == VK_ESCAPE):
             self.close(focus=True)
@@ -436,6 +468,38 @@ class HelpWindow:
             self._set_status("Speichern fehlgeschlagen.")
             return
         self._set_status("Index gespeichert.")
+
+    def _copy_index(self) -> None:
+        source = choose_index_open_path(self.hwnd, "Index kopieren")
+        if not source:
+            return
+        dest = choose_index_save_path(self.hwnd, "Index kopieren")
+        if not dest:
+            return
+        try:
+            copy_index(source, dest)
+        except Exception:
+            self._set_status("Kopieren fehlgeschlagen.")
+            return
+        self._set_status("Index kopiert.")
+
+    def _compare_indexes(self) -> None:
+        left = choose_index_open_path(self.hwnd, "Erster Index")
+        if not left:
+            return
+        right = choose_index_open_path(self.hwnd, "Zweiter Index")
+        if not right:
+            return
+        try:
+            report = format_index_compare(compare_indexes(left, right))
+        except Exception:
+            self._set_status("Vergleich fehlgeschlagen.")
+            return
+        self._set_status("Vergleich fertig.")
+        if self.body:
+            ctypes.windll.user32.SetWindowTextW(self.body, report)
+            ctypes.windll.user32.SetFocus(self.body)
+            ctypes.windll.user32.SendMessageW(self.body, EM_SETSEL, 0, 0)
 
 
 class NativeWindow:

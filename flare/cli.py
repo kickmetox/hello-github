@@ -7,6 +7,7 @@ import json
 import logging
 import os
 import signal
+import sqlite3
 import sys
 from pathlib import Path
 from typing import Any
@@ -16,7 +17,7 @@ from flare.autostart import install_autostart, remove_autostart
 from flare.client import Client
 from flare.paths import config_dir, data_dir
 from flare.service import Service, roots_from_args
-from flare.store import Index
+from flare.store import Index, compare_indexes, copy_index, format_index_compare
 
 
 def load_config(folder: Path | None = None) -> dict[str, Any]:
@@ -59,6 +60,12 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("remove-autostart", help="Autostart entfernen")
     saved = sub.add_parser("index-save", help="Index zusätzlich in eine Datei schreiben")
     saved.add_argument("dest", metavar="ZIELDATEI")
+    copied = sub.add_parser("index-copy", help="eine Indexdatei in eine andere kopieren")
+    copied.add_argument("source", metavar="QUELLE")
+    copied.add_argument("dest", metavar="ZIEL")
+    compared = sub.add_parser("index-compare", help="zwei Indexdateien vergleichen")
+    compared.add_argument("left", metavar="A")
+    compared.add_argument("right", metavar="B")
     return parser
 
 
@@ -77,6 +84,26 @@ def _index_save(args: argparse.Namespace) -> int:
     finally:
         index.close()
     print(saved)
+    return 0
+
+
+def _index_copy(args: argparse.Namespace) -> int:
+    try:
+        saved = copy_index(args.source, args.dest)
+    except (OSError, ValueError, sqlite3.Error) as exc:
+        print(f"Kopieren fehlgeschlagen: {exc}", file=sys.stderr)
+        return 1
+    print(saved)
+    return 0
+
+
+def _index_compare(args: argparse.Namespace) -> int:
+    try:
+        report = compare_indexes(args.left, args.right)
+    except (OSError, ValueError, sqlite3.Error) as exc:
+        print(f"Vergleich fehlgeschlagen: {exc}", file=sys.stderr)
+        return 1
+    print(format_index_compare(report))
     return 0
 
 
@@ -154,6 +181,10 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.cmd == "index-save":
         return _index_save(args)
+    if args.cmd == "index-copy":
+        return _index_copy(args)
+    if args.cmd == "index-compare":
+        return _index_compare(args)
     # Nur Windows. Eine eingefrorene Flare.exe meldet win32 und läuft weiter.
     if sys.platform != "win32":
         print("Flare ist nur für Windows 11.", file=sys.stderr)
