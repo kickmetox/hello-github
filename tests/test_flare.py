@@ -17,7 +17,7 @@ os.environ.setdefault("FLARE_FORCE_CPU", "1")
 from flare.autostart import install_autostart, launch_command, remove_autostart
 from flare.calc import try_calc
 from flare.client import Client
-from flare.crawl import Crawler, DRIVE_POLL_S, application_roots, dedupe_roots, merge_volume_roots, should_skip_dir, _user_dirs
+from flare.crawl import Crawler, DRIVE_POLL_S, RESCHEDULE, application_roots, dedupe_roots, merge_volume_roots, roots_worth_watching, should_skip_dir, _user_dirs
 from flare.paths import is_inside, norm, place_key, prefix_with_sep
 from flare.volumes import (
     DRIVE_CDROM,
@@ -761,7 +761,7 @@ class VolumeTests(unittest.TestCase):
             (modules / "pkg.js").write_text("nope\n", encoding="utf-8")
             docs = Path(tmp) / "docs"
             docs.mkdir()
-            (docs / "bleib.txt").write_text("bleibt\n", encoding="utf-8")
+            (docs / "bleib.txt").write_text("aktenzeichen\n", encoding="utf-8")
             state = {"drives": [(str(stick), 1)]}
 
             def poll() -> list[tuple[str, int]]:
@@ -783,10 +783,14 @@ class VolumeTests(unittest.TestCase):
                 crawler.drain()
                 self.assertIn("foto.txt", _names(index, "foto"))
                 self.assertIn("deep.txt", _names(index, "deep"))
-                content_hits = search(index, Ranker(allow_cuda=False), "bildwort")["results"]
+                self.assertTrue(crawler.hides_content(norm(stick)))
+                self.assertFalse(crawler.hides_content(norm(docs)))
+                bild = search(index, Ranker(allow_cuda=False), "bildwort")["results"]
+                self.assertFalse(any(hit.get("via") == "content" for hit in bild), bild)
+                bleib = search(index, Ranker(allow_cuda=False), "aktenzeichen")["results"]
                 self.assertTrue(
-                    any(hit["name"] == "foto.txt" and hit["via"] == "content" for hit in content_hits),
-                    content_hits,
+                    any(hit["name"] == "bleib.txt" and hit["via"] == "content" for hit in bleib),
+                    bleib,
                 )
                 self.assertIn("bleib.txt", _names(index, "bleib"))
                 self.assertFalse(_names(index, ".env"))
@@ -868,6 +872,135 @@ class VolumeTests(unittest.TestCase):
         self.assertEqual(drive_roots_for_config(), [])
         self.assertEqual(read_onedrive_folders(), [])
         self.assertEqual(windows_system_drive(), "")
+
+    def test_external_and_cloud_roots_are_names_only(self) -> None:
+        self.assertFalse(should_sample_content(enabled=True, tier=1, offline=False, names_only=True))
+        self.assertTrue(should_sample_content(enabled=True, tier=1, offline=False))
+        self.assertFalse(index_network_enabled({}))
+        self.assertFalse(index_network_enabled(None))
+        self.assertEqual(RESCHEDULE[1], 300.0)
+        watched = roots_worth_watching(
+            [("/home/me/Dokumente", 1), ("/mnt/usb", 1), ("/home/me/OneDrive", 1)],
+            ["/mnt/usb", "/home/me/OneDrive"],
+        )
+        self.assertEqual(watched, ["/home/me/Dokumente"])
+        with tempfile.TemporaryDirectory() as tmp:
+            external = Path(tmp) / "usb"
+            cloud = Path(tmp) / "OneDrive"
+            known = Path(tmp) / "Dokumente"
+            for folder in (external, cloud, known):
+                folder.mkdir()
+            (external / "stick.txt").write_text("usbinhaltgeheim\n", encoding="utf-8")
+            (cloud / "wolke.txt").write_text("cloudinhaltgeheim\n", encoding="utf-8")
+            (known / "notiz.txt").write_text("sonderakte\n", encoding="utf-8")
+            index = Index(Path(tmp) / "index.db")
+            try:
+                crawler = Crawler(
+                    index,
+                    Governor(fast=True),
+                    [(str(external), 1), (str(cloud), 1), (str(known), 1)],
+                    threading.Event(),
+                    content=True,
+                    index_path=False,
+                    dynamic_roots=[str(external)],
+                    names_only=[str(cloud)],
+                )
+                self.assertEqual(dict(crawler.roots)[norm(external)], 1)
+                self.assertTrue(crawler.hides_content(norm(external / "stick.txt")))
+                self.assertTrue(crawler.hides_content(norm(cloud)))
+                self.assertFalse(crawler.hides_content(norm(known)))
+                crawler.prime()
+                crawler.drain()
+                self.assertIn("stick.txt", _names(index, "stick"))
+                self.assertIn("wolke.txt", _names(index, "wolke"))
+                self.assertIn("notiz.txt", _names(index, "notiz"))
+                usb = search(index, Ranker(allow_cuda=False), "usbinhaltgeheim")["results"]
+                cloud_hits = search(index, Ranker(allow_cuda=False), "cloudinhaltgeheim")["results"]
+                known_hits = search(index, Ranker(allow_cuda=False), "sonderakte")["results"]
+                self.assertFalse(any(hit.get("via") == "content" for hit in usb), usb)
+                self.assertFalse(any(hit.get("via") == "content" for hit in cloud_hits), cloud_hits)
+                self.assertTrue(
+                    any(hit["name"] == "notiz.txt" and hit["via"] == "content" for hit in known_hits),
+                    known_hits,
+                )
+            finally:
+                index.close()
+
+    def test_governor_duty_stays_light(self) -> None:
+        import inspect
+
+        import flare.crawl as crawl
+        import flare.service as service
+        import flare.volumes as volumes
+
+        gov = Governor(duty=0.35)
+        self.assertEqual(gov.base_duty, 0.35)
+        self.assertEqual(gov.boost_seconds, 20.0)
+        self.assertEqual(gov.duty, 0.85)
+        gov.started = time.perf_counter() - 21
+        self.assertEqual(gov.duty, 0.35)
+        self.assertEqual(RESCHEDULE[1], 300.0)
+        for module in (crawl, service, volumes):
+            self.assertNotIn("lower_background_thread(", inspect.getsource(module))
+
+    def test_backup_roundtrip_keeps_the_live_index(self) -> None:
+        import io
+        from contextlib import redirect_stdout
+
+        from flare.cli import main
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "docs"
+            root.mkdir()
+            (root / "merkname.txt").write_text("merklich\n", encoding="utf-8")
+            data = Path(tmp) / "data"
+            data.mkdir()
+            db = data / "index.db"
+            index = Index(db)
+            dest = Path(tmp) / "kopie" / "flare-index.db"
+            try:
+                crawler = Crawler(
+                    index,
+                    Governor(fast=True),
+                    [(str(root), 1)],
+                    threading.Event(),
+                    content=True,
+                    index_path=False,
+                )
+                crawler.prime()
+                crawler.drain()
+                self.assertIn("merkname.txt", _names(index, "merkname"))
+                with self.assertRaises(ValueError):
+                    index.backup(db)
+                saved = index.backup(dest)
+                self.assertEqual(Path(saved), dest)
+                self.assertTrue(db.exists())
+                self.assertTrue(dest.exists())
+            finally:
+                index.close()
+            live = Index(db)
+            copy = Index(dest, readonly=True)
+            try:
+                self.assertIn("merkname.txt", _names(live, "merkname"))
+                self.assertIn("merkname.txt", _names(copy, "merkname"))
+            finally:
+                live.close()
+                copy.close()
+            out = io.StringIO()
+            with redirect_stdout(out):
+                code = main(["--data-dir", str(data), "index-save", str(Path(tmp) / "cli.db")])
+            self.assertEqual(code, 0)
+            self.assertIn("cli.db", out.getvalue())
+            via_cli = Index(Path(tmp) / "cli.db", readonly=True)
+            try:
+                self.assertIn("merkname.txt", _names(via_cli, "merkname"))
+            finally:
+                via_cli.close()
+            self.assertTrue(db.exists())
+            missing = main(
+                ["--data-dir", str(Path(tmp) / "leer"), "index-save", str(Path(tmp) / "kein.db")]
+            )
+            self.assertEqual(missing, 1)
 
     def test_indexer_does_not_lower_the_thread_or_read_wstring(self) -> None:
         import inspect

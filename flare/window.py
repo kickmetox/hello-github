@@ -61,6 +61,7 @@ VK_UP = 0x26
 VK_DOWN = 0x28
 VK_F1 = 0x70
 IDC_HELP = 104
+IDC_SAVE_INDEX = 201
 SM_CXSCREEN = 0
 SM_CYSCREEN = 1
 
@@ -94,6 +95,61 @@ def supported() -> bool:
     return sys.platform == "win32"
 
 
+def choose_index_save_path(owner: int = 0) -> str | None:
+    """Speichern-Dialog. Nur unter Windows, und erst beim Klick, nicht beim Import."""
+    if sys.platform != "win32":
+        return None
+    comdlg32 = ctypes.WinDLL("comdlg32", use_last_error=True)
+
+    class OPENFILENAMEW(ctypes.Structure):
+        _fields_ = [
+            ("lStructSize", wintypes.DWORD),
+            ("hwndOwner", wintypes.HWND),
+            ("hInstance", wintypes.HINSTANCE),
+            ("lpstrFilter", wintypes.LPCWSTR),
+            ("lpstrCustomFilter", wintypes.LPWSTR),
+            ("nMaxCustFilter", wintypes.DWORD),
+            ("nFilterIndex", wintypes.DWORD),
+            ("lpstrFile", wintypes.LPWSTR),
+            ("nMaxFile", wintypes.DWORD),
+            ("lpstrFileTitle", wintypes.LPWSTR),
+            ("nMaxFileTitle", wintypes.DWORD),
+            ("lpstrInitialDir", wintypes.LPCWSTR),
+            ("lpstrTitle", wintypes.LPCWSTR),
+            ("Flags", wintypes.DWORD),
+            ("nFileOffset", wintypes.WORD),
+            ("nFileExtension", wintypes.WORD),
+            ("lpstrDefExt", wintypes.LPCWSTR),
+            ("lCustData", wintypes.LPARAM),
+            ("lpfnHook", ctypes.c_void_p),
+            ("lpTemplateName", wintypes.LPCWSTR),
+            ("pvReserved", ctypes.c_void_p),
+            ("dwReserved", wintypes.DWORD),
+            ("FlagsEx", wintypes.DWORD),
+        ]
+
+    comdlg32.GetSaveFileNameW.argtypes = [ctypes.POINTER(OPENFILENAMEW)]
+    comdlg32.GetSaveFileNameW.restype = wintypes.BOOL
+    file_buf = ctypes.create_unicode_buffer(32768)
+    file_buf.value = "flare-index.db"
+    title = "Index speichern"
+    filt = "SQLite-Datenbank\0*.db\0Alle Dateien\0*.*\0"
+    ofn = OPENFILENAMEW()
+    ofn.lStructSize = ctypes.sizeof(OPENFILENAMEW)
+    ofn.hwndOwner = owner or None
+    ofn.lpstrFilter = filt
+    ofn.nFilterIndex = 1
+    ofn.lpstrFile = ctypes.cast(file_buf, wintypes.LPWSTR)
+    ofn.nMaxFile = len(file_buf)
+    ofn.lpstrTitle = title
+    ofn.Flags = 0x00080000 | 0x00000800 | 0x00000002
+    ofn.lpstrDefExt = "db"
+    if not comdlg32.GetSaveFileNameW(ctypes.byref(ofn)):
+        return None
+    chosen = file_buf.value.strip()
+    return chosen or None
+
+
 def shortcut_action(key: int, *, help_open: bool, help_target: bool) -> str | None:
     """Tasten im Suchfenster, ohne ein HWND zu erzeugen.
 
@@ -124,6 +180,8 @@ class HelpWindow:
         self.owner = owner
         self.hwnd = 0
         self.body = 0
+        self.save_btn = 0
+        self.save_status = 0
         self._proc: Any = None
         self._wndproc_type: Any = None
         self._brush = 0
@@ -233,6 +291,8 @@ class HelpWindow:
             user32.SendMessageW(self.body, WM_SETFONT, self.owner._font, 1)
         if self.body:
             user32.SetWindowTextW(self.body, help_text())
+        self.save_btn = self._child("BUTTON", "Index speichern", IDC_SAVE_INDEX, BS_PUSHBUTTON)
+        self.save_status = self._child("STATIC", "", 202, 0)
         self._layout()
         user32.ShowWindow(self.hwnd, SW_SHOW)
         user32.SetForegroundWindow(self.hwnd)
@@ -303,12 +363,24 @@ class HelpWindow:
         user32.GetClientRect(self.hwnd, ctypes.byref(rect))
         width = max(40, (rect.right - rect.left) - 24)
         height = max(40, (rect.bottom - rect.top) - 24)
-        user32.MoveWindow(self.body, 12, 12, width, height, True)
+        reserve = 44 if self.save_btn else 0
+        body_h = max(40, height - reserve)
+        user32.MoveWindow(self.body, 12, 12, width, body_h, True)
+        if self.save_btn:
+            user32.MoveWindow(self.save_btn, 12, 20 + body_h, 180, 28, True)
+        if self.save_status:
+            user32.MoveWindow(self.save_status, 204, 24 + body_h, max(40, width - 204), 22, True)
 
     def _wndproc(self, hwnd: int, msg: int, wparam: int, lparam: int) -> int:
         user32 = _prepare_user32()
         if msg == WM_SIZE:
             self._layout()
+            return 0
+        if msg == WM_COMMAND:
+            ident = int(wparam) & 0xFFFF
+            code = (int(wparam) >> 16) & 0xFFFF
+            if ident == IDC_SAVE_INDEX and code == BN_CLICKED:
+                self._save_index()
             return 0
         if msg == WM_CLOSE or (msg == WM_KEYDOWN and int(wparam) == VK_ESCAPE):
             self.close(focus=True)
@@ -325,9 +397,55 @@ class HelpWindow:
             return self._field_brush or self._brush
         return user32.DefWindowProcW(hwnd, msg, wparam, lparam)
 
+    def _child(self, klass: str, title: str, ident: int, style: int) -> int:
+        user32 = ctypes.windll.user32
+        hwnd = user32.CreateWindowExW(
+            0,
+            klass,
+            title,
+            WS_CHILD | WS_VISIBLE | WS_TABSTOP | style,
+            0,
+            0,
+            10,
+            10,
+            self.hwnd,
+            wintypes.HMENU(ident),
+            ctypes.windll.kernel32.GetModuleHandleW(None),
+            None,
+        )
+        font = self.owner._font
+        if font and hwnd:
+            user32.SendMessageW(hwnd, WM_SETFONT, font, 1)
+        return int(hwnd) if hwnd else 0
+
+    def _set_status(self, text: str) -> None:
+        if self.save_status:
+            ctypes.windll.user32.SetWindowTextW(self.save_status, text)
+
+    def _save_index(self) -> None:
+        path = choose_index_save_path(self.hwnd)
+        if not path:
+            return
+        save = getattr(self.owner, "save_index", None)
+        if save is None:
+            self._set_status("Speichern fehlgeschlagen.")
+            return
+        try:
+            save(path)
+        except Exception:
+            self._set_status("Speichern fehlgeschlagen.")
+            return
+        self._set_status("Index gespeichert.")
+
 
 class NativeWindow:
-    def __init__(self, search: SearchFn, open_hit: OpenFn, status: StatusFn) -> None:
+    def __init__(
+        self,
+        search: SearchFn,
+        open_hit: OpenFn,
+        status: StatusFn,
+        save_index: Callable[[str], str] | None = None,
+    ) -> None:
         self._search = search
         self._open_hit = open_hit
         self._status = status
@@ -346,6 +464,7 @@ class NativeWindow:
         self._field_brush = 0
         self._font = 0
         self.help_btn = 0
+        self.save_index = save_index
         self._help = HelpWindow(self)
 
     def show(self) -> None:

@@ -118,7 +118,8 @@ Bilder, Musik und Videos, auch wenn Windows sie nach OneDrive verschoben hat.
 Anschließend das Benutzerprofil. Externe Festplatten und USB-Sticks werden
 eigene Wurzeln, auch wenn eine externe Platte als festes Laufwerk erscheint.
 Lokale Ordner von OneDrive, Dropbox und Google Drive kommen dazu, soweit sie
-auf der Platte liegen. Nur-online-Platzhalter zählen mit Namen, ihr Inhalt
+auf der Platte liegen. Externe Festplatten, USB-Sticks und diese Cloud-Ordner
+tragen nur Namen bei. Nur-online-Platzhalter zählen mit Namen, ihr Inhalt
 wird nicht geladen.
 
 Das Systemlaufwerk wird nicht vollständig gelesen. CD-Laufwerke entfallen.
@@ -130,8 +131,10 @@ keine Kontakte und keine Chats.
 Ausgelassen werden unter anderem `node_modules`, `.git`, versteckte Ordner,
 Caches und Schlüsseldateien (`id_rsa`, `.env`, `*.pem`).
 
-Dateinamen immer. Textinhalt nur in den heißen Ordnern, nur bis 64 KiB, nur
-die ersten 4 KiB, nur bekannte Textendungen.
+Dateinamen immer. Textinhalt nur in Desktop, Dokumente, Downloads, Bilder,
+Musik und Videos, nur bis 64 KiB, nur die ersten 4 KiB, nur bekannte
+Textendungen. Nicht auf externen Datenträgern, USB-Sticks, Cloud-Ordnern
+oder Netzlaufwerken.
 
 ## Last
 
@@ -184,7 +187,10 @@ starken Treffer nicht reichen.
 Datenträgerbezeichnung. Sie werden nicht indiziert. `index_network` steht
 standardmäßig auf `false`; `true` liest gemappte Netzlaufwerke nur nach Namen.
 
-Der Katalog liegt unter `%LOCALAPPDATA%\Flare\`.
+Der laufende Index ist `%LOCALAPPDATA%\Flare\index.db`. Er bleibt beim
+Entfernen liegen und wird beim Start weiterverwendet.
+`py -3 flare.py index-save ZIELDATEI` schreibt eine zusätzliche Kopie, im
+Hilfefenster der Knopf „Index speichern“.
 
 ## Installer neu bauen
 

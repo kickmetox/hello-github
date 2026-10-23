@@ -9,7 +9,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from flare.crawl import Crawler, dedupe_roots, default_roots, merge_volume_roots
+from flare.crawl import Crawler, dedupe_roots, default_roots, merge_volume_roots, roots_worth_watching
 from flare.volumes import (
     drive_roots_for_config,
     drive_snapshot_for_config,
@@ -21,7 +21,7 @@ from flare.governor import Governor
 from flare.hotkey import HotkeyThread, hotkey_label
 from flare.launch import launch_target
 from flare.paths import data_dir as default_data_dir
-from flare.paths import norm
+from flare.paths import norm, place_key
 from flare.rank import Ranker
 from flare.search import search
 from flare.server import EventBus, Server
@@ -62,6 +62,7 @@ class Service:
         self.exclude_drives = exclude_drive_list(cfg)
         self._drive_poll = None
         dynamic: list[str] = []
+        names_only: list[str] = []
         if roots is None:
             base = default_roots(extra)
             drives: list[tuple[str, int]] = []
@@ -74,9 +75,18 @@ class Service:
                 cloud = windows_cloud_roots()
                 self._drive_poll = self._poll_drives
             self.roots, dynamic = merge_volume_roots(base, drives, cloud)
+            known = {place_key(path) for path, _tier in base}
+            light = {place_key(path) for path, _tier in drives}
+            light.update(place_key(path) for path in cloud)
+            names_only = [
+                path
+                for path, _tier in self.roots
+                if place_key(path) in light and place_key(path) not in known
+            ]
         else:
             self.roots = dedupe_roots(list(roots) + extra)
         self._dynamic_roots = dynamic
+        self._names_only_roots = names_only
         self.index = Index(self.data_path / "index.db")
         self.ranker = Ranker()
         self.bus = EventBus()
@@ -115,7 +125,12 @@ class Service:
         )
         http.start()
         self._threads.append(http)
-        hot_roots = [path for path, tier in self.roots if tier <= 1]
+        # Namen-only-Wurzeln (Platte, USB, Cloud, Netz) nicht beobachten.
+        # Sonst würde jede Änderung sie vor dem Tier-1-Takt von 300 s neu lesen.
+        hot_roots = roots_worth_watching(
+            self.roots,
+            [*self._names_only_roots, *self._dynamic_roots],
+        )
 
         def on_change(path: str, descend: bool = False) -> None:
             if self.crawler is not None:
@@ -136,6 +151,7 @@ class Service:
             watcher=self.watcher,
             drive_poll=self._drive_poll,
             dynamic_roots=self._dynamic_roots,
+            names_only=self._names_only_roots,
         )
         crawler = threading.Thread(target=self._crawl, name="flare-index", daemon=True)
         crawler.start()
@@ -167,7 +183,12 @@ class Service:
             if self.allow_ui and sys.platform == "win32":
                 from flare.window import NativeWindow
 
-                self.window = NativeWindow(self._ui_search, self._ui_open, self._ui_status)
+                self.window = NativeWindow(
+                    self._ui_search,
+                    self._ui_open,
+                    self._ui_status,
+                    self.save_index_copy,
+                )
                 self.window.run(self.stop, visible=show)
             else:
                 while not self.stop.wait(3600):
@@ -229,6 +250,10 @@ class Service:
         self.bus.push({"type": "focus"})
         if self.window is not None:
             self.window.show()
+
+    def save_index_copy(self, dest: str) -> str:
+        """Zusätzliche Kopie. Die laufende Datenbank bleibt liegen."""
+        return str(self.index.backup(dest))
 
     def reindex(self) -> None:
         self.index.invalidate_all()

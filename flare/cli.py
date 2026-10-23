@@ -16,6 +16,7 @@ from flare.autostart import install_autostart, remove_autostart
 from flare.client import Client
 from flare.paths import config_dir, data_dir
 from flare.service import Service, roots_from_args
+from flare.store import Index
 
 
 def load_config(folder: Path | None = None) -> dict[str, Any]:
@@ -56,7 +57,27 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("reindex", help="Katalog neu lesen")
     sub.add_parser("install-autostart", help="mit der Anmeldung starten")
     sub.add_parser("remove-autostart", help="Autostart entfernen")
+    saved = sub.add_parser("index-save", help="Index zusätzlich in eine Datei schreiben")
+    saved.add_argument("dest", metavar="ZIELDATEI")
     return parser
+
+
+def _index_save(args: argparse.Namespace) -> int:
+    folder = args.data_dir or data_dir()
+    source = Path(folder) / "index.db"
+    if not source.exists():
+        print("Index fehlt", file=sys.stderr)
+        return 1
+    index = Index(source)
+    try:
+        saved = index.backup(args.dest)
+    except (OSError, ValueError) as exc:
+        print(f"Speichern fehlgeschlagen: {exc}", file=sys.stderr)
+        return 1
+    finally:
+        index.close()
+    print(saved)
+    return 0
 
 
 def _client(args: argparse.Namespace) -> Client:
@@ -131,6 +152,8 @@ def main(argv: list[str] | None = None) -> int:
     _ensure_stdio()
     parser = build_parser()
     args = parser.parse_args(argv)
+    if args.cmd == "index-save":
+        return _index_save(args)
     # Nur Windows. Eine eingefrorene Flare.exe meldet win32 und läuft weiter.
     if sys.platform != "win32":
         print("Flare ist nur für Windows 11.", file=sys.stderr)

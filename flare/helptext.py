@@ -26,7 +26,9 @@ def description() -> str:
         "Dieselbe Suche gibt es als --similar und als similar=1. "
         "Andere Programme fragen über 127.0.0.1, Port 47731, nach. "
         "Der Knopf Hilfe und die Taste F1 öffnen diesen Text. "
-        "Escape schließt die Hilfe und kehrt zur Suche zurück."
+        "Escape schließt die Hilfe und kehrt zur Suche zurück. "
+        "Der Knopf „Index speichern“ schreibt eine zusätzliche Kopie. "
+        "Der Index selbst liegt unter %LOCALAPPDATA%\\Flare und bleibt beim Entfernen erhalten."
     )
 
 
@@ -36,7 +38,7 @@ def features() -> list[str]:
         "Spotlight-Suche im eigenen Win32-Fenster, Kürzel Strg+Alt+Leertaste.",
         "Schließen blendet das Fenster aus, der Index läuft weiter.",
         "Ähnliche Namen über das Kontrollkästchen, --similar und similar=1; umgekehrter Trigramm-Index, CUDA über nvcuda.dll ab 32 Kandidaten, sonst die CPU.",
-        "Index aus Startmenü-Verknüpfungen (.lnk), PATH-Programmen (.exe, .bat, .cmd, .com), den Ordnern Desktop, Dokumente, Downloads, Bilder, Musik, Videos und dem Benutzerprofil, dazu externe Festplatten, USB-Sticks und lokale Ordner von OneDrive, Dropbox und Google Drive.",
+        "Index aus Startmenü-Verknüpfungen (.lnk), PATH-Programmen (.exe, .bat, .cmd, .com), den Ordnern Desktop, Dokumente, Downloads, Bilder, Musik, Videos und dem Benutzerprofil, dazu externe Festplatten, USB-Sticks und lokale Ordner von OneDrive, Dropbox und Google Drive. Externe Festplatten, USB-Sticks und Cloud-Ordner tragen nur Namen bei, ohne Dateiinhalt.",
         "Das Systemlaufwerk wird nicht vollständig durchsucht. CD-Laufwerke entfallen. Gemappte Netzlaufwerke bleiben aus, bis index_network in der Konfiguration true ist; dann nur Dateinamen, mit derselben Last wie das Benutzerprofil. Freigaben ohne Laufwerksbuchstaben werden nicht aufgenommen.",
         "Nur-online-Dateien in Cloud-Ordnern stehen mit Namen im Index. Der Inhalt wird nicht heruntergeladen.",
         "Ausschlussliste in der Konfiguration: exclude_drives, ein Laufwerk wie E:\\ oder eine Datenträgerbezeichnung. Diese Laufwerke werden nicht indiziert.",
@@ -44,7 +46,7 @@ def features() -> list[str]:
         "Übersprungen werden node_modules, .git, versteckte Ordner und Geheimnisdateien.",
         "Index-Last etwa 85 % in den ersten 20 Sekunden, danach etwa 35 %. Ist die CPU beschäftigt, wartet Flare zusätzlich.",
         "Andere Programme: HTTP auf 127.0.0.1 Port 47731, flare.py query und flare.client.Client.",
-        "Einrichtung pro Benutzer unter %LOCALAPPDATA%\\Programs\\Flare. Katalog und Index bleiben unter %LOCALAPPDATA%\\Flare und werden beim Entfernen nicht gelöscht. Das Setup beendet ein laufendes Flare.exe, bevor es DLLs kopiert.",
+        "Einrichtung pro Benutzer unter %LOCALAPPDATA%\\Programs\\Flare. Der Index liegt automatisch unter %LOCALAPPDATA%\\Flare und wird beim Entfernen nicht gelöscht. „Index speichern“ schreibt eine zusätzliche Kopie. Das Setup beendet ein laufendes Flare.exe, bevor es DLLs kopiert.",
         "Rechnung wie 2+2*3. Enter öffnet einen Treffer, Escape blendet die Suche aus.",
         "Hilfe über den Knopf Hilfe oder F1. Escape schließt die Hilfe und kehrt zur Suche zurück.",
     ]

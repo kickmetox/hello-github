@@ -75,6 +75,15 @@ TEXT_EXT = {
 }
 
 RESCHEDULE = {0: 90.0, 1: 300.0, 2: 1200.0}
+
+
+def roots_worth_watching(
+    roots: list[tuple[str, int]],
+    quiet: list[str],
+) -> list[str]:
+    """Heiße Ordner beobachten. Platte, USB, Cloud und Netz bleiben beim Takt."""
+    skip = {norm(path) for path in quiet}
+    return [path for path, tier in roots if tier <= 1 and norm(path) not in skip]
 # GetLogicalDriveStringsW / GetDriveTypeW, kein enger Takt.
 DRIVE_POLL_S = 12.0
 # Gleiche mtime im selben Zeitquant verdeckt ein schnelles Löschen. Spätestens
@@ -252,6 +261,7 @@ class Crawler:
         watcher: Any | None = None,
         drive_poll: Callable[[], list[tuple[str, int]]] | None = None,
         dynamic_roots: list[str] | None = None,
+        names_only: list[str] | None = None,
     ) -> None:
         self.index = index
         self.governor = governor
@@ -275,6 +285,9 @@ class Crawler:
         dynamic_norm = {norm(path) for path in (dynamic_roots or [])}
         self._static_roots = {path for path, _tier in self.roots if path not in dynamic_norm}
         self._dynamic = {path: tier for path, tier in self.roots if path in dynamic_norm}
+        # Laufwerke und Cloud-Spiegel: nur Namen, Nachschau höchstens im Tier-1-Takt.
+        self._names_only = {norm(path) for path in (names_only or [])}
+        self._names_only.update(self._dynamic)
 
     def add(self, path: str, tier: int, *, descend: bool, priority: int | None = None) -> None:
         path = norm(path) if not path.startswith(":") else path
@@ -428,6 +441,7 @@ class Crawler:
         if not present:
             return
         self._dynamic[path] = tier
+        self._names_only.add(path)
         if not any(existing == path for existing, _tier in self.roots):
             self.roots.append((path, tier))
         if not any(existing == path for existing, _tier in self._claimed):
@@ -439,11 +453,25 @@ class Crawler:
         self._dynamic.pop(path, None)
         if path in self._static_roots:
             return
+        self._names_only.discard(path)
         self.roots = [(existing, tier) for existing, tier in self.roots if existing != path]
         self._claimed = [(existing, tier) for existing, tier in self._claimed if existing != path]
         self._discard_queued(path)
         self.index.drop_tree(path)
         log.info("drive removed: %s", path)
+
+    def hides_content(self, path: str) -> bool:
+        """Externe Platte, USB, Cloud oder Netz: keine Dateibytes lesen."""
+        for root in self._names_only:
+            if is_inside(path, root):
+                return True
+        return False
+
+    def _watch_dir(self, path: str, tier: int) -> None:
+        # Wechseldatenträger nicht öfter als der Tier-1-Takt (300 s) nachlesen.
+        if tier > 1 or self.watcher is None or self.hides_content(path):
+            return
+        self.watcher.watch(path)
 
     def _discard_queued(self, root: str) -> None:
         with self._lock:
@@ -534,8 +562,7 @@ class Crawler:
             if descend:
                 for child in self.index.child_dirs(path):
                     self.add(child, tier, descend=True, priority=tier)
-            if tier <= 1 and self.watcher is not None:
-                self.watcher.watch(path)
+            self._watch_dir(path, tier)
             return
         self.readdirs += 1
         files: list[os.DirEntry[str]] = []
@@ -596,7 +623,7 @@ class Crawler:
             except OSError:
                 continue
             mtime_ns = getattr(st_file, "st_mtime_ns", int(st_file.st_mtime * 1e9))
-            if lowered.endswith(".lnk"):
+            if lowered.endswith(".lnk") and not self.hides_content(full):
                 parsed = parse_lnk(full)
                 if parsed is None:
                     continue
@@ -619,7 +646,12 @@ class Crawler:
                 }
             )
             offline = is_offline_file(full, st_file, marker_dir=markers)
-            if should_sample_content(enabled=self.content, tier=tier, offline=offline):
+            if should_sample_content(
+                enabled=self.content,
+                tier=tier,
+                offline=offline,
+                names_only=self.hides_content(full),
+            ):
                 sample = read_text_sample(full, st_file.st_size)
                 if sample:
                     samples.append((full, sample))
@@ -634,8 +666,7 @@ class Crawler:
         if saved_mtime != current_mtime:
             self.index.mark_dirty(path)
             self.add(path, tier, descend=descend, priority=tier)
-        if tier <= 1 and self.watcher is not None:
-            self.watcher.watch(path)
+        self._watch_dir(path, tier)
         for child in subdirs:
             if descend or not self.index.knows_dir(child):
                 self.add(child, tier, descend=True, priority=tier)

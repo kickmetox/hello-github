@@ -187,12 +187,20 @@ def is_offline_file(path: str, st: object, *, marker_dir: bool = False) -> bool:
         return False
 
 
-def should_sample_content(*, enabled: bool, tier: int, offline: bool) -> bool:
-    """Inhalt nur in heißen Bäumen, und nie bei Nur-online-Platzhaltern.
+def should_sample_content(
+    *,
+    enabled: bool,
+    tier: int,
+    offline: bool,
+    names_only: bool = False,
+) -> bool:
+    """Inhalt nur in den bekannten lokalen Ordnern.
 
-    Tier 2 (Benutzerprofil und optionale Netzlaufwerke) liefert nur Namen.
+    Externe Platten, USB, Cloud-Spiegel und Netzlaufwerke liefern nur Namen.
+    Tier 2 (Benutzerprofil und optionale Netzlaufwerke) ebenfalls. Nur-online-
+    Platzhalter werden nie geöffnet.
     """
-    return bool(enabled) and tier <= 1 and not offline
+    return bool(enabled) and tier <= 1 and not offline and not names_only
 
 
 def dropbox_paths_from_info(text: str) -> list[str]:

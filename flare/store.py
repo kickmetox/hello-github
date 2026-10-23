@@ -145,6 +145,11 @@ class Index:
 
     def close(self) -> None:
         with self.lock:
+            if not self.readonly:
+                try:
+                    self.con.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+                except sqlite3.Error:
+                    pass
             self.con.close()
 
     def _migrate(self) -> None:
@@ -489,3 +494,21 @@ class Index:
     def checkpoint(self) -> None:
         with self.lock:
             self.con.execute("PRAGMA wal_checkpoint(PASSIVE)")
+
+    def backup(self, dest: str | Path) -> Path:
+        """Konsistente Kopie über sqlite3.Connection.backup.
+
+        Die laufende Datenbank bleibt an ihrem Ort. Es wird kein WAL roh kopiert.
+        """
+        target = Path(dest)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if target.resolve() == self.path.resolve():
+            raise ValueError("Ziel ist der laufende Index")
+        with self.lock:
+            dest_con = sqlite3.connect(target)
+            try:
+                self.con.backup(dest_con)
+                dest_con.commit()
+            finally:
+                dest_con.close()
+        return target

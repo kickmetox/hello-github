@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import unittest
 
 from flare.helptext import description, features, help_text, short_description
@@ -47,11 +48,26 @@ class HelpTextTests(unittest.TestCase):
             "E-Mail",
             "Kontakte",
             "Chats",
+            "Index speichern",
+            "nur Namen",
         ):
             self.assertIn(fact, joined)
 
 
 class HelpShortcutTests(unittest.TestCase):
+    def test_save_dialog_is_not_built_at_import(self) -> None:
+        import inspect
+
+        import flare.window as window
+
+        source = inspect.getsource(window.choose_index_save_path)
+        self.assertIn("GetSaveFileNameW", source)
+        self.assertIn("flare-index.db", source)
+        self.assertNotIn("WINFUNCTYPE", source)
+        self.assertIn("Index speichern", inspect.getsource(window.HelpWindow))
+        if os.name != "nt":
+            self.assertIsNone(window.choose_index_save_path(0))
+
     def test_f1_opens_help_and_escape_closes_it(self) -> None:
         self.assertEqual(shortcut_action(VK_F1, help_open=False, help_target=False), "help")
         self.assertEqual(shortcut_action(VK_F1, help_open=True, help_target=True), "help")
