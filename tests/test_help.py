@@ -208,8 +208,16 @@ class HelpShortcutTests(unittest.TestCase):
         self.assertEqual(shortcut_action(VK_ESCAPE, help_open=True, help_target=False), "close-help")
         self.assertEqual(shortcut_action(VK_ESCAPE, help_open=False, help_target=False), "hide")
         self.assertEqual(enter_action("report", "johnson", selected=0, count=1), "search")
-        self.assertEqual(enter_action("johnson", "johnson", selected=0, count=4), "open")
-        self.assertEqual(enter_action("johnson", "johnson", selected=3, count=4), "open")
+        fresh = enter_action("GDF", "GDF", selected=0, count=158, picked=False)
+        self.assertEqual(fresh, "stay")
+        self.assertNotEqual(fresh, "open")
+        self.assertFalse(enter_activates_other_window(fresh))
+        later = enter_action("GDF", "GDF", selected=0, count=158, picked=True)
+        self.assertEqual(later, "open")
+        self.assertTrue(enter_activates_other_window(later))
+        self.assertEqual(enter_action("johnson", "johnson", selected=0, count=4), "stay")
+        self.assertEqual(enter_action("johnson", "johnson", selected=0, count=4, picked=True), "open")
+        self.assertEqual(enter_action("johnson", "johnson", selected=3, count=4, picked=True), "open")
         self.assertEqual(enter_action("johnson", "johnson", selected=-1, count=4), "none")
         self.assertEqual(enter_action("johnson", None, selected=0, count=1), "search")
         self.assertNotEqual(enter_action("report", "johnson", selected=0, count=1), "open")
@@ -222,9 +230,21 @@ class HelpShortcutTests(unittest.TestCase):
         self.assertFalse(enter_activates_other_window(empty))
         self.assertFalse(enter_activates_other_window(stale))
         self.assertFalse(enter_activates_other_window("none"))
-        self.assertTrue(
+        self.assertFalse(enter_activates_other_window("stay"))
+        self.assertFalse(
             enter_activates_other_window(enter_action("GDF", "GDF", selected=0, count=1))
         )
+        import inspect
+
+        from flare.window import NativeWindow
+
+        change = inspect.getsource(NativeWindow._wndproc)
+        self.assertIn("EN_CHANGE", change)
+        self.assertIn("_run_search", change)
+        opened = inspect.getsource(NativeWindow._open_selected)
+        self.assertIn("picked=self._picked", opened)
+        self.assertIn("stay", opened)
+        self.assertIn("self._picked = False", inspect.getsource(NativeWindow._run_search))
         self.assertTrue(swallow_enter(WM_KEYDOWN, VK_RETURN))
         self.assertTrue(swallow_enter(WM_KEYUP, VK_RETURN))
         self.assertTrue(swallow_enter(WM_CHAR, 13))

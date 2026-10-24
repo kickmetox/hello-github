@@ -485,17 +485,27 @@ def rows_after_reset(labels: list[str]) -> list[str]:
     return list(labels)
 
 
-def enter_action(query: str, list_query: str | None, *, selected: int, count: int) -> str:
-    """Enter öffnet nur einen Treffer der aktuellen Anfrage.
+def enter_action(
+    query: str,
+    list_query: str | None,
+    *,
+    selected: int,
+    count: int,
+    picked: bool = False,
+) -> str:
+    """Enter nach dem Tippen lässt die gerade gefüllte Liste stehen.
 
-    Leere Liste oder eine Liste zu einem anderen Text: „search“. Nichts öffnen
-    und das Fenster nicht abgeben. „open“ nur, wenn ein Treffer dieser Anfrage
-    ausgewählt ist und gerade geöffnet wird.
+    Leere Liste oder eine Liste zu einem anderen Text: „search“. Die Liste,
+    die zur aktuellen Anfrage gerade gefüllt wurde, ist noch nicht gewählt:
+    „stay“. Nichts öffnen, Flare nicht ausblenden, kein anderes Programm nach
+    vorn. „open“ erst, wenn eine Zeile dieser Anfrage gewählt ist.
     """
     if list_query != query or count <= 0:
         return "search"
     if selected < 0 or selected >= count:
         return "none"
+    if not picked:
+        return "stay"
     return "open"
 
 
@@ -1017,6 +1027,8 @@ class NativeWindow:
         self._edit_proc_cb: Any = None
         self._old_edit_proc: Any = None
         self._enter_busy = False
+        # True erst, wenn der Nutzer eine Zeile wählt. Die Markierung nach dem Füllen zählt nicht.
+        self._picked = False
         self._result_menu_open = False
         self._ignore_context_until = 0.0
         self._point_api = False
@@ -1732,7 +1744,7 @@ class NativeWindow:
             except (AttributeError, OSError):
                 pass
         if command == IDC_CTX_OPEN:
-            self._open_selected()
+            self._open_selected(from_enter=False)
         elif command == IDC_CTX_REVEAL:
             self._reveal_selected()
         elif command == IDC_CTX_EDIT:
@@ -1850,14 +1862,14 @@ class NativeWindow:
             elif ident == 100 and code == EN_CHANGE:
                 if not self._suspend_query:
                     self._on_query_edited()
-                    user32.SetTimer(hwnd, 1, 30, None)
+                    self._run_search()
             elif ident == 101 and code == BN_CLICKED:
                 self.similar = user32.SendMessageW(self.check, BM_GETCHECK, 0, 0) == BST_CHECKED
                 self._run_search()
             elif ident == 102 and code == LBN_SELCHANGE:
                 self._sync_selection()
             elif ident == 102 and code == LBN_DBLCLK:
-                self._open_selected()
+                self._open_selected(from_enter=False)
             elif ident == IDC_HELP and code == BN_CLICKED:
                 self._open_help()
             return 0
@@ -1956,6 +1968,7 @@ class NativeWindow:
         self.results = []
         self._rows = []
         self.selected = -1
+        self._picked = False
         self._list_query = stamp
         self._result_status = None
         if sys.platform == "win32" and self.list:
@@ -1993,6 +2006,8 @@ class NativeWindow:
         select = 0 if self.results else -1
         self._list_query = query
         self.selected = select
+        # Die erste Zeile ist nur markiert. Enter öffnet sie noch nicht.
+        self._picked = False
         suspended = self._suspend_query
         self._suspend_query = True
         try:
@@ -2114,6 +2129,8 @@ class NativeWindow:
             return
         choice = self._live_selection()
         self.selected = choice
+        if choice >= 0:
+            self._picked = True
         if self._list_query == self._query():
             self._apply_result_status()
 
@@ -2121,6 +2138,7 @@ class NativeWindow:
         if not self.results or self._list_query != self._query():
             return
         self.selected = max(0, min(len(self.results) - 1, self.selected + delta))
+        self._picked = True
         _send_msg(self.list, LB_SETCURSEL, self.selected, 0)
         if self._query():
             self._apply_result_status()
@@ -2147,7 +2165,7 @@ class NativeWindow:
         except (AttributeError, OSError):
             return
 
-    def _open_selected(self) -> None:
+    def _open_selected(self, *, from_enter: bool = True) -> None:
         if sys.platform == "win32" and not self.list:
             self._hold_flare_focus()
             return
@@ -2155,7 +2173,18 @@ class NativeWindow:
         selected = self.selected
         if self._list_query == query:
             selected = self._live_selection()
-        action = enter_action(query, self._list_query, selected=selected, count=len(self.results))
+        if from_enter:
+            action = enter_action(
+                query,
+                self._list_query,
+                selected=selected,
+                count=len(self.results),
+                picked=self._picked,
+            )
+        elif self._list_query == query and 0 <= selected < len(self.results):
+            action = "open"
+        else:
+            action = "none"
         if enter_activates_other_window(action):
             if self._query() != query or self._list_query != query:
                 self._hold_flare_focus()
@@ -2164,6 +2193,7 @@ class NativeWindow:
                 self._hold_flare_focus()
                 return
             self.selected = selected
+            self._picked = True
             hit = self.results[self.selected]
             try:
                 self._open_hit(hit)
@@ -2181,6 +2211,10 @@ class NativeWindow:
         else:
             if action == "search":
                 self._run_search()
+            elif action == "stay" and 0 <= selected < len(self.results):
+                # Nächstes Enter öffnet diese Zeile. Dieses hier lässt die Liste stehen.
+                self.selected = selected
+                self._picked = True
             self._hold_flare_focus()
             return
         if hit.get("kind") == "calc":
