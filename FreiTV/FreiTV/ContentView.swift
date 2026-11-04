@@ -1,25 +1,37 @@
 import SwiftUI
 
 struct ContentView: View {
-    @StateObject private var store = ChannelStore()
+    @StateObject private var store = MediaStore()
     @State private var showPlaylistSheet = false
     @State private var selectedTab = 0
 
     var body: some View {
         TabView(selection: $selectedTab) {
-            channelBrowser
-                .tabItem { Label("Kanäle", systemImage: "tv") }
+            ProgramGuideView(store: store)
+                .tabItem { Label("Programm", systemImage: "list.bullet.rectangle.portrait") }
                 .tag(0)
 
-            favoritesBrowser
-                .tabItem { Label("Favoriten", systemImage: "star.fill") }
+            channelBrowser
+                .tabItem { Label("Live", systemImage: "tv") }
                 .tag(1)
+
+            MediathekListView(store: store)
+                .tabItem { Label("Mediathek", systemImage: "play.rectangle.on.rectangle") }
+                .tag(2)
+
+            MoviesView(store: store)
+                .tabItem { Label("Kino", systemImage: "film") }
+                .tag(3)
+
+            FavoritesView(store: store)
+                .tabItem { Label("Favoriten", systemImage: "star.fill") }
+                .tag(4)
 
             NavigationStack {
                 AboutView()
             }
             .tabItem { Label("Info", systemImage: "info.circle") }
-            .tag(2)
+            .tag(5)
         }
         .tint(Color(red: 0.15, green: 0.72, blue: 0.78))
         .sheet(isPresented: $showPlaylistSheet) {
@@ -59,18 +71,18 @@ struct ContentView: View {
                 Section {
                     ForEach(store.filteredChannels) { channel in
                         NavigationLink {
-                            PlayerView(channel: channel)
+                            StreamPlayerView(title: channel.name, url: channel.streamURL)
                         } label: {
                             ChannelRow(channel: channel) {
-                                store.toggleFavorite(channel)
+                                store.toggleFavorite(channel: channel)
                             }
                         }
                     }
                 } footer: {
-                    Text("\(store.filteredChannels.count) Kanäle · Demo-Streams + optionale Playlist")
+                    Text("\(store.filteredChannels.count) Live-/Demo-Kanäle · eigene M3U möglich")
                 }
             }
-            .navigationTitle("FreiTV")
+            .navigationTitle("Live")
             .searchable(text: $store.searchText, prompt: "Kanal suchen")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -82,31 +94,6 @@ struct ContentView: View {
                     .accessibilityLabel("Playlist laden")
                 }
             }
-        }
-    }
-
-    private var favoritesBrowser: some View {
-        NavigationStack {
-            Group {
-                if store.favoriteChannels.isEmpty {
-                    ContentUnavailableView(
-                        "Keine Favoriten",
-                        systemImage: "star",
-                        description: Text("Tippe auf den Stern neben einem Kanal.")
-                    )
-                } else {
-                    List(store.favoriteChannels) { channel in
-                        NavigationLink {
-                            PlayerView(channel: channel)
-                        } label: {
-                            ChannelRow(channel: channel) {
-                                store.toggleFavorite(channel)
-                            }
-                        }
-                    }
-                }
-            }
-            .navigationTitle("Favoriten")
         }
     }
 }

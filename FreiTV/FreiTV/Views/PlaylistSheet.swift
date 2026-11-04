@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct PlaylistSheet: View {
-    @ObservedObject var store: ChannelStore
+    @ObservedObject var store: MediaStore
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {

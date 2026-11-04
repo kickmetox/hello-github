@@ -1,16 +1,16 @@
 # FreiTV
 
-iPhone-App (SwiftUI) zum Abspielen freier Internet-Streams und eigener M3U/M3U8-Playlists.
+iPhone-App (SwiftUI) für freie TV-Streams, öffentlich-rechtliche Mediatheken und freies Kino.
 
 **Kontakt:** [ame@sellerbach.de](mailto:ame@sellerbach.de)
 
 ## Funktionen
 
-- Eingebaute Demo-Kanäle (öffentliche HLS-Teststreams)
-- HLS-Player mit AVKit
-- Suche und Kategorien
-- Favoriten
-- M3U/M3U8-Playlist per URL laden
+- **Programm** – durchscrollbare Programminfos im TV-Stil (Now/Next)
+- **Live** – freie Live-/Demo-Kanäle + eigene M3U/M3U8-Playlists
+- **Mediathek** – ARD, ZDF, ARTE, 3sat, Dritte Programme, KiKA, funk, phoenix, DW, ORF ON, SRF Play u. a.
+- **Kino & Filme** – Creative-Commons-/Public-Domain-Filme und freie Archive
+- **Favoriten** – sortierbar (manuell per Drag & Drop, Name, Neueste, Typ)
 - App-Icon unter `FreiTV/Assets.xcassets/AppIcon.appiconset/`
 
 ## Voraussetzungen
@@ -26,23 +26,13 @@ iPhone-App (SwiftUI) zum Abspielen freier Internet-Streams und eigener M3U/M3U8-
 3. iPhone-Simulator oder Gerät auswählen
 4. Run (`⌘R`)
 
-## Eigene freie Kanäle
+## Hinweise
 
-In der App: **Playlist-Icon** → M3U-URL eintragen → **Playlist laden**.
+Mediatheken öffnen die offiziellen Portale der Anbieter in der App. Nur Streams und Playlists verwenden, die du rechtlich empfangen darfst.
 
-Nur Streams verwenden, die du rechtlich empfangen darfst. Die App enthält keine illegalen Senderlisten.
+## Tests (ohne Xcode)
 
-## Projektstruktur
-
-```
-FreiTV/
-├── FreiTV.xcodeproj
-└── FreiTV/
-    ├── FreiTVApp.swift
-    ├── ContentView.swift
-    ├── Models/
-    ├── Services/
-    ├── Views/
-    ├── Resources/sample.m3u
-    └── Assets.xcassets/
+```bash
+python3 scripts/test_m3u_parser.py
+python3 scripts/test_freitv_catalog.py
 ```

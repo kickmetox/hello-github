@@ -17,24 +17,8 @@ struct ChannelRow: View {
                     )
                     .frame(width: 52, height: 52)
 
-                if let logoURL = channel.logoURL {
-                    AsyncImage(url: logoURL) { phase in
-                        switch phase {
-                        case .success(let image):
-                            image
-                                .resizable()
-                                .scaledToFit()
-                                .padding(6)
-                        default:
-                            Image(systemName: "tv")
-                                .foregroundStyle(.cyan)
-                        }
-                    }
-                    .frame(width: 52, height: 52)
-                } else {
-                    Image(systemName: "play.tv.fill")
-                        .foregroundStyle(.cyan)
-                }
+                Image(systemName: "play.tv.fill")
+                    .foregroundStyle(.cyan)
             }
 
             VStack(alignment: .leading, spacing: 4) {
@@ -42,6 +26,13 @@ struct ChannelRow: View {
                     .font(.headline)
                     .foregroundStyle(.primary)
                     .lineLimit(1)
+
+                if let nowPlaying = channel.nowPlaying {
+                    Text(nowPlaying)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
 
                 Text("\(channel.category) · \(channel.country)")
                     .font(.caption)

@@ -7,7 +7,7 @@ struct AboutView: View {
                 VStack(alignment: .leading, spacing: 10) {
                     Text("FreiTV")
                         .font(.largeTitle.bold())
-                    Text("Freie Internet-Streams auf dem iPhone – Demo-Kanäle inklusive, eigene M3U-Playlists willkommen.")
+                    Text("Programmübersicht, freie Mediatheken, Live-Streams und freies Kino – alles an einem Ort.")
                         .foregroundStyle(.secondary)
                 }
                 .padding(.vertical, 8)
@@ -19,14 +19,22 @@ struct AboutView: View {
                 }
             }
 
+            Section("Inhalte") {
+                Text("Programm: durchscrollbare Now/Next-Karten wie im TV.")
+                Text("Mediathek: ARD, ZDF, ARTE, 3sat, Dritte, KiKA, funk, ORF, SRF u. a.")
+                Text("Kino: Creative-Commons-Filme und freie Archive.")
+                Text("Favoriten: sortierbar (manuell, Name, Neueste, Typ).")
+            }
+
             Section("Hinweise") {
-                Text("Eingebaute Kanäle sind öffentliche Demo-/Teststreams.")
-                Text("Über „Playlist laden“ kannst du eigene, rechtlich erlaubte M3U-Quellen hinzufügen.")
-                Text("Keine Garantie für Verfügbarkeit externer Streams.")
+                Text("Mediatheken öffnen die offiziellen Portale der Anbieter.")
+                Text("Nur rechtlich erlaubte Streams und Playlists verwenden.")
+                Text("Keine Garantie für Verfügbarkeit externer Quellen.")
             }
 
             Section("Technik") {
-                LabeledContent("Player", value: "AVKit / HLS")
+                LabeledContent("Player", value: "AVKit / HLS / MP4")
+                LabeledContent("Mediathek", value: "WKWebView")
                 LabeledContent("Format", value: "M3U / M3U8")
                 LabeledContent("Plattform", value: "iOS 17+")
             }

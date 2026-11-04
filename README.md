@@ -1,6 +1,6 @@
 # FreiTV
 
-iOS-App zum Schauen freier Internet-Streams auf dem iPhone.
+iOS-App: Programmübersicht, freie Mediatheken, Live-Streams und freies Kino.
 
 Öffne das Xcode-Projekt unter [`FreiTV/`](FreiTV/README.md).
 
