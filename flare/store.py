@@ -106,6 +106,25 @@ def like_pattern(prefix: str) -> str:
     return "".join(out)
 
 
+def query_words(text: str) -> list[str]:
+    """Wörter der Anfrage, klein geschrieben. Mehrfache Leerzeichen zählen nicht."""
+    return [part.casefold() for part in text.split() if part]
+
+
+def name_has_every_word(name: str, words: list[str]) -> bool:
+    """Jedes Wort steckt im Namen. Ein einzelnes Zeichen nur als eigenes Wort."""
+    folded = name.casefold()
+    for word in words:
+        if not word:
+            continue
+        if len(word) == 1:
+            if not has_whole_word(word, folded):
+                return False
+        elif word not in folded:
+            return False
+    return True
+
+
 def has_whole_word(query: str, name: str) -> bool:
     """Die Anfrage ist ein ganzes Wort: Ränder sind Anfang, Ende oder kein Buchstabe und keine Ziffer."""
     needle = query.casefold().strip()
@@ -421,26 +440,42 @@ class Index:
         )
 
     def contains(self, folded: str, limit: int) -> list[dict[str, Any]]:
-        """Datei- und Ordnernamen, die die Anfrage irgendwo enthalten.
-
-        `name_fold` ist bereits klein geschrieben, `case_sensitive_like` bleibt an.
-        Das führende `%` sucht mitten im Namen, nicht nur am Anfang. Ein ganzes
-        Wort steht vor einem Infix, damit Hash-Dateien kurze Treffer nicht verdrängen.
-        Unabhängig von FTS5: Trigramm-Phrasen mit drei Zeichen sind unzuverlässig.
-        """
-        if len(folded) < 3:
+        """Ein Wort irgendwo im Namen. Ab zwei Zeichen."""
+        if len(folded) < 2:
             return []
+        return self.contains_all([folded], limit)
+
+    def contains_all(self, words: list[str], limit: int) -> list[dict[str, Any]]:
+        """Alle Wörter müssen im Namen stehen, die Reihenfolge ist egal.
+
+        `name_fold` ist klein. Ein Zeichen gilt nur als eigenes Wort, damit
+        „a“ nicht jeden Namen trifft. Groß- und Kleinschreibung sind schon
+        in `name_fold` zusammengefallen.
+        """
+        terms = [word.casefold() for word in words if word]
+        if not terms:
+            return []
+        clauses: list[str] = []
+        params: list[Any] = []
+        for word in terms:
+            if len(word) == 1:
+                clauses.append("flare_word(name_fold, ?) = 1")
+                params.append(word)
+            else:
+                clauses.append("name_fold LIKE ? ESCAPE '!'")
+                params.append("%" + like_pattern(word))
+        score = " + ".join("flare_word(name_fold, ?)" for _ in terms)
         return self._all(
             f"""
             SELECT {ITEM_COLS} FROM items
-            WHERE name_fold LIKE ? ESCAPE '!'
-            ORDER BY flare_word(name_fold, ?) DESC,
+            WHERE {" AND ".join(clauses)}
+            ORDER BY ({score}) DESC,
                      use_count DESC,
                      length(name_fold) ASC,
                      name_fold ASC
             LIMIT ?
             """,
-            ("%" + like_pattern(folded), folded, max(0, int(limit))),
+            (*params, *terms, max(0, int(limit))),
         )
 
     def fts(self, match: str, limit: int) -> list[dict[str, Any]]:

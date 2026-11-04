@@ -79,6 +79,57 @@ class RankingTests(unittest.TestCase):
         self.assertGreater(exact, prefix)
         self.assertGreater(prefix, token)
 
+    def test_several_words_ignore_case_and_order(self) -> None:
+        whole = lexical_score(
+            "hafen nord", "Nord Hafen", "/d/Nord Hafen", kind="dir", tier=1, use_count=0, via="trigram"
+        )
+        buried = lexical_score(
+            "HAFEN nord",
+            "xhafenxx-nordextraextra",
+            "/d/x",
+            kind="file",
+            tier=1,
+            use_count=0,
+            via="trigram",
+        )
+        missing = lexical_score(
+            "hafen nord", "Nur Hafen", "/d/Nur Hafen", kind="dir", tier=1, use_count=0, via="trigram"
+        )
+        self.assertGreater(whole, buried)
+        self.assertEqual(missing, 0.0)
+        with tempfile.TemporaryDirectory() as tmp:
+            index = Index(Path(tmp) / "index.db")
+            ranker = Ranker(allow_cuda=False)
+            try:
+                items = []
+                for name in ("Nord Hafen", "Nur Hafen", "Hafenplan Nordlicht"):
+                    items.append(
+                        {
+                            "kind": "dir",
+                            "name": name,
+                            "path": rf"D:\Orte\{name}",
+                            "dir": r"D:\Orte",
+                            "ext": "",
+                            "launch": None,
+                            "mtime_ns": 1,
+                            "size": 0,
+                            "tier": 1,
+                        }
+                    )
+                index.reconcile_dir(r"D:\Orte", r"D:\\", 1, 1, items, [])
+                found = search(index, ranker, "hafen NORD", limit=20, similar=False)
+                got = [hit["name"] for hit in found["results"]]
+                self.assertIn("Nord Hafen", got)
+                self.assertNotIn("Nur Hafen", got)
+                swapped = search(index, ranker, "NORD hafen", limit=20, similar=False)
+                self.assertEqual(
+                    [hit["name"] for hit in swapped["results"] if hit["name"] == "Nord Hafen"],
+                    ["Nord Hafen"],
+                )
+            finally:
+                index.close()
+                ranker.close()
+
     def test_gdf_word_outranks_hash_infix(self) -> None:
         zurich = lexical_score(
             "gdf", "Zürich GDF", r"D:\Zürich GDF", kind="dir", tier=1, use_count=0, via="trigram"

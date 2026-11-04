@@ -22,6 +22,7 @@ def description() -> str:
         "Es startet weder Chrome noch Edge. Schließen blendet das Fenster "
         "nur aus; der Index läuft im Hintergrund weiter. "
         "Suche zurücksetzen und das erste Escape löschen die Anfrage und die Treffer, während Enter nur einen Treffer der aktuellen Anfrage öffnet. "
+        "Groß- und Kleinschreibung sind egal. Mehrere Wörter müssen alle im Namen stehen, die Reihenfolge ist egal. "
         "Das zweite Escape blendet das Fenster aus. "
         "Ein Rechtsklick, Umschalt+F10 oder die Kontextmenütaste öffnet Öffnen, Speicherort öffnen, "
         "Im Editor bearbeiten, Senden an, Pfad kopieren und Als Pfad kopieren. "

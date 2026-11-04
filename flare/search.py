@@ -9,7 +9,7 @@ from typing import Any
 
 from flare.calc import try_calc
 from flare.rank import Ranker
-from flare.store import Index, has_whole_word, open_index
+from flare.store import Index, has_whole_word, name_has_every_word, open_index, query_words
 
 _TOKEN = re.compile(r"[^\W_]+", re.UNICODE)
 _FUZZY_MIN = 0.5
@@ -141,8 +141,23 @@ def lexical_score(
     q = query.casefold().strip()
     folded = name.casefold()
     path_folded = path.casefold()
+    words = query_words(q)
     if not q:
         base = 100.0
+    elif len(words) > 1:
+        if folded == q:
+            base = _EXACT
+        elif folded.startswith(q):
+            base = _PREFIX - min(len(folded) - len(q), 80)
+        elif name_has_every_word(folded, words):
+            if all(has_whole_word(word, folded) for word in words):
+                base = _TOKEN_BAND
+            else:
+                base = _SUBSTRING - min(len(folded), 80)
+        elif name_has_every_word(path_folded, words):
+            base = _PATH
+        else:
+            return 0.0
     elif folded == q:
         base = _EXACT
     elif folded.startswith(q):
@@ -365,10 +380,11 @@ def search(
                     via="prefix",
                 ),
             )
-        # Teilstring irgendwo im Namen, nicht nur am Anfang. LIKE, nicht die
-        # Trigramm-Phrase: die liefert bei drei Zeichen oft nichts.
-        if len(folded_query) >= 3:
-            for item in index.contains(folded_query, fetch):
+        # Jedes Wort irgendwo im Namen, Reihenfolge egal, ohne Beachtung
+        # der Großschreibung. LIKE auf name_fold, nicht die Trigramm-Phrase.
+        words = query_words(text)
+        if words:
+            for item in index.contains_all(words, fetch):
                 consider(
                     item,
                     "trigram",
