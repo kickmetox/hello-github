@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "flare"
+version = "1.0.0"
+description = "Spotlight-ähnlicher Starter für Windows 11"
+readme = "README.md"
+requires-python = ">=3.11"
+
+[project.scripts]
+flare = "flare.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["flare*"]
+
+[tool.setuptools.package-data]
+flare = ["ui.html"]
