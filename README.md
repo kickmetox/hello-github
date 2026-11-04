@@ -5,7 +5,7 @@ Dateien in einem eigenen Fenster, läuft im Hintergrund und lässt sich aus
 anderen Programmen abfragen.
 
 Kompletter Arbeitsbaum als Zip (Quellcode, Tests, Build und Installer):
-[flare-workspace-ifatsea.zip](https://github.com/kickmetox/hello-github/raw/cursor/flare-spotlight-a293/flare-workspace-ifatsea.zip)
+[flare-workspace-suche.zip](https://github.com/kickmetox/hello-github/raw/cursor/flare-spotlight-a293/flare-workspace-suche.zip)
 
 Das Fenster ist ein normales Win32-Fenster. Es startet keinen Browser.
 Schließen blendet es nur aus; der Index läuft weiter, Strg+Alt+Leertaste holt es zurück.
@@ -157,20 +157,19 @@ gelesen wird danach nur, wo sich die Ordner-mtime geändert hat. Liegen Anlegen
 und Löschen im selben Zeitstempel, zieht das Watcher-Flag den Ordner sofort
 neu. Ohne Meldung passiert das spätestens nach 15 Minuten.
 
-Die Suche nutzt den B-Tree für Präfixe (auch ein oder zwei Zeichen). Ab drei
-Zeichen zählt ein Teilstring im Namen über den kleingeschriebenen Namen, nicht
-über eine FTS5-Trigramm-Phrase: die liefert unter drei Zeichen nichts und bei
-genau drei oft einen leeren Treffer. `gdf` trifft daher `GDF Formulare`,
-`Zürich GDF`, `1 GDF Formulare` und `Schriften GdF`, unabhängig von der
-Großschreibung. Ein ganzes Wort, begrenzt durch Anfang, Ende oder ein Zeichen
-das kein Buchstabe und keine Ziffer ist, steht weit vor einem Infix in einem
-langen Token. Gibt es mindestens ein ganzes Wort, füllen solche Hash-Treffer
-die Liste nicht. Längere Teilstrings nutzen zusätzlich FTS5-Trigramme. Das
-Fenster zeigt bis zu 1000 Treffer, die Statuszeile nennt die Zahl. Ein exakter
-Name steht vor einem Präfix, ein Präfix vor einem Infix wie `xchange` in
-`DataExchangeHost`. Tippfehler werden nur nachgezogen, wenn weder ein exakter
-Name noch ein Präfix oder ein ganzes kurzes Wort vorhanden ist und die starken
-Treffer nicht reichen, und nur über den Anteil gemeinsamer Trigramme.
+Die Suche nutzt den B-Tree für Präfixe. Ab zwei Zeichen zählt jedes Wort als
+Teilstring im kleingeschriebenen Namen, nicht als eine FTS5-Trigramm-Phrase.
+Mehrere Wörter müssen alle vorkommen, die Reihenfolge ist egal: `hafen nord`
+trifft `Nord Hafen`. Groß- und Kleinschreibung fallen zusammen. Ein einzelnes
+Zeichen gilt nur als eigenes Wort. Ein ganzes Wort, begrenzt durch Anfang,
+Ende oder ein Zeichen das kein Buchstabe und keine Ziffer ist, steht weit vor
+einem Infix in einem langen Token. Gibt es mindestens ein ganzes Wort, füllen
+solche Hash-Treffer die Liste nicht. Längere einzelne Wörter nutzen zusätzlich
+FTS5-Trigramme. Das Fenster zeigt bis zu 1000 Treffer, die Statuszeile nennt
+die Zahl. Ein exakter Name steht vor einem Präfix, ein Präfix vor einem Infix.
+Der erste Enter lässt die Liste stehen, der nächste öffnet die markierte Zeile.
+Tippfehler werden nur nachgezogen, wenn weder ein exakter Name noch ein Präfix
+oder ein ganzes kurzes Wort vorhanden ist und die starken Treffer nicht reichen.
 
 CUDA wird benutzt, wenn `nvcuda.dll` einen Rechner meldet. Dann bewertet ein
 kleiner PTX-Kern ab 32 Kandidaten den Trigramm-Recall auf der GPU. Dieselbe
